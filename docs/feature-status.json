@@ -1,0 +1,182 @@
+{
+  "version": "1.2.0",
+  "generatedAt": "2026-10-08T02:25:00Z",
+  "phase": "Phase E.2 Public Core Production Closure",
+  "features": {
+    "authentication_signup": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Bcrypt salted, rate limited, validated against hosted Neon PostgreSQL"
+    },
+    "authentication_signin": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Timing-safe password verification, rate limited, session cookies"
+    },
+    "authentication_session": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "HttpOnly, SameSite=lax, Secure in production, 7-day TTL"
+    },
+    "person_360": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Strict IDOR isolation via session context, verified on hosted Postgres"
+    },
+    "onboarding_v2": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Academic context, goal selection, unverified claim isolation"
+    },
+    "resume_ingestion": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Magic byte check, 5MB cap, in-memory parsing, no exec storage"
+    },
+    "database_persistence": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Neon Serverless PostgreSQL over HTTPS port 443; persistence verified across process restarts"
+    },
+    "rate_limiting": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Distributed multi-instance Upstash Redis token bucket with instant fail-safe fallback to memory"
+    },
+    "production_secrets": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Cryptographic 256-bit entropy generator, environment audit, zero secret leakage in logs"
+    },
+    "skills_graph": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Strict separation between verified and self-reported skills"
+    },
+    "evidence_provenance": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Immutable provenance audit trail per evidence item on hosted Postgres"
+    },
+    "institutional_verification": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "RBAC enforced; students cannot verify own evidence"
+    },
+    "readiness_v1": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "100% deterministic arithmetic, coverage gating, zero LLM authority"
+    },
+    "roadmap_v2": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Dynamic stage progression based on demonstrated evidence"
+    },
+    "next_actions": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Capped at max 3 explainable actions, priority re-ranking"
+    },
+    "eora_intelligence": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "PII scrubbing, prompt injection defense, deterministic fallback"
+    },
+    "app_handoff_tokens": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Signed HMAC-SHA256, 5-min TTL, opaque stu_ IDs, zero PII"
+    },
+    "csrf_defense": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Same-origin and referer validation on mutating endpoints"
+    },
+    "ssrf_defense": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "RFC1918, loopback, link-local, and cloud metadata blocking"
+    },
+    "security_headers": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "CSP, X-Frame-Options DENY, nosniff, Referrer-Policy"
+    },
+    "health_probes": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "/api/health and /api/ready verified against hosted Neon Postgres with 3000ms fail-fast timeout"
+    },
+    "github_connection": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "Feature-flagged ENABLE_GITHUB_LIVE=false for Core GA; gated for Phase F Live GitHub Activation"
+    },
+    "github_sync": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "Simulation certified; gated for Phase F"
+    },
+    "github_webhook": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "HMAC SHA-256 signature check certified; gated for Phase F"
+    },
+    "project_discovery": {
+      "status": "production_ready",
+      "liveCertified": true,
+      "notes": "Candidate selection and student confirmation workflow on hosted Postgres"
+    },
+    "study_lpu_integration": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "Contract certified; feature-flagged ENABLE_STUDY_LPU_LIVE=false for Core GA; gated for Phase G"
+    },
+    "padho_code_integration": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "Contract certified; feature-flagged ENABLE_PADHO_CODE_LIVE=false for Core GA; gated for Phase G"
+    },
+    "eris_integration": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "Contract certified; feature-flagged ENABLE_ERIS_LIVE=false for Core GA; gated for Phase G"
+    },
+    "mentormaze_integration": {
+      "status": "disabled",
+      "liveCertified": false,
+      "notes": "Contract certified; feature-flagged ENABLE_MENTORMAZE_LIVE=false for Core GA; gated for Phase G"
+    },
+    "events_marketplace": {
+      "status": "out_of_scope",
+      "liveCertified": false,
+      "notes": "Explicitly excluded from Phase E scope (no new feature expansion)"
+    },
+    "placement_admin": {
+      "status": "out_of_scope",
+      "liveCertified": false,
+      "notes": "Explicitly excluded from Phase E scope (no new feature expansion)"
+    },
+    "hod_analytics": {
+      "status": "out_of_scope",
+      "liveCertified": false,
+      "notes": "Explicitly excluded from Phase E scope (no new feature expansion)"
+    }
+  },
+  "verdicts": {
+    "controlled_pilot": "READY",
+    "public_core_production": "READY",
+    "github_live": "DISABLED",
+    "full_ecosystem_production": "NOT_READY",
+    "pilotBlockers": [],
+    "coreProductionBlockers": [],
+    "ecosystemProductionBlockers": [
+      "Live GitHub App client registration on github.com/organizations (Phase F)",
+      "Live Study LPU university LMS outbound webhook connection (Phase G)",
+      "Live Padho Code coding platform outbound webhook connection (Phase G)",
+      "Live ERIS assessment platform outbound webhook connection (Phase G)",
+      "Live MentorMaze interview platform outbound webhook connection (Phase G)"
+    ]
+  }
+}

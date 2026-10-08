@@ -1,0 +1,274 @@
+import { createEvidenceItem, summarizeEvidence } from "@/lib/domain/evidence";
+export const STORAGE_KEY = "ai-tathastu-onboarding-v2";
+export const stageIds = [
+  "name",
+  "welcome",
+  "role",
+  "direction",
+  "priorities",
+  "academic",
+  "resume",
+  "footprints",
+  "analysis",
+  "insights",
+  "python",
+  "technologies",
+  "certifications",
+  "projects",
+  "contribution",
+  "goal",
+  "reveal",
+] as const;
+export type StageId = (typeof stageIds)[number];
+export type SourceId = "github" | "linkedin" | "leetcode" | "hackerrank" | "hackerearth" | "codechef";
+export type Project = {
+  id: string;
+  title: string;
+  description?: string;
+  technologies: string[];
+  sources: string[];
+  status: "suggested" | "confirmed" | "removed";
+  contribution: string[];
+  contributionNote: string;
+};
+
+export type OnboardingDraft = {
+  version: 2;
+  stage: StageId;
+  name: string;
+  role: string;
+  targetRole: string;
+  targetRoleId?: string;
+  targetTimeline?: string;
+  customGoalText?: string;
+  degree: string;
+  specialization: string;
+  institution?: string;
+  year: string;
+  semester: string;
+  expectedGraduationYear?: number;
+  resume: "pending" | "processed" | "skipped" | "unreadable";
+  resumeSuggestions: { education: string; skills: string; experience: string };
+  acceptedResumeSkills: string[];
+  certificationSuggestions: { title: string; status: "suggested" | "kept" | "removed" }[];
+  profiles: Partial<Record<SourceId, string>>;
+  githubConsent: boolean;
+  python: "yes" | "not_yet" | "";
+  skills: string[];
+  certifications: string[];
+  projects: Project[];
+  goal: string;
+  priorities?: string[];
+  primaryPriority?: string;
+  completed: boolean;
+};
+
+export const initialDraft: OnboardingDraft = {
+  version: 2,
+  stage: "name",
+  name: "",
+  role: "student",
+  targetRole: "Generative AI Engineer",
+  targetRoleId: "genai_engineer",
+  targetTimeline: "Within 6 months",
+  customGoalText: "",
+  degree: "",
+  specialization: "",
+  institution: "",
+  year: "",
+  semester: "",
+  resume: "pending",
+  resumeSuggestions: { education: "", skills: "", experience: "" },
+  acceptedResumeSkills: [],
+  certificationSuggestions: [],
+  profiles: {},
+  githubConsent: false,
+  python: "",
+  skills: [],
+  certifications: [],
+  projects: [],
+  goal: "Get an AI/ML internship",
+  priorities: [],
+  primaryPriority: undefined,
+  completed: false,
+};
+
+export const stageConfig: Record<
+  StageId,
+  { section: string; optional: boolean; canContinue: (draft: OnboardingDraft) => boolean }
+> = {
+  name: { section: "Meet EORA", optional: false, canContinue: (d) => d.name.trim().length >= 2 },
+  welcome: { section: "Meet EORA", optional: false, canContinue: () => true },
+  role: { section: "Profile", optional: false, canContinue: (d) => d.role === "student" },
+  direction: { section: "Direction", optional: false, canContinue: (d) => Boolean(d.targetRole && d.goal) },
+  priorities: { section: "Direction", optional: false, canContinue: () => true },
+  academic: {
+    section: "Profile",
+    optional: false,
+    canContinue: (d) => Boolean(d.degree && d.specialization && d.year),
+  },
+  resume: { section: "Profile", optional: true, canContinue: (d) => d.resume !== "pending" },
+  footprints: { section: "Footprints", optional: true, canContinue: () => true },
+  analysis: { section: "Footprints", optional: false, canContinue: () => true },
+  insights: { section: "Footprints", optional: false, canContinue: () => true },
+  python: { section: "Skills", optional: false, canContinue: (d) => Boolean(d.python) },
+  technologies: { section: "Skills", optional: true, canContinue: () => true },
+  certifications: { section: "Skills", optional: true, canContinue: () => true },
+  projects: { section: "Projects", optional: true, canContinue: () => true },
+  contribution: { section: "Projects", optional: true, canContinue: () => true },
+  goal: { section: "Goal", optional: false, canContinue: (d) => Boolean(d.goal.trim()) },
+  reveal: { section: "Goal", optional: false, canContinue: () => true },
+};
+
+export const sections = ["Meet EORA", "Direction", "Profile", "Footprints", "Skills", "Projects", "Goal"];
+
+export function nextStage(stage: StageId): StageId {
+  return stageIds[Math.min(stageIds.length - 1, stageIds.indexOf(stage) + 1)];
+}
+
+export function previousStage(stage: StageId): StageId {
+  return stageIds[Math.max(0, stageIds.indexOf(stage) - 1)];
+}
+
+export function safeDraft(value: unknown): OnboardingDraft {
+  if (!value || typeof value !== "object") return initialDraft;
+  const raw = value as Partial<OnboardingDraft>;
+  const str = (v: unknown, max = 500) => (typeof v === "string" ? v.slice(0, max) : "");
+  const strings = (v: unknown) =>
+    Array.isArray(v)
+      ? v
+          .filter((x): x is string => typeof x === "string")
+          .slice(0, 80)
+          .map((x) => x.slice(0, 120))
+      : [];
+  const profiles: OnboardingDraft["profiles"] = {};
+  for (const id of ["github", "linkedin", "leetcode", "hackerrank", "hackerearth", "codechef"] as SourceId[]) {
+    if (raw.profiles?.[id]) profiles[id] = str(raw.profiles[id], 300);
+  }
+  const gradYear =
+    typeof raw.expectedGraduationYear === "number" && !isNaN(raw.expectedGraduationYear)
+      ? raw.expectedGraduationYear
+      : raw.year && /20\d\d/.test(raw.year)
+      ? parseInt(raw.year.match(/20\d\d/)![0], 10)
+      : undefined;
+  const priorities = Array.isArray(raw.priorities) ? strings(raw.priorities) : [];
+  const primaryPriority = raw.primaryPriority ? str(raw.primaryPriority) : undefined;
+
+  return {
+    version: 2,
+    stage: stageIds.includes(raw.stage as StageId) ? (raw.stage as StageId) : "name",
+    name: str(raw.name, 80),
+    role: str(raw.role, 40) || "student",
+    targetRole: str(raw.targetRole, 100) || "Generative AI Engineer",
+    targetRoleId: raw.targetRoleId ? str(raw.targetRoleId, 60) : undefined,
+    targetTimeline: str(raw.targetTimeline, 80) || "Within 6 months",
+    customGoalText: str(raw.customGoalText, 200),
+    degree: str(raw.degree, 100),
+    specialization: str(raw.specialization, 100),
+    institution: str(raw.institution, 140),
+    year: str(raw.year, 30),
+    semester: str(raw.semester, 30),
+    expectedGraduationYear: gradYear,
+    resume: ["pending", "processed", "skipped", "unreadable"].includes(raw.resume || "")
+      ? raw.resume!
+      : "pending",
+    resumeSuggestions: {
+      education: str(raw.resumeSuggestions?.education),
+      skills: str(raw.resumeSuggestions?.skills),
+      experience: str(raw.resumeSuggestions?.experience),
+    },
+    acceptedResumeSkills: strings(raw.acceptedResumeSkills),
+    certificationSuggestions: Array.isArray(raw.certificationSuggestions)
+      ? raw.certificationSuggestions
+          .slice(0, 20)
+          .filter((x) => x && typeof x.title === "string")
+          .map((x) => ({
+            title: str(x.title, 140),
+            status: x.status === "kept" || x.status === "removed" ? x.status : "suggested",
+          }))
+      : [],
+    profiles,
+    githubConsent: raw.githubConsent === true,
+    python: raw.python === "yes" || raw.python === "not_yet" ? raw.python : "",
+    skills: strings(raw.skills),
+    certifications: strings(raw.certifications),
+    projects: Array.isArray(raw.projects)
+      ? raw.projects
+          .slice(0, 30)
+          .filter((p) => p && typeof p.title === "string")
+          .map((p) => ({
+            id: str(p.id, 80),
+            title: str(p.title, 180),
+            description: str(p.description, 500),
+            technologies: strings(p.technologies),
+            sources: strings(p.sources),
+            status: p.status === "confirmed" || p.status === "removed" ? p.status : "suggested",
+            contribution: strings(p.contribution),
+            contributionNote: str(p.contributionNote),
+          }))
+      : [],
+    goal: str(raw.goal, 160) || "Get an AI/ML internship",
+    priorities,
+    primaryPriority,
+    completed: raw.completed === true,
+  };
+}
+
+export function startingPicture(draft: OnboardingDraft) {
+  const evidence = [
+    ...(draft.degree && draft.specialization && draft.year
+      ? [
+          createEvidenceItem({
+            category: "education",
+            subject: draft.specialization,
+            value: `${draft.degree} · ${draft.specialization} · ${draft.year}`,
+            source: "self_reported",
+            verificationStatus: "self_reported",
+          }),
+        ]
+      : []),
+    ...(draft.targetRole
+      ? [
+          createEvidenceItem({
+            category: "goal",
+            subject: `Target Role: ${draft.targetRole}`,
+            value: draft.targetRole,
+            source: "self_reported",
+            verificationStatus: "self_reported",
+          }),
+        ]
+      : []),
+    ...(draft.goal
+      ? [
+          createEvidenceItem({
+            category: "goal",
+            subject: `Target Goal: ${draft.goal}`,
+            value: draft.goal,
+            source: "self_reported",
+            verificationStatus: "self_reported",
+          }),
+        ]
+      : []),
+    ...draft.skills.map((skill) =>
+      createEvidenceItem({
+        category: "skill",
+        subject: skill,
+        value: skill,
+        source: "self_reported",
+        verificationStatus: "self_reported",
+      })
+    ),
+    ...draft.projects
+      .filter((project) => project.status === "confirmed")
+      .map((project) =>
+        createEvidenceItem({
+          category: "project",
+          subject: project.title,
+          value: project.title,
+          source: "self_reported",
+          verificationStatus: "self_reported",
+        })
+      ),
+  ];
+  return summarizeEvidence(evidence);
+}

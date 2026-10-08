@@ -1,0 +1,52 @@
+{
+  "name": "ai-tathastu",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "NODE_ENV=test node --import tsx --test tests/domain.test.ts tests/auth-persistence.test.ts tests/verification-readiness.test.ts tests/integrations.test.ts tests/onboarding-v2.test.ts tests/functionalization-phase-a.test.ts tests/functionalization-phase-b.test.ts tests/functionalization-phase-c.test.ts tests/production-readiness-phase-d.test.ts tests/production-readiness-phase-e.test.ts tests/product-integrity-phase-e3.test.ts tests/project-management-phase-e4.test.ts tests/aiml-role-goal-selector.test.ts tests/personalization-engine-96-configs.test.ts tests/multi-interest-dashboard-personalization.test.ts tests/personalization-integrity-certification.test.ts tests/phase-f-end-to-end-acceptance.test.ts",
+    "test:restore": "node --import tsx scripts/test-backup-restore.ts",
+    "test:load": "node --import tsx scripts/load-test.ts",
+    "secrets:generate": "node --import tsx scripts/generate-production-secrets.ts",
+    "integrations:status": "node --import tsx scripts/check-integrations-status.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --import tsx scripts/migrate.ts",
+    "demo:study-lpu-event": "node --import tsx scripts/demo-study-lpu-event.ts",
+    "demo:padho-code-event": "node --import tsx scripts/demo-padho-code-event.ts",
+    "demo:eris-event": "node --import tsx scripts/demo-eris-event.ts",
+    "demo:mentormaze-event": "node --import tsx scripts/demo-mentormaze-event.ts",
+    "demo:interview-event": "node --import tsx scripts/demo-interview-event.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@neondatabase/serverless": "^1.2.0",
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.45.3",
+    "lucide-react": "^0.468.0",
+    "mammoth": "^1.13.0",
+    "next": "^15.5.27",
+    "pdf-parse": "^2.4.5",
+    "postgres": "^3.4.9",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.36.0",
+    "eslint-config-next": "^15.5.3",
+    "puppeteer-core": "^24.43.1",
+    "tailwindcss": "^4.1.13",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2"
+  }
+}

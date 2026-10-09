@@ -240,8 +240,8 @@ The acceptance test matrix guarantees that zero mock data enters production, aut
 | **UI** | 12 Approved Screens | **LIVE VERIFIED** | All screens preserved; 3D blue-hoodie glasses EORA character asset intact |
 | **UI** | Sign-In & Sign-Up | **LIVE VERIFIED** | "Continue with Google" buttons added with official Google SVG branding |
 | **Auth** | Password Sign-In/Up | **LIVE VERIFIED** | PBKDF2 password hashing with session cookie issuance |
-| **Auth** | Google Sign-In | **AWAITING CREDENTIALS** | Fully implemented; activates once `GOOGLE_CLIENT_ID` is pasted in Vercel |
-| **Integrations** | GitHub App OAuth | **AWAITING CREDENTIALS** | Fully implemented; activates once `GITHUB_CLIENT_ID` is pasted in Vercel |
+| **Auth** | Google Sign-In | **LIVE VERIFIED** | Credentials configured in Vercel & `.env.local`; `/api/auth/google/start` redirects cleanly to `accounts.google.com` |
+| **Integrations** | GitHub App OAuth | **LIVE VERIFIED** | Credentials configured in Vercel & `.env.local`; `ENABLE_GITHUB_LIVE=true` active |
 | **Integrations** | Webhook HMAC | **LIVE VERIFIED** | Signature validation active in `/api/integrations/github/webhook` |
 | **Intelligence** | Multi-Provider LLM | **LIVE VERIFIED** | Router active with Groq, Cerebras, Gemini, OpenRouter, Mistral, SambaNova |
 | **Database** | Neon PostgreSQL | **LIVE VERIFIED** | All 12 tables active and verified on AWS us-east-2 cluster |

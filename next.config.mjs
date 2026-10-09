@@ -1,5 +1,4 @@
-import type { NextConfig } from "next";
-
+/** @type {import('next').NextConfig} */
 const securityHeaders = [
   {
     key: "X-Content-Type-Options",
@@ -24,7 +23,7 @@ const securityHeaders = [
   },
 ];
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   serverExternalPackages: ["pdf-parse", "mammoth", "@electric-sql/pglite", "postgres"],
   eslint: {
     ignoreDuringBuilds: true,

@@ -21,6 +21,9 @@ export interface CodingPlatformProfile {
   displayName?: string | null;
   badges?: Array<{ badge: string; stars?: number }>;
   rating?: number | null;
+  problemsSolved?: number | null;
+  globalRank?: number | null;
+  studentReported?: boolean;
   status: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "UNAVAILABLE";
   retrievedAt: string;
   notes?: string;
@@ -45,9 +48,13 @@ export function normalizeCodingHandle(input: string, platform: "codechef" | "hac
 }
 
 /**
- * Validates and retrieves HackerRank public profile and badge information.
+ * Validates and retrieves HackerRank public profile and badge information,
+ * with optional student-reported metrics.
  */
-export async function fetchHackerRankProfile(rawInput: string): Promise<CodingPlatformProfile> {
+export async function fetchHackerRankProfile(
+  rawInput: string,
+  manualMetrics?: { rating?: number; problemsSolved?: number }
+): Promise<CodingPlatformProfile> {
   const username = normalizeCodingHandle(rawInput, "hackerrank");
   const profileUrl = `https://www.hackerrank.com/${username}`;
   const now = new Date().toISOString();
@@ -91,6 +98,9 @@ export async function fetchHackerRankProfile(rawInput: string): Promise<CodingPl
         username,
         profileUrl,
         badges,
+        rating: manualMetrics?.rating ?? null,
+        problemsSolved: manualMetrics?.problemsSolved ?? null,
+        studentReported: Boolean(manualMetrics),
         status: badges.length > 0 ? "LIVE_VERIFIED" : "PROFILE_LINK_ONLY",
         retrievedAt: now,
         notes: badges.length > 0
@@ -106,16 +116,24 @@ export async function fetchHackerRankProfile(rawInput: string): Promise<CodingPl
     platform: "hackerrank",
     username,
     profileUrl,
+    rating: manualMetrics?.rating ?? null,
+    problemsSolved: manualMetrics?.problemsSolved ?? null,
+    studentReported: Boolean(manualMetrics),
     status: "PROFILE_LINK_ONLY",
     retrievedAt: now,
-    notes: "Profile URL verified and linked. Background sync disabled.",
+    notes: manualMetrics
+      ? "HackerRank profile linked with student-reported practice metrics."
+      : "Profile URL verified and linked. Background sync disabled.",
   };
 }
 
 /**
- * Validates CodeChef profile reference and handle.
+ * Validates CodeChef profile reference and handle, with optional student-reported metrics.
  */
-export async function fetchCodeChefProfile(rawInput: string): Promise<CodingPlatformProfile> {
+export async function fetchCodeChefProfile(
+  rawInput: string,
+  manualMetrics?: { rating?: number; problemsSolved?: number; globalRank?: number }
+): Promise<CodingPlatformProfile> {
   const username = normalizeCodingHandle(rawInput, "codechef");
   const profileUrl = `https://www.codechef.com/users/${username}`;
   const now = new Date().toISOString();
@@ -135,16 +153,25 @@ export async function fetchCodeChefProfile(rawInput: string): Promise<CodingPlat
     platform: "codechef",
     username,
     profileUrl,
+    rating: manualMetrics?.rating ?? null,
+    problemsSolved: manualMetrics?.problemsSolved ?? null,
+    globalRank: manualMetrics?.globalRank ?? null,
+    studentReported: Boolean(manualMetrics),
     status: "PROFILE_LINK_ONLY",
     retrievedAt: now,
-    notes: "CodeChef profile linked. Automated scraping is disabled per provider terms.",
+    notes: manualMetrics
+      ? "CodeChef profile linked with self-reported contest metrics. Unofficial automated scraping disabled per platform terms."
+      : "CodeChef profile linked. Automated scraping is disabled per provider terms.",
   };
 }
 
 /**
- * Validates HackerEarth profile reference and handle.
+ * Validates HackerEarth profile reference and handle, with optional student-reported metrics.
  */
-export async function fetchHackerEarthProfile(rawInput: string): Promise<CodingPlatformProfile> {
+export async function fetchHackerEarthProfile(
+  rawInput: string,
+  manualMetrics?: { rating?: number; problemsSolved?: number }
+): Promise<CodingPlatformProfile> {
   const username = normalizeCodingHandle(rawInput, "hackerearth");
   const profileUrl = `https://www.hackerearth.com/@${username}`;
   const now = new Date().toISOString();
@@ -164,8 +191,14 @@ export async function fetchHackerEarthProfile(rawInput: string): Promise<CodingP
     platform: "hackerearth",
     username,
     profileUrl,
+    rating: manualMetrics?.rating ?? null,
+    problemsSolved: manualMetrics?.problemsSolved ?? null,
+    studentReported: Boolean(manualMetrics),
     status: "PROFILE_LINK_ONLY",
     retrievedAt: now,
-    notes: "HackerEarth profile linked. Practice activity recorded upon student confirmation.",
+    notes: manualMetrics
+      ? "HackerEarth profile linked with self-reported hackathon/practice records."
+      : "HackerEarth profile linked. Practice activity recorded upon student confirmation.",
   };
 }
+

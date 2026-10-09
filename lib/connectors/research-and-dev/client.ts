@@ -15,12 +15,20 @@
  * - Handles rate limits, timeouts, and private profiles defensively
  */
 
+import { isValidOrcidChecksum } from "@/lib/services/digital-footprint-registry";
+
 export interface HuggingFaceArtifacts {
   username: string;
   profileUrl: string;
   models: Array<{
     id: string;
     pipelineTag?: string;
+    likes: number;
+    downloads: number;
+    tags: string[];
+  }>;
+  datasets: Array<{
+    id: string;
     likes: number;
     downloads: number;
     tags: string[];
@@ -62,10 +70,12 @@ export interface DevToArticles {
     url: string;
     publishedAt: string;
     tags: string[];
+    detectedTopics: string[];
     positiveReactionsCount: number;
   }>;
   status: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "UNAVAILABLE";
   retrievedAt: string;
+  notes?: string;
 }
 
 export interface StackOverflowProfile {
@@ -74,8 +84,37 @@ export interface StackOverflowProfile {
   displayName?: string;
   reputation: number;
   badgeCounts?: { bronze: number; silver: number; gold: number };
+  topTags?: Array<{ tagName: string; answerCount: number; questionCount: number }>;
   status: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "UNAVAILABLE";
   retrievedAt: string;
+  notes?: string;
+}
+
+export interface KaggleProfile {
+  username: string;
+  profileUrl: string;
+  displayName?: string;
+  tier?: string;
+  datasetsCount?: number;
+  notebooksCount?: number;
+  competitionsCount?: number;
+  studentReportedArtifacts?: Array<{
+    type: "dataset" | "notebook" | "competition" | "model";
+    title: string;
+    url?: string;
+    description?: string;
+  }>;
+  status: "MANUAL_PROFILE_REFERENCE" | "LIVE_VERIFIED" | "UNAVAILABLE";
+  retrievedAt: string;
+  notes?: string;
+}
+
+export interface GoogleScholarProfile {
+  scholarId: string;
+  profileUrl: string;
+  status: "MANUAL_PROFILE_REFERENCE" | "UNAVAILABLE";
+  retrievedAt: string;
+  notes?: string;
 }
 
 /**
@@ -90,7 +129,7 @@ export function normalizeHuggingFaceUsername(input: string): string {
 }
 
 /**
- * Fetches public Hugging Face models and spaces.
+ * Fetches public Hugging Face models, datasets and spaces via official Hub API.
  */
 export async function fetchHuggingFaceArtifacts(rawInput: string): Promise<HuggingFaceArtifacts> {
   const username = normalizeHuggingFaceUsername(rawInput);
@@ -98,12 +137,16 @@ export async function fetchHuggingFaceArtifacts(rawInput: string): Promise<Huggi
   const now = new Date().toISOString();
 
   if (!username) {
-    return { username: "", profileUrl: "", models: [], spaces: [], status: "UNAVAILABLE", retrievedAt: now };
+    return { username: "", profileUrl: "", models: [], datasets: [], spaces: [], status: "UNAVAILABLE", retrievedAt: now };
   }
 
   try {
-    const [modelsRes, spacesRes] = await Promise.all([
+    const [modelsRes, datasetsRes, spacesRes] = await Promise.all([
       fetch(`https://huggingface.co/api/models?author=${encodeURIComponent(username)}&limit=15`, {
+        headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-HFAuditor/1.0" },
+        signal: AbortSignal.timeout(6000),
+      }),
+      fetch(`https://huggingface.co/api/datasets?author=${encodeURIComponent(username)}&limit=15`, {
         headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-HFAuditor/1.0" },
         signal: AbortSignal.timeout(6000),
       }),
@@ -114,6 +157,7 @@ export async function fetchHuggingFaceArtifacts(rawInput: string): Promise<Huggi
     ]);
 
     const modelsData = modelsRes.ok ? await modelsRes.json() : [];
+    const datasetsData = datasetsRes.ok ? await datasetsRes.json() : [];
     const spacesData = spacesRes.ok ? await spacesRes.json() : [];
 
     const models = Array.isArray(modelsData)
@@ -126,6 +170,15 @@ export async function fetchHuggingFaceArtifacts(rawInput: string): Promise<Huggi
         }))
       : [];
 
+    const datasets = Array.isArray(datasetsData)
+      ? datasetsData.map((d: any) => ({
+          id: String(d.id),
+          likes: Number(d.likes) || 0,
+          downloads: Number(d.downloads) || 0,
+          tags: Array.isArray(d.tags) ? d.tags.map(String) : [],
+        }))
+      : [];
+
     const spaces = Array.isArray(spacesData)
       ? spacesData.map((s: any) => ({
           id: String(s.id),
@@ -134,41 +187,44 @@ export async function fetchHuggingFaceArtifacts(rawInput: string): Promise<Huggi
         }))
       : [];
 
+    const hasArtifacts = models.length > 0 || datasets.length > 0 || spaces.length > 0;
     return {
       username,
       profileUrl,
       models,
+      datasets,
       spaces,
-      status: models.length > 0 || spaces.length > 0 ? "LIVE_VERIFIED" : "PROFILE_LINK_ONLY",
+      status: hasArtifacts ? "LIVE_VERIFIED" : "PROFILE_LINK_ONLY",
       retrievedAt: now,
-      notes: `Discovered ${models.length} models and ${spaces.length} spaces on Hugging Face.`,
+      notes: `Discovered ${models.length} models, ${datasets.length} datasets, and ${spaces.length} spaces on Hugging Face Hub.`,
     };
-  } catch (err: unknown) {
+  } catch {
     return {
       username,
       profileUrl,
       models: [],
+      datasets: [],
       spaces: [],
       status: "PROFILE_LINK_ONLY",
       retrievedAt: now,
-      notes: "Hugging Face profile linked. Network timeout contacting open registry.",
+      notes: "Hugging Face profile linked. Open Hub registry query timed out.",
     };
   }
 }
 
 /**
- * Validates ORCID 16-character identifier (e.g., 0000-0002-1825-0097).
+ * Normalizes ORCID 16-character identifier (e.g., 0000-0002-1825-0097).
  */
 export function normalizeOrcidId(input: string): string {
-  const cleaned = input
+  return input
     .trim()
     .replace(/^https?:\/\/(www\.)?orcid\.org\//i, "")
     .replace(/\/$/, "");
-  return cleaned;
 }
 
 /**
- * Queries public ORCID member record for academic works and DOIs.
+ * Queries public ORCID member record for academic works and DOIs,
+ * with ISO 7064 Mod 11,2 checksum validation and DOI deduplication.
  */
 export async function fetchOrcidRecord(rawInput: string): Promise<OrcidRecord> {
   const orcid = normalizeOrcidId(rawInput);
@@ -184,6 +240,18 @@ export async function fetchOrcidRecord(rawInput: string): Promise<OrcidRecord> {
       status: "UNAVAILABLE",
       retrievedAt: now,
       notes: "Invalid ORCID format. Expected 16-character ID like 0000-0002-1825-0097.",
+    };
+  }
+
+  // Validate Mod 11,2 checksum
+  if (!isValidOrcidChecksum(orcid)) {
+    return {
+      orcid,
+      profileUrl,
+      works: [],
+      status: "UNAVAILABLE",
+      retrievedAt: now,
+      notes: "ORCID check digit failed ISO 7064 Mod 11,2 verification.",
     };
   }
 
@@ -203,15 +271,17 @@ export async function fetchOrcidRecord(rawInput: string): Promise<OrcidRecord> {
         works: [],
         status: "PROFILE_LINK_ONLY",
         retrievedAt: now,
-        notes: `ORCID registry returned HTTP status ${res.status}. Profile URL preserved.`,
+        notes: `ORCID public registry returned HTTP status ${res.status}. Profile URL preserved.`,
       };
     }
 
     const data = await res.json();
     const group = data?.group || [];
     const works: OrcidPublication[] = [];
+    const seenDois = new Set<string>();
+    const seenTitles = new Set<string>();
 
-    for (let i = 0; i < group.length && i < 20; i++) {
+    for (let i = 0; i < group.length && i < 30; i++) {
       const summary = group[i]?.["work-summary"]?.[0];
       if (!summary) continue;
 
@@ -226,10 +296,18 @@ export async function fetchOrcidRecord(rawInput: string): Promise<OrcidRecord> {
       const externalIds = summary["external-ids"]?.["external-id"] || [];
       for (const ext of externalIds) {
         if (ext["external-id-type"] === "doi") {
-          doi = ext["external-id-value"];
+          doi = ext["external-id-value"]?.trim();
           break;
         }
       }
+
+      // Deduplicate by DOI or lowercase normalized title
+      const normalizedTitle = title.toLowerCase().trim();
+      if (doi && seenDois.has(doi.toLowerCase())) continue;
+      if (!doi && seenTitles.has(normalizedTitle)) continue;
+
+      if (doi) seenDois.add(doi.toLowerCase());
+      seenTitles.add(normalizedTitle);
 
       works.push({
         title,
@@ -263,10 +341,38 @@ export async function fetchOrcidRecord(rawInput: string): Promise<OrcidRecord> {
 }
 
 /**
- * Fetches published articles from DEV.to public API.
+ * Classifies technical writing topics based on article titles and tags.
+ */
+export function classifyDevToTopics(title: string, tags: string[]): string[] {
+  const combined = `${title} ${tags.join(" ")}`.toLowerCase();
+  const topics: string[] = [];
+
+  const TOPIC_RULES: Array<{ topic: string; pattern: RegExp }> = [
+    { topic: "Generative AI", pattern: /\b(generative ai|genai|llm|llms|gpt|prompt engineering|rag|langchain|llamaindex|claude|gemini)\b/i },
+    { topic: "Deep Learning", pattern: /\b(deep learning|neural network|pytorch|tensorflow|keras|cnn|rnn|transformer)\b/i },
+    { topic: "Machine Learning", pattern: /\b(machine learning|ml|scikit-learn|supervised|unsupervised|clustering|regression)\b/i },
+    { topic: "Computer Vision", pattern: /\b(computer vision|opencv|yolo|object detection|image classification|segmentation)\b/i },
+    { topic: "NLP", pattern: /\b(nlp|natural language processing|tokenization|embeddings|sentiment analysis)\b/i },
+    { topic: "MLOps", pattern: /\b(mlops|model serving|mlflow|dvc|kubeflow|triton|model monitoring)\b/i },
+    { topic: "System Design", pattern: /\b(system design|microservices|scalability|distributed systems|architecture|kafka|redis)\b/i },
+    { topic: "Python", pattern: /\b(python|fastapi|flask|django|numpy|pandas)\b/i },
+    { topic: "Web Development", pattern: /\b(next\.?js|react|typescript|javascript|frontend|webdev|tailwind)\b/i },
+  ];
+
+  for (const rule of TOPIC_RULES) {
+    if (rule.pattern.test(combined)) {
+      topics.push(rule.topic);
+    }
+  }
+
+  return topics.length > 0 ? topics : ["Technical Writing"];
+}
+
+/**
+ * Fetches published articles from DEV.to public API and extracts candidate topics.
  */
 export async function fetchDevToArticles(rawInput: string): Promise<DevToArticles> {
-  const username = rawInput.trim().replace(/^https?:\/\/(www\.)?dev\.to\//i, "").replace(/\/$/, "");
+  const username = rawInput.trim().replace(/^https?:\/\/(www\.)?dev\.to\//i, "").replace(/\/$/, "").replace(/^@/, "");
   const profileUrl = `https://dev.to/${username}`;
   const now = new Date().toISOString();
 
@@ -275,7 +381,7 @@ export async function fetchDevToArticles(rawInput: string): Promise<DevToArticle
   }
 
   try {
-    const res = await fetch(`https://dev.to/api/articles?username=${encodeURIComponent(username)}&per_page=10`, {
+    const res = await fetch(`https://dev.to/api/articles?username=${encodeURIComponent(username)}&per_page=15`, {
       headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-DevToAuditor/1.0" },
       signal: AbortSignal.timeout(5000),
     });
@@ -283,13 +389,19 @@ export async function fetchDevToArticles(rawInput: string): Promise<DevToArticle
     if (res.ok) {
       const data = await res.json();
       const articles = Array.isArray(data)
-        ? data.map((a: any) => ({
-            title: String(a.title || "Article"),
-            url: String(a.url || ""),
-            publishedAt: String(a.published_at || a.created_at || now),
-            tags: Array.isArray(a.tag_list) ? a.tag_list.map(String) : [],
-            positiveReactionsCount: Number(a.positive_reactions_count) || 0,
-          }))
+        ? data.map((a: any) => {
+            const title = String(a.title || "Article");
+            const tags = Array.isArray(a.tag_list) ? a.tag_list.map(String) : [];
+            const detectedTopics = classifyDevToTopics(title, tags);
+            return {
+              title,
+              url: String(a.url || ""),
+              publishedAt: String(a.published_at || a.created_at || now),
+              tags,
+              detectedTopics,
+              positiveReactionsCount: Number(a.positive_reactions_count) || 0,
+            };
+          })
         : [];
 
       return {
@@ -298,6 +410,7 @@ export async function fetchDevToArticles(rawInput: string): Promise<DevToArticle
         articles,
         status: articles.length > 0 ? "LIVE_VERIFIED" : "PROFILE_LINK_ONLY",
         retrievedAt: now,
+        notes: `Discovered ${articles.length} published technical articles on DEV.to.`,
       };
     }
   } catch {
@@ -310,11 +423,12 @@ export async function fetchDevToArticles(rawInput: string): Promise<DevToArticle
     articles: [],
     status: "PROFILE_LINK_ONLY",
     retrievedAt: now,
+    notes: "DEV.to profile linked. Network timeout connecting to public articles endpoint.",
   };
 }
 
 /**
- * Queries public Stack Overflow reputation and badges.
+ * Queries public Stack Overflow reputation, badges and top tags.
  */
 export async function fetchStackOverflowProfile(rawInput: string): Promise<StackOverflowProfile> {
   const cleaned = rawInput.trim();
@@ -330,27 +444,48 @@ export async function fetchStackOverflowProfile(rawInput: string): Promise<Stack
       reputation: 0,
       status: "PROFILE_LINK_ONLY",
       retrievedAt: now,
+      notes: "Invalid Stack Overflow user ID. Expected numeric ID like 1234567.",
     };
   }
 
   try {
-    const res = await fetch(`https://api.stackexchange.com/2.3/users/${userId}?site=stackoverflow`, {
-      headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-SOAuditor/1.0" },
-      signal: AbortSignal.timeout(5000),
-    });
+    const [userRes, tagsRes] = await Promise.all([
+      fetch(`https://api.stackexchange.com/2.3/users/${userId}?site=stackoverflow`, {
+        headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-SOAuditor/1.0" },
+        signal: AbortSignal.timeout(5000),
+      }),
+      fetch(`https://api.stackexchange.com/2.3/users/${userId}/top-tags?site=stackoverflow`, {
+        headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-SOAuditor/1.0" },
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => null),
+    ]);
 
-    if (res.ok) {
-      const data = await res.json();
+    if (userRes.ok) {
+      const data = await userRes.json();
       const user = data.items?.[0];
       if (user) {
+        let topTags: Array<{ tagName: string; answerCount: number; questionCount: number }> | undefined = undefined;
+        if (tagsRes && tagsRes.ok) {
+          const tagsData = await tagsRes.json();
+          if (Array.isArray(tagsData.items)) {
+            topTags = tagsData.items.slice(0, 10).map((t: any) => ({
+              tagName: String(t.tag_name),
+              answerCount: Number(t.answer_count) || 0,
+              questionCount: Number(t.question_count) || 0,
+            }));
+          }
+        }
+
         return {
           userId,
           profileUrl,
           displayName: user.display_name,
           reputation: Number(user.reputation) || 0,
           badgeCounts: user.badge_counts,
+          topTags,
           status: "LIVE_VERIFIED",
           retrievedAt: now,
+          notes: `Stack Overflow profile verified with ${user.reputation} reputation score.`,
         };
       }
     }
@@ -364,5 +499,101 @@ export async function fetchStackOverflowProfile(rawInput: string): Promise<Stack
     reputation: 0,
     status: "PROFILE_LINK_ONLY",
     retrievedAt: now,
+    notes: "Stack Overflow profile linked. Public API query timed out or quota exceeded.",
   };
 }
+
+/**
+ * Normalizes Kaggle username or profile URL.
+ */
+export function normalizeKaggleUsername(input: string): string {
+  return input
+    .trim()
+    .replace(/^https?:\/\/(www\.)?kaggle\.com\//i, "")
+    .replace(/\/$/, "")
+    .replace(/^@/, "");
+}
+
+/**
+ * Validates and normalizes Kaggle profile reference, supporting student-confirmed
+ * datasets, notebooks, and competition records.
+ */
+export function fetchKaggleProfile(
+  rawInput: string,
+  manualArtifacts?: Array<{ type: "dataset" | "notebook" | "competition" | "model"; title: string; url?: string; description?: string }>
+): KaggleProfile {
+  const username = normalizeKaggleUsername(rawInput);
+  const profileUrl = `https://www.kaggle.com/${username}`;
+  const now = new Date().toISOString();
+
+  if (!username || !/^[a-zA-Z0-9_]{3,40}$/.test(username)) {
+    return {
+      username: username || "unknown",
+      profileUrl,
+      status: "UNAVAILABLE",
+      retrievedAt: now,
+      notes: "Invalid Kaggle username format.",
+    };
+  }
+
+  const artifacts = Array.isArray(manualArtifacts) ? manualArtifacts : [];
+  const datasetsCount = artifacts.filter((a) => a.type === "dataset").length;
+  const notebooksCount = artifacts.filter((a) => a.type === "notebook").length;
+  const competitionsCount = artifacts.filter((a) => a.type === "competition").length;
+
+  return {
+    username,
+    profileUrl,
+    displayName: username,
+    datasetsCount,
+    notebooksCount,
+    competitionsCount,
+    studentReportedArtifacts: artifacts,
+    status: "MANUAL_PROFILE_REFERENCE",
+    retrievedAt: now,
+    notes: "Kaggle profile reference preserved. Automatic scraping is disabled per provider terms. Artifacts recorded upon student confirmation.",
+  };
+}
+
+/**
+ * Validates Google Scholar profile link and extracts scholar user ID.
+ */
+export function validateGoogleScholarProfile(rawInput: string): GoogleScholarProfile {
+  const trimmed = rawInput.trim();
+  const now = new Date().toISOString();
+
+  // Try extracting ?user=... parameter
+  let scholarId = "";
+  try {
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      const url = new URL(trimmed);
+      if (url.hostname.includes("scholar.google.")) {
+        scholarId = url.searchParams.get("user") || "";
+      }
+    } else if (/^[a-zA-Z0-9_-]{10,20}$/.test(trimmed)) {
+      scholarId = trimmed;
+    }
+  } catch {
+    // URL parsing failed
+  }
+
+  if (!scholarId) {
+    return {
+      scholarId: "invalid",
+      profileUrl: trimmed,
+      status: "UNAVAILABLE",
+      retrievedAt: now,
+      notes: "Invalid Google Scholar URL. Expected link in format: https://scholar.google.com/citations?user=XXXXXXXXXXXX",
+    };
+  }
+
+  const canonicalUrl = `https://scholar.google.com/citations?user=${scholarId}`;
+  return {
+    scholarId,
+    profileUrl: canonicalUrl,
+    status: "MANUAL_PROFILE_REFERENCE",
+    retrievedAt: now,
+    notes: "Google Scholar profile reference preserved. In accordance with platform terms, direct automated profile scraping is disabled. Publication records are resolved via Crossref, ORCID and DOIs.",
+  };
+}
+

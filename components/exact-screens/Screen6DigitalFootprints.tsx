@@ -316,6 +316,12 @@ export function Screen6DigitalFootprints({
     setStatuses(nextStatuses);
 
     onProfilesChange?.(nextProfiles);
+
+    // Call persistent disconnect endpoint
+    fetch(`/api/student/connections?provider=${encodeURIComponent(platformId)}`, {
+      method: "DELETE",
+    }).catch(() => null);
+
     if (activePrompt === platformId) {
       handleClosePrompt();
     }
@@ -325,13 +331,25 @@ export function Screen6DigitalFootprints({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const isZip = file.name.toLowerCase().endsWith(".zip");
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setUploadFile({ name: file.name, content: text });
-      setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import to parse.`);
-    };
-    reader.readAsText(file);
+
+    if (isZip) {
+      reader.onload = (event) => {
+        const result = (event.target?.result as string) || "";
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        setUploadFile({ name: file.name, content: base64 });
+        setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import to parse.`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      reader.onload = (event) => {
+        const text = (event.target?.result as string) || "";
+        setUploadFile({ name: file.name, content: text });
+        setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import to parse.`);
+      };
+      reader.readAsText(file);
+    }
   };
 
   const handleSavePlatform = async (platformId: string) => {
@@ -957,10 +975,10 @@ export function Screen6DigitalFootprints({
                     }}
                   >
                     <Upload size={15} />
-                    <span>{uploadFile ? uploadFile.name : "Upload Archive (.csv/.json)"}</span>
+                    <span>{uploadFile ? uploadFile.name : "Upload Archive (.zip/.csv/.json)"}</span>
                     <input
                       type="file"
-                      accept=".csv,.json"
+                      accept=".csv,.json,.zip"
                       onChange={handleFileUpload}
                       style={{ display: "none" }}
                     />

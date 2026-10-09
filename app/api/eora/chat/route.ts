@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getPerson360 } from "@/lib/services/person-360-service";
+import { getExternalConnections } from "@/lib/repositories/connection-repository";
 import { defaultIntelligenceRouter } from "@/lib/intelligence/router";
 import { retrieveKnowledge } from "@/lib/knowledge/rag-engine";
 import type { EoraActionProposal } from "@/lib/intelligence/schemas";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
     const personId = auth.person.id;
     const studentName = auth.person.displayName;
     const person360 = await getPerson360(personId, personId);
+    const connections = await getExternalConnections(personId);
+
     const goalTitle = person360.activeGoal?.title || "No goal selected";
     const skillsList = (person360.evidence || []).filter((e) => e.category === "skill" && e.verificationStatus !== "rejected").map((e) => e.subject);
     const projectsList = (person360.projects || []).filter((p) => p.status === "confirmed").map((p) => p.title).slice(0, 5).join(", ") || "No confirmed projects";
@@ -49,6 +52,22 @@ export async function POST(req: Request) {
     const unconfirmedSkills = (person360.evidence || [])
       .filter((e) => e.category === "skill" && e.verificationStatus !== "verified")
       .map((e) => e.subject);
+
+    // V4.0 Footprint Intelligence Context
+    const connectedAccounts = connections.filter((c: any) => c.status === "connected").map((c: any) => c.provider);
+    const linkedProfiles = connections.filter((c: any) => c.status === "reference_only").map((c: any) => c.provider);
+    const hfModels = (person360.evidence || [])
+      .filter((e) => e.sourceReference && e.sourceReference.includes("huggingface.co"))
+      .map((e) => e.subject);
+    const orcidPapers = (person360.evidence || [])
+      .filter((e) => e.sourceReference && (e.sourceReference.includes("doi.org") || e.sourceReference.includes("orcid.org")))
+      .map((e) => e.subject);
+    const technicalArticles = (person360.evidence || [])
+      .filter((e) => e.sourceReference && e.sourceReference.includes("dev.to"))
+      .map((e) => e.subject);
+    const staleSources = connections
+      .filter((c: any) => c.status === "connected" && (!c.lastSyncedAt || Date.now() - new Date(c.lastSyncedAt).getTime() > 7 * 86400000))
+      .map((c: any) => c.provider);
 
     // 1. RAG Knowledge Retrieval over Canonical AI/ML Knowledge Base
     const ragBundle = retrieveKnowledge({
@@ -71,10 +90,15 @@ GROUNDING RULES:
 1. Ground your advice exclusively in the student's actual profile context:
    - Student Name: ${wrapUntrustedContent("name", studentName)}
    - Target Goal: ${wrapUntrustedContent("goal", goalTitle)}
+   - Connected Accounts: ${wrapUntrustedContent("connected_accounts", connectedAccounts.join(", ") || "None")}
+   - Linked Profiles: ${wrapUntrustedContent("linked_profiles", linkedProfiles.join(", ") || "None")}
    - Recorded Skills: ${wrapUntrustedContent("skills", skillsList.slice(0, 10).join(", ") || "None")}
    - Unconfirmed Skills: ${wrapUntrustedContent("unconfirmed_skills", unconfirmedSkills.slice(0, 8).join(", ") || "None")}
    - Confirmed Projects: ${wrapUntrustedContent("projects", projectsList)}
    - GitHub Projects: ${wrapUntrustedContent("github_projects", githubProjects.join(", ") || "None")}
+   - Hugging Face Models: ${wrapUntrustedContent("hf_models", hfModels.join(", ") || "None")}
+   - Research Papers (ORCID): ${wrapUntrustedContent("orcid_papers", orcidPapers.join("; ") || "None")}
+   - Published Technical Articles: ${wrapUntrustedContent("technical_articles", technicalArticles.join("; ") || "None")}
    - Resume Items: ${wrapUntrustedContent("resume_skills", resumeSkills.join(", ") || "None")}
    - Verification: ${readinessText}
 ${knowledgeContext}
@@ -98,7 +122,125 @@ ${knowledgeContext}
     const lowerMsg = message.toLowerCase();
     const lowerReply = replyContent.toLowerCase();
 
-    if (response.fallbackUsed) {
+    // Check specific digital footprint questions first (even if LLM or fallback)
+    if (
+      lowerMsg.includes("which digital accounts") ||
+      (lowerMsg.includes("connected") && lowerMsg.includes("account")) ||
+      lowerMsg.includes("accounts have i connected")
+    ) {
+      finalReply = connectedAccounts.length > 0
+        ? `You have connected ${connectedAccounts.length} account(s): ${connectedAccounts.map((a: string) => a.toUpperCase()).join(", ")}. These accounts have authorized data access or verified imports.`
+        : `You haven't authorized full data access for any external accounts yet. You can connect your GitHub, Hugging Face, or LinkedIn export in Step 6.`;
+      proposedAction = {
+        actionId: "act_view_footprints",
+        actionType: "Verify",
+        label: "Manage Digital Footprints",
+        destinationUrl: "/student/profile",
+        contextReason: "Inspect connected developer profiles",
+        requiresConfirmation: false,
+      };
+    } else if (
+      lowerMsg.includes("which profiles") &&
+      (lowerMsg.includes("only linked") || lowerMsg.includes("linked-only") || lowerMsg.includes("just linked"))
+    ) {
+      finalReply = linkedProfiles.length > 0
+        ? `The following profiles are currently reference-only links without automated synchronization: ${linkedProfiles.map((p: string) => p.toUpperCase()).join(", ")}. In accordance with platform terms, stats on these profiles remain self-reported or reference links.`
+        : `You currently have no linked-only profile references. All your current footprints are either fully connected or pending addition.`;
+      proposedAction = {
+        actionId: "act_view_footprints",
+        actionType: "Verify",
+        label: "Manage Digital Footprints",
+        destinationUrl: "/student/profile",
+        contextReason: "Inspect reference-only links",
+        requiresConfirmation: false,
+      };
+    } else if ((lowerMsg.includes("github") && lowerMsg.includes("project")) || lowerMsg.includes("from github")) {
+      if (githubProjects.length > 0) {
+        finalReply = `The following ${githubProjects.length} project(s) were imported from your GitHub account: ${githubProjects.join(", ")}. Each includes detected repository technologies and contribution metadata.`;
+      } else {
+        finalReply = `You currently have no projects imported from GitHub. You can link your GitHub account or import a repository in Digital Footprints.`;
+      }
+      proposedAction = {
+        actionId: "act_workspace_projects",
+        actionType: "Build",
+        label: "View GitHub Projects",
+        destinationUrl: "/student/projects",
+        contextReason: "Inspect repository evidence and contribution notes",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("hugging face") && (lowerMsg.includes("model") || lowerMsg.includes("artifact"))) {
+      finalReply = hfModels.length > 0
+        ? `Your profile records ${hfModels.length} Hugging Face model artifact(s): ${hfModels.join(", ")}. These are public model repositories discovered from your Hub account.`
+        : `No Hugging Face models are currently linked to your profile. You can link your Hugging Face username in Step 6 to discover public models, datasets, and Spaces.`;
+      proposedAction = {
+        actionId: "act_workspace_projects",
+        actionType: "Build",
+        label: "View ML Models",
+        destinationUrl: "/student/projects",
+        contextReason: "Inspect Hugging Face model artifacts",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("orcid") || (lowerMsg.includes("paper") && lowerMsg.includes("research"))) {
+      finalReply = orcidPapers.length > 0
+        ? `Your public ORCID record contained ${orcidPapers.length} research publication(s): ${orcidPapers.slice(0, 3).join("; ")}. Peer-reviewed works are verified via persistent DOIs.`
+        : `No research publications are currently imported from ORCID. You can connect your 16-character ORCID identifier in Step 6 to import scholarly works.`;
+      proposedAction = {
+        actionId: "act_workspace_verify",
+        actionType: "Verify",
+        label: "View Research Evidence",
+        destinationUrl: "/verification",
+        contextReason: "Review academic publications and DOIs",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("technical article") || (lowerMsg.includes("article") && lowerMsg.includes("published"))) {
+      finalReply = technicalArticles.length > 0
+        ? `You have ${technicalArticles.length} published technical article(s) recorded: ${technicalArticles.slice(0, 3).join("; ")}. Topics have been categorized to support your software engineering evidence.`
+        : `No published technical articles are currently recorded. You can connect your DEV.to username to import public technical tutorials.`;
+      proposedAction = {
+        actionId: "act_workspace_evidence",
+        actionType: "Verify",
+        label: "View Technical Writing",
+        destinationUrl: "/verification",
+        contextReason: "Inspect published technical articles",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("evidence supports") || (lowerMsg.includes("evidence") && lowerMsg.includes("goal"))) {
+      finalReply = `To support your goal of ${goalTitle}, you currently have ${readinessText}, ${person360.projects?.length || 0} candidate projects, and ${skillsList.length} recorded skills across your verified resume and digital footprint sources.`;
+      proposedAction = {
+        actionId: "act_workspace_roadmap",
+        actionType: "Navigate",
+        label: "View Goal Evidence",
+        destinationUrl: "/student/roadmap",
+        contextReason: "Inspect ordered milestones and skill evidence",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("haven't synchronized") || lowerMsg.includes("not synchronized") || lowerMsg.includes("stale")) {
+      finalReply = staleSources.length > 0
+        ? `The following sources have not been synchronized recently: ${staleSources.map((s: string) => s.toUpperCase()).join(", ")}. You can trigger a refresh from your Digital Footprints settings.`
+        : `All your connected data sources are current or represent static confirmed imports.`;
+      proposedAction = {
+        actionId: "act_view_footprints",
+        actionType: "Verify",
+        label: "Check Sync Status",
+        destinationUrl: "/student/profile",
+        contextReason: "Review digital profile synchronization dates",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("needs my confirmation") || lowerMsg.includes("unconfirmed")) {
+      if (unconfirmedSkills.length > 0) {
+        finalReply = `You have ${unconfirmedSkills.length} unconfirmed skill candidate(s) awaiting your review: ${unconfirmedSkills.slice(0, 6).join(", ")}. Please review them so they become canonical evidence.`;
+      } else {
+        finalReply = `All your currently recorded skills and projects have been confirmed or verified.`;
+      }
+      proposedAction = {
+        actionId: "act_verify_evidence",
+        actionType: "Verify",
+        label: "Review Unconfirmed Items",
+        destinationUrl: "/student/skills",
+        contextReason: "Review candidate skills and contributions",
+        requiresConfirmation: false,
+      };
+    } else if (response.fallbackUsed) {
       if ((lowerMsg.includes("github") && lowerMsg.includes("project")) || lowerMsg.includes("from github")) {
         if (githubProjects.length > 0) {
           finalReply = `The following ${githubProjects.length} project(s) came from your GitHub account: ${githubProjects.join(", ")}. Each has your documented personal contributions and repository link.`;

@@ -1,8 +1,9 @@
 export function wrapUntrustedContent(tag: string, content: string): string {
-  // Neutralize any closing tag variant for this tag
-  const sanitized = content.replace(new RegExp(`</${tag}[^>]*>`, "gi"), (match) =>
-    match.replace("<", "&lt;").replace(">", "&gt;")
-  );
+  // Neutralize any tag variants or wrapper breakouts
+  const sanitized = content
+    .replace(new RegExp(`</?${tag}[^>]*>`, "gi"), (match) => match.replace("<", "&lt;").replace(">", "&gt;"))
+    .replace(new RegExp(`</?${tag}_data_untrusted[^>]*>`, "gi"), (match) => match.replace("<", "&lt;").replace(">", "&gt;"))
+    .replace(/<\/?(script|iframe|object|embed)[^>]*>/gi, (match) => match.replace("<", "&lt;").replace(">", "&gt;"));
 
   return `<${tag}_data_untrusted>
 ${sanitized}

@@ -11,12 +11,26 @@
 
 import { URL } from "node:url";
 
+export interface PortfolioDiscoveredProject {
+  title: string;
+  description?: string;
+  url?: string;
+  technologies?: string[];
+}
+
 export interface PortfolioMetadata {
   url: string;
   title: string | null;
   description: string | null;
+  author: string | null;
+  openGraph: {
+    title?: string;
+    description?: string;
+    siteName?: string;
+  };
   detectedLinks: string[];
   technologies: string[];
+  discoveredProjects: PortfolioDiscoveredProject[];
   extractedAt: string;
 }
 
@@ -81,7 +95,22 @@ export async function fetchPortfolioMetadata(rawUrl: string): Promise<PortfolioM
     truncatedHtml.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
   const description = metaDescMatch ? metaDescMatch[1].trim() : null;
 
-  // Extract outward links to github/linkedin
+  // Extract Author
+  const authorMatch = truncatedHtml.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i) ||
+    truncatedHtml.match(/<meta[^>]*property=["']article:author["'][^>]*content=["']([^"']+)["']/i);
+  const author = authorMatch ? authorMatch[1].trim() : null;
+
+  // Extract Open Graph
+  const ogTitleMatch = truncatedHtml.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+  const ogDescMatch = truncatedHtml.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+  const ogSiteMatch = truncatedHtml.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i);
+  const openGraph = {
+    title: ogTitleMatch ? ogTitleMatch[1].trim() : undefined,
+    description: ogDescMatch ? ogDescMatch[1].trim() : undefined,
+    siteName: ogSiteMatch ? ogSiteMatch[1].trim() : undefined,
+  };
+
+  // Extract outward links to github/linkedin/huggingface
   const detectedLinks: string[] = [];
   const linkMatches = truncatedHtml.matchAll(/href=["'](https?:\/\/[^"'\s]+)["']/gi);
   for (const match of linkMatches) {
@@ -91,24 +120,63 @@ export async function fetchPortfolioMetadata(rawUrl: string): Promise<PortfolioM
         detectedLinks.push(link);
       }
     }
-    if (detectedLinks.length >= 10) break;
+    if (detectedLinks.length >= 15) break;
   }
 
   // Detect common AI/ML technology keywords mentioned in body
   const commonTech = [
     "PyTorch", "TensorFlow", "scikit-learn", "Hugging Face", "LangChain",
-    "LlamaIndex", "FastAPI", "Docker", "Kubernetes", "Next.js", "React", "Python"
+    "LlamaIndex", "FastAPI", "Docker", "Kubernetes", "Next.js", "React", "Python",
+    "TypeScript", "PostgreSQL", "OpenCV", "ChromaDB"
   ];
   const technologies = commonTech.filter((tech) =>
     new RegExp(`\\b${tech}\\b`, "i").test(truncatedHtml)
   );
 
+  // Extract candidate projects from JSON-LD or github repository links
+  const discoveredProjects: PortfolioDiscoveredProject[] = [];
+
+  // 1. JSON-LD structured data
+  const jsonLdMatches = truncatedHtml.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  for (const jm of jsonLdMatches) {
+    try {
+      const parsedJson = JSON.parse(jm[1].trim());
+      const items = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+      for (const item of items) {
+        if (item["@type"] === "SoftwareSourceCode" || item["@type"] === "CreativeWork" || item["@type"] === "Project") {
+          discoveredProjects.push({
+            title: String(item.name || item.headline || "Portfolio Project"),
+            description: item.description ? String(item.description) : undefined,
+            url: item.url || item.codeRepository ? String(item.url || item.codeRepository) : undefined,
+          });
+        }
+      }
+    } catch {
+      // Non-fatal if JSON-LD is malformed
+    }
+  }
+
+  // 2. Outward GitHub repos as projects
+  for (const link of detectedLinks) {
+    const ghMatch = link.match(/github\.com\/([a-zA-Z0-9_\-]+)\/([a-zA-Z0-9_\-]+)/i);
+    if (ghMatch && !discoveredProjects.some((p) => p.url === link)) {
+      discoveredProjects.push({
+        title: ghMatch[2],
+        url: link,
+        description: `Repository linked from personal portfolio: ${link}`,
+      });
+    }
+  }
+
   return {
     url: check.parsed.toString(),
-    title,
-    description,
+    title: openGraph.title || title,
+    description: openGraph.description || description,
+    author,
+    openGraph,
     detectedLinks,
     technologies,
+    discoveredProjects: discoveredProjects.slice(0, 10),
     extractedAt: new Date().toISOString(),
   };
 }

@@ -77,38 +77,96 @@ ${knowledgeContext}
 
     const replyContent = response.content.trim();
 
-    // 3. Propose Validated Contextual Action
+    // 3. Grounded Deterministic Reply Fallback for common student questions
+    let finalReply = replyContent;
     let proposedAction: EoraActionProposal | undefined = undefined;
     const lowerMsg = message.toLowerCase();
     const lowerReply = replyContent.toLowerCase();
 
-    if (!response.fallbackUsed && (lowerMsg.includes("project") || lowerMsg.includes("portfolio") || lowerReply.includes("project"))) {
-      proposedAction = {
-        actionId: "act_workspace_projects",
-        actionType: "Build",
-        label: "Open Project Workspace",
-        destinationUrl: "/student/projects",
-        contextReason: "Document and build candidate artifact for evidence ledger",
-        requiresConfirmation: false,
-      };
-    } else if (!response.fallbackUsed && (lowerMsg.includes("roadmap") || lowerMsg.includes("milestone") || lowerReply.includes("roadmap"))) {
-      proposedAction = {
-        actionId: "act_workspace_roadmap",
-        actionType: "Navigate",
-        label: "View Personalized Roadmap",
-        destinationUrl: "/student/roadmap",
-        contextReason: "Inspect competency prerequisites for target role",
-        requiresConfirmation: false,
-      };
-    } else if (!response.fallbackUsed && (lowerMsg.includes("verify") || lowerMsg.includes("verification") || lowerReply.includes("verification"))) {
-      proposedAction = {
-        actionId: "act_workspace_verify",
-        actionType: "Verify",
-        label: "Evidence & Verification",
-        destinationUrl: "/verification",
-        contextReason: "Submit evidence item for institutional review",
-        requiresConfirmation: false,
-      };
+    if (response.fallbackUsed) {
+      if (lowerMsg.includes("resume") || lowerMsg.includes("cv")) {
+        finalReply = `I reviewed your resume records. We extracted ${skillsList.length} skills and ${person360.projects?.length || 0} projects. You can review and confirm unverified claims directly in your profile.`;
+        proposedAction = {
+          actionId: "act_review_skills",
+          actionType: "Verify",
+          label: "Review Extracted Skills",
+          destinationUrl: "/student/skills",
+          contextReason: "Inspect unconfirmed resume extractions",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("project")) {
+        finalReply = `Your profile currently records ${person360.projects?.length || 0} projects (${projectsList}). You can document personal contributions and add evaluation metrics in your project workspace.`;
+        proposedAction = {
+          actionId: "act_workspace_projects",
+          actionType: "Build",
+          label: "Open Project Workspace",
+          destinationUrl: "/student/projects",
+          contextReason: "View and edit recorded projects",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("unconfirmed") || lowerMsg.includes("missing") || lowerMsg.includes("verify")) {
+        const unverifiedCount = Math.max(0, skillsList.length - verifiedCount);
+        finalReply = `You have ${unverifiedCount} self-reported or source-detected claims waiting for student review or faculty verification.`;
+        proposedAction = {
+          actionId: "act_verify_evidence",
+          actionType: "Verify",
+          label: "Evidence & Verification",
+          destinationUrl: "/verification",
+          contextReason: "Submit evidence for institutional verification",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("roadmap") || lowerMsg.includes("next") || lowerMsg.includes("work on")) {
+        finalReply = `For your goal of ${goalTitle}, your recommended next focus is advancing your project evidence and completing your foundational competency milestones.`;
+        proposedAction = {
+          actionId: "act_workspace_roadmap",
+          actionType: "Navigate",
+          label: "View Personalized Roadmap",
+          destinationUrl: "/student/roadmap",
+          contextReason: "Inspect ordered milestones for target role",
+          requiresConfirmation: false,
+        };
+      } else {
+        finalReply = `Hello ${studentName}! I am here to help you advance towards your goal of ${goalTitle}. Currently, you have ${skillsList.length} recorded skills and ${verifiedCount} verified evidence items.`;
+      }
+    } else {
+      // LLM was live, match contextual proposed action
+      if (lowerMsg.includes("project") || lowerReply.includes("project")) {
+        proposedAction = {
+          actionId: "act_workspace_projects",
+          actionType: "Build",
+          label: "Open Project Workspace",
+          destinationUrl: "/student/projects",
+          contextReason: "Document and build candidate artifact for evidence ledger",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("roadmap") || lowerMsg.includes("milestone") || lowerReply.includes("roadmap")) {
+        proposedAction = {
+          actionId: "act_workspace_roadmap",
+          actionType: "Navigate",
+          label: "View Personalized Roadmap",
+          destinationUrl: "/student/roadmap",
+          contextReason: "Inspect competency prerequisites for target role",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("verify") || lowerMsg.includes("verification") || lowerReply.includes("verification")) {
+        proposedAction = {
+          actionId: "act_workspace_verify",
+          actionType: "Verify",
+          label: "Evidence & Verification",
+          destinationUrl: "/verification",
+          contextReason: "Submit evidence item for institutional review",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("profile") || lowerMsg.includes("goal")) {
+        proposedAction = {
+          actionId: "act_workspace_profile",
+          actionType: "Navigate",
+          label: "View Profile & Goals",
+          destinationUrl: "/student/profile",
+          contextReason: "Update career target and academic settings",
+          requiresConfirmation: false,
+        };
+      }
     }
 
     // 4. Handle Streaming Response if Requested
@@ -116,7 +174,7 @@ ${knowledgeContext}
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         start(controller) {
-          const words = replyContent.split(" ");
+          const words = finalReply.split(" ");
           let i = 0;
           const interval = setInterval(() => {
             if (i < words.length) {
@@ -159,7 +217,7 @@ ${knowledgeContext}
 
     // 5. Standard JSON Response
     return NextResponse.json({
-      reply: replyContent,
+      reply: finalReply,
       proposedAction,
       referencedSources: ragBundle.referencedResources.map((r) => ({
         title: r.title,

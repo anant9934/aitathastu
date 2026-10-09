@@ -7,13 +7,31 @@ import type { ReviewedResumeClaim } from "@/lib/onboarding-v2";
 type Candidate = Pick<ReviewedResumeClaim, "category" | "value" | "sourceSpan"> & { candidateId: string };
 type ResumeSnapshot = { version: 1; candidates: Candidate[] };
 
+import { ExtractionValidator } from "./extraction-validator";
+
 export function resumeCandidates(extracted: ResumeInterpretationOutput): Candidate[] {
   const candidates: Candidate[] = [];
   const add = (category: Candidate["category"], rows: Array<{ value: string; sourceSpan: string }>) => {
     rows.forEach((row, index) => {
-      if (row.value.trim() && row.sourceSpan.trim()) {
-        candidates.push({ candidateId: `${category}_${index}`, category, value: row.value.trim(), sourceSpan: row.sourceSpan.trim() });
+      const trimmedVal = row.value.trim();
+      const trimmedSpan = row.sourceSpan.trim();
+      if (!trimmedVal || !trimmedSpan) return;
+
+      if (category === "skill") {
+        const valRes = ExtractionValidator.validateSkillClaim(trimmedVal, trimmedSpan);
+        if (!valRes.valid) return; // Discard negated, aspirational, or unsupported claims
+        candidates.push({ candidateId: `${category}_${index}`, category, value: valRes.normalizedValue, sourceSpan: trimmedSpan });
+        return;
       }
+
+      if (category === "project") {
+        const valRes = ExtractionValidator.validateProjectClaim(trimmedVal, trimmedSpan);
+        if (!valRes.valid) return;
+        candidates.push({ candidateId: `${category}_${index}`, category, value: valRes.normalizedValue, sourceSpan: trimmedSpan });
+        return;
+      }
+
+      candidates.push({ candidateId: `${category}_${index}`, category, value: trimmedVal, sourceSpan: trimmedSpan });
     });
   };
   add("education", extracted.education.map((x) => ({ value: [x.degree, x.fieldOfStudy, x.institution].filter(Boolean).join(" · "), sourceSpan: x.sourceSpan })));

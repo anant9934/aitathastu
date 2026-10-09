@@ -450,7 +450,90 @@ export const MIGRATION_SQL_STATEMENTS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   );`,
   `CREATE INDEX IF NOT EXISTS "idx_coding_activities_person" ON "coding_practice_activities" ("person_id");`,
-  `CREATE INDEX IF NOT EXISTS "idx_coding_activities_topic" ON "coding_practice_activities" ("topic_key");`
+  `CREATE INDEX IF NOT EXISTS "idx_coding_activities_topic" ON "coding_practice_activities" ("topic_key");`,
+  // Core V3: source_processing_jobs
+  `CREATE TABLE IF NOT EXISTS "source_processing_jobs" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "source_id" text NOT NULL,
+    "stage" text NOT NULL,
+    "status" text NOT NULL,
+    "started_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "completed_at" timestamp with time zone,
+    "model_version" text,
+    "result_reference" text,
+    "error_code" text,
+    "error_message" text,
+    "retry_count" integer DEFAULT 0 NOT NULL,
+    "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_source_jobs_person" ON "source_processing_jobs" ("person_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_source_jobs_status" ON "source_processing_jobs" ("status");`,
+  // Core V3: roadmap_milestones
+  `CREATE TABLE IF NOT EXISTS "roadmap_milestones" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "goal_id" text NOT NULL REFERENCES "goals"("id") ON DELETE CASCADE,
+    "competency_id" text NOT NULL,
+    "title" text NOT NULL,
+    "description" text DEFAULT '' NOT NULL,
+    "outcome" text DEFAULT '' NOT NULL,
+    "action_type" text DEFAULT 'Build' NOT NULL,
+    "destination_url" text DEFAULT '/student/projects' NOT NULL,
+    "prerequisite_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "completion_criteria" text DEFAULT '' NOT NULL,
+    "evidence_requirement" text DEFAULT '' NOT NULL,
+    "status" text DEFAULT 'pending' NOT NULL,
+    "version" integer DEFAULT 1 NOT NULL,
+    "order_index" integer DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_roadmap_milestones_person_goal" ON "roadmap_milestones" ("person_id", "goal_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_roadmap_milestones_status" ON "roadmap_milestones" ("status");`,
+  // Core V3: person_profile_versions
+  `CREATE TABLE IF NOT EXISTS "person_profile_versions" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "version_number" integer NOT NULL,
+    "change_type" text NOT NULL,
+    "change_summary" text NOT NULL,
+    "snapshot" jsonb NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_profile_versions_person" ON "person_profile_versions" ("person_id");`,
+  // Core V3: source_conflicts
+  `CREATE TABLE IF NOT EXISTS "source_conflicts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "field" text NOT NULL,
+    "source_a" text NOT NULL,
+    "value_a" text NOT NULL,
+    "observed_at_a" timestamp with time zone,
+    "source_b" text NOT NULL,
+    "value_b" text NOT NULL,
+    "observed_at_b" timestamp with time zone,
+    "status" text DEFAULT 'detected' NOT NULL,
+    "resolved_value" text,
+    "resolved_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_source_conflicts_person" ON "source_conflicts" ("person_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_source_conflicts_status" ON "source_conflicts" ("status");`,
+  // Core V3: intelligence_artifacts
+  `CREATE TABLE IF NOT EXISTS "intelligence_artifacts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "artifact_type" text NOT NULL,
+    "profile_version" integer DEFAULT 1 NOT NULL,
+    "source_references" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "content" jsonb NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_intel_artifacts_person_type" ON "intelligence_artifacts" ("person_id", "artifact_type");`
 ];
 
 

@@ -22,6 +22,8 @@ export type AimLGoalTemplate =
   | "Placement Preparation"
   | "Custom Goal";
 
+export type CoreActionPlatform = "Projects" | "Skills" | "Verification" | "Roadmap" | "Profile" | "Study LPU" | "Padho Code" | "ERIS" | "MentorMaze" | "External";
+
 export type RoadmapStage = {
   stageNumber: number;
   title: string;
@@ -33,7 +35,8 @@ export type RoadmapStage = {
     title: string;
     description: string;
     reason: string;
-    sourcePlatform: "Study LPU" | "Padho Code" | "Projects" | "ERIS" | "MentorMaze" | "External";
+    sourcePlatform: CoreActionPlatform;
+    destinationUrl?: string;
   }>;
 };
 
@@ -49,7 +52,8 @@ export type StudentRoadmap = {
     title: string;
     description: string;
     whyItMatters: string;
-    sourcePlatform: "Study LPU" | "Padho Code" | "Projects" | "ERIS" | "MentorMaze" | "External";
+    sourcePlatform: CoreActionPlatform;
+    destinationUrl?: string;
   }>;
 };
 
@@ -63,7 +67,8 @@ type GoalCurriculum = {
       actionType: "Learn" | "Practice" | "Build" | "Verify" | "Interview";
       title: string;
       description: string;
-      sourcePlatform: "Study LPU" | "Padho Code" | "Projects" | "ERIS" | "MentorMaze" | "External";
+      sourcePlatform: CoreActionPlatform;
+      destinationUrl?: string;
     }>;
   }>;
 };
@@ -76,8 +81,8 @@ const GENAI_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: [],
       skills: ["Python", "DSA", "OOP"],
       actions: [
-        { actionType: "Practice", title: "Practice Python Data Structures", description: "Implement graph and queue data structures in Python.", sourcePlatform: "Padho Code" },
-        { actionType: "Learn", title: "Async Programming in Python", description: "Learn async/await and streaming patterns.", sourcePlatform: "Study LPU" },
+        { actionType: "Practice", title: "Practice Python Data Structures", description: "Implement graph and queue data structures in Python.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
+        { actionType: "Learn", title: "Async Programming in Python", description: "Learn async/await and streaming patterns.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -86,8 +91,8 @@ const GENAI_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Python"],
       skills: ["Linear Algebra", "Scikit-Learn", "Machine Learning"],
       actions: [
-        { actionType: "Learn", title: "Vector & Matrix Mathematics", description: "Review dot products, cosine distance, and embedding spaces.", sourcePlatform: "Study LPU" },
-        { actionType: "Practice", title: "Scikit-Learn Pipelines", description: "Build data preprocessing and classification pipelines.", sourcePlatform: "Padho Code" },
+        { actionType: "Learn", title: "Vector & Matrix Mathematics", description: "Review dot products, cosine distance, and embedding spaces.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
+        { actionType: "Practice", title: "Scikit-Learn Pipelines", description: "Build data preprocessing and classification pipelines.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -96,8 +101,8 @@ const GENAI_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Python", "Machine Learning"],
       skills: ["PyTorch", "Deep Learning", "Transformers"],
       actions: [
-        { actionType: "Build", title: "Fine-tune a Small Language Model", description: "Use Hugging Face transformers with PEFT/LoRA.", sourcePlatform: "Projects" },
-        { actionType: "Verify", title: "Request Faculty Verification for Deep Learning", description: "Submit your transformer project evidence.", sourcePlatform: "ERIS" },
+        { actionType: "Build", title: "Fine-tune a Small Language Model", description: "Use Hugging Face transformers with PEFT/LoRA.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
+        { actionType: "Verify", title: "Document Evidence for Deep Learning", description: "Submit your transformer project evidence.", sourcePlatform: "Verification", destinationUrl: "/verification" },
       ],
     },
     {
@@ -106,8 +111,8 @@ const GENAI_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Transformers", "Python"],
       skills: ["Vector Databases", "FAISS", "LangChain", "RAG"],
       actions: [
-        { actionType: "Build", title: "Build an End-to-End RAG System", description: "Implement semantic search with FAISS and hybrid ranking.", sourcePlatform: "Projects" },
-        { actionType: "Practice", title: "Evaluate Retrieval Quality with RAGAS", description: "Measure context precision, recall, and answer relevance.", sourcePlatform: "Padho Code" },
+        { actionType: "Build", title: "Build an End-to-End RAG System", description: "Implement semantic search with FAISS and hybrid ranking.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
+        { actionType: "Practice", title: "Evaluate Retrieval Quality with RAGAS", description: "Measure context precision, recall, and answer relevance.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -116,8 +121,8 @@ const GENAI_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["RAG", "FastAPI"],
       skills: ["FastAPI", "Docker", "LLMOps", "Model Evaluation"],
       actions: [
-        { actionType: "Build", title: "Deploy FastAPI Inference Microservice", description: "Containerize your model pipeline and expose streaming endpoints.", sourcePlatform: "Projects" },
-        { actionType: "Interview", title: "Technical Mock Interview for GenAI", description: "Complete a MentorMaze systems interview on RAG architectures.", sourcePlatform: "MentorMaze" },
+        { actionType: "Build", title: "Deploy FastAPI Inference Microservice", description: "Containerize your model pipeline and expose streaming endpoints.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
+        { actionType: "Interview", title: "Technical Architecture Review for GenAI", description: "Review systems architecture on RAG and vector retrieval.", sourcePlatform: "Roadmap", destinationUrl: "/student/roadmap" },
       ],
     },
   ],
@@ -131,8 +136,8 @@ const ML_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: [],
       skills: ["Python", "DSA", "NumPy"],
       actions: [
-        { actionType: "Practice", title: "Algorithmic Problem Solving", description: "Solve algorithmic graph and tree challenges.", sourcePlatform: "Padho Code" },
-        { actionType: "Learn", title: "Numerical Python Optimization", description: "Vectorized operations and memory profiling with NumPy.", sourcePlatform: "Study LPU" },
+        { actionType: "Practice", title: "Algorithmic Problem Solving", description: "Solve algorithmic graph and tree challenges.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
+        { actionType: "Learn", title: "Numerical Python Optimization", description: "Vectorized operations and memory profiling with NumPy.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -141,8 +146,8 @@ const ML_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Python"],
       skills: ["Machine Learning", "Scikit-Learn", "Feature Engineering"],
       actions: [
-        { actionType: "Build", title: "Tabular Feature Engineering Pipeline", description: "Build automated imputation and feature selection.", sourcePlatform: "Projects" },
-        { actionType: "Practice", title: "Model Validation Techniques", description: "Stratified K-fold and hyperparameter tuning.", sourcePlatform: "Padho Code" },
+        { actionType: "Build", title: "Tabular Feature Engineering Pipeline", description: "Build automated imputation and feature selection.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
+        { actionType: "Practice", title: "Model Validation Techniques", description: "Stratified K-fold and hyperparameter tuning.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -151,8 +156,8 @@ const ML_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Machine Learning", "Python"],
       skills: ["PyTorch", "Deep Learning"],
       actions: [
-        { actionType: "Build", title: "Custom PyTorch Training Loop", description: "Implement early stopping, learning rate scheduling, and checkpointing.", sourcePlatform: "Projects" },
-        { actionType: "Verify", title: "ERIS Deep Learning Assessment", description: "Validate neural network implementation mastery.", sourcePlatform: "ERIS" },
+        { actionType: "Build", title: "Custom PyTorch Training Loop", description: "Implement early stopping, learning rate scheduling, and checkpointing.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
+        { actionType: "Verify", title: "Verify Deep Learning Evidence", description: "Validate neural network implementation mastery.", sourcePlatform: "Verification", destinationUrl: "/verification" },
       ],
     },
     {
@@ -161,8 +166,8 @@ const ML_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["PyTorch"],
       skills: ["MLOps", "Docker", "Model Monitoring", "FastAPI"],
       actions: [
-        { actionType: "Build", title: "Containerize ML Inference Service", description: "Deploy Dockerized model server with health checks.", sourcePlatform: "Projects" },
-        { actionType: "Interview", title: "ML System Design Interview", description: "Practice large-scale model design with MentorMaze.", sourcePlatform: "MentorMaze" },
+        { actionType: "Build", title: "Containerize ML Inference Service", description: "Deploy Dockerized model server with health checks.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
+        { actionType: "Interview", title: "ML System Design Review", description: "Practice large-scale model design and data distribution.", sourcePlatform: "Roadmap", destinationUrl: "/student/roadmap" },
       ],
     },
   ],
@@ -176,7 +181,7 @@ const AI_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: [],
       skills: ["Python", "FastAPI", "SQL", "PostgreSQL"],
       actions: [
-        { actionType: "Build", title: "Build Scalable Backend API", description: "Develop async endpoints with SQL database persistence.", sourcePlatform: "Projects" },
+        { actionType: "Build", title: "Build Scalable Backend API", description: "Develop async endpoints with SQL database persistence.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
       ],
     },
     {
@@ -185,7 +190,7 @@ const AI_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Python", "FastAPI"],
       skills: ["LangChain", "OpenAI", "Vector Databases"],
       actions: [
-        { actionType: "Build", title: "Build Agentic Workflow Pipeline", description: "Integrate tool-calling agents with vector search.", sourcePlatform: "Projects" },
+        { actionType: "Build", title: "Build Agentic Workflow Pipeline", description: "Integrate tool-calling agents with vector search.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
       ],
     },
     {
@@ -194,7 +199,7 @@ const AI_ENGINEER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["LangChain"],
       skills: ["Docker", "Kubernetes", "System Design"],
       actions: [
-        { actionType: "Interview", title: "AI Full-Stack Architecture Mock", description: "Complete technical systems simulation.", sourcePlatform: "MentorMaze" },
+        { actionType: "Interview", title: "AI Full-Stack Architecture Review", description: "Complete technical systems simulation.", sourcePlatform: "Roadmap", destinationUrl: "/student/roadmap" },
       ],
     },
   ],
@@ -208,7 +213,7 @@ const RESEARCHER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: [],
       skills: ["Mathematics & Proofs", "Probability", "Linear Algebra"],
       actions: [
-        { actionType: "Learn", title: "Optimization Theory for Deep Learning", description: "Study SGD convergence and loss landscape geometry.", sourcePlatform: "Study LPU" },
+        { actionType: "Learn", title: "Optimization Theory for Deep Learning", description: "Study SGD convergence and loss landscape geometry.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -217,7 +222,7 @@ const RESEARCHER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Mathematics & Proofs"],
       skills: ["PyTorch", "Literature Review", "Experimental Rigor"],
       actions: [
-        { actionType: "Build", title: "Reproduce a Recent ArXiv Paper", description: "Implement architecture and report baseline metrics.", sourcePlatform: "Projects" },
+        { actionType: "Build", title: "Reproduce a Recent ArXiv Paper", description: "Implement architecture and report baseline metrics.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
       ],
     },
     {
@@ -226,7 +231,7 @@ const RESEARCHER_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Experimental Rigor"],
       skills: ["LaTeX", "ArXiv", "Statistical Testing"],
       actions: [
-        { actionType: "Verify", title: "Faculty Research Review on ERIS", description: "Submit manuscript draft for formal faculty critique.", sourcePlatform: "ERIS" },
+        { actionType: "Verify", title: "Research Evidence Review", description: "Submit manuscript draft for formal verification review.", sourcePlatform: "Verification", destinationUrl: "/verification" },
       ],
     },
   ],
@@ -240,7 +245,7 @@ const DATA_SCIENTIST_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: [],
       skills: ["Python", "Pandas", "SQL", "Statistics"],
       actions: [
-        { actionType: "Practice", title: "Advanced SQL Analytical Queries", description: "Window functions, CTEs, and time-series aggregation.", sourcePlatform: "Padho Code" },
+        { actionType: "Practice", title: "Advanced SQL Analytical Queries", description: "Window functions, CTEs, and time-series aggregation.", sourcePlatform: "Skills", destinationUrl: "/student/skills" },
       ],
     },
     {
@@ -249,7 +254,7 @@ const DATA_SCIENTIST_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Python", "Statistics"],
       skills: ["Scikit-Learn", "Machine Learning", "A/B Testing"],
       actions: [
-        { actionType: "Build", title: "End-to-End Business Predictive Model", description: "Build churn/conversion predictive model with feature importance.", sourcePlatform: "Projects" },
+        { actionType: "Build", title: "End-to-End Business Predictive Model", description: "Build churn/conversion predictive model with feature importance.", sourcePlatform: "Projects", destinationUrl: "/student/projects" },
       ],
     },
     {
@@ -258,7 +263,7 @@ const DATA_SCIENTIST_CURRICULUM: GoalCurriculum = {
       prerequisiteSkills: ["Scikit-Learn"],
       skills: ["Data Visualization", "SHAP", "Streamlit"],
       actions: [
-        { actionType: "Interview", title: "Data Science Technical Interview", description: "Practice business case breakdown and metric defense on MentorMaze.", sourcePlatform: "MentorMaze" },
+        { actionType: "Interview", title: "Data Science Technical Review", description: "Practice business case breakdown and metric defense.", sourcePlatform: "Roadmap", destinationUrl: "/student/roadmap" },
       ],
     },
   ],
@@ -340,6 +345,7 @@ export function generatePersonalizedRoadmap(
 
     const actions = rawStage.actions.map((act) => ({
       ...act,
+      destinationUrl: act.destinationUrl || (act.actionType === "Build" ? "/student/projects" : act.actionType === "Verify" ? "/verification" : "/student/skills"),
       reason: isPartiallyEvidenced
         ? `Verified evidence covers ${demonstratedCount}/${rawStage.skills.length} skills in this stage; review the remaining requirements.`
         : `No verified evidence is recorded for these ${resolvedRole} stage skills: ${rawStage.skills.join(", ")}.`,
@@ -368,6 +374,7 @@ export function generatePersonalizedRoadmap(
       title: "Document evaluation for a confirmed project",
       description: "Add your personal contribution, evaluation method, and observed results to a recorded project.",
       sourcePlatform: "Projects",
+      destinationUrl: "/student/projects",
       reason: `${options.confirmedProjectCount} confirmed project record${options.confirmedProjectCount === 1 ? "" : "s"} can be strengthened with documented evidence. This does not complete a skill milestone automatically.`,
     });
   }
@@ -411,6 +418,7 @@ export function generatePersonalizedRoadmap(
     title: act.title,
     description: act.description,
     sourcePlatform: act.sourcePlatform,
+    destinationUrl: act.destinationUrl || (act.actionType === "Build" ? "/student/projects" : act.actionType === "Verify" ? "/verification" : "/student/skills"),
     whyItMatters:
       isNearGraduation && (act.actionType === "Interview" || act.actionType === "Verify")
         ? `Because you are graduating in ${expectedGraduationYear || "the upcoming cycle"}, verified proof and interview practice are highest priority for your ${resolvedRole} target.`
@@ -430,4 +438,61 @@ export function generatePersonalizedRoadmap(
     stages,
     primaryActions,
   };
+}
+
+import { getDb, roadmapMilestones, type TathastuDb } from "@/lib/db";
+import { eq, and } from "drizzle-orm";
+import crypto from "node:crypto";
+
+export async function persistRoadmapMilestones(
+  personId: string,
+  goalId: string,
+  roadmap: StudentRoadmap,
+  dbClient?: TathastuDb
+): Promise<void> {
+  const db = dbClient || (await getDb());
+
+  for (let i = 0; i < roadmap.stages.length; i++) {
+    const stage = roadmap.stages[i];
+    const milestoneId = `ms_${crypto.createHash("sha256").update(`${personId}:${goalId}:${stage.stageNumber}:${stage.title}`).digest("hex").slice(0, 16)}`;
+
+    await db
+      .insert(roadmapMilestones)
+      .values({
+        id: milestoneId,
+        personId,
+        goalId,
+        competencyId: stage.requiredSkills[0] || stage.title,
+        title: stage.title,
+        description: stage.description,
+        outcome: `Master competency requirements for ${stage.title}`,
+        actionType: (stage.recommendedActions[0]?.actionType as "Build" | "Practice" | "Learn" | "Verify" | "Document") || "Build",
+        destinationUrl: stage.recommendedActions[0]?.destinationUrl || "/student/projects",
+        prerequisiteIds: stage.requiredSkills,
+        completionCriteria: `Verified evidence recorded for skills: ${stage.requiredSkills.join(", ")}`,
+        status: stage.status === "completed" ? "completed" : stage.status === "in_progress" ? "in_progress" : "pending",
+        orderIndex: stage.stageNumber,
+        version: 1,
+      })
+      .onConflictDoUpdate({
+        target: roadmapMilestones.id,
+        set: {
+          status: stage.status === "completed" ? "completed" : stage.status === "in_progress" ? "in_progress" : "pending",
+          updatedAt: new Date(),
+        },
+      });
+  }
+}
+
+export async function getPersistedRoadmapMilestones(
+  personId: string,
+  goalId: string,
+  dbClient?: TathastuDb
+) {
+  const db = dbClient || (await getDb());
+  return db
+    .select()
+    .from(roadmapMilestones)
+    .where(and(eq(roadmapMilestones.personId, personId), eq(roadmapMilestones.goalId, goalId)))
+    .orderBy(roadmapMilestones.orderIndex);
 }

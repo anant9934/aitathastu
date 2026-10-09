@@ -573,3 +573,116 @@ export const codingPracticeActivities = pgTable(
   ]
 );
 
+// Core Intelligence V3: Source Processing Jobs
+export const sourceProcessingJobs = pgTable(
+  "source_processing_jobs",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    sourceId: text("source_id").notNull(), // 'resume' | 'github' | 'portfolio' | 'manual' | 'linkedin'
+    stage: text("stage").notNull(), // 'acquire' | 'parse' | 'extract' | 'validate' | 'normalize' | 'merge' | 'review' | 'persist' | 'interpret' | 'plan'
+    status: text("status").notNull(), // 'queued' | 'running' | 'completed' | 'failed' | 'retry'
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    modelVersion: text("model_version"),
+    resultReference: text("result_reference"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    retryCount: integer("retry_count").default(0).notNull(),
+    metadata: jsonb("metadata").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_source_jobs_person").on(table.personId),
+    index("idx_source_jobs_status").on(table.status),
+  ]
+);
+
+// Core Intelligence V3: Adaptive Roadmap Milestones
+export const roadmapMilestones = pgTable(
+  "roadmap_milestones",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    goalId: text("goal_id").notNull().references(() => goals.id, { onDelete: "cascade" }),
+    competencyId: text("competency_id").notNull(),
+    title: text("title").notNull(),
+    description: text("description").default("").notNull(),
+    outcome: text("outcome").default("").notNull(),
+    actionType: text("action_type").default("Build").notNull(), // 'Build' | 'Practice' | 'Learn' | 'Verify' | 'Document'
+    destinationUrl: text("destination_url").default("/student/projects").notNull(),
+    prerequisiteIds: jsonb("prerequisite_ids").default([]).notNull(), // string[]
+    completionCriteria: text("completion_criteria").default("").notNull(),
+    evidenceRequirement: text("evidence_requirement").default("").notNull(),
+    status: text("status").default("pending").notNull(), // 'pending' | 'in_progress' | 'completed' | 'skipped'
+    version: integer("version").default(1).notNull(),
+    orderIndex: integer("order_index").default(0).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_roadmap_milestones_person_goal").on(table.personId, table.goalId),
+    index("idx_roadmap_milestones_status").on(table.status),
+  ]
+);
+
+// Core Intelligence V3: Person 360 Profile Version History
+export const personProfileVersions = pgTable(
+  "person_profile_versions",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    changeType: text("change_type").notNull(), // 'onboarding' | 'resume_review' | 'project_confirmed' | 'goal_updated' | 'evidence_added'
+    changeSummary: text("change_summary").notNull(),
+    snapshot: jsonb("snapshot").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_profile_versions_person").on(table.personId),
+  ]
+);
+
+// Core Intelligence V3: Cross-Source Conflict Registry
+export const sourceConflicts = pgTable(
+  "source_conflicts",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    field: text("field").notNull(), // e.g. 'education.graduationYear'
+    sourceA: text("source_a").notNull(),
+    valueA: text("value_a").notNull(),
+    observedAtA: timestamp("observed_at_a", { withTimezone: true }),
+    sourceB: text("source_b").notNull(),
+    valueB: text("value_b").notNull(),
+    observedAtB: timestamp("observed_at_b", { withTimezone: true }),
+    status: text("status").default("detected").notNull(), // 'detected' | 'resolved' | 'dismissed'
+    resolvedValue: text("resolved_value"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_source_conflicts_person").on(table.personId),
+    index("idx_source_conflicts_status").on(table.status),
+  ]
+);
+
+// Core Intelligence V3: Intelligence Artifacts (Versioned interpretations referenced by UI)
+export const intelligenceArtifacts = pgTable(
+  "intelligence_artifacts",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    artifactType: text("artifact_type").notNull(), // 'project_interpretation' | 'profile_summary' | 'roadmap_explanation' | 'skill_gap_analysis'
+    profileVersion: integer("profile_version").default(1).notNull(),
+    sourceReferences: jsonb("source_references").default([]).notNull(), // string[]
+    content: jsonb("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_intel_artifacts_person_type").on(table.personId, table.artifactType),
+  ]
+);
+

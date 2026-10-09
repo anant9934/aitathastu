@@ -107,6 +107,21 @@ export const GitHubProjectInterpretationSchema = z.object({
     })
   ).default([]),
   uncertaintyNotes: z.array(z.string().max(300)).default([]),
+  architectureFindings: z.array(
+    z.object({
+      component: z.string().min(1).max(100),
+      status: z.enum(["OBSERVED", "DOCUMENTED", "INFERRED", "NOT_FOUND", "UNAVAILABLE"]),
+      evidence: z.string().max(300).optional(),
+    })
+  ).default([]),
+  improvementSuggestions: z.array(
+    z.object({
+      suggestion: z.string().min(5).max(300),
+      targetRole: z.string().min(2).max(100),
+      reason: z.string().min(5).max(400),
+      actionDestination: z.string().default("/student/projects"),
+    })
+  ).default([]),
 });
 
 export type GitHubProjectInterpretationOutput = z.infer<typeof GitHubProjectInterpretationSchema>;

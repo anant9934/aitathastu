@@ -4,7 +4,7 @@ import { getPersonProfile, getUserPreferences } from "@/lib/repositories/person-
 import { getActiveGoal } from "@/lib/repositories/goal-repository";
 import { getEvidenceByPersonId } from "@/lib/repositories/evidence-repository";
 import { getProjectsByPersonId } from "@/lib/repositories/project-repository";
-import { generatePersonalizedRoadmap } from "@/lib/domain/roadmap";
+import { generatePersonalizedRoadmap, persistRoadmapMilestones } from "@/lib/domain/roadmap";
 
 export const runtime = "nodejs";
 
@@ -39,11 +39,20 @@ export async function GET() {
     primaryPriority: preferences?.primaryPriority || undefined,
     confirmedProjectCount: projects.filter((project) => project.status === "confirmed").length,
   });
+  const CORE_PLATFORMS = new Set(["Projects", "Skills", "Verification", "Roadmap", "Profile"]);
   const roadmap = {
     ...generated,
-    stages: generated.stages.map((stage) => ({ ...stage, recommendedActions: stage.recommendedActions.filter((action) => action.sourcePlatform === "Projects") })),
-    primaryActions: generated.primaryActions.filter((action) => action.sourcePlatform === "Projects"),
+    stages: generated.stages.map((stage) => ({
+      ...stage,
+      recommendedActions: stage.recommendedActions.filter((action) => CORE_PLATFORMS.has(action.sourcePlatform)),
+    })),
+    primaryActions: generated.primaryActions.filter((action) => CORE_PLATFORMS.has(action.sourcePlatform)),
   };
+
+  // Persist adaptive milestones in background if activeGoal exists
+  if (activeGoal?.id) {
+    persistRoadmapMilestones(personId, activeGoal.id, roadmap).catch(() => {});
+  }
 
   return NextResponse.json({
     roadmap,

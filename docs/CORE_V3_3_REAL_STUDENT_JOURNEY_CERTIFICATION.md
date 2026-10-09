@@ -241,7 +241,7 @@ Exact Persisted State Verified in Neon PostgreSQL
 
 1. **Production Secrets Insecure Defaults Audit (`GATE_0A`):**
    - Verified 0 insecure defaults across production environment keys.
-   - Verified that `CRON_SECRET` whitespace defect on Vercel deployment has been completely corrected with exact 32-character hex byte-piping (`b7a775fbf56a4587dc79bb1039d9ce3a`).
+   - Verified that `CRON_SECRET` whitespace defect on Vercel deployment has been completely corrected with exact 32-character hex byte-piping ([ROTATED / REDACTED]).
 2. **AES-256-GCM Cryptographic Verification (`GATE_0B`):**
    - Verified 256-bit AES authenticated encryption with initialization vector (IV) and authentication tag roundtrip. Plaintext tokens never stored unencrypted.
 3. **Zip-Slip & Decompression Bomb Defense (`GATE_3B`, `GATE_3C`):**

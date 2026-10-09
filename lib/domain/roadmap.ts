@@ -278,6 +278,7 @@ const GOAL_CURRICULA: Record<string, GoalCurriculum> = {
   "Deep Learning Engineer": ML_ENGINEER_CURRICULUM,
   "MLOps Engineer": ML_ENGINEER_CURRICULUM,
   "NLP Engineer": GENAI_CURRICULUM,
+  "Natural Language Processing Engineer": GENAI_CURRICULUM,
   "Computer Vision Engineer": ML_ENGINEER_CURRICULUM,
   "AI Researcher": RESEARCHER_CURRICULUM,
   "Applied AI Researcher": RESEARCHER_CURRICULUM,

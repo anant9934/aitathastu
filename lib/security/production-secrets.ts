@@ -19,10 +19,17 @@ const REQUIRED_PRODUCTION_SECRETS = [
   "PADHO_CODE_INTEGRATION_SECRET",
   "ERIS_INTEGRATION_SECRET",
   "MENTORMAZE_INTEGRATION_SECRET",
+  "CRON_SECRET",
   "DATABASE_URL",
 ];
 
 const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
+  CRON_SECRET: [
+    "b7a775fbf56a4587dc79bb1039d9ce3a",
+    "cron-secret",
+    "secret",
+    "change-me",
+  ],
   SESSION_SECRET: ["dev-session-secret", "secret", "change-me", "password123"],
   HANDOFF_SIGNING_SECRET: [
     "tathastu_handoff_secret_key_prod_default",
@@ -91,7 +98,7 @@ export function auditProductionSecrets(
 
     // Check minimum length for cryptographic secrets
     if (
-      ["SESSION_SECRET", "HANDOFF_SIGNING_SECRET", "GITHUB_WEBHOOK_SECRET", "EXTERNAL_TOKEN_ENCRYPTION_KEY"].includes(secretKey) &&
+      ["SESSION_SECRET", "HANDOFF_SIGNING_SECRET", "GITHUB_WEBHOOK_SECRET", "EXTERNAL_TOKEN_ENCRYPTION_KEY", "CRON_SECRET"].includes(secretKey) &&
       val.length < 32
     ) {
       if (isProd) {

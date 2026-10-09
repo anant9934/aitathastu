@@ -90,6 +90,24 @@ export function Screen5ResumeUpload({
       append("project", structured.projects || [], (item) => String(item.title || ""));
       append("skill", structured.skills || [], (item) => String(item.name || ""));
       append("certification", structured.certifications || [], (item) => String(item.name || ""));
+
+      if (rows.length === 0 && documentId) {
+        if (data.suggestions?.education) {
+          rows.push({ id: `education_0`, candidateId: `education_0`, category: "education", value: String(data.suggestions.education), sourceSpan: String(data.suggestions.education), documentId, corrected: false, selected: false });
+        }
+        if (data.suggestions?.skills) {
+          const skl = String(data.suggestions.skills).split(/[,;]/);
+          skl.forEach((s: string, idx: number) => {
+            const trimmed = s.trim();
+            if (trimmed) rows.push({ id: `skill_${idx}`, candidateId: `skill_${idx}`, category: "skill", value: trimmed, sourceSpan: trimmed, documentId, corrected: false, selected: false });
+          });
+        }
+        if (data.discovery?.projects && Array.isArray(data.discovery.projects)) {
+          data.discovery.projects.forEach((p: string, idx: number) => {
+            if (p) rows.push({ id: `project_${idx}`, candidateId: `project_${idx}`, category: "project", value: p, sourceSpan: p, documentId, corrected: false, selected: false });
+          });
+        }
+      }
       setCandidates(rows);
     } catch {
       setErrorMessage("Network error during file upload. You can continue manually.");

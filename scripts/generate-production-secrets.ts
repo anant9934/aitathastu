@@ -26,6 +26,8 @@ function main() {
     PADHO_CODE_INTEGRATION_SECRET: generateSecureSecret("padhocode", 32),
     ERIS_INTEGRATION_SECRET: generateSecureSecret("eris", 32),
     MENTORMAZE_INTEGRATION_SECRET: generateSecureSecret("mentormaze", 32),
+    EXTERNAL_TOKEN_ENCRYPTION_KEY: crypto.randomBytes(32).toString("hex"),
+    CRON_SECRET: generateSecureSecret("cron", 32),
   };
 
   const fileLines: string[] = [

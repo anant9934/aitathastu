@@ -212,19 +212,22 @@ async function runCertification() {
   console.log("\n--- PRIORITY 2: COMPLETE RESUME INGESTION & BENCHMARK ---");
 
   let correct = 0;
-  let total = LABELED_BENCHMARK_DATASET.length;
+  const total = LABELED_BENCHMARK_DATASET.length;
   let negationFiltered = 0;
   let aspirationFiltered = 0;
 
   for (const tc of LABELED_BENCHMARK_DATASET) {
-    if (tc.category === "skill") {
+    if (tc.field === "skill" || tc.category === "skill") {
       const res = ExtractionValidator.validateSkillClaim(tc.claimValue, tc.sourceSpan, tc.fullDocText);
       const isMatch = res.valid === tc.expectedValid;
       if (isMatch) correct++;
       if (tc.expectedFlag === "negation" && res.flag === "negation") negationFiltered++;
       if (tc.expectedFlag === "aspiration" && res.flag === "aspiration") aspirationFiltered++;
-    } else if (tc.category === "project") {
+    } else if (tc.field === "project" || tc.category === "project") {
       const res = ExtractionValidator.validateProjectClaim(tc.claimValue, tc.sourceSpan, tc.fullDocText);
+      if (res.valid === tc.expectedValid) correct++;
+    } else {
+      const res = ExtractionValidator.validateSemanticClaim(tc.claimValue, tc.sourceSpan, tc.fullDocText, tc.field);
       if (res.valid === tc.expectedValid) correct++;
     }
   }

@@ -7,6 +7,7 @@ import { ScreenFooter } from "./ScreenFooter";
 
 interface Screen6DigitalFootprintsProps {
   initialProfiles?: Partial<Record<string, string>>;
+  discoveredResumeProfiles?: Partial<Record<string, string>>;
   onProfilesChange?: (profiles: Partial<Record<string, string>>) => void;
   onGitHubProjectsDiscovered?: (
     projects: Array<{ id: string; title: string; description?: string; technologies?: string[]; url?: string }>
@@ -254,6 +255,7 @@ const platforms: PlatformConfig[] = [
 
 export function Screen6DigitalFootprints({
   initialProfiles = {},
+  discoveredResumeProfiles = {},
   onProfilesChange,
   onGitHubProjectsDiscovered,
   onNext,
@@ -268,6 +270,18 @@ export function Screen6DigitalFootprints({
     }
     return init;
   });
+  const [ignoredResumeCandidates, setIgnoredResumeCandidates] = useState<Set<string>>(new Set());
+
+  const handleConfirmResumeCandidate = (platformId: string, url: string) => {
+    const nextProfiles = { ...profiles, [platformId]: url };
+    setProfiles(nextProfiles);
+    setStatuses((prev) => ({ ...prev, [platformId]: "Profile Linked" }));
+    onProfilesChange?.(nextProfiles);
+  };
+
+  const handleRemoveResumeCandidate = (platformId: string) => {
+    setIgnoredResumeCandidates((prev) => new Set([...prev, platformId]));
+  };
 
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [inputVal, setInputVal] = useState<string>("");
@@ -552,6 +566,9 @@ export function Screen6DigitalFootprints({
               const isConnected = Boolean(profiles[p.id]);
               const currentStatus: FootprintHonestStatus = statuses[p.id] || "Not Connected";
               const isCurrentOpen = activePrompt === p.id;
+              const resumeCandidate = !ignoredResumeCandidates.has(p.id) ? discoveredResumeProfiles?.[p.id] : undefined;
+              const isCandidateOnly = !isConnected && Boolean(resumeCandidate);
+              const hasConflict = isConnected && Boolean(resumeCandidate) && profiles[p.id] !== resumeCandidate;
 
               return (
                 <div
@@ -565,11 +582,15 @@ export function Screen6DigitalFootprints({
                     borderRadius: 16,
                     border: isConnected
                       ? "2px solid #10B981"
+                      : isCandidateOnly
+                      ? "2px solid #93C5FD"
                       : isCurrentOpen
                       ? "2px solid #5942DC"
                       : "2px solid #FFFFFF",
                     background: isConnected
                       ? "#F0FDF4"
+                      : isCandidateOnly
+                      ? "#F8FAFC"
                       : isCurrentOpen
                       ? "rgba(89, 66, 220, 0.04)"
                       : "#FFFFFF",
@@ -588,7 +609,7 @@ export function Screen6DigitalFootprints({
                   }}
                   onMouseLeave={(e) => {
                     if (!isConnected && !isCurrentOpen) {
-                      e.currentTarget.style.borderColor = "#FFFFFF";
+                      e.currentTarget.style.borderColor = isCandidateOnly ? "#93C5FD" : "#FFFFFF";
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.03)";
                     }
@@ -615,62 +636,169 @@ export function Screen6DigitalFootprints({
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 15, fontWeight: 750, color: "#1E1B4B" }}>{p.name}</span>
                       </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: isConnected ? "#059669" : "#64748B",
-                          fontWeight: isConnected ? 650 : 400,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          maxWidth: 130,
-                        }}
-                      >
-                        {isConnected ? currentStatus : p.supportedCapability}
-                      </div>
+                      {isCandidateOnly ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              color: "#1D4ED8",
+                              background: "#EFF6FF",
+                              border: "1px solid #BFDBFE",
+                              padding: "1px 7px",
+                              borderRadius: 9999,
+                              width: "fit-content",
+                            }}
+                          >
+                            Found in your resume
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "#64748B",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 130,
+                            }}
+                            title={resumeCandidate}
+                          >
+                            {resumeCandidate}
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: isConnected ? "#059669" : "#64748B",
+                            fontWeight: isConnected ? 650 : 400,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 130,
+                          }}
+                        >
+                          {isConnected ? currentStatus : p.supportedCapability}
+                        </div>
+                      )}
+                      {hasConflict && (
+                        <div
+                          style={{
+                            fontSize: 10.5,
+                            color: "#92400E",
+                            background: "#FEF3C7",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            marginTop: 3,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 140,
+                          }}
+                          title={`Resume has different URL: ${resumeCandidate}`}
+                        >
+                          Resume: {resumeCandidate}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenPrompt(p.id);
-                      }}
-                      style={{
-                        padding: "7px 14px",
-                        borderRadius: 9999,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        border: "1px solid",
-                        borderColor: isConnected ? "#86EFAC" : "#FFFFFF",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 5,
-                        background: isConnected
-                          ? "#DCFCE7"
-                          : "linear-gradient(135deg, #5942DC 0%, #4564FF 100%)",
-                        color: isConnected ? "#15803D" : "#FFFFFF",
-                        boxShadow: isConnected
-                          ? "none"
-                          : "0 2px 8px rgba(89, 66, 220, 0.25)",
-                        transition: "transform 0.15s ease",
-                      }}
-                    >
-                      {isConnected ? (
-                        <>
-                          <Check size={13} strokeWidth={3} />
-                          <span>{currentStatus === "Review Required" ? "Review" : "Linked"}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={13} strokeWidth={2.5} />
-                          <span>{p.supportedCapability.split(" ")[0]}</span>
-                        </>
-                      )}
-                    </button>
+                    {isCandidateOnly ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmResumeCandidate(p.id, resumeCandidate!)}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 750,
+                            background: "#10B981",
+                            color: "#FFFFFF",
+                            border: "none",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleOpenPrompt(p.id);
+                            setInputVal(resumeCandidate!);
+                          }}
+                          style={{
+                            padding: "5px 8px",
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: "#F1F5F9",
+                            color: "#334155",
+                            border: "1px solid #CBD5E1",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveResumeCandidate(p.id)}
+                          title="Remove or skip suggestion"
+                          style={{
+                            padding: "4px 6px",
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            color: "#94A3B8",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenPrompt(p.id);
+                        }}
+                        style={{
+                          padding: "7px 14px",
+                          borderRadius: 9999,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          border: "1px solid",
+                          borderColor: isConnected ? "#86EFAC" : "#FFFFFF",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          background: isConnected
+                            ? "#DCFCE7"
+                            : "linear-gradient(135deg, #5942DC 0%, #4564FF 100%)",
+                          color: isConnected ? "#15803D" : "#FFFFFF",
+                          boxShadow: isConnected
+                            ? "none"
+                            : "0 2px 8px rgba(89, 66, 220, 0.25)",
+                          transition: "transform 0.15s ease",
+                        }}
+                      >
+                        {isConnected ? (
+                          <>
+                            <Check size={13} strokeWidth={3} />
+                            <span>{currentStatus === "Review Required" ? "Review" : "Linked"}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={13} strokeWidth={2.5} />
+                            <span>{p.supportedCapability.split(" ")[0]}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
 
                     {isConnected && (
                       <button

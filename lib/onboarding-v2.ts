@@ -72,6 +72,7 @@ export type OnboardingDraft = {
   goal: string;
   priorities?: string[];
   primaryPriority?: string;
+  discoveredResumeProfiles?: Partial<Record<string, string>>;
   completed: boolean;
 };
 
@@ -231,6 +232,14 @@ export function safeDraft(value: unknown): OnboardingDraft {
     goal: str(raw.goal, 160),
     priorities,
     primaryPriority,
+    discoveredResumeProfiles:
+      raw.discoveredResumeProfiles && typeof raw.discoveredResumeProfiles === "object"
+        ? Object.fromEntries(
+            Object.entries(raw.discoveredResumeProfiles)
+              .filter(([k, v]) => typeof k === "string" && typeof v === "string")
+              .map(([k, v]) => [k, str(v, 300)])
+          )
+        : undefined,
     completed: raw.completed === true,
   };
 }

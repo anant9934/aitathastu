@@ -20,7 +20,7 @@ export interface ValidationResult {
 // Negation patterns in English
 const NEGATION_PATTERNS = [
   /\b(?:have\s+not|haven't|never|not\s+used|no\s+experience\s+with|no\s+prior\s+experience|no\s+commercial\s+experience|haven't\s+worked\s+with|lack\s+of|unfamiliar\s+with|did\s+not\s+use|didn't\s+use)\b/i,
-  /\b(?:no\s+knowledge\s+of|without\s+using|excluding|excluded\s+.*?\s+from)\b/i,
+  /\b(?:no\s+knowledge\s+of|without\s+using|excluding|excluded\s+.*?\s+from|not\s+proficient(?:\s+in|\s+with)?|no\s+proficiency(?:\s+in)?|not\s+experienced(?:\s+in)?|unskilled(?:\s+in)?)\b/i,
 ];
 
 // Aspiration / future learning patterns
@@ -40,8 +40,12 @@ const TECH_NORMALIZATION: Record<string, string> = {
   "python": "Python",
   "tensorflow": "TensorFlow",
   "tf": "TensorFlow",
-  "scikit-learn": "Scikit-Learn",
-  "sklearn": "Scikit-Learn",
+  "scikit-learn": "Scikit-learn",
+  "sklearn": "Scikit-learn",
+  "typescript": "TypeScript",
+  "ts": "TypeScript",
+  "javascript": "JavaScript",
+  "js": "JavaScript",
   "huggingface": "Hugging Face",
   "hugging face": "Hugging Face",
   "langchain": "LangChain",
@@ -74,7 +78,12 @@ export class ExtractionValidator {
   /**
    * Semantically validates an extracted skill claim against its source span.
    */
-  static validateSkillClaim(skillName: string, sourceSpan: string, fullDocText?: string): ValidationResult {
+  static validateSkillClaim(
+    skillName: string,
+    sourceSpan: string,
+    fullDocText?: string,
+    matchedAlias?: string
+  ): ValidationResult {
     const norm = this.normalizeSkill(skillName);
     const span = sourceSpan.trim();
 
@@ -129,7 +138,8 @@ export class ExtractionValidator {
     // 5. Must mention the skill in either verbatim or normalized form
     const containsSkill =
       span.toLowerCase().includes(skillName.toLowerCase()) ||
-      span.toLowerCase().includes(norm.toLowerCase());
+      span.toLowerCase().includes(norm.toLowerCase()) ||
+      (Boolean(matchedAlias) && span.toLowerCase().includes(matchedAlias!.toLowerCase()));
 
     if (!containsSkill) {
       return {

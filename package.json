@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx scripts/test-core-v3.ts",
+    "test:core-v3-9": "node --env-file=.env --import tsx scripts/verify-v3-9-zero-llm-extraction.ts",
     "test:core-v3-6": "node --env-file=.env --import tsx scripts/verify-v3-6-production-certification.ts",
     "test:core-v3-5": "node --env-file=.env --import tsx scripts/verify-v3-5-production-pilot.ts",
     "test:browser-v3-5": "node --env-file=.env --import tsx scripts/verify-v3-5-browser-journey.ts",
@@ -48,6 +49,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tailwindcss": "^4.1.13",
+    "tesseract.js": "^7.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.2",
     "zod": "^3.24.2"

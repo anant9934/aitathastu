@@ -59,6 +59,7 @@ export function ExactScreensContainer({
   );
   const [resumeReviewed, setResumeReviewed] = useState<ReviewedResumeClaim[]>([]);
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>({});
+  const [discoveredResumeProfiles, setDiscoveredResumeProfiles] = useState<Partial<Record<string, string>>>({});
   const [skills, setSkills] = useState<string[]>(isGalleryMode ? ["Python", "Machine Learning", "Data Analysis", "DSA"] : []);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [priorities, setPriorities] = useState<string[]>([]);
@@ -131,6 +132,7 @@ export function ExactScreensContainer({
             }
             if (d.goal) setGoal(d.goal);
             if (d.profiles) setProfiles(d.profiles);
+            if (d.discoveredResumeProfiles) setDiscoveredResumeProfiles(d.discoveredResumeProfiles);
             if (d.priorities) setPriorities(d.priorities);
             if (d.primaryPriority) setPrimaryPriority(d.primaryPriority);
           }
@@ -174,6 +176,7 @@ export function ExactScreensContainer({
             resumeReviewed: patch.resumeReviewed ?? resumeReviewed,
             projects: patch.projects ?? projects,
             profiles: patch.profiles ?? profiles,
+            discoveredResumeProfiles: patch.discoveredResumeProfiles ?? discoveredResumeProfiles,
             goal: patch.goal ?? goal,
             priorities: patch.priorities ?? priorities,
             primaryPriority: patch.primaryPriority ?? primaryPriority,
@@ -189,6 +192,7 @@ export function ExactScreensContainer({
       isGalleryMode,
       name,
       profiles,
+      discoveredResumeProfiles,
       projects,
       role,
       skills,
@@ -406,9 +410,36 @@ export function ExactScreensContainer({
         {currentScreen === 5 && (
           <Screen5ResumeUpload
             initialFileName={resumeFileName}
-            onExtractSuccess={(fileName, claims) => {
+            onExtractSuccess={(fileName, claims, extraData) => {
               setResumeFileName(fileName);
               setResumeReviewed(claims);
+
+              // Auto-fill Name & Academic if not already entered by student
+              if (extraData?.extractedProfile) {
+                const ep = extraData.extractedProfile;
+                if (ep.fullName && !name) {
+                  setName(ep.fullName);
+                }
+                setAcademic((prev) => ({
+                  ...prev,
+                  fullName: prev.fullName || ep.fullName || "",
+                  email: prev.email || ep.email || "",
+                  mobile: prev.mobile || ep.mobile || "",
+                  degree: prev.degree || ep.degree || "",
+                  department: prev.department || ep.specialization || "",
+                  institution: prev.institution || ep.institution || "",
+                  currentYear: prev.currentYear || ep.currentYear || "",
+                  expectedGraduationYear: prev.expectedGraduationYear || ep.expectedGraduationYear,
+                }));
+              }
+
+              // Auto-fill Discovered Footprints for Step 6
+              const nextDiscoveredProfiles = {
+                ...discoveredResumeProfiles,
+                ...(extraData?.discoveredProfiles || {}),
+              };
+              setDiscoveredResumeProfiles(nextDiscoveredProfiles);
+
               const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
               const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
               setSkills(nextSkills);
@@ -417,7 +448,12 @@ export function ExactScreensContainer({
               }));
               const nextProjects = [...projects.filter((project) => !project.id.startsWith("resume_")), ...resumeProjects];
               setProjects(nextProjects);
-              persistDraft({ skills: nextSkills, projects: nextProjects, resumeReviewed: claims });
+              persistDraft({
+                skills: nextSkills,
+                projects: nextProjects,
+                resumeReviewed: claims,
+                discoveredResumeProfiles: nextDiscoveredProfiles,
+              });
             }}
             onNext={() => setCurrentScreen(6)}
             onBack={() => setCurrentScreen(4)}
@@ -429,6 +465,7 @@ export function ExactScreensContainer({
         {currentScreen === 6 && (
           <Screen6DigitalFootprints
             initialProfiles={profiles}
+            discoveredResumeProfiles={discoveredResumeProfiles}
             onProfilesChange={(p) => {
               setProfiles(p);
               persistDraft({ profiles: p });

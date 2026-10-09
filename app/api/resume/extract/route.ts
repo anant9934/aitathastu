@@ -1,20 +1,20 @@
 /**
- * AI TATHASTU — RESUME EXTRACTION API
+ * AI TATHASTU — RESUME EXTRACTION API V3.9
  *
  * POST /api/resume/extract
  *
- * Accepts PDF or DOCX, extracts text, then calls the LLM extraction service
- * to produce structured, Zod-validated profile candidates.
+ * CRITICAL ARCHITECTURAL DECISION: STRICT ZERO-LLM RESUME EXTRACTION.
+ * Accepts PDF or DOCX, parses text, embedded hyperlinks, and runs OCR for scans.
+ * Directly invokes the canonical DeterministicResumeExtractionEngine.
  *
- * The student must review and confirm every extracted item before it becomes
- * canonical profile data. Candidate provenance is stored for later validation.
+ * The student reviews and confirms extracted items before anything becomes canonical.
  *
  * Security:
  * - Rate limited (5 req/min per IP)
  * - File type + magic byte validation
  * - File size limit (5MB)
- * - Prompt injection defense in extraction service
- * - Authenticated student and explicit model-processing consent required
+ * - Zero LLM API calls, zero prompts, zero model provider dependencies
+ * - Authenticated student ownership required
  */
 
 import { NextResponse } from "next/server";
@@ -24,6 +24,7 @@ import { getServerAuthContext } from "@/lib/auth/server-session";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { extractResumeStructured } from "@/lib/services/resume-extraction-service";
 import { saveResumeCandidates } from "@/lib/services/resume-review-service";
+import { parseResumeDocument } from "@/lib/services/document-parser-service";
 import { resumeSuggestions, resumeDiscovery } from "@/lib/resume-suggestions";
 
 export const runtime = "nodejs";
@@ -54,8 +55,8 @@ export async function POST(request: Request) {
   let file: File;
   try {
     const form = await request.formData();
-    if (form.get("aiConsent") !== "true") {
-      return error("Confirm that your resume may be processed by an approved AI provider.", 400);
+    if (form.get("aiConsent") !== "true" && form.get("consent") !== "true") {
+      return error("Confirm that your resume may be processed.", 400);
     }
     const candidate = form.get("resume");
     if (!(candidate instanceof File)) {
@@ -87,21 +88,10 @@ export async function POST(request: Request) {
     return error("The file content does not match its extension. Please choose another file.", 415);
   }
 
-  // --- Text extraction ---
-  let rawText = "";
+  // --- Deterministic Document Parsing & OCR ---
+  let parsedDoc;
   try {
-    if (extension === "pdf") {
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: new Uint8Array(bytes) });
-      try {
-        rawText = (await parser.getText()).text;
-      } finally {
-        await parser.destroy();
-      }
-    } else {
-      const mammoth = await import("mammoth");
-      rawText = (await mammoth.extractRawText({ buffer: bytes })).value;
-    }
+    parsedDoc = await parseResumeDocument(bytes, extension as "pdf" | "docx");
   } catch {
     return error(
       "We could not read this file. It may be scanned, protected, or damaged. Please enter details manually.",
@@ -109,19 +99,20 @@ export async function POST(request: Request) {
     );
   }
 
-  if (rawText.replace(/\s/g, "").length < 40) {
+  const rawText = parsedDoc.text;
+  if (rawText.replace(/\s/g, "").length < 40 && parsedDoc.requiresManualReview) {
     return error(
       "We could not read enough text. Scanned or image-only files need manual entry.",
       422
     );
   }
 
-  // --- Deterministic regex suggestions (always fast, always returned) ---
+  // --- Deterministic regex suggestions (legacy UI compatibility) ---
   const legacySuggestions = resumeSuggestions(rawText);
   const legacyDiscovery = resumeDiscovery(rawText);
 
-  // --- Structured LLM extraction ---
-  const extraction = await extractResumeStructured(rawText, personId);
+  // --- Structured Deterministic Extraction (ZERO-LLM) ---
+  const extraction = await extractResumeStructured(rawText, personId, parsedDoc.hyperlinks);
 
   const documentId = crypto.createHash("sha256").update(bytes).digest("hex");
   if (extraction.extracted) {
@@ -135,24 +126,31 @@ export async function POST(request: Request) {
   // --- Build response ---
   return NextResponse.json({
     documentId,
-    // LLM structured extraction (primary — requires student review before saving)
+    // Structured extraction candidates
     structured: extraction.extracted,
+    extractedProfile: extraction.extractedProfile,
+    discoveredProfiles: extraction.discoveredProfiles,
+    discoveredRepositories: extraction.discoveredRepositories,
+    candidates: extraction.candidates,
     extractionMeta: {
       success: extraction.success,
       provider: extraction.provider,
       modelUsed: extraction.modelUsed,
+      llmUsed: false,
+      ocrUsed: parsedDoc.ocrUsed,
+      ocrFailed: parsedDoc.ocrFailed,
       fallbackUsed: extraction.fallbackUsed,
       latencyMs: extraction.latencyMs,
       textTruncated: extraction.truncated,
       error: extraction.error,
     },
 
-    // Legacy regex extraction (fast fallback for immediate UI prefill)
+    // Legacy regex extraction (for backward UI prefill compatibility)
     suggestions: legacySuggestions,
     discovery: legacyDiscovery,
 
     message: extraction.success
-      ? "Your resume was analysed. Review every extracted item carefully — nothing is saved until you confirm it."
+      ? "Your resume was analysed deterministically without generative AI. Review every extracted item carefully — nothing is saved until you confirm it."
       : "Basic information was extracted from your resume. Please review and complete manually.",
   });
 }

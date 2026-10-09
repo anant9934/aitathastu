@@ -14,11 +14,30 @@ export type ReviewedResumeClaim = {
   corrected: boolean;
 };
 
+export type ExtractedProfileData = {
+  fullName?: string;
+  email?: string;
+  mobile?: string;
+  degree?: string;
+  specialization?: string;
+  institution?: string;
+  currentYear?: string;
+  expectedGraduationYear?: number;
+  gpa?: string;
+};
+
 type ResumeCandidate = ReviewedResumeClaim & { id: string; selected: boolean };
 
 interface Screen5ResumeUploadProps {
   initialFileName?: string | null;
-  onExtractSuccess?: (fileName: string, claims: ReviewedResumeClaim[]) => void;
+  onExtractSuccess?: (
+    fileName: string,
+    claims: ReviewedResumeClaim[],
+    extraData?: {
+      extractedProfile?: ExtractedProfileData;
+      discoveredProfiles?: Partial<Record<string, string>>;
+    }
+  ) => void;
   onNext: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
@@ -39,6 +58,10 @@ export function Screen5ResumeUpload({
   const [aiConsent, setAiConsent] = useState(false);
   const [candidates, setCandidates] = useState<ResumeCandidate[]>([]);
   const [reviewSaved, setReviewSaved] = useState(false);
+  const [extraData, setExtraData] = useState<{
+    extractedProfile?: ExtractedProfileData;
+    discoveredProfiles?: Partial<Record<string, string>>;
+  }>({});
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,6 +96,10 @@ export function Screen5ResumeUpload({
       setIsUploaded(true);
       setIsProcessing(false);
       setReviewSaved(false);
+      setExtraData({
+        extractedProfile: data.extractedProfile,
+        discoveredProfiles: data.discoveredProfiles,
+      });
       const structured = data.structured || {};
       const documentId = String(data.documentId || "");
       const rows: ResumeCandidate[] = [];
@@ -298,7 +325,7 @@ export function Screen5ResumeUpload({
                   boxShadow: "0 4px 16px rgba(69, 100, 255, 0.35)",
                 }}
               >
-                {isProcessing ? "Analyzing Resume with AI..." : isUploaded ? "Replace File" : "Browse Computer"}
+                {isProcessing ? "Extracting Details..." : isUploaded ? "Replace File" : "Browse Computer"}
               </button>
 
               {errorMessage && (
@@ -319,13 +346,13 @@ export function Screen5ResumeUpload({
                   <small style={{ color: "#64748B" }}>Source: “{candidate.sourceSpan}”</small>
                 </div>
               </div>)}
-              <button type="button" onClick={() => { onExtractSuccess?.(fileName || "resume", candidates.filter((candidate) => candidate.selected && candidate.value.trim()).map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({ candidateId, category, value: value.trim(), sourceSpan, documentId, corrected }))); setReviewSaved(true); }} style={{ background: "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>Save selected claims</button>
+              <button type="button" onClick={() => { onExtractSuccess?.(fileName || "resume", candidates.filter((candidate) => candidate.selected && candidate.value.trim()).map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({ candidateId, category, value: value.trim(), sourceSpan, documentId, corrected })), extraData); setReviewSaved(true); }} style={{ background: "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>Save selected claims</button>
               {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12 }}>Review saved</span>}
             </div>}
 
             <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, color: "#475569", fontSize: 12.5, lineHeight: 1.45 }}>
               <input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} />
-              I agree to have this resume parsed and relevant text sent to an approved AI provider to suggest profile details. I will review suggestions before saving them.
+              I agree to have this resume parsed to suggest profile details. I will review suggestions before saving them.
             </label>
 
             <div style={{ textAlign: "center", marginTop: 16 }}>

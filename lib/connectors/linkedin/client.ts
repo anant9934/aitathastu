@@ -376,3 +376,121 @@ export function parseLinkedInDataExport(filename: string, content: string): Part
     complianceNotice: `Unrecognized LinkedIn export format in ${filename}. Supported files: Positions.csv, Education.csv, Skills.csv, Projects.csv.`,
   };
 }
+
+/**
+ * Safely parses a student-authorized LinkedIn ZIP archive in-memory.
+ *
+ * Security Protections:
+ * 1. Zip Slip / Directory Traversal: Drops entries with '..', leading slashes, or non-standard paths.
+ * 2. Decompression Bomb Defense: Enforces a strict 10MB total uncompressed limit and 4MB per entry.
+ * 3. File Type Whitelist: Only extracts .csv and .json files; executable or script types are rejected.
+ */
+export function parseLinkedInZipArchive(buffer: Buffer): Partial<LinkedInParsedExportResult> {
+  const zlib = require("node:zlib");
+  const MAX_TOTAL_UNCOMPRESSED = 10 * 1024 * 1024; // 10 MB
+  const MAX_ENTRY_UNCOMPRESSED = 4 * 1024 * 1024;  // 4 MB
+  const FORBIDDEN_EXTENSIONS = /\.(exe|bat|cmd|sh|bin|js|ts|py|php|vbs|jar|app|msi)$/i;
+
+  if (buffer.length < 30 || buffer.readUInt32LE(0) !== 0x04034b50) {
+    return {
+      source: "linkedin_export",
+      totalRecords: 0,
+      extractedAt: new Date().toISOString(),
+      complianceNotice: "File is not a valid ZIP archive format.",
+    };
+  }
+
+  let totalUncompressed = 0;
+  let offset = 0;
+  const aggregated: LinkedInParsedExportResult = {
+    source: "linkedin_export",
+    positions: [],
+    education: [],
+    skills: [],
+    projects: [],
+    certifications: [],
+    totalRecords: 0,
+    extractedAt: new Date().toISOString(),
+    complianceNotice: "Extracted from student-authorized LinkedIn ZIP archive with Zip-Slip defense.",
+  };
+
+  while (offset + 30 <= buffer.length) {
+    const sig = buffer.readUInt32LE(offset);
+    if (sig !== 0x04034b50) break; // Reached end of local file headers
+
+    const flags = buffer.readUInt16LE(offset + 6);
+    const method = buffer.readUInt16LE(offset + 8);
+    const compSize = buffer.readUInt32LE(offset + 18);
+    const uncompSize = buffer.readUInt32LE(offset + 22);
+    const nameLen = buffer.readUInt16LE(offset + 26);
+    const extraLen = buffer.readUInt16LE(offset + 28);
+
+    if (offset + 30 + nameLen > buffer.length) break;
+    const rawFilename = buffer.toString("utf8", offset + 30, offset + 30 + nameLen);
+    const dataStart = offset + 30 + nameLen + extraLen;
+
+    // Security Check 1: Directory Traversal (Zip Slip)
+    const isTraversal =
+      rawFilename.includes("..") ||
+      rawFilename.startsWith("/") ||
+      rawFilename.startsWith("\\") ||
+      /^[a-zA-Z]:/.test(rawFilename) ||
+      rawFilename.includes("\0");
+
+    // Security Check 2: Unsafe executable extensions
+    const isForbidden = FORBIDDEN_EXTENSIONS.test(rawFilename);
+
+    // Security Check 3: Only process CSV or JSON
+    const isSupported = (rawFilename.toLowerCase().endsWith(".csv") || rawFilename.toLowerCase().endsWith(".json")) && !isTraversal && !isForbidden;
+
+    if (uncompSize > MAX_ENTRY_UNCOMPRESSED) {
+      return {
+        ...aggregated,
+        complianceNotice: `Entry "${rawFilename}" exceeded safe decompression limit (${MAX_ENTRY_UNCOMPRESSED} bytes). Import rejected.`,
+      };
+    }
+
+    if (dataStart + compSize <= buffer.length && isSupported) {
+      try {
+        let entryBuffer: Buffer;
+        if (method === 0) {
+          entryBuffer = buffer.subarray(dataStart, dataStart + compSize);
+        } else if (method === 8) {
+          entryBuffer = zlib.inflateRawSync(buffer.subarray(dataStart, dataStart + compSize));
+        } else {
+          entryBuffer = Buffer.alloc(0);
+        }
+
+        totalUncompressed += entryBuffer.length;
+        if (totalUncompressed > MAX_TOTAL_UNCOMPRESSED) {
+          return {
+            ...aggregated,
+            complianceNotice: `Archive exceeded maximum total uncompressed size limit (${MAX_TOTAL_UNCOMPRESSED} bytes). Decompression halted.`,
+          };
+        }
+
+        const textContent = entryBuffer.toString("utf8");
+        const parsed = parseLinkedInDataExport(rawFilename, textContent);
+        if (parsed.positions) aggregated.positions.push(...parsed.positions);
+        if (parsed.education) aggregated.education.push(...parsed.education);
+        if (parsed.skills) aggregated.skills.push(...parsed.skills);
+        if (parsed.projects) aggregated.projects.push(...parsed.projects);
+        if (parsed.certifications) aggregated.certifications.push(...parsed.certifications);
+      } catch {
+        // Continue to next entry on decompression failure
+      }
+    }
+
+    offset = dataStart + compSize;
+  }
+
+  aggregated.totalRecords =
+    aggregated.positions.length +
+    aggregated.education.length +
+    aggregated.skills.length +
+    aggregated.projects.length +
+    aggregated.certifications.length;
+
+  return aggregated;
+}
+

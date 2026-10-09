@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx scripts/test-core-v3.ts",
     "test:core-v3": "node --import tsx scripts/test-core-v3.ts",
+    "test:core-v3-3": "node --env-file=.env --import tsx scripts/verify-v3-3-certification.ts",
+    "test:e2e-v3-3": "node --env-file=.env --import tsx scripts/verify-v3-3-e2e-journey.ts",
     "test:core-v3-1": "node --import tsx scripts/verify-v3-1-live.ts",
     "test:core-v2": "node --import tsx scripts/test-core-v2.ts",
     "test:llm": "node --import tsx scripts/test-live-llm.ts",

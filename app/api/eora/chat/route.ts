@@ -38,6 +38,17 @@ export async function POST(req: Request) {
     const projectsList = (person360.projects || []).filter((p) => p.status === "confirmed").map((p) => p.title).slice(0, 5).join(", ") || "No confirmed projects";
     const verifiedCount = (person360.evidence || []).filter((e) => e.verificationStatus === "verified").length;
     const readinessText = `${verifiedCount} independently verified evidence items`;
+    const githubProjects = (person360.projects || [])
+      .filter((p) => (p.sources || []).includes("github"))
+      .map((p) => p.title);
+    const resumeEvidence = (person360.evidence || []).filter(
+      (e) => e.source === "resume" || (e.sourceReference && e.sourceReference.startsWith("resume:"))
+    );
+    const resumeSkills = resumeEvidence.filter((e) => e.category === "skill").map((e) => e.subject);
+    const resumeProjects = resumeEvidence.filter((e) => e.category === "project").map((e) => e.subject);
+    const unconfirmedSkills = (person360.evidence || [])
+      .filter((e) => e.category === "skill" && e.verificationStatus !== "verified")
+      .map((e) => e.subject);
 
     // 1. RAG Knowledge Retrieval over Canonical AI/ML Knowledge Base
     const ragBundle = retrieveKnowledge({
@@ -60,13 +71,17 @@ GROUNDING RULES:
 1. Ground your advice exclusively in the student's actual profile context:
    - Student Name: ${wrapUntrustedContent("name", studentName)}
    - Target Goal: ${wrapUntrustedContent("goal", goalTitle)}
-   - Recorded Skills (not necessarily verified): ${wrapUntrustedContent("skills", skillsList.slice(0, 8).join(", ") || "None")}
+   - Recorded Skills: ${wrapUntrustedContent("skills", skillsList.slice(0, 10).join(", ") || "None")}
+   - Unconfirmed Skills: ${wrapUntrustedContent("unconfirmed_skills", unconfirmedSkills.slice(0, 8).join(", ") || "None")}
    - Confirmed Projects: ${wrapUntrustedContent("projects", projectsList)}
+   - GitHub Projects: ${wrapUntrustedContent("github_projects", githubProjects.join(", ") || "None")}
+   - Resume Items: ${wrapUntrustedContent("resume_skills", resumeSkills.join(", ") || "None")}
    - Verification: ${readinessText}
 ${knowledgeContext}
 2. Suggest concrete, actionable next steps in the student workspace (e.g. building project evidence, practicing code, or requesting faculty verification).
 3. Keep responses conversational, concise (2-4 sentences), and motivating.
-4. Never invent fake accomplishments, scores, or external data.`;
+4. Always cite source provenance when answering which projects or skills came from where.
+5. Never invent fake accomplishments, scores, or external data.`;
 
     const response = await defaultIntelligenceRouter.complete({
       task: "EORA_CHAT",
@@ -84,14 +99,57 @@ ${knowledgeContext}
     const lowerReply = replyContent.toLowerCase();
 
     if (response.fallbackUsed) {
-      if (lowerMsg.includes("resume") || lowerMsg.includes("cv")) {
-        finalReply = `I reviewed your resume records. We extracted ${skillsList.length} skills and ${person360.projects?.length || 0} projects. You can review and confirm unverified claims directly in your profile.`;
+      if ((lowerMsg.includes("github") && lowerMsg.includes("project")) || lowerMsg.includes("from github")) {
+        if (githubProjects.length > 0) {
+          finalReply = `The following ${githubProjects.length} project(s) came from your GitHub account: ${githubProjects.join(", ")}. Each has your documented personal contributions and repository link.`;
+        } else {
+          finalReply = `You currently have no projects imported from GitHub. You can link your GitHub account or import a repository in Digital Footprints.`;
+        }
+        proposedAction = {
+          actionId: "act_workspace_projects",
+          actionType: "Build",
+          label: "View GitHub Projects",
+          destinationUrl: "/student/projects",
+          contextReason: "Inspect repository evidence and contribution notes",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("resume") || lowerMsg.includes("cv")) {
+        const detailParts: string[] = [];
+        if (resumeSkills.length > 0) detailParts.push(`${resumeSkills.length} skill(s) (${resumeSkills.slice(0, 5).join(", ")})`);
+        if (resumeProjects.length > 0) detailParts.push(`${resumeProjects.length} project(s)`);
+        finalReply = detailParts.length > 0
+          ? `From your resume, I extracted ${detailParts.join(" and ")}. All items require your student review before canonical inclusion.`
+          : `I reviewed your resume records. We extracted ${skillsList.length} skills and ${person360.projects?.length || 0} projects. You can review and confirm unverified claims directly in your profile.`;
         proposedAction = {
           actionId: "act_review_skills",
           actionType: "Verify",
           label: "Review Extracted Skills",
           destinationUrl: "/student/skills",
           contextReason: "Inspect unconfirmed resume extractions",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("unconfirmed") || (lowerMsg.includes("skill") && (lowerMsg.includes("still") || lowerMsg.includes("not verified")))) {
+        if (unconfirmedSkills.length > 0) {
+          finalReply = `Your unconfirmed skills are: ${unconfirmedSkills.slice(0, 6).join(", ")}. These are currently self-reported or source-detected and await your confirmation or faculty review.`;
+        } else {
+          finalReply = `All your currently recorded skills have been confirmed or verified.`;
+        }
+        proposedAction = {
+          actionId: "act_verify_evidence",
+          actionType: "Verify",
+          label: "Evidence & Verification",
+          destinationUrl: "/verification",
+          contextReason: "Submit evidence for institutional verification",
+          requiresConfirmation: false,
+        };
+      } else if (lowerMsg.includes("why") && (lowerMsg.includes("recommend") || lowerMsg.includes("roadmap") || lowerMsg.includes("milestone"))) {
+        finalReply = `I recommended this milestone because your target role is ${goalTitle}, and our gap analysis identified that you need practical project evidence and verified skill mastery to meet industry expectations for this track.`;
+        proposedAction = {
+          actionId: "act_workspace_roadmap",
+          actionType: "Navigate",
+          label: "View Personalized Roadmap",
+          destinationUrl: "/student/roadmap",
+          contextReason: "Inspect ordered milestones for target role",
           requiresConfirmation: false,
         };
       } else if (lowerMsg.includes("project")) {
@@ -102,17 +160,6 @@ ${knowledgeContext}
           label: "Open Project Workspace",
           destinationUrl: "/student/projects",
           contextReason: "View and edit recorded projects",
-          requiresConfirmation: false,
-        };
-      } else if (lowerMsg.includes("unconfirmed") || lowerMsg.includes("missing") || lowerMsg.includes("verify")) {
-        const unverifiedCount = Math.max(0, skillsList.length - verifiedCount);
-        finalReply = `You have ${unverifiedCount} self-reported or source-detected claims waiting for student review or faculty verification.`;
-        proposedAction = {
-          actionId: "act_verify_evidence",
-          actionType: "Verify",
-          label: "Evidence & Verification",
-          destinationUrl: "/verification",
-          contextReason: "Submit evidence for institutional verification",
           requiresConfirmation: false,
         };
       } else if (lowerMsg.includes("roadmap") || lowerMsg.includes("next") || lowerMsg.includes("work on")) {

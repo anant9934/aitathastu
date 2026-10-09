@@ -29,7 +29,7 @@ import { createJourneyEventRecord } from "@/lib/repositories/journey-repository"
 
 // Connectors
 import { fetchPortfolioMetadata } from "@/lib/connectors/portfolio/client";
-import { validateLinkedInUrl, parseLinkedInDataExport } from "@/lib/connectors/linkedin/client";
+import { validateLinkedInUrl, parseLinkedInDataExport, parseLinkedInZipArchive } from "@/lib/connectors/linkedin/client";
 import { fetchLeetCodeProfileStats } from "@/lib/connectors/leetcode/client";
 import {
   fetchHackerRankProfile,
@@ -119,8 +119,15 @@ export async function POST(req: Request) {
       case "linkedin": {
         await SourceProcessingJobService.updateStage(jobId, personId, "extract");
         if (exportContent && exportFilename) {
-          // Student-authorized export archive
-          const parsed = parseLinkedInDataExport(exportFilename, exportContent);
+          // Student-authorized export archive (.zip or .csv/.json)
+          let parsed: ReturnType<typeof parseLinkedInZipArchive>;
+          if (exportFilename.toLowerCase().endsWith(".zip")) {
+            const zipBuf = Buffer.from(exportContent, "base64");
+            parsed = parseLinkedInZipArchive(zipBuf);
+          } else {
+            parsed = parseLinkedInDataExport(exportFilename, exportContent);
+          }
+
           const positions = parsed.positions || [];
           const education = parsed.education || [];
           const skills = parsed.skills || [];
@@ -168,8 +175,8 @@ export async function POST(req: Request) {
             recordsCreated++;
           }
 
-          acquisitionStatus = "LIVE_VERIFIED";
-          summary = `Parsed LinkedIn export archive. Extracted ${positions.length} roles, ${education.length} degrees, and ${skills.length} skills for student review.`;
+          acquisitionStatus = "MANUAL_ARCHIVE_VERIFIED";
+          summary = `Parsed student-authorized LinkedIn archive (${exportFilename}). Extracted ${positions.length} roles, ${education.length} degrees, and ${skills.length} skills for student review.`;
           extractedDetails = {
             positionsCount: positions.length,
             educationCount: education.length,
@@ -226,9 +233,9 @@ export async function POST(req: Request) {
           recordsCreated++;
         }
 
-        acquisitionStatus = stats.acquisitionStatus;
+        acquisitionStatus = stats.acquisitionStatus === "LIVE_VERIFIED" ? "API_PUBLIC_UNVERIFIED_OWNERSHIP" : stats.acquisitionStatus;
         summary = stats.totalSolved > 0
-          ? `Ingested LeetCode public stats: ${stats.totalSolved} problems solved.`
+          ? `Ingested LeetCode public stats: ${stats.totalSolved} problems solved (unauthenticated public metrics).`
           : `LeetCode profile reference linked (${stats.profileUrl}).`;
         extractedDetails = stats as any;
         break;
@@ -262,7 +269,7 @@ export async function POST(req: Request) {
           }
         }
 
-        acquisitionStatus = profile.status;
+        acquisitionStatus = profile.status === "LIVE_VERIFIED" ? "API_PUBLIC_UNVERIFIED_OWNERSHIP" : profile.status;
         summary = profile.notes || "HackerRank profile linked.";
         extractedDetails = profile as any;
         break;

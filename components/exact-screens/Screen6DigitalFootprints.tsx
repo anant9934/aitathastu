@@ -374,9 +374,12 @@ export function Screen6DigitalFootprints({
           throw new Error(data.error || "Failed to sync digital footprint.");
         }
 
-        const isLive = data.acquisitionStatus === "LIVE_VERIFIED";
-        const newStatus: FootprintHonestStatus = isLive
-          ? uploadFile ? "Review Required" : "Connected"
+        const isLive = data.acquisitionStatus === "LIVE_VERIFIED" || data.acquisitionStatus === "API_PUBLIC_UNVERIFIED_OWNERSHIP";
+        const isArchive = data.acquisitionStatus === "MANUAL_ARCHIVE_VERIFIED" || Boolean(uploadFile);
+        const newStatus: FootprintHonestStatus = isArchive
+          ? "Review Required"
+          : isLive
+          ? "Connected"
           : "Profile Linked";
 
         setStatuses((prev) => ({ ...prev, [platformId]: newStatus }));

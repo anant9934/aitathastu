@@ -202,3 +202,121 @@ export async function fetchHackerEarthProfile(
   };
 }
 
+/**
+ * Deterministically parses CodeChef export files or contest summaries.
+ */
+export function parseCodeChefExport(
+  filename: string,
+  content: string
+): { rating?: number; problemsSolved?: number; globalRank?: number; stars?: number } {
+  const trimmed = content.trim();
+  const res: { rating?: number; problemsSolved?: number; globalRank?: number; stars?: number } = {};
+
+  if (trimmed.startsWith("{")) {
+    try {
+      const data = JSON.parse(trimmed);
+      if (data.rating || data.contestRating) res.rating = Number(data.rating || data.contestRating);
+      if (data.problemsSolved || data.solved) res.problemsSolved = Number(data.problemsSolved || data.solved);
+      if (data.globalRank || data.rank) res.globalRank = Number(data.globalRank || data.rank);
+      if (data.stars) res.stars = Number(data.stars);
+      return res;
+    } catch {
+      // Fall through
+    }
+  }
+
+  const ratingMatch = trimmed.match(/rating[\s:]+(\d+)/i);
+  const solvedMatch = trimmed.match(/(?:solved|problems)[\s:]+(\d+)/i);
+  const rankMatch = trimmed.match(/(?:rank|global)[\s:]+(\d+)/i);
+  const starsMatch = trimmed.match(/(\d+)\s*star/i);
+
+  if (ratingMatch) res.rating = parseInt(ratingMatch[1], 10);
+  if (solvedMatch) res.problemsSolved = parseInt(solvedMatch[1], 10);
+  if (rankMatch) res.globalRank = parseInt(rankMatch[1], 10);
+  if (starsMatch) res.stars = parseInt(starsMatch[1], 10);
+
+  return res;
+}
+
+/**
+ * Deterministically parses HackerRank export files, certificate logs, or badge summaries.
+ */
+export function parseHackerRankExport(
+  filename: string,
+  content: string
+): { badges: Array<{ badge: string; stars?: number }>; problemsSolved?: number; rating?: number } {
+  const trimmed = content.trim();
+  const badges: Array<{ badge: string; stars?: number }> = [];
+  let problemsSolved: number | undefined;
+  let rating: number | undefined;
+
+  if (trimmed.startsWith("{")) {
+    try {
+      const data = JSON.parse(trimmed);
+      if (Array.isArray(data.badges)) {
+        for (const b of data.badges) {
+          badges.push({
+            badge: String(b.badge || b.name || b),
+            stars: typeof b.stars === "number" ? b.stars : undefined,
+          });
+        }
+      }
+      if (data.problemsSolved || data.solved) problemsSolved = Number(data.problemsSolved || data.solved);
+      if (data.rating) rating = Number(data.rating);
+      return { badges, problemsSolved, rating };
+    } catch {
+      // Fall through
+    }
+  }
+
+  const lines = trimmed.split(/\r?\n/).filter(Boolean);
+  for (const line of lines) {
+    if (line.toLowerCase().includes("badge") || line.toLowerCase().includes("star")) {
+      const starMatch = line.match(/(\d+)\s*star/i);
+      badges.push({
+        badge: line.trim(),
+        stars: starMatch ? parseInt(starMatch[1], 10) : undefined,
+      });
+    }
+  }
+
+  const solvedMatch = trimmed.match(/(?:solved|problems)[\s:]+(\d+)/i);
+  if (solvedMatch) problemsSolved = parseInt(solvedMatch[1], 10);
+
+  return { badges, problemsSolved, rating };
+}
+
+/**
+ * Deterministically parses HackerEarth export files or practice summaries.
+ */
+export function parseHackerEarthExport(
+  filename: string,
+  content: string
+): { rating?: number; problemsSolved?: number; hackathons?: number } {
+  const trimmed = content.trim();
+  const res: { rating?: number; problemsSolved?: number; hackathons?: number } = {};
+
+  if (trimmed.startsWith("{")) {
+    try {
+      const data = JSON.parse(trimmed);
+      if (data.rating) res.rating = Number(data.rating);
+      if (data.problemsSolved || data.solved) res.problemsSolved = Number(data.problemsSolved || data.solved);
+      if (data.hackathons || data.contests) res.hackathons = Number(data.hackathons || data.contests);
+      return res;
+    } catch {
+      // Fall through
+    }
+  }
+
+  const ratingMatch = trimmed.match(/rating[\s:]+(\d+)/i);
+  const solvedMatch = trimmed.match(/(?:solved|problems)[\s:]+(\d+)/i);
+  const hackMatch = trimmed.match(/(?:hackathons|contests)[\s:]+(\d+)/i);
+
+  if (ratingMatch) res.rating = parseInt(ratingMatch[1], 10);
+  if (solvedMatch) res.problemsSolved = parseInt(solvedMatch[1], 10);
+  if (hackMatch) res.hackathons = parseInt(hackMatch[1], 10);
+
+  return res;
+}
+
+

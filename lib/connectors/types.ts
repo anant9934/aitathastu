@@ -117,9 +117,49 @@ export interface SyncResult {
   normalized?: NormalizedSourceRecords;
 }
 
+export interface CodingProfileMetrics {
+  problemsSolved?: number;
+  easySolved?: number;
+  mediumSolved?: number;
+  hardSolved?: number;
+  globalRank?: number;
+  contestRating?: number;
+  contestCount?: number;
+  badges?: Array<{
+    name: string;
+    sourceUrl?: string;
+  }>;
+  languages?: string[];
+  topicCounts?: Record<string, number>;
+}
+
+export interface CodingProfileSnapshot {
+  personId: string;
+  providerId: string;
+  externalUserId?: string;
+  username: string;
+  profileUrl: string;
+  acquisitionMode:
+    | "authorized_api"
+    | "permitted_public_api"
+    | "authorized_export"
+    | "student_uploaded_evidence"
+    | "student_reported";
+  ownershipState:
+    | "linked"
+    | "student_confirmed"
+    | "provider_authenticated";
+  metrics: CodingProfileMetrics;
+  observedAt: string;
+  providerUpdatedAt?: string;
+  sourceSnapshotId: string;
+  lastSyncStatus: string;
+}
+
 export interface StudentSourceConnector {
   providerId: string;
   getCapabilities(): ProviderCapabilities;
   validateProfile(input: string): ProfileValidationResult;
   normalize(raw: unknown): NormalizedSourceRecords;
 }
+

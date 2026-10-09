@@ -69,6 +69,12 @@ export async function POST(req: Request) {
       .filter((c: any) => c.status === "connected" && (!c.lastSyncedAt || Date.now() - new Date(c.lastSyncedAt).getTime() > 7 * 86400000))
       .map((c: any) => c.provider);
 
+    const leetcodeEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("leetcode"));
+    const codechefEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("codechef"));
+    const hackerrankBadges = (person360.evidence || []).filter((e) => e.subject.toLowerCase().includes("hackerrank"));
+    const hackerearthEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("hackerearth"));
+    const kaggleArtifacts = (person360.projects || []).filter((p) => (p.sources || []).includes("kaggle"));
+
     // 1. RAG Knowledge Retrieval over Canonical AI/ML Knowledge Base
     const ragBundle = retrieveKnowledge({
       query: message,
@@ -97,6 +103,10 @@ GROUNDING RULES:
    - Confirmed Projects: ${wrapUntrustedContent("projects", projectsList)}
    - GitHub Projects: ${wrapUntrustedContent("github_projects", githubProjects.join(", ") || "None")}
    - Hugging Face Models: ${wrapUntrustedContent("hf_models", hfModels.join(", ") || "None")}
+   - Kaggle Artifacts: ${wrapUntrustedContent("kaggle_artifacts", kaggleArtifacts.map((k) => k.title).join(", ") || "None")}
+   - LeetCode Evidence: ${wrapUntrustedContent("leetcode_evidence", leetcodeEvidence ? `${leetcodeEvidence.subject}: ${leetcodeEvidence.value}` : "None")}
+   - CodeChef Evidence: ${wrapUntrustedContent("codechef_evidence", codechefEvidence ? `${codechefEvidence.subject}: ${codechefEvidence.value}` : "None")}
+   - HackerRank Badges: ${wrapUntrustedContent("hackerrank_badges", hackerrankBadges.map((b) => b.subject).join(", ") || "None")}
    - Research Papers (ORCID): ${wrapUntrustedContent("orcid_papers", orcidPapers.join("; ") || "None")}
    - Published Technical Articles: ${wrapUntrustedContent("technical_articles", technicalArticles.join("; ") || "None")}
    - Resume Items: ${wrapUntrustedContent("resume_skills", resumeSkills.join(", ") || "None")}
@@ -202,6 +212,54 @@ ${knowledgeContext}
         label: "View Technical Writing",
         destinationUrl: "/verification",
         contextReason: "Inspect published technical articles",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("leetcode") || lowerMsg.includes("problems solved")) {
+      finalReply = leetcodeEvidence
+        ? `Your LeetCode record indicates ${leetcodeEvidence.value}. Provenance: ${leetcodeEvidence.interpretation || "Student verified coding profile"}.`
+        : `No LeetCode practice evidence is recorded yet. You can upload an authorized export or confirm your statistics in Step 6.`;
+      proposedAction = {
+        actionId: "act_view_footprints",
+        actionType: "Practice",
+        label: "View Coding Profiles",
+        destinationUrl: "/student/profile",
+        contextReason: "Inspect LeetCode problem solving metrics",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("codechef") || (lowerMsg.includes("contest") && lowerMsg.includes("rating"))) {
+      finalReply = codechefEvidence
+        ? `Your CodeChef competitive programming evidence shows: ${codechefEvidence.value}.`
+        : `No CodeChef contest records are currently stored. You can import your CodeChef account or export file in Step 6.`;
+      proposedAction = {
+        actionId: "act_view_footprints",
+        actionType: "Practice",
+        label: "View Competitive Programming",
+        destinationUrl: "/student/profile",
+        contextReason: "Inspect CodeChef contest performance",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("hackerrank") || (lowerMsg.includes("badge") && !lowerMsg.includes("stack overflow"))) {
+      finalReply = hackerrankBadges.length > 0
+        ? `You have earned ${hackerrankBadges.length} HackerRank skill badge(s): ${hackerrankBadges.map((b) => b.subject.replace("HackerRank Badge: ", "")).slice(0, 4).join(", ")}.`
+        : `No HackerRank badges are currently recorded. You can connect your profile or import your badge export in Step 6.`;
+      proposedAction = {
+        actionId: "act_view_footprints",
+        actionType: "Practice",
+        label: "View HackerRank Badges",
+        destinationUrl: "/student/profile",
+        contextReason: "Inspect earned skill badges",
+        requiresConfirmation: false,
+      };
+    } else if (lowerMsg.includes("kaggle")) {
+      finalReply = kaggleArtifacts.length > 0
+        ? `You have ${kaggleArtifacts.length} Kaggle project(s) recorded: ${kaggleArtifacts.map((k) => k.title).slice(0, 3).join(", ")}. These datasets and notebooks corroborate your practical data science fluency.`
+        : `No Kaggle artifacts are currently recorded. You can connect your Kaggle username or upload an export file in Step 6.`;
+      proposedAction = {
+        actionId: "act_workspace_projects",
+        actionType: "Build",
+        label: "View Kaggle Projects",
+        destinationUrl: "/student/projects",
+        contextReason: "Inspect data science notebooks and datasets",
         requiresConfirmation: false,
       };
     } else if (lowerMsg.includes("evidence supports") || (lowerMsg.includes("evidence") && lowerMsg.includes("goal"))) {

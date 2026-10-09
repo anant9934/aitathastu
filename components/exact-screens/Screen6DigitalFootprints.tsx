@@ -174,12 +174,13 @@ const platforms: PlatformConfig[] = [
   {
     id: "leetcode",
     name: "LeetCode",
-    placeholder: "LeetCode username (e.g. anant99)",
+    placeholder: "LeetCode username (e.g. anant99) or upload export",
     prefix: "leetcode.com/",
     renderIcon: LeetCodeIcon,
     color: "#FFA116",
     bg: "#FFF7ED",
-    supportedCapability: "Enter Details",
+    supportedCapability: "Import Authorized Export",
+    supportsExportUpload: true,
   },
   {
     id: "huggingface",
@@ -204,42 +205,46 @@ const platforms: PlatformConfig[] = [
   {
     id: "hackerrank",
     name: "HackerRank",
-    placeholder: "HackerRank username",
+    placeholder: "HackerRank username or upload badge export",
     prefix: "hackerrank.com/",
     renderIcon: HackerRankIcon,
     color: "#00EA64",
     bg: "#ECFDF5",
-    supportedCapability: "Enter Details",
+    supportedCapability: "Import Authorized Export",
+    supportsExportUpload: true,
   },
   {
     id: "codechef",
     name: "CodeChef",
-    placeholder: "CodeChef handle",
+    placeholder: "CodeChef handle or upload contest summary",
     prefix: "codechef.com/users/",
     renderIcon: CodeChefIcon,
     color: "#5B4638",
     bg: "#FEF3C7",
-    supportedCapability: "Add Profile URL",
+    supportedCapability: "Import Authorized Export",
+    supportsExportUpload: true,
   },
   {
     id: "hackerearth",
     name: "HackerEarth",
-    placeholder: "HackerEarth handle",
+    placeholder: "HackerEarth handle or upload practice summary",
     prefix: "hackerearth.com/@",
     renderIcon: HackerEarthIcon,
     color: "#3253DC",
     bg: "#EFF6FF",
-    supportedCapability: "Add Profile URL",
+    supportedCapability: "Import Authorized Export",
+    supportsExportUpload: true,
   },
   {
     id: "kaggle",
     name: "Kaggle",
-    placeholder: "Kaggle username",
+    placeholder: "Kaggle username or upload metadata",
     prefix: "kaggle.com/",
     renderIcon: KaggleIcon,
     color: "#20BEFF",
     bg: "#F0F9FF",
-    supportedCapability: "Add Profile URL",
+    supportedCapability: "Connect Account",
+    supportsExportUpload: true,
   },
   {
     id: "devto",
@@ -436,6 +441,9 @@ export function Screen6DigitalFootprints({
   };
 
   const connectedCount = Object.keys(profiles).filter((k) => Boolean(profiles[k])).length;
+  const connectedAccounts = Object.entries(statuses).filter(([_, s]) => s === "Connected").length;
+  const importedSources = Object.entries(statuses).filter(([_, s]) => s === "Import Completed" || s === "Review Required").length;
+  const linkedProfiles = Object.entries(statuses).filter(([k, s]) => Boolean(profiles[k]) && s !== "Connected" && s !== "Import Completed" && s !== "Review Required").length;
   const activePlatform = platforms.find((p) => p.id === activePrompt);
 
   return (
@@ -556,19 +564,53 @@ export function Screen6DigitalFootprints({
               </p>
             </div>
             {connectedCount > 0 && (
-              <span
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  color: "#10B981",
-                  background: "#ECFDF5",
-                  border: "1px solid #A7F3D0",
-                  padding: "4px 12px",
-                  borderRadius: 9999,
-                }}
-              >
-                {connectedCount} Linked
-              </span>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {connectedAccounts > 0 && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#10B981",
+                      background: "#ECFDF5",
+                      border: "1px solid #A7F3D0",
+                      padding: "3px 10px",
+                      borderRadius: 9999,
+                    }}
+                  >
+                    {connectedAccounts} Connected
+                  </span>
+                )}
+                {importedSources > 0 && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#7C3AED",
+                      background: "#F5F3FF",
+                      border: "1px solid #DDD6FE",
+                      padding: "3px 10px",
+                      borderRadius: 9999,
+                    }}
+                  >
+                    {importedSources} Imported
+                  </span>
+                )}
+                {linkedProfiles > 0 && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#2563EB",
+                      background: "#EFF6FF",
+                      border: "1px solid #BFDBFE",
+                      padding: "3px 10px",
+                      borderRadius: 9999,
+                    }}
+                  >
+                    {linkedProfiles} Linked
+                  </span>
+                )}
+              </div>
             )}
           </div>
 

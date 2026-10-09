@@ -206,3 +206,111 @@ export async function fetchLeetCodeProfileStats(rawInput: string): Promise<LeetC
     };
   }
 }
+
+export interface ParsedLeetCodeExport {
+  totalSolved: number;
+  easySolved: number;
+  mediumSolved: number;
+  hardSolved: number;
+  globalRanking: number | null;
+  reputation: number | null;
+  topicCounts: Record<string, number>;
+}
+
+/**
+ * Deterministically parses a user-provided LeetCode export file (JSON, CSV, or text log)
+ * extracting problem metrics and difficulty distributions without manual data entry.
+ */
+export function parseLeetCodeExport(filename: string, content: string): ParsedLeetCodeExport {
+  const result: ParsedLeetCodeExport = {
+    totalSolved: 0,
+    easySolved: 0,
+    mediumSolved: 0,
+    hardSolved: 0,
+    globalRanking: null,
+    reputation: null,
+    topicCounts: {},
+  };
+
+  const trimmed = content.trim();
+
+  // 1. JSON handling
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const data = JSON.parse(trimmed);
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          const diff = String(item.difficulty || "").toLowerCase();
+          const status = String(item.status || item.verdict || "accepted").toLowerCase();
+          if (status.includes("accept") || status.includes("solv") || !item.status) {
+            if (diff === "easy") result.easySolved++;
+            else if (diff === "medium") result.mediumSolved++;
+            else if (diff === "hard") result.hardSolved++;
+
+            if (item.topic) {
+              const t = String(item.topic);
+              result.topicCounts[t] = (result.topicCounts[t] || 0) + 1;
+            }
+          }
+        }
+        result.totalSolved = result.easySolved + result.mediumSolved + result.hardSolved;
+        return result;
+      } else if (typeof data === "object" && data !== null) {
+        result.totalSolved = Number(data.totalSolved || data.problemsSolved || data.solved) || 0;
+        result.easySolved = Number(data.easySolved || data.easy) || 0;
+        result.mediumSolved = Number(data.mediumSolved || data.medium) || 0;
+        result.hardSolved = Number(data.hardSolved || data.hard) || 0;
+        if (data.ranking || data.globalRanking) {
+          result.globalRanking = Number(data.ranking || data.globalRanking);
+        }
+        if (data.reputation) {
+          result.reputation = Number(data.reputation);
+        }
+        if (data.topics && typeof data.topics === "object") {
+          result.topicCounts = data.topics;
+        }
+        if (result.totalSolved === 0 && (result.easySolved || result.mediumSolved || result.hardSolved)) {
+          result.totalSolved = result.easySolved + result.mediumSolved + result.hardSolved;
+        }
+        return result;
+      }
+    } catch {
+      // Fall through to text/CSV
+    }
+  }
+
+  // 2. CSV / Text parsing
+  const lines = trimmed.split(/\r?\n/).filter(Boolean);
+  if (filename.toLowerCase().endsWith(".csv") || trimmed.includes(",")) {
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (lower.includes("easy")) result.easySolved++;
+      else if (lower.includes("medium") || lower.includes("med")) result.mediumSolved++;
+      else if (lower.includes("hard")) result.hardSolved++;
+    }
+    if (result.easySolved || result.mediumSolved || result.hardSolved) {
+      result.totalSolved = result.easySolved + result.mediumSolved + result.hardSolved;
+      return result;
+    }
+  }
+
+  // 3. Text summary regex fallback
+  const solvedMatch = trimmed.match(/(?:solved|total|problems)[\s:]+(\d+)/i);
+  const easyMatch = trimmed.match(/easy[\s:]+(\d+)/i);
+  const medMatch = trimmed.match(/(?:medium|med)[\s:]+(\d+)/i);
+  const hardMatch = trimmed.match(/hard[\s:]+(\d+)/i);
+  const rankMatch = trimmed.match(/(?:rank|ranking)[\s:]+(\d+)/i);
+
+  if (solvedMatch) result.totalSolved = parseInt(solvedMatch[1], 10);
+  if (easyMatch) result.easySolved = parseInt(easyMatch[1], 10);
+  if (medMatch) result.mediumSolved = parseInt(medMatch[1], 10);
+  if (hardMatch) result.hardSolved = parseInt(hardMatch[1], 10);
+  if (rankMatch) result.globalRanking = parseInt(rankMatch[1], 10);
+
+  if (result.totalSolved === 0 && (result.easySolved || result.mediumSolved || result.hardSolved)) {
+    result.totalSolved = result.easySolved + result.mediumSolved + result.hardSolved;
+  }
+
+  return result;
+}
+

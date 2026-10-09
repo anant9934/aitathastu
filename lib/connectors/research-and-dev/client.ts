@@ -556,6 +556,106 @@ export function fetchKaggleProfile(
 }
 
 /**
+ * Automatically fetches public Kaggle datasets and kernels via official Kaggle API endpoint,
+ * supporting optional HTTP Basic authentication via KAGGLE_USERNAME / KAGGLE_KEY.
+ */
+export async function fetchKaggleApiData(rawInput: string): Promise<KaggleProfile> {
+  const username = normalizeKaggleUsername(rawInput);
+  const profileUrl = `https://www.kaggle.com/${username}`;
+  const now = new Date().toISOString();
+
+  if (!username || !/^[a-zA-Z0-9_]{3,40}$/.test(username)) {
+    return {
+      username: username || "unknown",
+      profileUrl,
+      status: "UNAVAILABLE",
+      retrievedAt: now,
+      notes: "Invalid Kaggle username format.",
+    };
+  }
+
+  const artifacts: Array<{
+    type: "dataset" | "notebook" | "competition" | "model";
+    title: string;
+    url?: string;
+    description?: string;
+  }> = [];
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "User-Agent": "AI-Tathastu-ProfileAuditor/1.0",
+  };
+
+  if (process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) {
+    const token = Buffer.from(`${process.env.KAGGLE_USERNAME}:${process.env.KAGGLE_KEY}`).toString("base64");
+    headers["Authorization"] = `Basic ${token}`;
+  }
+
+  try {
+    // 1. Fetch public datasets
+    const dsRes = await fetch(`https://www.kaggle.com/api/v1/datasets/list?user=${encodeURIComponent(username)}`, {
+      headers,
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (dsRes.ok) {
+      const datasets = await dsRes.json();
+      if (Array.isArray(datasets)) {
+        for (const d of datasets) {
+          artifacts.push({
+            type: "dataset",
+            title: String(d.title || d.ref || "Kaggle Dataset"),
+            url: d.url || `https://www.kaggle.com/datasets/${d.ref}`,
+            description: d.description || `Dataset published on Kaggle. Votes: ${d.totalVotes || 0}`,
+          });
+        }
+      }
+    }
+
+    // 2. Fetch public kernels / notebooks
+    const kernelRes = await fetch(`https://www.kaggle.com/api/v1/kernels/list?user=${encodeURIComponent(username)}`, {
+      headers,
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (kernelRes.ok) {
+      const kernels = await kernelRes.json();
+      if (Array.isArray(kernels)) {
+        for (const k of kernels) {
+          artifacts.push({
+            type: "notebook",
+            title: String(k.title || k.ref || "Kaggle Notebook"),
+            url: k.url || `https://www.kaggle.com/code/${k.ref}`,
+            description: k.description || `Jupyter notebook on Kaggle. Language: ${k.language || "Python"}`,
+          });
+        }
+      }
+    }
+  } catch {
+    // Graceful network timeout fallback
+  }
+
+  const datasetsCount = artifacts.filter((a) => a.type === "dataset").length;
+  const notebooksCount = artifacts.filter((a) => a.type === "notebook").length;
+
+  return {
+    username,
+    profileUrl,
+    displayName: username,
+    datasetsCount,
+    notebooksCount,
+    competitionsCount: 0,
+    studentReportedArtifacts: artifacts,
+    status: artifacts.length > 0 ? "LIVE_VERIFIED" : "MANUAL_PROFILE_REFERENCE",
+    retrievedAt: now,
+    notes: artifacts.length > 0
+      ? `Retrieved ${artifacts.length} public artifacts from Kaggle Hub API.`
+      : "Kaggle profile linked. Automated retrieval returned 0 public artifacts or timed out.",
+  };
+}
+
+
+/**
  * Validates Google Scholar profile link and extracts scholar user ID.
  */
 export function validateGoogleScholarProfile(rawInput: string): GoogleScholarProfile {

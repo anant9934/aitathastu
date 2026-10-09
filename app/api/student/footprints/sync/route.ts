@@ -53,8 +53,10 @@ import {
   fetchDevToArticles,
   fetchStackOverflowProfile,
   fetchKaggleProfile,
+  fetchKaggleApiData,
   validateGoogleScholarProfile,
 } from "@/lib/connectors/research-and-dev/client";
+import { CodingProfileIntelligenceService } from "@/lib/services/coding-profile-intelligence-service";
 
 export async function POST(req: Request) {
   try {
@@ -304,155 +306,301 @@ export async function POST(req: Request) {
       }
 
       case "leetcode": {
-        if (!cleanId) throw new Error("LeetCode username is required.");
-        await SourceProcessingJobService.updateStage(jobId, personId, "parse");
-        const stats = await fetchLeetCodeProfileStats(cleanId);
-        await SourceProcessingJobService.updateStage(jobId, personId, "extract");
+        if (exportContent && exportFilename) {
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          const parsed = CodingProfileIntelligenceService.parseCodingExportFile("leetcode", exportFilename, exportContent);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
 
-        await saveExternalConnection({
-          personId,
-          provider: "leetcode",
-          externalUsername: stats.username,
-          profileUrl: stats.profileUrl,
-          displayName: stats.realName || stats.username,
-          status: stats.acquisitionStatus === "LIVE_VERIFIED" ? "connected" : "reference_only",
-        });
-
-        const solvedCount = stats.totalSolved > 0 ? stats.totalSolved : (manualMetrics?.solvedCount ?? manualMetrics?.totalSolved ?? 0);
-        if (solvedCount > 0) {
-          const isManual = stats.totalSolved === 0;
-          await createEvidenceRecord(personId, {
-            category: "other",
-            subject: "LeetCode Problem Solving",
-            value: `${solvedCount} solved (${stats.easySolved} Easy, ${stats.mediumSolved} Medium, ${stats.hardSolved} Hard)`,
-            source: isManual ? "self_reported" : "imported",
-            verificationStatus: "unverified",
-            sourceReference: stats.profileUrl,
-            interpretation: isManual
-              ? `Student-reported LeetCode problem solving count (${solvedCount} problems).`
-              : `Public LeetCode problem solving record. Global Rank: ${stats.globalRanking ?? "N/A"}.`,
-            whyItMatters: "Demonstrates consistent algorithmic practice and data structure implementation.",
+          await saveExternalConnection({
+            personId,
+            provider: "leetcode",
+            externalUsername: cleanId || exportFilename,
+            profileUrl: cleanId ? `https://leetcode.com/u/${cleanId}` : `export://${exportFilename}`,
+            displayName: cleanId || "LeetCode Export",
+            status: "connected",
+            metadata: { metrics: parsed.metrics, exportFilename },
           });
-          recordsCreated++;
-        }
 
-        acquisitionStatus = stats.acquisitionStatus === "LIVE_VERIFIED" ? "API_PUBLIC_UNVERIFIED_OWNERSHIP" : stats.acquisitionStatus;
-        summary = solvedCount > 0
-          ? `Ingested LeetCode stats: ${solvedCount} problems solved.`
-          : `LeetCode profile reference linked (${stats.profileUrl}).`;
-        extractedDetails = { ...stats, manualMetrics } as any;
+          if (parsed.metrics.problemsSolved && parsed.metrics.problemsSolved > 0) {
+            const breakdown = [
+              parsed.metrics.easySolved ? `${parsed.metrics.easySolved} Easy` : null,
+              parsed.metrics.mediumSolved ? `${parsed.metrics.mediumSolved} Medium` : null,
+              parsed.metrics.hardSolved ? `${parsed.metrics.hardSolved} Hard` : null,
+            ].filter(Boolean).join(", ");
+
+            await createEvidenceRecord(personId, {
+              category: "other",
+              subject: "LeetCode Problem Solving",
+              value: breakdown
+                ? `${parsed.metrics.problemsSolved} solved (${breakdown})`
+                : `${parsed.metrics.problemsSolved} solved`,
+              source: "imported",
+              verificationStatus: "unverified",
+              sourceReference: cleanId ? `https://leetcode.com/u/${cleanId}` : `export://${exportFilename}`,
+              interpretation: `Parsed from student-authorized LeetCode export file (${exportFilename}).`,
+              whyItMatters: "Demonstrates consistent algorithmic practice and data structure implementation.",
+            });
+            recordsCreated++;
+          }
+
+          acquisitionStatus = "AUTHORIZED_EXPORT_SUPPORTED";
+          summary = parsed.summary;
+          extractedDetails = { ...parsed.metrics, filename: exportFilename };
+        } else {
+          if (!cleanId) throw new Error("LeetCode username is required.");
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          const stats = await fetchLeetCodeProfileStats(cleanId);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
+
+          await saveExternalConnection({
+            personId,
+            provider: "leetcode",
+            externalUsername: stats.username,
+            profileUrl: stats.profileUrl,
+            displayName: stats.realName || stats.username,
+            status: stats.acquisitionStatus === "LIVE_VERIFIED" ? "connected" : "reference_only",
+          });
+
+          const solvedCount = stats.totalSolved > 0 ? stats.totalSolved : (manualMetrics?.solvedCount ?? manualMetrics?.totalSolved ?? 0);
+          if (solvedCount > 0) {
+            const isManual = stats.totalSolved === 0;
+            await createEvidenceRecord(personId, {
+              category: "other",
+              subject: "LeetCode Problem Solving",
+              value: `${solvedCount} solved (${stats.easySolved} Easy, ${stats.mediumSolved} Medium, ${stats.hardSolved} Hard)`,
+              source: isManual ? "self_reported" : "imported",
+              verificationStatus: "unverified",
+              sourceReference: stats.profileUrl,
+              interpretation: isManual
+                ? `Student-reported LeetCode problem solving count (${solvedCount} problems).`
+                : `Public LeetCode problem solving record. Global Rank: ${stats.globalRanking ?? "N/A"}.`,
+              whyItMatters: "Demonstrates consistent algorithmic practice and data structure implementation.",
+            });
+            recordsCreated++;
+          }
+
+          acquisitionStatus = stats.acquisitionStatus === "LIVE_VERIFIED" ? "API_PUBLIC_UNVERIFIED_OWNERSHIP" : stats.acquisitionStatus;
+          summary = solvedCount > 0
+            ? `Ingested LeetCode stats: ${solvedCount} problems solved.`
+            : `LeetCode profile reference linked (${stats.profileUrl}).`;
+          extractedDetails = { ...stats, manualMetrics } as any;
+        }
         break;
       }
 
       case "hackerrank": {
-        if (!cleanId) throw new Error("HackerRank username is required.");
-        const profile = await fetchHackerRankProfile(cleanId, manualMetrics);
-        await saveExternalConnection({
-          personId,
-          provider: "hackerrank",
-          externalUsername: profile.username,
-          profileUrl: profile.profileUrl,
-          displayName: profile.username,
-          status: profile.status === "LIVE_VERIFIED" ? "connected" : "reference_only",
-        });
+        if (exportContent && exportFilename) {
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          const parsed = CodingProfileIntelligenceService.parseCodingExportFile("hackerrank", exportFilename, exportContent);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
 
-        if (profile.badges && profile.badges.length > 0) {
-          for (const b of profile.badges) {
+          await saveExternalConnection({
+            personId,
+            provider: "hackerrank",
+            externalUsername: cleanId || exportFilename,
+            profileUrl: cleanId ? `https://www.hackerrank.com/${cleanId}` : `export://${exportFilename}`,
+            displayName: cleanId || "HackerRank Export",
+            status: "connected",
+            metadata: { metrics: parsed.metrics, exportFilename },
+          });
+
+          if (parsed.metrics.badges && parsed.metrics.badges.length > 0) {
+            for (const b of parsed.metrics.badges) {
+              await createEvidenceRecord(personId, {
+                category: "other",
+                subject: `HackerRank Badge: ${b.name}`,
+                value: "Earned Skill Badge",
+                source: "imported",
+                verificationStatus: "unverified",
+                sourceReference: cleanId ? `https://www.hackerrank.com/${cleanId}` : `export://${exportFilename}`,
+                interpretation: `Parsed from student-authorized HackerRank export (${exportFilename}).`,
+                whyItMatters: "Corroborates topic practice and domain fluency.",
+              });
+              recordsCreated++;
+            }
+          }
+
+          acquisitionStatus = "AUTHORIZED_EXPORT_SUPPORTED";
+          summary = parsed.summary;
+          extractedDetails = { ...parsed.metrics, filename: exportFilename };
+        } else {
+          if (!cleanId) throw new Error("HackerRank username is required.");
+          const profile = await fetchHackerRankProfile(cleanId, manualMetrics);
+          await saveExternalConnection({
+            personId,
+            provider: "hackerrank",
+            externalUsername: profile.username,
+            profileUrl: profile.profileUrl,
+            displayName: profile.username,
+            status: profile.status === "LIVE_VERIFIED" ? "connected" : "reference_only",
+          });
+
+          if (profile.badges && profile.badges.length > 0) {
+            for (const b of profile.badges) {
+              await createEvidenceRecord(personId, {
+                category: "other",
+                subject: `HackerRank ${b.badge} Badge`,
+                value: b.stars ? `${b.stars} Stars` : "Earned Badge",
+                source: "imported",
+                verificationStatus: "unverified",
+                sourceReference: profile.profileUrl,
+                interpretation: `Public skill badge from HackerRank profile.`,
+                whyItMatters: "Corroborates topic practice and domain fluency.",
+              });
+              recordsCreated++;
+            }
+          }
+
+          if (profile.studentReported && (profile.problemsSolved || profile.rating)) {
             await createEvidenceRecord(personId, {
               category: "other",
-              subject: `HackerRank ${b.badge} Badge`,
-              value: b.stars ? `${b.stars} Stars` : "Earned Badge",
-              source: "imported",
+              subject: "HackerRank Practice",
+              value: `${profile.problemsSolved ?? 0} problems solved, Rating: ${profile.rating ?? "N/A"}`,
+              source: "self_reported",
               verificationStatus: "unverified",
               sourceReference: profile.profileUrl,
-              interpretation: `Public skill badge from HackerRank profile.`,
-              whyItMatters: "Corroborates topic practice and domain fluency.",
+              interpretation: "Student-reported HackerRank practice metrics.",
+              whyItMatters: "Demonstrates problem solving fluency.",
             });
             recordsCreated++;
           }
-        }
 
-        if (profile.studentReported && (profile.problemsSolved || profile.rating)) {
-          await createEvidenceRecord(personId, {
-            category: "other",
-            subject: "HackerRank Practice",
-            value: `${profile.problemsSolved ?? 0} problems solved, Rating: ${profile.rating ?? "N/A"}`,
-            source: "self_reported",
-            verificationStatus: "unverified",
-            sourceReference: profile.profileUrl,
-            interpretation: "Student-reported HackerRank practice metrics.",
-            whyItMatters: "Demonstrates problem solving fluency.",
-          });
-          recordsCreated++;
+          acquisitionStatus = profile.status === "LIVE_VERIFIED" ? "API_PUBLIC_UNVERIFIED_OWNERSHIP" : profile.status;
+          summary = profile.notes || "HackerRank profile linked.";
+          extractedDetails = profile as any;
         }
-
-        acquisitionStatus = profile.status === "LIVE_VERIFIED" ? "API_PUBLIC_UNVERIFIED_OWNERSHIP" : profile.status;
-        summary = profile.notes || "HackerRank profile linked.";
-        extractedDetails = profile as any;
         break;
       }
 
       case "codechef": {
-        if (!cleanId) throw new Error("CodeChef handle is required.");
-        const profile = await fetchCodeChefProfile(cleanId, manualMetrics);
-        await saveExternalConnection({
-          personId,
-          provider: "codechef",
-          externalUsername: profile.username,
-          profileUrl: profile.profileUrl,
-          displayName: profile.username,
-          status: "reference_only",
-        });
+        if (exportContent && exportFilename) {
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          const parsed = CodingProfileIntelligenceService.parseCodingExportFile("codechef", exportFilename, exportContent);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
 
-        if (profile.studentReported && (profile.rating || profile.problemsSolved)) {
-          await createEvidenceRecord(personId, {
-            category: "other",
-            subject: "CodeChef Competitive Programming",
-            value: `Rating: ${profile.rating ?? "N/A"}, Solved: ${profile.problemsSolved ?? 0}`,
-            source: "self_reported",
-            verificationStatus: "unverified",
-            sourceReference: profile.profileUrl,
-            interpretation: "Student-reported CodeChef contest rating and problem count.",
-            whyItMatters: "Competitive programming and algorithmic contest performance.",
+          await saveExternalConnection({
+            personId,
+            provider: "codechef",
+            externalUsername: cleanId || exportFilename,
+            profileUrl: cleanId ? `https://www.codechef.com/users/${cleanId}` : `export://${exportFilename}`,
+            displayName: cleanId || "CodeChef Export",
+            status: "connected",
+            metadata: { metrics: parsed.metrics, exportFilename },
           });
-          recordsCreated++;
-        }
 
-        acquisitionStatus = "PROFILE_LINK_ONLY";
-        summary = profile.notes || "CodeChef profile linked.";
-        extractedDetails = profile as any;
+          if (parsed.metrics.contestRating || parsed.metrics.problemsSolved) {
+            await createEvidenceRecord(personId, {
+              category: "other",
+              subject: "CodeChef Competitive Programming",
+              value: `Rating: ${parsed.metrics.contestRating ?? "N/A"}, Solved: ${parsed.metrics.problemsSolved ?? "N/A"}`,
+              source: "imported",
+              verificationStatus: "unverified",
+              sourceReference: cleanId ? `https://www.codechef.com/users/${cleanId}` : `export://${exportFilename}`,
+              interpretation: `Parsed from student-authorized CodeChef export (${exportFilename}).`,
+              whyItMatters: "Competitive programming and algorithmic contest performance.",
+            });
+            recordsCreated++;
+          }
+
+          acquisitionStatus = "AUTHORIZED_EXPORT_SUPPORTED";
+          summary = parsed.summary;
+          extractedDetails = { ...parsed.metrics, filename: exportFilename };
+        } else {
+          if (!cleanId) throw new Error("CodeChef handle is required.");
+          const profile = await fetchCodeChefProfile(cleanId, manualMetrics);
+          await saveExternalConnection({
+            personId,
+            provider: "codechef",
+            externalUsername: profile.username,
+            profileUrl: profile.profileUrl,
+            displayName: profile.username,
+            status: "reference_only",
+          });
+
+          if (profile.studentReported && (profile.rating || profile.problemsSolved)) {
+            await createEvidenceRecord(personId, {
+              category: "other",
+              subject: "CodeChef Competitive Programming",
+              value: `Rating: ${profile.rating ?? "N/A"}, Solved: ${profile.problemsSolved ?? 0}`,
+              source: "self_reported",
+              verificationStatus: "unverified",
+              sourceReference: profile.profileUrl,
+              interpretation: "Student-reported CodeChef contest rating and problem count.",
+              whyItMatters: "Competitive programming and algorithmic contest performance.",
+            });
+            recordsCreated++;
+          }
+
+          acquisitionStatus = "PROFILE_LINK_ONLY";
+          summary = profile.notes || "CodeChef profile linked.";
+          extractedDetails = profile as any;
+        }
         break;
       }
 
       case "hackerearth": {
-        if (!cleanId) throw new Error("HackerEarth handle is required.");
-        const profile = await fetchHackerEarthProfile(cleanId, manualMetrics);
-        await saveExternalConnection({
-          personId,
-          provider: "hackerearth",
-          externalUsername: profile.username,
-          profileUrl: profile.profileUrl,
-          displayName: profile.username,
-          status: "reference_only",
-        });
+        if (exportContent && exportFilename) {
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          const parsed = CodingProfileIntelligenceService.parseCodingExportFile("hackerearth", exportFilename, exportContent);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
 
-        if (profile.studentReported && (profile.rating || profile.problemsSolved)) {
-          await createEvidenceRecord(personId, {
-            category: "other",
-            subject: "HackerEarth Practice & Hackathons",
-            value: `Rating: ${profile.rating ?? "N/A"}, Problems: ${profile.problemsSolved ?? 0}`,
-            source: "self_reported",
-            verificationStatus: "unverified",
-            sourceReference: profile.profileUrl,
-            interpretation: "Student-reported HackerEarth participation and practice records.",
-            whyItMatters: "Hackathon participation and algorithmic fluency.",
+          await saveExternalConnection({
+            personId,
+            provider: "hackerearth",
+            externalUsername: cleanId || exportFilename,
+            profileUrl: cleanId ? `https://www.hackerearth.com/@${cleanId}` : `export://${exportFilename}`,
+            displayName: cleanId || "HackerEarth Export",
+            status: "connected",
+            metadata: { metrics: parsed.metrics, exportFilename },
           });
-          recordsCreated++;
-        }
 
-        acquisitionStatus = "PROFILE_LINK_ONLY";
-        summary = profile.notes || "HackerEarth profile linked.";
-        extractedDetails = profile as any;
+          if (parsed.metrics.contestRating || parsed.metrics.problemsSolved) {
+            await createEvidenceRecord(personId, {
+              category: "other",
+              subject: "HackerEarth Practice & Hackathons",
+              value: `Rating: ${parsed.metrics.contestRating ?? "N/A"}, Problems: ${parsed.metrics.problemsSolved ?? "N/A"}`,
+              source: "imported",
+              verificationStatus: "unverified",
+              sourceReference: cleanId ? `https://www.hackerearth.com/@${cleanId}` : `export://${exportFilename}`,
+              interpretation: `Parsed from student-authorized HackerEarth export (${exportFilename}).`,
+              whyItMatters: "Hackathon participation and algorithmic fluency.",
+            });
+            recordsCreated++;
+          }
+
+          acquisitionStatus = "AUTHORIZED_EXPORT_SUPPORTED";
+          summary = parsed.summary;
+          extractedDetails = { ...parsed.metrics, filename: exportFilename };
+        } else {
+          if (!cleanId) throw new Error("HackerEarth handle is required.");
+          const profile = await fetchHackerEarthProfile(cleanId, manualMetrics);
+          await saveExternalConnection({
+            personId,
+            provider: "hackerearth",
+            externalUsername: profile.username,
+            profileUrl: profile.profileUrl,
+            displayName: profile.username,
+            status: "reference_only",
+          });
+
+          if (profile.studentReported && (profile.rating || profile.problemsSolved)) {
+            await createEvidenceRecord(personId, {
+              category: "other",
+              subject: "HackerEarth Practice & Hackathons",
+              value: `Rating: ${profile.rating ?? "N/A"}, Problems: ${profile.problemsSolved ?? 0}`,
+              source: "self_reported",
+              verificationStatus: "unverified",
+              sourceReference: profile.profileUrl,
+              interpretation: "Student-reported HackerEarth participation and practice records.",
+              whyItMatters: "Hackathon participation and algorithmic fluency.",
+            });
+            recordsCreated++;
+          }
+
+          acquisitionStatus = "PROFILE_LINK_ONLY";
+          summary = profile.notes || "HackerEarth profile linked.";
+          extractedDetails = profile as any;
+        }
         break;
       }
 
@@ -565,50 +713,128 @@ export async function POST(req: Request) {
       }
 
       case "kaggle": {
-        if (!cleanId) throw new Error("Kaggle username is required.");
-        const kaggle = fetchKaggleProfile(cleanId, manualMetrics?.artifacts);
+        if (exportContent && exportFilename) {
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          const parsed = CodingProfileIntelligenceService.parseCodingExportFile("kaggle", exportFilename, exportContent);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
 
-        if (kaggle.status === "UNAVAILABLE") {
-          throw new Error(kaggle.notes || "Invalid Kaggle username format.");
-        }
+          await saveExternalConnection({
+            personId,
+            provider: "kaggle",
+            externalUsername: cleanId || exportFilename,
+            profileUrl: cleanId ? `https://www.kaggle.com/${cleanId}` : `export://${exportFilename}`,
+            displayName: cleanId || "Kaggle Export",
+            status: "connected",
+            metadata: { metrics: parsed.metrics, exportFilename },
+          });
 
-        await saveExternalConnection({
-          personId,
-          provider: "kaggle",
-          externalUsername: kaggle.username,
-          profileUrl: kaggle.profileUrl,
-          displayName: kaggle.username,
-          status: "reference_only",
-        });
+          if (parsed.extractedProjects && parsed.extractedProjects.length > 0) {
+            for (const proj of parsed.extractedProjects) {
+              await saveProject(personId, {
+                title: proj.title,
+                summary: proj.description,
+                demoUrl: proj.url,
+                technologies: proj.technologies || ["Kaggle", "Python", "Data Science"],
+                sources: ["kaggle"],
+                status: "candidate",
+                projectType: proj.type === "research" ? "research" : "software",
+              });
 
-        if (kaggle.studentReportedArtifacts && kaggle.studentReportedArtifacts.length > 0) {
-          for (const item of kaggle.studentReportedArtifacts) {
-            await saveProject(personId, {
-              title: `Kaggle ${item.type}: ${item.title}`,
-              summary: item.description || `Kaggle ${item.type} artifact by ${kaggle.username}`,
-              demoUrl: item.url || kaggle.profileUrl,
-              sources: ["kaggle"],
-              status: "candidate",
-              projectType: "software",
-            });
-
-            await createEvidenceRecord(personId, {
-              category: "project",
-              subject: `Kaggle ${item.type}: ${item.title}`,
-              value: item.description || "Student-confirmed Kaggle artifact",
-              source: "self_reported",
-              verificationStatus: "unverified",
-              sourceReference: item.url || kaggle.profileUrl,
-              interpretation: `Kaggle ${item.type} artifact associated with ${kaggle.username}.`,
-              whyItMatters: "Demonstrates practical data science, notebook analysis, or competition modeling.",
-            });
-            recordsCreated++;
+              await createEvidenceRecord(personId, {
+                category: "project",
+                subject: proj.title,
+                value: proj.description,
+                source: "imported",
+                verificationStatus: "unverified",
+                sourceReference: proj.url || `export://${exportFilename}`,
+                interpretation: `Parsed from student-authorized Kaggle export (${exportFilename}).`,
+                whyItMatters: "Demonstrates practical data science, notebook analysis, or competition modeling.",
+              });
+              recordsCreated++;
+            }
           }
-        }
 
-        acquisitionStatus = "PROFILE_LINK_ONLY";
-        summary = kaggle.notes || `Kaggle profile linked (${kaggle.profileUrl}).`;
-        extractedDetails = kaggle as any;
+          acquisitionStatus = "AUTHORIZED_EXPORT_SUPPORTED";
+          summary = parsed.summary;
+          extractedDetails = { ...parsed.metrics, projects: parsed.extractedProjects, filename: exportFilename };
+        } else {
+          if (!cleanId) throw new Error("Kaggle username is required.");
+          await SourceProcessingJobService.updateStage(jobId, personId, "parse");
+          // Attempt official Kaggle API retrieval
+          const kaggleApi = await fetchKaggleApiData(cleanId);
+          await SourceProcessingJobService.updateStage(jobId, personId, "extract");
+
+          if (kaggleApi.status === "UNAVAILABLE") {
+            throw new Error(kaggleApi.notes || "Invalid Kaggle username format.");
+          }
+
+          const isLive = kaggleApi.status === "LIVE_VERIFIED" && kaggleApi.studentReportedArtifacts && kaggleApi.studentReportedArtifacts.length > 0;
+
+          await saveExternalConnection({
+            personId,
+            provider: "kaggle",
+            externalUsername: kaggleApi.username,
+            profileUrl: kaggleApi.profileUrl,
+            displayName: kaggleApi.username,
+            status: isLive ? "connected" : "reference_only",
+          });
+
+          if (kaggleApi.studentReportedArtifacts && kaggleApi.studentReportedArtifacts.length > 0) {
+            for (const item of kaggleApi.studentReportedArtifacts) {
+              await saveProject(personId, {
+                title: item.title,
+                summary: item.description || `Kaggle ${item.type} artifact by ${kaggleApi.username}`,
+                demoUrl: item.url || kaggleApi.profileUrl,
+                sources: ["kaggle"],
+                status: "candidate",
+                projectType: item.type === "dataset" ? "research" : "software",
+                technologies: ["Kaggle", "Data Science", "Python"],
+              });
+
+              await createEvidenceRecord(personId, {
+                category: "project",
+                subject: item.title,
+                value: item.description || "Discovered public Kaggle artifact",
+                source: isLive ? "imported" : "self_reported",
+                verificationStatus: "unverified",
+                sourceReference: item.url || kaggleApi.profileUrl,
+                interpretation: `Discovered from public Kaggle API for user ${kaggleApi.username}.`,
+                whyItMatters: "Demonstrates practical data science, notebook analysis, or competition modeling.",
+              });
+              recordsCreated++;
+            }
+          }
+
+          // If student passed manual metrics artifacts, merge them too
+          if (manualMetrics?.artifacts && Array.isArray(manualMetrics.artifacts)) {
+            for (const item of manualMetrics.artifacts) {
+              await saveProject(personId, {
+                title: `Kaggle ${item.type}: ${item.title}`,
+                summary: item.description || `Kaggle ${item.type} artifact by ${cleanId}`,
+                demoUrl: item.url || `https://www.kaggle.com/${cleanId}`,
+                sources: ["kaggle"],
+                status: "candidate",
+                projectType: "software",
+              });
+
+              await createEvidenceRecord(personId, {
+                category: "project",
+                subject: `Kaggle ${item.type}: ${item.title}`,
+                value: item.description || "Student-confirmed Kaggle artifact",
+                source: "self_reported",
+                verificationStatus: "unverified",
+                sourceReference: item.url || `https://www.kaggle.com/${cleanId}`,
+                interpretation: `Student-confirmed Kaggle ${item.type} artifact.`,
+                whyItMatters: "Demonstrates practical data science, notebook analysis, or competition modeling.",
+              });
+              recordsCreated++;
+            }
+          }
+
+          acquisitionStatus = isLive ? "LIVE_VERIFIED" : "PROFILE_LINK_ONLY";
+          summary = kaggleApi.notes || `Kaggle profile linked (${kaggleApi.profileUrl}).`;
+          extractedDetails = kaggleApi as any;
+        }
         break;
       }
 

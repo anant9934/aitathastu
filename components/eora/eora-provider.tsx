@@ -1,15 +1,22 @@
 "use client";
 
 /**
- * EORA PROVIDER — SHARED COMPANION CONTROLLER — VERSION 1.0
- * One single EORA instance across the entire app.
- * Manages: context, intent, decisions, tour state, preferences, animation.
+ * EORA PROVIDER — SHARED COMPANION CONTROLLER — VERSION 1.1
+ * Phase 5: Full live application wiring.
  *
- * Performance rules:
- * - No duplicate timers or subscriptions.
- * - Cleans up all listeners on unmount.
- * - Lazy-loads nothing here (pure state management).
- * - ZERO LLM calls for routine interactions.
+ * New in 1.1:
+ * - updateLiveStudentContext() — receives real Person 360 data
+ * - Tour spotlight DOM targeting
+ * - Field focus tracking via userIsFocused
+ * - Proper celebration with student name
+ * - Dashboard companion with personalization context
+ * - Success event with verified backend origin flag
+ * - Logout / context-clear support
+ *
+ * Security rules (unchanged):
+ * - Never stores raw OAuth tokens, passwords, or secret keys
+ * - Never mixes authenticated identities
+ * - Zero LLM calls for routine interactions
  */
 
 import React, {
@@ -23,13 +30,20 @@ import React, {
 } from "react";
 import { usePathname } from "next/navigation";
 
-import type { EoraContext, OnboardingStep } from "@/lib/eora/context";
+import type { EoraContext, OnboardingStep, StudentContext } from "@/lib/eora/context";
 import {
   createDefaultContext,
+  createEmptyStudentContext,
   resolveRouteFromPathname,
   shouldEoraBeQuiet,
 } from "@/lib/eora/context";
 import type { EoraMessage } from "@/lib/eora/dialogue";
+import {
+  getOnboardingStepMessage,
+  getTinyVictoryMessage,
+  getCelebrationMessage,
+  getWelcomeBackMessage,
+} from "@/lib/eora/dialogue";
 import { recognizeIntent } from "@/lib/eora/intent";
 import { processUserInput, getProactiveDecision } from "@/lib/eora/brain";
 import type { EoraPreferences } from "@/lib/eora/engagement";
@@ -38,6 +52,7 @@ import {
   savePreferences,
   markTourCompleted,
   snoozeEora,
+  isEoraSnoozed,
   canSendProactiveNudge,
   recordNudgeSent,
   recordInteraction,
@@ -47,91 +62,101 @@ import {
 import type { TourDefinition } from "@/lib/eora/tours";
 import { getTourById } from "@/lib/eora/tours";
 import type { EoraAnimationState } from "@/lib/eora/identity";
+import { getPoseForState } from "@/lib/eora/identity";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTEXT TYPE
+// LIVE STUDENT DATA — safe subset only (no tokens/passwords/secrets)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface EoraLiveStudentData {
+  personId: string;
+  displayName: string;
+  isAuthenticated: true;
+  activeGoalTitle: string | null;
+  targetRole: string | null;
+  primaryPriority: string | null;
+  secondaryPriorities: string[];
+  skillsCount: number;
+  projectsCount: number;
+  verifiedEvidenceCount: number;
+  connectedSources: string[];
+  nextMilestoneTitle: string | null;
+  isProcessing: boolean;
+  /** Whether this student has just completed onboarding (for welcome celebration) */
+  isFirstSession: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTROLLER STATE TYPE
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface EoraControllerState {
-  /** Current EORA message (empty text = no message shown) */
   currentMessage: EoraMessage;
-  /** Current animation pose */
   animationState: EoraAnimationState;
-  /** Whether the floating companion is visible */
+  /** Resolved pose name (for avatar rendering) */
+  currentPose: string;
   isVisible: boolean;
-  /** Whether the help panel is expanded */
   isPanelOpen: boolean;
-  /** Whether EORA is in quiet mode */
   isQuiet: boolean;
-  /** Active tour definition (null if no tour running) */
   activeTour: TourDefinition | null;
-  /** Current tour step index */
   tourStepIndex: number;
-  /** Whether EORA is minimized to avatar-only */
+  /** Current spotlight target data-eora-id (null when not in tour) */
+  tourSpotlightTargetId: string | null;
   isMinimized: boolean;
-  /** Current onboarding step (set externally by onboarding container) */
   onboardingStep: OnboardingStep;
-  /** User preferences */
   preferences: EoraPreferences;
-  /** Clarifying options shown when intent is uncertain */
   clarifyingOptions: string[] | null;
-  /** Navigation URL from last decision */
   pendingNavUrl: string | null;
   pendingNavLabel: string | null;
-  /** Whether to show a celebration */
   showCelebration: boolean;
+  /** Whether live student data has been loaded */
+  hasLiveStudentData: boolean;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTROLLER INTERFACE
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface EoraController extends EoraControllerState {
-  /** Called when user sends a message to EORA */
   handleUserMessage: (text: string) => void;
-  /** Called when a clarifying option is clicked */
   handleClarifyingChoice: (text: string) => void;
-  /** Opens the help panel */
   openPanel: () => void;
-  /** Closes the help panel */
   closePanel: () => void;
-  /** Dismisses the companion */
   dismiss: () => void;
-  /** Restores the companion */
   restore: () => void;
-  /** Minimizes to icon */
   minimize: () => void;
-  /** Expands from minimized */
   expand: () => void;
-  /** Snoozes EORA for N minutes */
   snooze: (minutes: number) => void;
-  /** Starts a tour by ID */
   startTour: (tourId: string) => void;
-  /** Advances tour step */
   nextTourStep: () => void;
-  /** Goes back one tour step */
   prevTourStep: () => void;
-  /** Exits current tour */
   exitTour: () => void;
-  /** Updates the onboarding step externally */
+  /** Called by ExactScreensContainer on each screen transition */
   setOnboardingStep: (step: OnboardingStep) => void;
-  /** Updates student context data */
-  updateStudentContext: (patch: Partial<EoraControllerState["preferences"]>) => void;
-  /** Updates preferences */
-  updatePreferences: (patch: Partial<EoraPreferences>) => void;
-  /** Resets all preferences */
-  resetAllPreferences: () => void;
-  /** Signals a successful action (e.g. resume uploaded) */
-  signalSuccess: (action: string) => void;
+  /** Called by WorkspaceProvider / student pages with real Person 360 data */
+  updateLiveStudentContext: (data: EoraLiveStudentData) => void;
+  /** Called on logout — clears all personal context */
+  clearStudentContext: () => void;
+  /** Signals a successful action confirmed by the backend */
+  signalSuccess: (action: string, studentName?: string) => void;
   /** Signals a field validation error */
   signalFieldError: (fieldId: string, label: string, error: string) => void;
-  /** Clears field error */
-  clearFieldError: () => void;
-  /** The full context (read-only) */
+  /** Clears field error when corrected */
+  clearFieldError: (fieldId?: string) => void;
+  /** Marks user as actively typing (suppresses proactive nudges) */
+  setUserFocused: (focused: boolean) => void;
+  updatePreferences: (patch: Partial<EoraPreferences>) => void;
+  resetAllPreferences: () => void;
+  /** Deprecated compat shim — use updateLiveStudentContext instead */
+  updateStudentContext: (patch: Partial<EoraPreferences>) => void;
   context: EoraContext;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTEXT
+// REACT CONTEXT
 // ─────────────────────────────────────────────────────────────────────────────
 
-const EoraContext = createContext<EoraController | null>(null);
+const EoraCtx = createContext<EoraController | null>(null);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROVIDER
@@ -141,9 +166,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // ── Core state ──────────────────────────────────────────────────────────────
-  const [preferences, setPreferences] = useState<EoraPreferences>(
-    createDefaultContext().student ? loadPreferences() : loadPreferences()
-  );
+  const [preferences, setPreferences] = useState<EoraPreferences>(loadPreferences);
   const [isVisible, setIsVisible] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -154,68 +177,84 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const [animationState, setAnimationState] = useState<EoraAnimationState>("IDLE");
   const [activeTour, setActiveTour] = useState<TourDefinition | null>(null);
   const [tourStepIndex, setTourStepIndex] = useState(0);
-  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>("none");
-  const [clarifyingOptions, setClarifyingOptions] = useState<string[] | null>(null);
+  const [tourSpotlightTargetId, setTourSpotlightTargetId] =
+    useState<string | null>(null);
+  const [onboardingStep, setOnboardingStepState] =
+    useState<OnboardingStep>("none");
+  const [clarifyingOptions, setClarifyingOptions] = useState<string[] | null>(
+    null
+  );
   const [pendingNavUrl, setPendingNavUrl] = useState<string | null>(null);
   const [pendingNavLabel, setPendingNavLabel] = useState<string | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [lastSuccessfulAction, setLastSuccessfulAction] = useState<string | null>(null);
-  const [focusedField, setFocusedField] = useState<EoraContext["focusedField"]>(null);
+  const [lastSuccessfulAction, setLastSuccessfulAction] = useState<
+    string | null
+  >(null);
+  const [focusedField, setFocusedField] =
+    useState<EoraContext["focusedField"]>(null);
+  const [userIsFocused, setUserIsFocused] = useState(false);
+  // Live student context — populated by WorkspaceProvider / student pages
+  const [liveStudent, setLiveStudent] = useState<StudentContext>(
+    createEmptyStudentContext()
+  );
+  const [hasLiveStudentData, setHasLiveStudentData] = useState(false);
 
-  // Session nudge counter (resets on page load)
+  // Session refs
   const sessionNudgeCount = useRef(0);
   const lastNudgeTimestamp = useRef<number | null>(null);
   const proactiveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reducedMotion = useRef(false);
+  const hasShownWelcomeBack = useRef(false);
 
   // ── Context construction ───────────────────────────────────────────────────
-  const context = useMemo<EoraContext>(() => {
-    const route = resolveRouteFromPathname(pathname ?? "/");
-    return {
-      route,
+  const context = useMemo<EoraContext>(
+    () => ({
+      route: resolveRouteFromPathname(pathname ?? "/"),
       onboardingStep,
       focusedField,
       student: {
-        personId: null, // Populated by external updateStudentContext calls
-        displayName: null,
-        isAuthenticated: false,
-        activeGoalTitle: null,
-        targetRole: null,
-        primaryPriority: null,
-        secondaryPriorities: [],
-        skillsCount: 0,
-        projectsCount: 0,
-        verifiedEvidenceCount: 0,
+        ...liveStudent,
         completedTourIds: preferences.tourCompletedIds,
         dismissedSuggestionIds: preferences.dismissedSuggestionIds,
-        isProcessing: false,
-        connectedSources: [],
-        nextMilestoneTitle: null,
       },
-      userIsFocused: false,
+      userIsFocused,
       lastSuccessfulAction,
-      processingState: null,
+      processingState: liveStudent.isProcessing ? "Processing..." : null,
       lastEoraInteractionAt: preferences.lastInteractionAt,
-    };
-  }, [pathname, onboardingStep, focusedField, preferences, lastSuccessfulAction]);
+    }),
+    [
+      pathname,
+      onboardingStep,
+      focusedField,
+      liveStudent,
+      preferences.tourCompletedIds,
+      preferences.dismissedSuggestionIds,
+      preferences.lastInteractionAt,
+      userIsFocused,
+      lastSuccessfulAction,
+    ]
+  );
 
   // ── Init: load preferences and detect reduced motion ──────────────────────
   useEffect(() => {
     const prefs = loadPreferences();
-    reducedMotion.current = detectReducedMotionPreference();
-    setPreferences({ ...prefs, reducedMotion: prefs.reducedMotion || reducedMotion.current });
+    const rm = detectReducedMotionPreference();
+    setPreferences({ ...prefs, reducedMotion: prefs.reducedMotion || rm });
   }, []);
 
-  // ── Proactive nudge on route change ───────────────────────────────────────
+  // ── Proactive nudge on route / step change ────────────────────────────────
   useEffect(() => {
     if (proactiveTimer.current) clearTimeout(proactiveTimer.current);
 
     const route = resolveRouteFromPathname(pathname ?? "/");
-    // Never proactively nudge on landing/auth pages
-    if (route === "landing" || route === "sign-in" || route === "sign-up") return;
+    if (
+      route === "landing" ||
+      route === "sign-in" ||
+      route === "sign-up"
+    )
+      return;
     if (shouldEoraBeQuiet(context)) return;
+    if (isEoraSnoozed(preferences)) return;
 
-    // Delay proactive suggestions by 2.5s after route change
     proactiveTimer.current = setTimeout(() => {
       if (
         !canSendProactiveNudge(
@@ -225,6 +264,23 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         )
       )
         return;
+
+      // ── Welcome-back message for authenticated returning student ──────────
+      if (
+        route === "student-home" &&
+        hasLiveStudentData &&
+        liveStudent.displayName &&
+        !hasShownWelcomeBack.current
+      ) {
+        hasShownWelcomeBack.current = true;
+        const msg = getWelcomeBackMessage(liveStudent.displayName);
+        setCurrentMessage(msg);
+        setAnimationState(msg.animationState);
+        sessionNudgeCount.current += 1;
+        lastNudgeTimestamp.current = Date.now();
+        setPreferences((p) => recordNudgeSent(p));
+        return;
+      }
 
       const decision = getProactiveDecision(context);
       if (!decision || !decision.message.text) return;
@@ -238,14 +294,25 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
 
       sessionNudgeCount.current += 1;
       lastNudgeTimestamp.current = Date.now();
-      setPreferences((prev) => recordNudgeSent(prev));
+      setPreferences((p) => recordNudgeSent(p));
     }, 2500);
 
     return () => {
       if (proactiveTimer.current) clearTimeout(proactiveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, onboardingStep, lastSuccessfulAction]);
+  }, [pathname, onboardingStep, lastSuccessfulAction, hasLiveStudentData]);
+
+  // ── Onboarding step change → EORA message ─────────────────────────────────
+  useEffect(() => {
+    if (onboardingStep === "none") return;
+    const msg = getOnboardingStepMessage(onboardingStep);
+    if (msg.text) {
+      setCurrentMessage(msg);
+      setAnimationState(msg.animationState);
+      setClarifyingOptions(null);
+    }
+  }, [onboardingStep]);
 
   // ── Clear celebration after 3s ────────────────────────────────────────────
   useEffect(() => {
@@ -254,7 +321,49 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [showCelebration]);
 
-  // ── User message handler ───────────────────────────────────────────────────
+  // ── Tour spotlight DOM management ─────────────────────────────────────────
+  useEffect(() => {
+    if (!tourSpotlightTargetId) {
+      // Remove spotlight from all elements
+      document
+        .querySelectorAll("[data-eora-spotlight='true']")
+        .forEach((el) => {
+          (el as HTMLElement).removeAttribute("data-eora-spotlight");
+        });
+      return;
+    }
+
+    // Remove old spotlight
+    document
+      .querySelectorAll("[data-eora-spotlight='true']")
+      .forEach((el) => {
+        (el as HTMLElement).removeAttribute("data-eora-spotlight");
+      });
+
+    // Apply new spotlight + scroll into view
+    const target = document.querySelector(
+      `[data-eora-id="${tourSpotlightTargetId}"]`
+    ) as HTMLElement | null;
+
+    if (target) {
+      target.setAttribute("data-eora-spotlight", "true");
+      target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    return () => {
+      // Cleanup on unmount
+      document
+        .querySelectorAll("[data-eora-spotlight='true']")
+        .forEach((el) => {
+          (el as HTMLElement).removeAttribute("data-eora-spotlight");
+        });
+    };
+  }, [tourSpotlightTargetId]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CALLBACKS
+  // ─────────────────────────────────────────────────────────────────────────
+
   const handleUserMessage = useCallback(
     (text: string) => {
       if (!text.trim()) return;
@@ -267,7 +376,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
 
       setCurrentMessage(decision.message);
       setAnimationState(decision.message.animationState);
-      setPreferences((prev) => recordInteraction(prev));
+      setPreferences((p) => recordInteraction(p));
 
       if (decision.clarifyingOptions) {
         setClarifyingOptions(decision.clarifyingOptions);
@@ -277,22 +386,30 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         setPendingNavLabel(decision.navigationLabel ?? null);
       }
 
-      // Handle dismiss/pause via intent
       if (intentResult.intent === "DISMISS_ASSISTANT") {
         setTimeout(() => setIsVisible(false), 800);
       }
       if (intentResult.intent === "PAUSE_ASSISTANT") {
-        setPreferences((prev) => snoozeEora(prev, 60));
+        setPreferences((p) => snoozeEora(p, 60));
       }
       if (intentResult.intent === "RESUME_ASSISTANT") {
         setIsVisible(true);
         setIsMinimized(false);
       }
+      // Tour navigation via chat
+      if (intentResult.intent === "NEXT_TOUR_STEP" && activeTour) {
+        nextTourStep();
+        return;
+      }
+      if (intentResult.intent === "PREVIOUS_TOUR_STEP" && activeTour) {
+        prevTourStep();
+        return;
+      }
     },
-    [context]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [context, activeTour]
   );
 
-  // ── Clarifying choice ──────────────────────────────────────────────────────
   const handleClarifyingChoice = useCallback(
     (text: string) => {
       handleUserMessage(text);
@@ -301,57 +418,107 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   );
 
   // ── Tour controls ──────────────────────────────────────────────────────────
-  const startTour = useCallback(
-    (tourId: string) => {
-      const tour = getTourById(tourId);
-      if (!tour) return;
-      setActiveTour(tour);
-      setTourStepIndex(0);
-      setCurrentMessage({
-        text: tour.steps[0]?.explanation ?? tour.description,
-        animationState: "EXPLAINING",
-      });
-      setAnimationState("EXPLAINING");
-      setIsPanelOpen(true);
-    },
-    []
-  );
+  const startTour = useCallback((tourId: string) => {
+    const tour = getTourById(tourId);
+    if (!tour) return;
+    setActiveTour(tour);
+    setTourStepIndex(0);
+    const firstStep = tour.steps[0];
+    setCurrentMessage({
+      text: firstStep?.explanation ?? tour.description,
+      animationState: "EXPLAINING",
+    });
+    setAnimationState("EXPLAINING");
+    setTourSpotlightTargetId(firstStep?.targetId ?? null);
+    setIsPanelOpen(true);
+  }, []);
 
   const nextTourStep = useCallback(() => {
     if (!activeTour) return;
     const nextIndex = tourStepIndex + 1;
     if (nextIndex >= activeTour.steps.length) {
-      // Tour complete
-      setPreferences((prev) => markTourCompleted(prev, activeTour.tourId));
+      setPreferences((p) => markTourCompleted(p, activeTour.tourId));
       setActiveTour(null);
       setTourStepIndex(0);
-      setCurrentMessage({ text: "Tour complete! Great job.", animationState: "HAPPY" });
+      setTourSpotlightTargetId(null);
+      setCurrentMessage({
+        text: "Tour complete! You know this page well now.",
+        animationState: "HAPPY",
+      });
       setAnimationState("HAPPY");
       return;
     }
     setTourStepIndex(nextIndex);
+    const step = activeTour.steps[nextIndex];
     setCurrentMessage({
-      text: activeTour.steps[nextIndex].explanation,
+      text: step.explanation,
       animationState: "POINTING",
     });
     setAnimationState("POINTING");
+    setTourSpotlightTargetId(step.targetId);
   }, [activeTour, tourStepIndex]);
 
   const prevTourStep = useCallback(() => {
     if (!activeTour || tourStepIndex === 0) return;
     const prevIndex = tourStepIndex - 1;
     setTourStepIndex(prevIndex);
+    const step = activeTour.steps[prevIndex];
     setCurrentMessage({
-      text: activeTour.steps[prevIndex].explanation,
+      text: step.explanation,
       animationState: "EXPLAINING",
     });
     setAnimationState("EXPLAINING");
+    setTourSpotlightTargetId(step.targetId);
   }, [activeTour, tourStepIndex]);
 
   const exitTour = useCallback(() => {
     setActiveTour(null);
     setTourStepIndex(0);
-    setCurrentMessage({ text: "Tour ended. Click me anytime for help.", animationState: "IDLE" });
+    setTourSpotlightTargetId(null);
+    setCurrentMessage({
+      text: "Tour ended. I'm here whenever you need me.",
+      animationState: "IDLE",
+    });
+    setAnimationState("IDLE");
+  }, []);
+
+  // ── Onboarding step external setter ──────────────────────────────────────
+  const setOnboardingStep = useCallback((step: OnboardingStep) => {
+    setOnboardingStepState(step);
+  }, []);
+
+  // ── Live student context (from WorkspaceProvider / student pages) ─────────
+  const updateLiveStudentContext = useCallback(
+    (data: EoraLiveStudentData) => {
+      // Security: never store tokens, passwords, or raw secrets
+      setLiveStudent({
+        personId: data.personId,
+        displayName: data.displayName,
+        isAuthenticated: true,
+        activeGoalTitle: data.activeGoalTitle,
+        targetRole: data.targetRole,
+        primaryPriority: data.primaryPriority,
+        secondaryPriorities: data.secondaryPriorities,
+        skillsCount: data.skillsCount,
+        projectsCount: data.projectsCount,
+        verifiedEvidenceCount: data.verifiedEvidenceCount,
+        completedTourIds: preferences.tourCompletedIds,
+        dismissedSuggestionIds: preferences.dismissedSuggestionIds,
+        isProcessing: data.isProcessing,
+        connectedSources: data.connectedSources,
+        nextMilestoneTitle: data.nextMilestoneTitle,
+      });
+      setHasLiveStudentData(true);
+    },
+    [preferences.tourCompletedIds, preferences.dismissedSuggestionIds]
+  );
+
+  const clearStudentContext = useCallback(() => {
+    setLiveStudent(createEmptyStudentContext());
+    setHasLiveStudentData(false);
+    hasShownWelcomeBack.current = false;
+    // Clear any personal message
+    setCurrentMessage({ text: "", animationState: "IDLE" });
     setAnimationState("IDLE");
   }, []);
 
@@ -359,7 +526,8 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const dismiss = useCallback(() => {
     setIsVisible(false);
     setIsPanelOpen(false);
-  }, []);
+    exitTour();
+  }, [exitTour]);
 
   const restore = useCallback(() => {
     setIsVisible(true);
@@ -371,16 +539,16 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     setIsPanelOpen(false);
   }, []);
 
-  const expand = useCallback(() => {
-    setIsMinimized(false);
-  }, []);
-
+  const expand = useCallback(() => setIsMinimized(false), []);
   const openPanel = useCallback(() => setIsPanelOpen(true), []);
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
 
   const snoozeHandler = useCallback((minutes: number) => {
-    setPreferences((prev) => snoozeEora(prev, minutes));
-    setCurrentMessage({ text: `I'll be quiet for ${minutes} minutes. See you soon!`, animationState: "QUIET" });
+    setPreferences((p) => snoozeEora(p, minutes));
+    setCurrentMessage({
+      text: `Quiet for ${minutes} minutes. See you soon!`,
+      animationState: "QUIET",
+    });
     setAnimationState("QUIET");
     setTimeout(() => {
       setCurrentMessage({ text: "", animationState: "IDLE" });
@@ -388,30 +556,74 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     }, minutes * 60 * 1000);
   }, []);
 
-  // ── Signals ────────────────────────────────────────────────────────────────
-  const signalSuccess = useCallback((action: string) => {
-    setLastSuccessfulAction(action);
-    if (action === "onboarding_complete" || action === "goal_achieved") {
-      setShowCelebration(true);
-      setCurrentMessage({ text: "Congratulations! You did it.", animationState: "CELEBRATING" });
-      setAnimationState("CELEBRATING");
-    }
-    // Clear after one cycle
-    setTimeout(() => setLastSuccessfulAction(null), 5000);
-  }, []);
+  // ── Success signals (must originate from verified backend results) ─────────
+  const signalSuccess = useCallback(
+    (action: string, studentName?: string) => {
+      setLastSuccessfulAction(action);
 
+      const celebrateActions = new Set([
+        "onboarding_complete",
+        "goal_achieved",
+      ]);
+
+      if (celebrateActions.has(action)) {
+        setShowCelebration(true);
+        const name = studentName || liveStudent.displayName || "Student";
+        const celebMsg = getCelebrationMessage(name);
+        setCurrentMessage(celebMsg);
+        setAnimationState(celebMsg.animationState);
+      } else {
+        const msg = getTinyVictoryMessage(action);
+        setCurrentMessage(msg);
+        setAnimationState(msg.animationState);
+      }
+
+      // Clear signal after animation cycle
+      setTimeout(() => setLastSuccessfulAction(null), 5000);
+    },
+    [liveStudent.displayName]
+  );
+
+  // ── Field validation signals ──────────────────────────────────────────────
   const signalFieldError = useCallback(
     (fieldId: string, label: string, error: string) => {
-      setFocusedField({ fieldId, label, isValid: false, isEmpty: false, errorMessage: error });
+      setFocusedField({
+        fieldId,
+        label,
+        isValid: false,
+        isEmpty: false,
+        errorMessage: error,
+      });
+      // Show EORA reassurance message for the field
+      setCurrentMessage({
+        text: `"${label}": ${error}`,
+        animationState: "REASSURING",
+      });
+      setAnimationState("REASSURING");
     },
     []
   );
 
-  const clearFieldError = useCallback(() => {
-    setFocusedField(null);
+  const clearFieldError = useCallback((fieldId?: string) => {
+    setFocusedField((prev) => {
+      if (!fieldId || prev?.fieldId === fieldId) return null;
+      return prev;
+    });
+    // Return to idle only if current message is a field error
+    setCurrentMessage((prev) => {
+      if (prev.animationState === "REASSURING") {
+        return { text: "", animationState: "IDLE" };
+      }
+      return prev;
+    });
+    setAnimationState((prev) => (prev === "REASSURING" ? "IDLE" : prev));
   }, []);
 
-  // ── Preference controls ────────────────────────────────────────────────────
+  const setUserFocused = useCallback((focused: boolean) => {
+    setUserIsFocused(focused);
+  }, []);
+
+  // ── Preferences ────────────────────────────────────────────────────────────
   const updatePreferences = useCallback((patch: Partial<EoraPreferences>) => {
     setPreferences((prev) => {
       const updated = { ...prev, ...patch };
@@ -421,27 +633,31 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateStudentContext = useCallback(
-    (patch: Partial<EoraControllerState["preferences"]>) => {
-      updatePreferences(patch as Partial<EoraPreferences>);
+    (patch: Partial<EoraPreferences>) => {
+      updatePreferences(patch);
     },
     [updatePreferences]
   );
 
   const resetAllPreferences = useCallback(() => {
-    const defaults = resetPreferences();
-    setPreferences(defaults);
+    setPreferences(resetPreferences());
   }, []);
 
+  // ── Derived values ─────────────────────────────────────────────────────────
   const isQuiet = shouldEoraBeQuiet(context);
+  const currentPose = getPoseForState(animationState);
 
+  // ── Controller value ───────────────────────────────────────────────────────
   const value: EoraController = {
     currentMessage,
     animationState,
+    currentPose,
     isVisible,
     isPanelOpen,
     isQuiet,
     activeTour,
     tourStepIndex,
+    tourSpotlightTargetId,
     isMinimized,
     onboardingStep,
     preferences,
@@ -449,6 +665,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     pendingNavUrl,
     pendingNavLabel,
     showCelebration,
+    hasLiveStudentData,
     context,
     handleUserMessage,
     handleClarifyingChoice,
@@ -464,33 +681,30 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     prevTourStep,
     exitTour,
     setOnboardingStep,
-    updateStudentContext,
-    updatePreferences,
-    resetAllPreferences,
+    updateLiveStudentContext,
+    clearStudentContext,
     signalSuccess,
     signalFieldError,
     clearFieldError,
+    setUserFocused,
+    updateStudentContext,
+    updatePreferences,
+    resetAllPreferences,
   };
 
-  return <EoraContext.Provider value={value}>{children}</EoraContext.Provider>;
+  return <EoraCtx.Provider value={value}>{children}</EoraCtx.Provider>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HOOK
+// HOOKS
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function useEora(): EoraController {
-  const ctx = useContext(EoraContext);
-  if (!ctx) {
-    throw new Error("useEora must be used within an EoraProvider");
-  }
+  const ctx = useContext(EoraCtx);
+  if (!ctx) throw new Error("useEora must be used within an EoraProvider");
   return ctx;
 }
 
-/**
- * Safe version that returns null if called outside of an EoraProvider.
- * Use this in components that may render outside the provider tree.
- */
 export function useEoraSafe(): EoraController | null {
-  return useContext(EoraContext);
+  return useContext(EoraCtx);
 }

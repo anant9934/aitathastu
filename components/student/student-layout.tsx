@@ -9,6 +9,8 @@ import { WorkspaceSearchModal } from "./workspace-search-modal";
 import { ComingSoonModal } from "./coming-soon-modal";
 import { EvidenceDrawer } from "./evidence-drawer";
 import { ImportContinuityModal } from "./import-continuity-modal";
+import { EoraStudentBridge } from "@/components/eora/eora-student-bridge";
+import { useEoraSafe } from "@/components/eora/eora-provider";
 
 type StudentLayoutProps = {
   children: React.ReactNode;
@@ -17,6 +19,7 @@ type StudentLayoutProps = {
 export function StudentLayout({ children }: StudentLayoutProps) {
   const {
     workspace,
+    hydrated,
     activeGoal,
     evidence,
     recommendations,
@@ -27,12 +30,32 @@ export function StudentLayout({ children }: StudentLayoutProps) {
     reloadWorkspace,
   } = useWorkspace();
 
+  const eora = useEoraSafe();
   const [searchOpen, setSearchOpen] = useState(false);
   const [evidenceDrawerOpen, setEvidenceDrawerOpen] = useState(false);
   const [comingSoonFeature, setComingSoonFeature] = useState<string | null>(null);
 
+  // Wire signalSuccess for workspace events when EORA is available
+  const handleRestoreEora = async () => {
+    eora?.restore();
+    await restoreEora();
+  };
+
   return (
     <div className="student-workspace-root">
+      {/* Feed real Person 360 data into EORA — no tokens/secrets */}
+      <EoraStudentBridge
+        workspace={workspace}
+        hydrated={hydrated}
+        primaryPriority={null}
+        secondaryPriorities={[]}
+        targetRole={activeGoal?.title ?? null}
+        nextMilestoneTitle={null}
+        isProcessing={false}
+        connectedSources={[]}
+        isFirstSession={false}
+      />
+
       <StudentTopbar
         person={workspace?.person || null}
         onOpenSearch={() => setSearchOpen(true)}
@@ -52,7 +75,7 @@ export function StudentLayout({ children }: StudentLayoutProps) {
 
       <StudentMobileNav
         onOpenComingSoon={(feature) => setComingSoonFeature(feature)}
-        onTriggerEora={restoreEora}
+        onTriggerEora={handleRestoreEora}
       />
 
       <WorkspaceSearchModal

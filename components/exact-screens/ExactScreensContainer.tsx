@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ScreenNavigator } from "./ScreenNavigator";
 import { Screen1Landing } from "./Screen1Landing";
+import { useEoraSafe } from "@/components/eora/eora-provider";
+import { screenNumberToOnboardingStep } from "@/lib/eora/context";
 import { Screen2EoraIntro } from "./Screen2EoraIntro";
 import { Screen3ChooseRole } from "./Screen3ChooseRole";
 import { Screen3bAiMlDirection } from "./Screen3bAiMlDirection";
@@ -28,6 +30,15 @@ export function ExactScreensContainer({
   isGalleryMode = false,
 }: ExactScreensContainerProps) {
   const [currentScreen, setCurrentScreen] = useState<number>(initialScreen);
+  // ── EORA wiring ─────────────────────────────────────────────────────────
+  const eora = useEoraSafe();
+
+  // Notify EORA whenever the onboarding screen changes
+  useEffect(() => {
+    if (isGalleryMode || !eora) return;
+    const step = screenNumberToOnboardingStep(currentScreen);
+    eora.setOnboardingStep(step);
+  }, [currentScreen, eora, isGalleryMode]);
 
   useEffect(() => {
     setCurrentScreen(initialScreen);
@@ -278,6 +289,8 @@ export function ExactScreensContainer({
         }),
       });
       if (!response.ok) throw new Error("Could not save onboarding. Please try again.");
+      // Signal confirmed backend success to EORA before navigating
+      eora?.signalSuccess("onboarding_complete", name || academic.fullName);
       window.location.assign("/student");
     } catch {
       setIsSubmitting(false);
@@ -454,6 +467,8 @@ export function ExactScreensContainer({
                 resumeReviewed: claims,
                 discoveredResumeProfiles: nextDiscoveredProfiles,
               });
+              // Signal confirmed backend extraction success to EORA
+              eora?.signalSuccess("resume_uploaded");
             }}
             onNext={() => setCurrentScreen(6)}
             onBack={() => setCurrentScreen(4)}
@@ -485,6 +500,8 @@ export function ExactScreensContainer({
               const nextProjects = [...projects, ...mapped];
               setProjects(nextProjects);
               persistDraft({ projects: nextProjects });
+              // Signal GitHub connection success to EORA
+              if (mapped.length > 0) eora?.signalSuccess("github_connected");
             }}
             onNext={() => setCurrentScreen(7)}
             onBack={() => setCurrentScreen(5)}

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Eye, EyeOff, Lock, Mail, User, Phone, Briefcase, Building2, BookOpen, AlertCircle } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
+import { useEoraSafe } from "@/components/eora/eora-provider";
 
 export interface AcademicDetailsData {
   fullName: string;
@@ -34,6 +35,7 @@ export function Screen4AcademicDetails({
   onBack,
   onJumpToStep,
 }: Screen4AcademicDetailsProps) {
+  const eora = useEoraSafe();
   const [formData, setFormData] = useState<AcademicDetailsData>({
     fullName: initialData?.fullName || "",
     email: initialData?.email || "",
@@ -58,6 +60,8 @@ export function Screen4AcademicDetails({
         delete next[field];
         return next;
       });
+      // Clear EORA field error when user starts correcting
+      eora?.clearFieldError(String(field));
     }
   };
 
@@ -81,6 +85,20 @@ export function Screen4AcademicDetails({
     }
 
     setErrors(newErrors);
+    // Signal EORA about the first validation error if any
+    if (Object.keys(newErrors).length > 0) {
+      const firstKey = Object.keys(newErrors)[0];
+      const labelMap: Record<string, string> = {
+        fullName: "Full Name",
+        email: "Email Address",
+        password: "Password",
+      };
+      eora?.signalFieldError(
+        firstKey,
+        labelMap[firstKey] ?? firstKey,
+        newErrors[firstKey]
+      );
+    }
     return Object.keys(newErrors).length === 0;
   };
 

@@ -45,6 +45,7 @@ const SAFETY_PATTERNS: Array<{
       /\b(you are now|pretend you are|act as if you are|override your)\b/i,
       /\b(forget everything|new persona|system prompt|jailbreak)\b/i,
       /(disregard|bypass)\s+your\s+(instructions|rules|safety)/i,
+      /disregard\s+(your|all|my|the)\s+(guidelines|rules|instructions|constraints)/i,
     ],
   },
   {
@@ -52,6 +53,7 @@ const SAFETY_PATTERNS: Array<{
     patterns: [
       /\b(invent|make up|create fake|fake project|fake skill|pretend i built)\b/i,
       /add\s+fake\s+(project|skill|achievement|certificate)/i,
+      /fake\s+(ml|ai|data|python|java|code)\s+(project|skill)/i,
     ],
   },
   {
@@ -65,16 +67,19 @@ const SAFETY_PATTERNS: Array<{
   {
     category: "CREDENTIAL_EXPOSURE",
     patterns: [
-      /\b(password|secret key|api key|token|bearer|private key|auth token)\b/i,
+      /\b(password|secret key|api key|bearer|private key|auth token)\b/i,
       /\b(give me.*(password|credentials)|show.*(password|credentials))\b/i,
+      /database\s+(connection\s+)?(string|url|credentials)/i,
+      /connection\s+string/i,
     ],
   },
   {
     category: "ACADEMIC_DISHONESTY",
     patterns: [
       /\b(cheat|plagiar|fake my|fake the|write my assignment|do my homework)\b/i,
-      /\bwrite my (essay|report|thesis|project|homework|assignment)\b/i,
+      /\bwrite my (essay|report|thesis|project|homework|assignment|internship\s+\w+)\b/i,
       /\b(pretend i (have|know|did)|add fake|add false|fabricate my)\b/i,
+      /write\s+(my|the)\s+(internship|college|university|course)\s+(report|assignment|project|work)/i,
     ],
   },
   {
@@ -96,6 +101,8 @@ const SAFETY_PATTERNS: Array<{
     patterns: [
       /\b(show me (other|another|someone else)'s|access (other|another|someone else)'s)\b/i,
       /\b(other student|another student|their profile|their data)\b/i,
+      /access\s+\w+'s\s+profile/i,
+      /access\s+[a-z]+['']s\s+(profile|account|data|information)/i,
     ],
   },
 ];

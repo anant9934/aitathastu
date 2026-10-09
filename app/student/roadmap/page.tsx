@@ -345,6 +345,7 @@ export default function RoadmapPage() {
 
             {/* Stages Progression */}
             <section
+              data-eora-id="eora-roadmap-milestones"
               style={{
                 padding: 24,
                 borderRadius: 16,

@@ -214,6 +214,7 @@ export function Screen3bAiMlDirection({
 
       <main
         className="screen-body"
+        data-eora-id="eora-ai-direction"
         style={{
           position: "relative",
           zIndex: 1,

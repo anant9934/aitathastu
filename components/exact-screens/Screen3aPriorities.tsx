@@ -107,6 +107,7 @@ export function Screen3aPriorities({
 
       <main
         className="screen-body"
+        data-eora-id="eora-priorities"
         style={{
           position: "relative",
           zIndex: 1,

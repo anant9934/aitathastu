@@ -206,7 +206,7 @@ export default function SkillsPage() {
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: 1040, marginInline: "auto", padding: "28px 20px 80px" }}>
+      <main data-eora-id="eora-skills-list" style={{ maxWidth: 1040, marginInline: "auto", padding: "28px 20px 80px" }}>
         {/* Metrics Row */}
         {data?.stats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>

@@ -478,6 +478,7 @@ export function Screen6DigitalFootprints({
 
       <main
         className="screen-body"
+        data-eora-id="eora-digital-footprints"
         style={{
           position: "relative",
           zIndex: 1,

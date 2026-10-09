@@ -186,7 +186,7 @@ export async function POST(req: Request) {
     }
 
     const expectedHost = VALID_PROVIDERS[provider].host;
-    let cleanUrl = typeof profileUrl === "string" && profileUrl.trim()
+    const cleanUrl = typeof profileUrl === "string" && profileUrl.trim()
       ? profileUrl.trim()
       : expectedHost
       ? `https://${expectedHost}/${cleanUsername}`

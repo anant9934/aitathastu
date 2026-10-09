@@ -4,16 +4,15 @@
  * Dashboard, EORA grounding, and Security Regressions.
  */
 
-import { getDb, persons, externalConnections, sourceSnapshots, projects, evidenceItems, journeyEvents } from "@/lib/db";
+import { getDb, persons, externalConnections, sourceSnapshots } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 
 // Connectors
-import { fetchGitHubProjects } from "@/lib/connectors/github/client";
 import { mapGitHubReposToProjects } from "@/lib/connectors/github/mapper";
-import { isSafePublicUrl, fetchPortfolioMetadata } from "@/lib/connectors/portfolio/client";
-import { validateLinkedInUrl, parseLinkedInZipArchive, parseLinkedInDataExport } from "@/lib/connectors/linkedin/client";
-import { normalizeLeetCodeUsername, fetchLeetCodeProfileStats } from "@/lib/connectors/leetcode/client";
+import { isSafePublicUrl } from "@/lib/connectors/portfolio/client";
+import { validateLinkedInUrl, parseLinkedInDataExport } from "@/lib/connectors/linkedin/client";
+import { normalizeLeetCodeUsername } from "@/lib/connectors/leetcode/client";
 import {
   fetchHackerRankProfile,
   fetchCodeChefProfile,
@@ -21,11 +20,7 @@ import {
   normalizeCodingHandle,
 } from "@/lib/connectors/coding-platforms/client";
 import {
-  fetchHuggingFaceArtifacts,
   normalizeHuggingFaceUsername,
-  fetchOrcidRecord,
-  normalizeOrcidId,
-  fetchDevToArticles,
   classifyDevToTopics,
   fetchStackOverflowProfile,
   fetchKaggleProfile,
@@ -34,7 +29,7 @@ import {
 } from "@/lib/connectors/research-and-dev/client";
 import { isValidOrcidChecksum } from "@/lib/services/digital-footprint-registry";
 import { saveProject } from "@/lib/repositories/project-repository";
-import { saveExternalConnection, saveSourceSnapshot, disconnectConnection, getExternalConnections } from "@/lib/repositories/connection-repository";
+import { saveExternalConnection, saveSourceSnapshot, disconnectConnection } from "@/lib/repositories/connection-repository";
 import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
 import { wrapUntrustedContent } from "@/lib/intelligence/prompt-defense";
 

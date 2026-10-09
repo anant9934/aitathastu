@@ -61,7 +61,7 @@ function recordTest(index: number, name: string, passed: boolean, notes: string)
 // Minimal valid PDF generator for testing
 function createMinimalPdfBuffer(textContent: string, hyperlinks: string[] = []): Buffer {
   let annotEntries = "";
-  let objCount = 5;
+  const objCount = 5;
 
   hyperlinks.forEach((url, i) => {
     const annotObjId = objCount + i;
@@ -165,8 +165,8 @@ Built transformer acceleration pipeline.`;
     const test1Pass =
       extractPdfResult.success &&
       extractPdfResult.provider === "deterministic-engine" &&
-      extractPdfResult.extracted?.education.length! > 0 &&
-      extractPdfResult.extracted?.skills.length! >= 4 &&
+      (extractPdfResult.extracted?.education?.length ?? 0) > 0 &&
+      (extractPdfResult.extracted?.skills?.length ?? 0) >= 4 &&
       routerCallCount === 0;
 
     recordTest(
@@ -662,7 +662,7 @@ Lovely Professional University`;
     const test26Pass =
       noKeysExtraction.success &&
       noKeysExtraction.provider === "deterministic-engine" &&
-      noKeysExtraction.extracted?.skills.length! > 0;
+      (noKeysExtraction.extracted?.skills?.length ?? 0) > 0;
 
     // Restore keys
     Object.assign(process.env, savedKeys);

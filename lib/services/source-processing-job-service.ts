@@ -77,6 +77,30 @@ export class SourceProcessingJobService {
   }
 
   /**
+   * Updates the processing stage of a job.
+   */
+  static async updateStage(
+    jobId: string,
+    personId: string,
+    stage: ProcessingStage,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    const db = await getDb();
+    await db
+      .update(sourceProcessingJobs)
+      .set({
+        stage,
+        ...(metadata ? { metadata } : {}),
+      })
+      .where(
+        and(
+          eq(sourceProcessingJobs.id, jobId),
+          eq(sourceProcessingJobs.personId, personId)
+        )
+      );
+  }
+
+  /**
    * Advances job to next stage or marks as completed.
    */
   static async completeJob(params: CompleteJobParams): Promise<void> {

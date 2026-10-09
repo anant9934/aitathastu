@@ -134,10 +134,12 @@ export async function getDb(): Promise<TathastuDb> {
         const check = await client.query("SELECT to_regclass('public.organizations') as reg");
         const isInitialized = Boolean((check.rows[0] as Record<string, unknown> | undefined)?.reg);
 
+        // Always execute all migration statements (CREATE TABLE IF NOT EXISTS) to ensure newly added tables exist
+        for (const stmt of MIGRATION_SQL_STATEMENTS) {
+          await client.query(stmt);
+        }
+
         if (!isInitialized) {
-          for (const stmt of MIGRATION_SQL_STATEMENTS) {
-            await client.query(stmt);
-          }
           await seedDefaultEntities(db);
         }
       } catch (migErr) {

@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx scripts/test-core-v3.ts",
     "test:core-v3": "node --import tsx scripts/test-core-v3.ts",
+    "test:core-v3-1": "node --import tsx scripts/verify-v3-1-live.ts",
     "test:core-v2": "node --import tsx scripts/test-core-v2.ts",
     "test:llm": "node --import tsx scripts/test-live-llm.ts",
     "secrets:generate": "node --import tsx scripts/generate-production-secrets.ts",

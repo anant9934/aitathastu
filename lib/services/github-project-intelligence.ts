@@ -16,6 +16,7 @@
 import { defaultIntelligenceRouter } from "../intelligence/router";
 import { GitHubProjectInterpretationSchema, type GitHubProjectInterpretationOutput } from "../intelligence/schemas";
 import { sanitizeTextForPrompt, wrapUntrustedContent } from "../intelligence/prompt-defense";
+import { SourceProcessingJobService } from "./source-processing-job-service";
 
 const GITHUB_API = "https://api.github.com";
 const USER_AGENT = "AI-Tathastu-ProjectIntel/1.0";
@@ -355,10 +356,32 @@ export async function interpretGitHubProject(
   }
 
   const startTime = Date.now();
+  let jobId: string | null = null;
+  
+  if (personId) {
+    try {
+      jobId = await SourceProcessingJobService.startJob({
+        personId,
+        sourceId: "github",
+        stage: "interpret",
+        metadata: { repoFullName },
+      });
+    } catch {
+      // ignore
+    }
+  }
 
   // Fetch repo content from GitHub
   const content = await fetchRepoContent(owner, repo, token);
   if (!content) {
+    if (jobId && personId) {
+      await SourceProcessingJobService.failJob({
+        jobId,
+        personId,
+        errorCode: "FETCH_ERROR",
+        errorMessage: `Could not fetch repository "${repoFullName}" from GitHub.`,
+      }).catch(() => null);
+    }
     return {
       success: false,
       repoFullName,
@@ -446,6 +469,30 @@ export async function interpretGitHubProject(
       improvementSuggestions,
     };
 
+    if (jobId && personId) {
+      try {
+        const { intelligenceArtifacts } = await import("../db");
+        const db = await import("../db").then(m => m.getDb());
+        const artifactId = `artifact_${Date.now()}`;
+        await db.insert(intelligenceArtifacts).values({
+          id: artifactId,
+          personId,
+          artifactType: "project_interpretation",
+          sourceReferences: [repoFullName],
+          content: interpretation,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        await SourceProcessingJobService.completeJob({
+          jobId,
+          personId,
+          resultReference: artifactId,
+        });
+      } catch (e) {
+        console.error("Failed to save artifact or complete job", e);
+      }
+    }
+
     return {
       success: true,
       repoFullName,
@@ -458,6 +505,14 @@ export async function interpretGitHubProject(
       readmeFetched: content.readme !== null,
     };
   } catch (err) {
+    if (jobId && personId) {
+      await SourceProcessingJobService.failJob({
+        jobId,
+        personId,
+        errorCode: "INTERPRETATION_ERROR",
+        errorMessage: err instanceof Error ? err.message : "Project interpretation failed",
+      }).catch(() => null);
+    }
     return {
       success: false,
       repoFullName,

@@ -37,6 +37,8 @@ export interface ProjectEntry {
   codeSnippet?: string;
   architecture?: string[];
   highlights?: string[];
+  aiPurpose?: string;
+  uncertaintyNotes?: string[];
 }
 
 interface Screen10GitHubProjectsProps {
@@ -192,22 +194,69 @@ export function Screen10GitHubProjects({
   onNext,
   onBack,
   onJumpToStep,
+  isGalleryMode = false,
 }: Screen10GitHubProjectsProps) {
   const [projects, setProjects] = useState<ProjectEntry[]>(
-    discoveredProjects.length >= 3 ? discoveredProjects : defaultRichProjects
+    isGalleryMode ? defaultRichProjects : discoveredProjects
   );
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    discoveredProjects.length > 0 ? discoveredProjects[0].id : defaultRichProjects[0].id
+    isGalleryMode ? defaultRichProjects[0].id : (discoveredProjects[0]?.id || "")
   );
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newTechs, setNewTechs] = useState("");
+  const [aiConsent, setAiConsent] = useState(false);
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisMessage, setAnalysisMessage] = useState("");
 
-  const activeProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
+  const activeProject: ProjectEntry = projects.find((p) => p.id === selectedProjectId) || projects[0] || {
+    id: "empty",
+    title: "No project added yet",
+    description: "Add a project or connect GitHub to review a repository.",
+    technologies: [],
+    sources: [],
+    status: "candidate" as const,
+    contribution: [],
+    contributionNote: "",
+  };
 
   const handleSelectProject = (proj: ProjectEntry) => {
     setSelectedProjectId(proj.id);
+    setAnalysisMessage("");
+    setAiConsent(false);
+  };
+
+  const updateProject = (id: string, patch: Partial<ProjectEntry>) => {
+    const next = projects.map((project) => project.id === id ? { ...project, ...patch } : project);
+    setProjects(next);
+    onProjectsChange?.(next);
+  };
+
+  const handleAnalyzeProject = async () => {
+    if (!activeProject.url || !aiConsent) return;
+    const match = /^https:\/\/github\.com\/([^/]+)\/([^/?#]+)\/?$/i.exec(activeProject.url);
+    if (!match) { setAnalysisMessage("A valid GitHub repository URL is required."); return; }
+    setAnalysisBusy(true);
+    setAnalysisMessage("");
+    try {
+      const response = await fetch("/api/student/projects/interpret", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoFullName: `${match[1]}/${match[2]}`, aiConsent: true }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.interpretation) throw new Error(data.error || data.meta?.error || "Interpretation unavailable.");
+      const result = data.interpretation;
+      updateProject(activeProject.id, {
+        description: result.projectPurpose,
+        aiPurpose: result.projectPurpose,
+        technologies: Array.from(new Set([...(activeProject.technologies || []), ...result.detectedTechnologies])),
+        uncertaintyNotes: result.uncertaintyNotes,
+      });
+      setAnalysisMessage("Repository interpretation is ready for your review. It does not verify your personal contribution.");
+    } catch (error) {
+      setAnalysisMessage(error instanceof Error ? error.message : "Interpretation unavailable.");
+    } finally { setAnalysisBusy(false); }
   };
 
   const handleAddProject = () => {
@@ -220,19 +269,12 @@ export function Screen10GitHubProjects({
     const newProj: ProjectEntry = {
       id: `proj_${Date.now()}`,
       title: newTitle.trim(),
-      description: newDesc.trim() || "Applied machine learning project.",
-      technologies: parsedTechs.length > 0 ? parsedTechs : ["Python", "Machine Learning"],
+      description: newDesc.trim(),
+      technologies: parsedTechs,
       sources: ["manual"],
       status: "confirmed",
-      contribution: ["Lead Developer"],
-      contributionNote: "Custom project added during onboarding.",
-      stars: 1,
-      forks: 0,
-      impactScore: 85,
-      commitsCount: 20,
-      architecture: ["Modular Microservice", "Clean Architecture"],
-      highlights: ["Initial release", "Ready for institutional review"],
-      codeSnippet: `# ${newTitle.trim()} - Main Entrypoint\nimport asyncio\n\nasync def main():\n    print("Executing ${newTitle.trim()}...")\n\nif __name__ == "__main__":\n    asyncio.run(main())`,
+      contribution: [],
+      contributionNote: "",
     };
 
     const next = [newProj, ...projects];
@@ -460,7 +502,7 @@ export function Screen10GitHubProjects({
                           color: "#64748B",
                         }}
                       >
-                        Public
+                        {proj.sources.includes("github") ? "GitHub" : "Manual"}
                       </span>
                     </div>
                   </div>
@@ -487,12 +529,12 @@ export function Screen10GitHubProjects({
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", opacity: 0.6, fontSize: 9.5 }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <Code2 size={10} color="#02C5F5" /> {proj.title.toLowerCase().replace(/\s+/g, "_")}.py
+                        <Code2 size={10} color="#02C5F5" /> {proj.url ? "Repository linked" : "No repository linked"}
                       </span>
-                      <span>{proj.commitsCount ?? 40} commits</span>
+                      <span>{proj.commitsCount == null ? "Commits unavailable" : `${proj.commitsCount} commits`}</span>
                     </div>
                     <div style={{ fontSize: 10.5, color: "#94A3B8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {proj.codeSnippet ? proj.codeSnippet.split("\n")[0] : `class ${proj.title.replace(/\s+/g, "")}Pipeline:`}
+                      {proj.codeSnippet ? proj.codeSnippet.split("\n")[0] : "Code preview unavailable"}
                     </div>
                   </div>
 
@@ -525,10 +567,10 @@ export function Screen10GitHubProjects({
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: "1px solid #F1F5F9" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#64748B" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                          <Star size={12} color="#F59E0B" fill="#F59E0B" /> {proj.stars ?? 12}
+                          <Star size={12} color="#F59E0B" fill="#F59E0B" /> {proj.stars ?? "—"}
                         </span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                          <GitFork size={12} /> {proj.forks ?? 4}
+                          <GitFork size={12} /> {proj.forks ?? "—"}
                         </span>
                       </div>
 
@@ -542,7 +584,7 @@ export function Screen10GitHubProjects({
                           color: isSelected ? "#FFFFFF" : "#5642EF",
                         }}
                       >
-                        AI Impact {proj.impactScore ?? 90}
+                        {proj.impactScore == null ? "Not assessed" : `AI Impact ${proj.impactScore}`}
                       </span>
                     </div>
                   </div>
@@ -581,11 +623,11 @@ export function Screen10GitHubProjects({
                     borderRadius: 6,
                   }}
                 >
-                  Project Telemetry
+                  Project Review
                 </span>
 
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#10B981", display: "flex", alignItems: "center", gap: 4 }}>
-                  <CheckCircle2 size={15} /> Verified Codebase
+                  <CheckCircle2 size={15} /> {isGalleryMode ? "Demo codebase" : activeProject.status === "confirmed" ? "Student confirmed" : "Needs review"}
                 </span>
               </div>
 
@@ -595,20 +637,31 @@ export function Screen10GitHubProjects({
               <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.45, margin: 0 }}>
                 {activeProject.description}
               </p>
+              {!isGalleryMode && activeProject.id !== "empty" && <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+                {activeProject.url && <a href={activeProject.url} target="_blank" rel="noopener noreferrer" style={{ color: "#5642EF", fontSize: 12 }}>Open repository</a>}
+                {activeProject.sources.includes("github") && <>
+                  <label style={{ display: "flex", gap: 7, alignItems: "flex-start", fontSize: 12, color: "#475569" }}><input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} /> I agree to send this repository&apos;s README and metadata to an approved AI provider for interpretation.</label>
+                  <button type="button" disabled={!aiConsent || analysisBusy || !activeProject.url} onClick={handleAnalyzeProject} style={{ border: 0, borderRadius: 8, background: "#5642EF", color: "white", padding: "8px 10px", cursor: "pointer" }}>{analysisBusy ? "Interpreting..." : "Interpret repository"}</button>
+                </>}
+                {analysisMessage && <span style={{ color: "#475569", fontSize: 12 }}>{analysisMessage}</span>}
+                {activeProject.uncertaintyNotes?.length ? <div style={{ fontSize: 12, color: "#92400E" }}>Uncertain: {activeProject.uncertaintyNotes.join("; ")}</div> : null}
+                <label style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>What did you personally work on?<textarea value={activeProject.contributionNote} onChange={(event) => updateProject(activeProject.id, { contributionNote: event.target.value })} rows={3} style={{ display: "block", width: "100%", marginTop: 5, border: "1px solid #CBD5E1", borderRadius: 7, padding: 7 }} /></label>
+                {activeProject.status === "candidate" && <div style={{ display: "flex", gap: 8 }}><button type="button" disabled={activeProject.sources.includes("github") && !activeProject.contributionNote.trim()} onClick={() => updateProject(activeProject.id, { status: "confirmed" })} style={{ background: "#059669", color: "white", border: 0, borderRadius: 7, padding: "7px 12px" }}>Confirm project</button><button type="button" onClick={() => updateProject(activeProject.id, { status: "removed" })} style={{ border: "1px solid #CBD5E1", borderRadius: 7, padding: "7px 12px" }}>Reject</button></div>}
+              </div>}
             </div>
 
             {/* AI Impact Breakdown Radar */}
             <div style={{ background: "#F8FAFC", borderRadius: 14, border: "1px solid #E2E8F0", padding: 14 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                  AI Verification Score
+                  {isGalleryMode ? "Demo score" : "Assessment"}
                 </span>
                 <span style={{ fontSize: 16, fontWeight: 850, color: "#5642EF" }}>
-                  {activeProject.impactScore ?? 90} / 100
+                  {activeProject.impactScore == null ? "Not assessed" : `${activeProject.impactScore} / 100`}
                 </span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, textAlign: "center" }}>
+              {isGalleryMode && <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, textAlign: "center" }}>
                 <div style={{ background: "#FFFFFF", padding: "8px 4px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: "#10B981" }}>96%</div>
                   <div style={{ fontSize: 9.5, color: "#64748B", fontWeight: 600 }}>Code Quality</div>
@@ -621,13 +674,13 @@ export function Screen10GitHubProjects({
                   <div style={{ fontSize: 13, fontWeight: 800, color: "#0284C7" }}>88%</div>
                   <div style={{ fontSize: 9.5, color: "#64748B", fontWeight: 600 }}>Testing</div>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Code Snippet Viewer */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 5 }}>
-                <Code2 size={13} color="#5642EF" /> Core Implementation Excerpt
+                <Code2 size={13} color="#5642EF" /> Code preview
               </div>
               <pre
                 style={{
@@ -644,17 +697,17 @@ export function Screen10GitHubProjects({
                   maxHeight: 140,
                 }}
               >
-                <code>{activeProject.codeSnippet || `# ${activeProject.title}\nimport torch\nimport numpy as np\n\n# Model pipeline loaded successfully`}</code>
+                <code>{activeProject.codeSnippet || "No code preview available."}</code>
               </pre>
             </div>
 
             {/* Architecture Layers */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 5 }}>
-                <Layers size={13} color="#0284C7" /> Architecture Components
+                <Layers size={13} color="#0284C7" /> Documented architecture
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {(activeProject.architecture || ["Neural Feature Extractor", "Inference Optimization Layer", "REST Microservice Endpoint"]).map((arch, i) => (
+                {(activeProject.architecture || []).map((arch, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#334155" }}>
                     <Cpu size={13} color="#5642EF" style={{ flexShrink: 0 }} />
                     <span>{arch}</span>
@@ -666,10 +719,10 @@ export function Screen10GitHubProjects({
             {/* Verified Highlights */}
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 5 }}>
-                <GitCommit size={13} color="#10B981" /> Verified Highlights
+                <GitCommit size={13} color="#10B981" /> Documented highlights
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {(activeProject.highlights || ["Verified repository integrity", "Passing automated test pipeline", "Active Git revision graph"]).map((hl, i) => (
+                {(activeProject.highlights || []).map((hl, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#334155" }}>
                     <CheckCircle2 size={13} color="#10B981" style={{ flexShrink: 0 }} />
                     <span>{hl}</span>

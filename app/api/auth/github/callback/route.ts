@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { connectGitHubAccount, syncGitHubConnection } from "@/lib/services/github-sync-service";
+import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 
 export async function GET(req: Request) {
+  if (!coreIngestionReady()) return NextResponse.json({ error: "GitHub connection is unavailable until credential rotation is complete." }, { status: 503 });
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const encodedState = url.searchParams.get("state");
@@ -96,7 +98,9 @@ export async function GET(req: Request) {
       username,
       externalAccountId: accountId,
       token: accessToken,
-      scopes: ["read:user", "repo:status"],
+      scopes: typeof tokenData.scope === "string"
+        ? tokenData.scope.split(/[\s,]+/).filter(Boolean)
+        : (userRes.headers.get("x-oauth-scopes") || "").split(/[\s,]+/).filter(Boolean),
     });
 
     void syncGitHubConnection(auth.person.id, accessToken).catch((syncErr) => {

@@ -110,11 +110,11 @@ export function StudentProjectsView() {
   const [links, setLinks] = useState<ProjectLinkRecord[]>([]);
 
   // Section C: Technologies
-  const [selectedTechs, setSelectedTechs] = useState<string[]>(["Python"]);
+  const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [customTechInput, setCustomTechInput] = useState("");
 
   // Section D: Contribution
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(["Model Development"]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [contributionNote, setContributionNote] = useState("");
 
   // Section E: Team & Mentors
@@ -205,9 +205,9 @@ export function StudentProjectsView() {
     setRepositoryUrl("");
     setDemoUrl("");
     setLinks([]);
-    setSelectedTechs(["Python"]);
+    setSelectedTechs([]);
     setCustomTechInput("");
-    setSelectedRoles(["Model Development"]);
+    setSelectedRoles([]);
     setContributionNote("");
     setProjectStructure("individual");
     setTeamName("");
@@ -269,8 +269,8 @@ export function StudentProjectsView() {
     setRepositoryUrl(proj.repositoryUrl || "");
     setDemoUrl(proj.demoUrl || "");
     setLinks(proj.links || []);
-    setSelectedTechs(proj.technologies && proj.technologies.length > 0 ? proj.technologies : ["Python"]);
-    setSelectedRoles(proj.contributionRoles && proj.contributionRoles.length > 0 ? proj.contributionRoles : ["Model Development"]);
+    setSelectedTechs(proj.technologies || []);
+    setSelectedRoles(proj.contributionRoles || []);
     setContributionNote(proj.contributionNote || "");
 
     if (proj.team) {
@@ -525,7 +525,7 @@ export function StudentProjectsView() {
       projectType,
       status: asDraft ? "planning" : status,
       technologies: selectedTechs,
-      sources: repositoryUrl.trim() ? ["github", "manual"] : ["manual"],
+      sources: ["manual"],
       repositoryUrl: repositoryUrl.trim() || undefined,
       demoUrl: demoUrl.trim() || undefined,
       links: links.filter((l) => l.url.trim().length > 0),
@@ -685,7 +685,7 @@ export function StudentProjectsView() {
       {/* Loading & Error States */}
       {loading && (
         <div style={{ padding: 48, textAlign: "center", color: "#6B7280", fontSize: 14 }}>
-          Loading your verified projects ledger...
+          Loading your projects...
         </div>
       )}
 

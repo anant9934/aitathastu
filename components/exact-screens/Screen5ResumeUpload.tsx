@@ -5,9 +5,20 @@ import { FileText, CheckCircle2, FileUp, Sparkles, AlertCircle, ShieldCheck, Lay
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 
+export type ReviewedResumeClaim = {
+  candidateId?: string;
+  category: "education" | "experience" | "project" | "skill" | "certification";
+  value: string;
+  sourceSpan: string;
+  documentId: string;
+  corrected: boolean;
+};
+
+type ResumeCandidate = ReviewedResumeClaim & { id: string; selected: boolean };
+
 interface Screen5ResumeUploadProps {
   initialFileName?: string | null;
-  onExtractSuccess?: (discovery: { fileName?: string; [key: string]: unknown } | null, suggestions: { skills?: string; [key: string]: unknown } | null) => void;
+  onExtractSuccess?: (fileName: string, claims: ReviewedResumeClaim[]) => void;
   onNext: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
@@ -25,10 +36,18 @@ export function Screen5ResumeUpload({
   const [isUploaded, setIsUploaded] = useState<boolean>(Boolean(initialFileName));
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [aiConsent, setAiConsent] = useState(false);
+  const [candidates, setCandidates] = useState<ResumeCandidate[]>([]);
+  const [reviewSaved, setReviewSaved] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!aiConsent) {
+      setErrorMessage("Please consent to resume processing before upload.");
+      e.target.value = "";
+      return;
+    }
 
     setErrorMessage(null);
     setIsProcessing(true);
@@ -36,6 +55,7 @@ export function Screen5ResumeUpload({
     try {
       const formData = new FormData();
       formData.append("resume", file);
+      formData.append("aiConsent", "true");
 
       const res = await fetch("/api/resume/extract", {
         method: "POST",
@@ -52,7 +72,25 @@ export function Screen5ResumeUpload({
       setFileName(file.name);
       setIsUploaded(true);
       setIsProcessing(false);
-      onExtractSuccess?.(data.discovery, data.suggestions);
+      setReviewSaved(false);
+      const structured = data.structured || {};
+      const documentId = String(data.documentId || "");
+      const rows: ResumeCandidate[] = [];
+      const append = (category: ReviewedResumeClaim["category"], values: unknown[], getValue: (item: Record<string, unknown>) => string) => {
+        values.forEach((raw, index) => {
+          if (!raw || typeof raw !== "object") return;
+          const item = raw as Record<string, unknown>;
+          const value = getValue(item);
+          const sourceSpan = typeof item.sourceSpan === "string" ? item.sourceSpan.trim() : "";
+          if (value && sourceSpan && documentId) rows.push({ id: `${category}_${index}`, candidateId: `${category}_${index}`, category, value, sourceSpan, documentId, corrected: false, selected: false });
+        });
+      };
+      append("education", structured.education || [], (item) => [item.degree, item.fieldOfStudy, item.institution].filter(Boolean).join(" · "));
+      append("experience", structured.experience || [], (item) => [item.role, item.company].filter(Boolean).join(" · "));
+      append("project", structured.projects || [], (item) => String(item.title || ""));
+      append("skill", structured.skills || [], (item) => String(item.name || ""));
+      append("certification", structured.certifications || [], (item) => String(item.name || ""));
+      setCandidates(rows);
     } catch {
       setErrorMessage("Network error during file upload. You can continue manually.");
       setIsProcessing(false);
@@ -189,7 +227,7 @@ export function Screen5ResumeUpload({
                 type="file"
                 ref={fileInputRef}
                 style={{ display: "none" }}
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.docx"
                 onChange={handleFileChange}
               />
 
@@ -220,7 +258,7 @@ export function Screen5ResumeUpload({
               </div>
 
               <div style={{ fontSize: 12.5, color: "#64748B", marginBottom: 20 }}>
-                Supports PDF, DOC, DOCX (Up to 10 MB)
+                Supports PDF and DOCX (up to 5 MB)
               </div>
 
               <button
@@ -251,6 +289,26 @@ export function Screen5ResumeUpload({
                 </div>
               )}
             </div>
+
+            {isUploaded && candidates.length > 0 && <div style={{ marginTop: 16, maxHeight: 260, overflowY: "auto", border: "1px solid #E2E8F0", borderRadius: 12, padding: 12, background: "#FFFFFF" }}>
+              <strong style={{ color: "#1E1B4B", fontSize: 13 }}>Review suggested claims</strong>
+              <p style={{ color: "#64748B", fontSize: 12, margin: "6px 0 10px" }}>Select only accurate items. You can correct the text before saving. These are not independently verified.</p>
+              {candidates.map((candidate, index) => <div key={candidate.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
+                <input aria-label={`Select ${candidate.category} ${candidate.value}`} type="checkbox" checked={candidate.selected} onChange={(event) => setCandidates((current) => current.map((item, i) => i === index ? { ...item, selected: event.target.checked } : item))} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ color: "#5642EF", fontWeight: 750, fontSize: 11, textTransform: "uppercase" }}>{candidate.category}</span>
+                  <input aria-label={`Edit ${candidate.category}`} value={candidate.value} onChange={(event) => setCandidates((current) => current.map((item, i) => i === index ? { ...item, value: event.target.value, corrected: true } : item))} style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12 }} />
+                  <small style={{ color: "#64748B" }}>Source: “{candidate.sourceSpan}”</small>
+                </div>
+              </div>)}
+              <button type="button" onClick={() => { onExtractSuccess?.(fileName || "resume", candidates.filter((candidate) => candidate.selected && candidate.value.trim()).map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({ candidateId, category, value: value.trim(), sourceSpan, documentId, corrected }))); setReviewSaved(true); }} style={{ background: "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>Save selected claims</button>
+              {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12 }}>Review saved</span>}
+            </div>}
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, color: "#475569", fontSize: 12.5, lineHeight: 1.45 }}>
+              <input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} />
+              I agree to have this resume parsed and relevant text sent to an approved AI provider to suggest profile details. I will review suggestions before saving them.
+            </label>
 
             <div style={{ textAlign: "center", marginTop: 16 }}>
               <button
@@ -322,7 +380,7 @@ export function Screen5ResumeUpload({
             </div>
 
             <div style={{ paddingTop: 18, borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "#64748B" }}>
-              <span>Privacy protected &bull; AES-256 encrypted</span>
+              <span>Private upload &bull; review before saving</span>
               <span style={{ fontWeight: 700, color: "#10B981" }}>Ready</span>
             </div>
           </div>

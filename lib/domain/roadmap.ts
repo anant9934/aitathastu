@@ -293,6 +293,7 @@ export function generatePersonalizedRoadmap(
     targetRole?: string;
     specificGoal?: string;
     primaryPriority?: string;
+    confirmedProjectCount?: number;
   }
 ): StudentRoadmap {
   const normSkills = new Set(evidencedSkills.map((s) => s.toLowerCase().trim()));
@@ -301,12 +302,16 @@ export function generatePersonalizedRoadmap(
   const roleDef = findAimlRole(roleKey);
   const resolvedRole = roleDef?.title || roleKey;
 
-  let curriculum = GOAL_CURRICULA[resolvedRole];
+  let curriculum: GoalCurriculum | undefined = GOAL_CURRICULA[resolvedRole];
   if (!curriculum) {
     const matchedKey = Object.keys(GOAL_CURRICULA).find(
       (k) => k.toLowerCase() === resolvedRole.toLowerCase()
     );
-    curriculum = matchedKey ? GOAL_CURRICULA[matchedKey] : GENAI_CURRICULUM;
+    curriculum = matchedKey ? GOAL_CURRICULA[matchedKey] : undefined;
+  }
+
+  if (!curriculum) {
+    return { goal: goalOrRole, targetRole: resolvedRole, cohort: expectedGraduationYear, totalStages: 0, currentStageIndex: -1, stages: [], primaryActions: [] };
   }
 
   const stages: RoadmapStage[] = [];
@@ -333,20 +338,19 @@ export function generatePersonalizedRoadmap(
       status = "locked";
     }
 
+    const actions = rawStage.actions.map((act) => ({
+      ...act,
+      reason: isPartiallyEvidenced
+        ? `Verified evidence covers ${demonstratedCount}/${rawStage.skills.length} skills in this stage; review the remaining requirements.`
+        : `No verified evidence is recorded for these ${resolvedRole} stage skills: ${rawStage.skills.join(", ")}.`,
+    }));
     stages.push({
       stageNumber: i + 1,
       title: rawStage.title,
       description: rawStage.description,
       requiredSkills: rawStage.skills,
       status,
-      recommendedActions: rawStage.actions.map((act) => ({
-        ...act,
-        reason: isPartiallyEvidenced
-          ? `You have demonstrated parts of this stage (${demonstratedCount}/${rawStage.skills.length} skills); complete remaining actions to advance.`
-          : `Prerequisite stage for ${resolvedRole}. Missing evidence in: ${rawStage.skills
-              .filter((s) => !normSkills.has(s.toLowerCase().trim()))
-              .join(", ")}.`,
-      })),
+      recommendedActions: actions,
     });
   }
 
@@ -358,6 +362,15 @@ export function generatePersonalizedRoadmap(
   }
 
   const activeStage = stages[currentStageIndex] || stages[0];
+  if (activeStage && options?.confirmedProjectCount) {
+    activeStage.recommendedActions.unshift({
+      actionType: "Build",
+      title: "Document evaluation for a confirmed project",
+      description: "Add your personal contribution, evaluation method, and observed results to a recorded project.",
+      sourcePlatform: "Projects",
+      reason: `${options.confirmedProjectCount} confirmed project record${options.confirmedProjectCount === 1 ? "" : "s"} can be strengthened with documented evidence. This does not complete a skill milestone automatically.`,
+    });
+  }
 
   // Adjust action prioritization based on priority, specific goal, and graduation context
   const currentYear = new Date().getFullYear();

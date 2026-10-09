@@ -18,6 +18,7 @@ export const ResumeInterpretationSchema = z.object({
       fieldOfStudy: z.string().max(100).optional(),
       graduationYear: z.string().max(20).optional(),
       gpa: z.string().max(20).optional(),
+      sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
   experience: z.array(
@@ -26,6 +27,7 @@ export const ResumeInterpretationSchema = z.object({
       role: z.string().min(1).max(150),
       duration: z.string().max(100).optional(),
       highlights: z.array(z.string().max(500)).default([]),
+      sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
   projects: z.array(
@@ -34,7 +36,7 @@ export const ResumeInterpretationSchema = z.object({
       description: z.string().max(1000).default(""),
       technologies: z.array(z.string().max(50)).default([]),
       repositoryUrl: z.string().url().max(500).optional().or(z.literal("")),
-      sourceSpan: z.string().max(300).optional(),
+      sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
   skills: z.array(
@@ -42,7 +44,7 @@ export const ResumeInterpretationSchema = z.object({
       name: z.string().min(1).max(100),
       category: z.enum(["language", "framework", "library", "tool", "concept", "other"]).default("other"),
       proficiencyHint: z.enum(["beginner", "intermediate", "advanced", "unknown"]).default("unknown"),
-      sourceSpan: z.string().max(200).optional(),
+      sourceSpan: z.string().min(3).max(200),
     })
   ).default([]),
   certifications: z.array(
@@ -50,6 +52,7 @@ export const ResumeInterpretationSchema = z.object({
       name: z.string().min(1).max(200),
       issuer: z.string().max(150).optional(),
       year: z.string().max(20).optional(),
+      sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
 });

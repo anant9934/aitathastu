@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
-import { confirmDiscoveredProject } from "@/lib/acquisition/acquisition-service";
+import { confirmDiscoveredProject, getProjectCandidatesForPerson } from "@/lib/acquisition/acquisition-service";
 
 export async function POST(req: Request) {
   try {
@@ -24,13 +24,25 @@ export async function POST(req: Request) {
       });
     }
 
+    const candidates = await getProjectCandidatesForPerson(auth.person.id);
+    const sourceCandidate = candidates.find((candidate) =>
+      candidate.title === project.title &&
+      (candidate.repositoryUrl || "") === (project.repositoryUrl || "")
+    );
+    if (!sourceCandidate) {
+      return NextResponse.json({ error: "Project candidate is not in your imported sources. Add it manually or sync its source first." }, { status: 400 });
+    }
+    if (sourceCandidate.sources.includes("github") && !String(project.contributionNote || "").trim()) {
+      return NextResponse.json({ error: "Describe what you personally contributed before confirming a GitHub project." }, { status: 400 });
+    }
+
     const saved = await confirmDiscoveredProject(auth.person.id, {
       title: project.title,
       description: project.description || "",
-      technologies: project.technologies || [],
-      sources: project.sources || ["github"],
-      repositoryUrl: project.repositoryUrl,
-      contributionRoles: project.contributionRoles || ["Machine Learning"],
+      technologies: sourceCandidate.technologies,
+      sources: sourceCandidate.sources,
+      repositoryUrl: sourceCandidate.repositoryUrl,
+      contributionRoles: Array.isArray(project.contributionRoles) ? project.contributionRoles : [],
       contributionNote: project.contributionNote || "",
     });
 

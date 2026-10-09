@@ -30,6 +30,17 @@ export type Project = {
   status: "suggested" | "confirmed" | "removed";
   contribution: string[];
   contributionNote: string;
+  url?: string;
+  aiPurpose?: string;
+  uncertaintyNotes?: string[];
+};
+export type ReviewedResumeClaim = {
+  candidateId?: string;
+  category: "education" | "experience" | "project" | "skill" | "certification";
+  value: string;
+  sourceSpan: string;
+  documentId: string;
+  corrected: boolean;
 };
 
 export type OnboardingDraft = {
@@ -50,6 +61,7 @@ export type OnboardingDraft = {
   resume: "pending" | "processed" | "skipped" | "unreadable";
   resumeSuggestions: { education: string; skills: string; experience: string };
   acceptedResumeSkills: string[];
+  resumeReviewed: ReviewedResumeClaim[];
   certificationSuggestions: { title: string; status: "suggested" | "kept" | "removed" }[];
   profiles: Partial<Record<SourceId, string>>;
   githubConsent: boolean;
@@ -68,9 +80,9 @@ export const initialDraft: OnboardingDraft = {
   stage: "name",
   name: "",
   role: "student",
-  targetRole: "Generative AI Engineer",
-  targetRoleId: "genai_engineer",
-  targetTimeline: "Within 6 months",
+  targetRole: "",
+  targetRoleId: "",
+  targetTimeline: "",
   customGoalText: "",
   degree: "",
   specialization: "",
@@ -80,6 +92,7 @@ export const initialDraft: OnboardingDraft = {
   resume: "pending",
   resumeSuggestions: { education: "", skills: "", experience: "" },
   acceptedResumeSkills: [],
+  resumeReviewed: [],
   certificationSuggestions: [],
   profiles: {},
   githubConsent: false,
@@ -87,7 +100,7 @@ export const initialDraft: OnboardingDraft = {
   skills: [],
   certifications: [],
   projects: [],
-  goal: "Get an AI/ML internship",
+  goal: "",
   priorities: [],
   primaryPriority: undefined,
   completed: false,
@@ -159,9 +172,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
     stage: stageIds.includes(raw.stage as StageId) ? (raw.stage as StageId) : "name",
     name: str(raw.name, 80),
     role: str(raw.role, 40) || "student",
-    targetRole: str(raw.targetRole, 100) || "Generative AI Engineer",
+    targetRole: str(raw.targetRole, 100),
     targetRoleId: raw.targetRoleId ? str(raw.targetRoleId, 60) : undefined,
-    targetTimeline: str(raw.targetTimeline, 80) || "Within 6 months",
+    targetTimeline: str(raw.targetTimeline, 80),
     customGoalText: str(raw.customGoalText, 200),
     degree: str(raw.degree, 100),
     specialization: str(raw.specialization, 100),
@@ -178,6 +191,11 @@ export function safeDraft(value: unknown): OnboardingDraft {
       experience: str(raw.resumeSuggestions?.experience),
     },
     acceptedResumeSkills: strings(raw.acceptedResumeSkills),
+    resumeReviewed: Array.isArray(raw.resumeReviewed) ? raw.resumeReviewed.slice(0, 100).filter((claim): claim is ReviewedResumeClaim =>
+      Boolean(claim && ["education", "experience", "project", "skill", "certification"].includes(claim.category) &&
+      typeof claim.value === "string" && typeof claim.sourceSpan === "string" &&
+      typeof claim.documentId === "string" && /^[a-f0-9]{64}$/.test(claim.documentId))
+    ).map((claim) => ({ candidateId: str(claim.candidateId, 80) || undefined, category: claim.category, value: str(claim.value, 300), sourceSpan: str(claim.sourceSpan, 300), documentId: claim.documentId, corrected: claim.corrected === true })) : [],
     certificationSuggestions: Array.isArray(raw.certificationSuggestions)
       ? raw.certificationSuggestions
           .slice(0, 20)
@@ -205,9 +223,12 @@ export function safeDraft(value: unknown): OnboardingDraft {
             status: p.status === "confirmed" || p.status === "removed" ? p.status : "suggested",
             contribution: strings(p.contribution),
             contributionNote: str(p.contributionNote),
+            url: str(p.url, 500),
+            aiPurpose: str(p.aiPurpose, 1000),
+            uncertaintyNotes: strings(p.uncertaintyNotes),
           }))
       : [],
-    goal: str(raw.goal, 160) || "Get an AI/ML internship",
+    goal: str(raw.goal, 160),
     priorities,
     primaryPriority,
     completed: raw.completed === true,

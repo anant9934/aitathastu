@@ -12,6 +12,8 @@ import { getPerson360 } from "@/lib/services/person-360-service";
 import { defaultIntelligenceRouter } from "@/lib/intelligence/router";
 import { retrieveKnowledge } from "@/lib/knowledge/rag-engine";
 import type { EoraActionProposal } from "@/lib/intelligence/schemas";
+import { checkRateLimit } from "@/lib/security/rate-limit";
+import { wrapUntrustedContent } from "@/lib/intelligence/prompt-defense";
 
 export const runtime = "nodejs";
 
@@ -21,48 +23,21 @@ export async function POST(req: Request) {
     const message = typeof body.message === "string" ? body.message.trim() : "";
     const isStreamRequested = body.stream === true;
 
-    if (!message) {
-      return NextResponse.json({ error: "Message is required." }, { status: 400 });
+    if (!message || message.length > 2000) {
+      return NextResponse.json({ error: "Enter a message under 2,000 characters." }, { status: 400 });
     }
 
     const auth = await getServerAuthContext();
-    let studentName = "Student";
-    let goalTitle = "Generative AI Engineer";
-    let skillsList: string[] = ["Python", "Machine Learning Foundations"];
-    let projectsList = "Portfolio Projects";
-    let readinessText = "In Progress";
-    let personId: string | undefined = undefined;
-
-    if (auth?.person) {
-      personId = auth.person.id;
-      studentName = auth.person.displayName;
-
-      try {
-        const person360 = await getPerson360(personId, personId);
-        goalTitle = person360.activeGoal?.title || goalTitle;
-
-        const skills = (person360.evidence || [])
-          .filter((e) => e.category === "skill")
-          .map((e) => e.subject);
-        if (skills.length > 0) {
-          skillsList = skills;
-        }
-
-        const projectTitles = (person360.projects || []).map((p) => p.title);
-        if (projectTitles.length > 0) {
-          projectsList = projectTitles.slice(0, 5).join(", ");
-        }
-
-        const verified = (person360.evidence || []).filter(
-          (e) => e.verificationStatus === "verified"
-        );
-        if (verified.length > 0) {
-          readinessText = `${verified.length} verified evidence items`;
-        }
-      } catch {
-        // Non-fatal: fallback to default minimal context
-      }
-    }
+    if (!auth) return NextResponse.json({ error: "Sign in to ask EORA about your profile." }, { status: 401 });
+    if (!checkRateLimit(auth.person.id, "ai").allowed) return NextResponse.json({ error: "Please wait before sending another question." }, { status: 429 });
+    const personId = auth.person.id;
+    const studentName = auth.person.displayName;
+    const person360 = await getPerson360(personId, personId);
+    const goalTitle = person360.activeGoal?.title || "No goal selected";
+    const skillsList = (person360.evidence || []).filter((e) => e.category === "skill" && e.verificationStatus !== "rejected").map((e) => e.subject);
+    const projectsList = (person360.projects || []).filter((p) => p.status === "confirmed").map((p) => p.title).slice(0, 5).join(", ") || "No confirmed projects";
+    const verifiedCount = (person360.evidence || []).filter((e) => e.verificationStatus === "verified").length;
+    const readinessText = `${verifiedCount} independently verified evidence items`;
 
     // 1. RAG Knowledge Retrieval over Canonical AI/ML Knowledge Base
     const ragBundle = retrieveKnowledge({
@@ -83,11 +58,11 @@ Speak in encouraging, precise, professional English.
 
 GROUNDING RULES:
 1. Ground your advice exclusively in the student's actual profile context:
-   - Student Name: ${studentName}
-   - Target Goal: ${goalTitle}
-   - Evidenced Skills: ${skillsList.slice(0, 8).join(", ")}
-   - Confirmed Projects: ${projectsList}
-   - Profile Readiness: ${readinessText}
+   - Student Name: ${wrapUntrustedContent("name", studentName)}
+   - Target Goal: ${wrapUntrustedContent("goal", goalTitle)}
+   - Recorded Skills (not necessarily verified): ${wrapUntrustedContent("skills", skillsList.slice(0, 8).join(", ") || "None")}
+   - Confirmed Projects: ${wrapUntrustedContent("projects", projectsList)}
+   - Verification: ${readinessText}
 ${knowledgeContext}
 2. Suggest concrete, actionable next steps in the student workspace (e.g. building project evidence, practicing code, or requesting faculty verification).
 3. Keep responses conversational, concise (2-4 sentences), and motivating.
@@ -107,7 +82,7 @@ ${knowledgeContext}
     const lowerMsg = message.toLowerCase();
     const lowerReply = replyContent.toLowerCase();
 
-    if (lowerMsg.includes("project") || lowerMsg.includes("portfolio") || lowerReply.includes("project")) {
+    if (!response.fallbackUsed && (lowerMsg.includes("project") || lowerMsg.includes("portfolio") || lowerReply.includes("project"))) {
       proposedAction = {
         actionId: "act_workspace_projects",
         actionType: "Build",
@@ -116,7 +91,7 @@ ${knowledgeContext}
         contextReason: "Document and build candidate artifact for evidence ledger",
         requiresConfirmation: false,
       };
-    } else if (lowerMsg.includes("roadmap") || lowerMsg.includes("milestone") || lowerReply.includes("roadmap")) {
+    } else if (!response.fallbackUsed && (lowerMsg.includes("roadmap") || lowerMsg.includes("milestone") || lowerReply.includes("roadmap"))) {
       proposedAction = {
         actionId: "act_workspace_roadmap",
         actionType: "Navigate",
@@ -125,7 +100,7 @@ ${knowledgeContext}
         contextReason: "Inspect competency prerequisites for target role",
         requiresConfirmation: false,
       };
-    } else if (lowerMsg.includes("verify") || lowerMsg.includes("verification") || lowerReply.includes("verification")) {
+    } else if (!response.fallbackUsed && (lowerMsg.includes("verify") || lowerMsg.includes("verification") || lowerReply.includes("verification"))) {
       proposedAction = {
         actionId: "act_workspace_verify",
         actionType: "Verify",

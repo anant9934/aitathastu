@@ -223,7 +223,7 @@ export function Screen6DigitalFootprints({
 
     if (platformId === "github") {
       setIsFetchingGithub(true);
-      setStatusMessage("Connecting to GitHub and discovering repositories...");
+      setStatusMessage("Looking up public GitHub repositories...");
       try {
         const res = await fetch("/api/onboarding-v2/github", {
           method: "POST",
@@ -233,12 +233,12 @@ export function Screen6DigitalFootprints({
         const data = await res.json();
         if (res.ok && data.projects) {
           onGitHubProjectsDiscovered?.(data.projects);
-          setStatusMessage(`Linked GitHub! Discovered ${data.projects.length} repositories.`);
+          setStatusMessage(`GitHub profile linked. Found ${data.projects.length} public repository candidates for review.`);
         } else {
           setStatusMessage(data.error || "Linked GitHub profile.");
         }
       } catch {
-        setStatusMessage("GitHub profile linked. Repositories will sync automatically.");
+        setStatusMessage("GitHub profile linked. Automatic sync is unavailable until you authorize your account.");
       } finally {
         setIsFetchingGithub(false);
       }

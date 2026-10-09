@@ -1,13 +1,17 @@
 import crypto from "crypto";
 import type { AppHandoffToken } from "./integrations";
 
-const DEFAULT_SECRET = process.env.HANDOFF_SIGNING_SECRET || "tathastu_handoff_secret_key_prod_default";
+function handoffSecret(secret?: string): string {
+  const value = secret || process.env.HANDOFF_SIGNING_SECRET;
+  if (!value || value.length < 32) throw new Error("HANDOFF_SIGNING_SECRET is not securely configured.");
+  return value;
+}
 
 /**
  * Generate an opaque, non-reversible person reference to prevent PII exposure in handoffs.
  */
-export function generateOpaquePersonRef(personId: string, salt: string = "tathastu_ref_salt"): string {
-  const hash = crypto.createHmac("sha256", salt).update(personId).digest("hex");
+export function generateOpaquePersonRef(personId: string, salt?: string): string {
+  const hash = crypto.createHmac("sha256", handoffSecret(salt)).update(personId).digest("hex");
   return `stu_${hash.slice(0, 16)}`;
 }
 
@@ -24,7 +28,7 @@ export function createAppHandoffToken(params: {
   expiresInSeconds?: number;
   secret?: string;
 }): { token: string; payload: AppHandoffToken; handoffUrl: string } {
-  const secret = params.secret || DEFAULT_SECRET;
+  const secret = handoffSecret(params.secret);
   const now = Date.now();
   const ttlMs = (params.expiresInSeconds || 900) * 1000; // default 15 minutes
   const expiresAt = new Date(now + ttlMs).toISOString();
@@ -67,7 +71,7 @@ export function createAppHandoffToken(params: {
  */
 export function verifyAppHandoffToken(
   tokenString: string,
-  secret: string = DEFAULT_SECRET
+  secret?: string
 ): { valid: boolean; payload?: AppHandoffToken; error?: string } {
   if (!tokenString || typeof tokenString !== "string") {
     return { valid: false, error: "Missing or invalid token string." };
@@ -79,9 +83,9 @@ export function verifyAppHandoffToken(
   }
 
   const [serialized, signature] = parts;
-  const expectedSignature = crypto.createHmac("sha256", secret).update(serialized).digest("base64url");
+  const expectedSignature = crypto.createHmac("sha256", handoffSecret(secret)).update(serialized).digest("base64url");
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+  if (signature.length !== expectedSignature.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
     return { valid: false, error: "Invalid token signature or tampered data." };
   }
 

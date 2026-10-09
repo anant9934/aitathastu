@@ -11,6 +11,7 @@ import {
 import { executeDeterministicFallback } from "./deterministic-fallback";
 import { checkAiQuota, estimateTokens, recordAiUsage } from "./cost-control";
 import { getDb, aiAuditLogs } from "../db";
+import { coreIngestionReady } from "../security/core-ingestion-gate";
 
 export class IntelligenceRouter {
   private providers: ModelProvider[] = [];
@@ -85,6 +86,13 @@ export class IntelligenceRouter {
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
     const startTime = Date.now();
+
+    if (process.env.CORE_DISABLE_LIVE_LLM === "true" || !coreIngestionReady()) {
+      const fallbackRes = executeDeterministicFallback(request);
+      const finalResponse = { ...fallbackRes, latencyMs: Date.now() - startTime };
+      void this.logAudit(request, finalResponse, finalResponse.latencyMs, "fallback");
+      return finalResponse;
+    }
 
     // Check daily AI token quota per user
     if (request.personId) {

@@ -35,9 +35,9 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
 
   const handleEoraClick = () => {
     const tips = [
-      "EORA says: Tathastu analyzes your skills and matches you with verified industry projects!",
-      "EORA says: Over 5,000+ mentors from top tech companies are ready to guide you.",
-      "EORA says: Click 'Get Started' to start your personalized journey in under 2 minutes!",
+      "EORA says: Review your resume and project evidence before adding it to your profile.",
+      "EORA says: Connect a public GitHub profile only when you want to include its projects.",
+      "EORA says: Set an AI/ML goal to see the next steps in your roadmap.",
     ];
     const tip = tips[Math.floor(Math.random() * tips.length)];
     setToastMessage(tip);
@@ -47,7 +47,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
   const faqs = [
     {
       q: "What makes AI Tathastu different from a standard learning portal?",
-      a: "Tathastu connects your actual academic records, GitHub code, and completed projects into a verified Person 360 profile, actively closing skill gaps and matching you to real opportunities."
+      a: "Tathastu helps you review resume and public GitHub evidence, build a Person 360 profile, and plan the next steps toward an AI/ML goal. Imported claims remain reviewable until you confirm them."
     },
     {
       q: "Who is EORA?",
@@ -55,11 +55,11 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
     },
     {
       q: "How does project verification work?",
-      a: "Projects submitted to Tathastu are reviewed by faculty or domain verifiers against rubric criteria (architecture, problem framing, code quality) to earn defensive, verifiable badges."
+      a: "You review imported projects and describe your own contribution. A repository link or AI interpretation does not automatically verify a project or award a badge."
     },
     {
       q: "Are my academic and GitHub details kept private?",
-      a: "Yes. You have complete data sovereignty. You control what is shared with mentors, faculty, or recruitment partners, with fine-grained visibility settings."
+      a: "Resume and GitHub import are optional. The app asks for your consent before AI interpretation, and you can disconnect a GitHub connection from your account settings."
     }
   ];
 
@@ -266,7 +266,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
                   fontWeight: 400,
                 }}
               >
-                An AI-powered ecosystem connecting students, faculty, mentors, alumni and opportunities into verifiable Person 360 portfolios.
+                Build your Person 360 profile from reviewed evidence, explore your AI/ML roadmap, and ask EORA about your next step.
               </p>
 
               {/* CTA Buttons */}
@@ -405,7 +405,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
               gap: 18,
             }}
           >
-            {/* Stat 1: Learners */}
+            {/* Core capability 1 */}
             <SpotlightCard
               spotlightColor="rgba(2, 197, 245, 0.2)"
               borderColor="rgba(2, 197, 245, 0.18)"
@@ -428,12 +428,12 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
                 <User size={22} />
               </div>
               <div>
-                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Learners</div>
-                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>50K+</div>
+                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Your profile</div>
+                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>Person 360</div>
               </div>
             </SpotlightCard>
 
-            {/* Stat 2: Mentors */}
+            {/* Core capability 2 */}
             <SpotlightCard
               spotlightColor="rgba(147, 53, 232, 0.2)"
               borderColor="rgba(147, 53, 232, 0.18)"
@@ -456,12 +456,12 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
                 <Users size={22} />
               </div>
               <div>
-                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Mentors</div>
-                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>5K+</div>
+                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Your sources</div>
+                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>Opt in</div>
               </div>
             </SpotlightCard>
 
-            {/* Stat 3: Opportunities */}
+            {/* Core capability 3 */}
             <SpotlightCard
               spotlightColor="rgba(69, 100, 255, 0.2)"
               borderColor="rgba(69, 100, 255, 0.18)"
@@ -484,12 +484,12 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
                 <Briefcase size={22} />
               </div>
               <div>
-                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Opportunities</div>
-                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>10K+</div>
+                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Your evidence</div>
+                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>Review</div>
               </div>
             </SpotlightCard>
 
-            {/* Stat 4: Projects */}
+            {/* Core capability 4 */}
             <SpotlightCard
               spotlightColor="rgba(16, 185, 129, 0.2)"
               borderColor="rgba(16, 185, 129, 0.18)"
@@ -512,8 +512,8 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
                 <Award size={22} />
               </div>
               <div>
-                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Projects</div>
-                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>25K+</div>
+                <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Your roadmap</div>
+                <div style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 800 }}>AI/ML</div>
               </div>
             </SpotlightCard>
           </div>
@@ -532,7 +532,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
             Bridging Potential to Real Industry Readiness
           </h2>
           <p style={{ color: "#94A3B8", fontSize: 16.5, lineHeight: 1.6 }}>
-            AI Tathastu continuously gathers your academic milestones, verified skills, and GitHub footprints to construct an authentic, verifiable Person 360 profile.
+            AI Tathastu combines the information you choose to share with your reviewed skills and projects to build a Person 360 profile.
           </p>
         </div>
 
@@ -543,7 +543,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
             </div>
             <h3 style={{ fontSize: 19, fontWeight: 700, color: "#FFFFFF", marginBottom: 10 }}>AI Context Understanding</h3>
             <p style={{ color: "#94A3B8", fontSize: 14.5, lineHeight: 1.65, margin: 0 }}>
-              Analyzes your curriculum, coding streaks, and project commits to establish grounded competency scores—never arbitrary numbers.
+              Interprets approved resume text and public project documentation into claims you can inspect, correct, or reject.
             </p>
           </SpotlightCard>
 
@@ -553,7 +553,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
             </div>
             <h3 style={{ fontSize: 19, fontWeight: 700, color: "#FFFFFF", marginBottom: 10 }}>Defensive Verification</h3>
             <p style={{ color: "#94A3B8", fontSize: 14.5, lineHeight: 1.65, margin: 0 }}>
-              Every project and skill is backed by real evidence ledgers verified by educators and industry mentors with defensive audit trails.
+              Keeps the source of each imported claim visible and distinguishes your own statements from independently verified evidence.
             </p>
           </SpotlightCard>
 
@@ -563,7 +563,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
             </div>
             <h3 style={{ fontSize: 19, fontWeight: 700, color: "#FFFFFF", marginBottom: 10 }}>Targeted Career Roadmaps</h3>
             <p style={{ color: "#94A3B8", fontSize: 14.5, lineHeight: 1.65, margin: 0 }}>
-              Personalized pathways toward AI/ML Engineer, Data Scientist, or Cloud Architect with dynamic milestone check-ins from EORA.
+              See recommended steps for your selected AI/ML role, with progress tied to evidence in your profile.
             </p>
           </SpotlightCard>
         </div>
@@ -594,7 +594,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
               <h3 style={{ fontSize: 21, fontWeight: 700, color: "#FFFFFF", margin: "0 0 8px" }}>For Students</h3>
               <p style={{ fontSize: 14.5, fontWeight: 600, color: "#38BDF8", margin: "0 0 10px" }}>Discover your potential. Build your future.</p>
               <p style={{ fontSize: 14, color: "#CBD5E1", lineHeight: 1.6, margin: "0 0 24px" }}>
-                Build an intelligent profile, showcase your skills and projects, discover what to learn next, connect with mentors, and find internships, projects, and career opportunities.
+                Build a profile from reviewed evidence, showcase your projects, and see what to learn next for your selected AI/ML goal.
               </p>
             </div>
             <button type="button" onClick={onStartJourney} style={{ background: "none", border: "none", color: "#38BDF8", fontWeight: 700, fontSize: 14.5, display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", padding: 0 }}>
@@ -773,7 +773,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
             Ready to shape your future with intelligence?
           </h2>
           <p style={{ color: "#94A3B8", fontSize: 16.5, maxWidth: 600, margin: "0 auto 32px" }}>
-            Join thousands of ambitious learners, faculty mentors, and tech innovators using AI Tathastu to reach their career dreams.
+            Start with your own goals, review the evidence you add, and use your roadmap to plan the next step.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 16 }}>
             <SpringButton
@@ -928,7 +928,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
               </div>
               <h4 style={{ fontSize: 17, fontWeight: 700, color: "#FFFFFF", margin: "0 0 6px" }}>Watch Platform Walkthrough</h4>
               <p style={{ color: "#94A3B8", fontSize: 13, maxWidth: 440, margin: "0 0 18px" }}>
-                Discover how Tathastu analyzes your academic footprint, predicts job suitability, and connects you directly with mentors.
+                Explore how Tathastu reviews your evidence, builds a Person 360 profile, and suggests AI/ML roadmap steps.
               </p>
               <SpringButton
                 variant="primary"

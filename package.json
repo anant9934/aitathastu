@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:core-v2": "node --import tsx scripts/test-core-v2.ts",
     "test:llm": "node --import tsx scripts/test-live-llm.ts",
     "secrets:generate": "node --import tsx scripts/generate-production-secrets.ts",
     "integrations:status": "node --import tsx scripts/check-integrations-status.ts",

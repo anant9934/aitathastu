@@ -13,7 +13,10 @@ export async function POST(req: Request) {
     const eventType = req.headers.get("x-github-event");
     const deliveryId = req.headers.get("x-github-delivery");
 
-    const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET || "aitathastu_gh_webhook_secret";
+    const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+    if (!webhookSecret || webhookSecret.length < 32) {
+      return NextResponse.json({ error: "Webhook is not configured." }, { status: 503 });
+    }
 
     const rawBody = await req.text();
 

@@ -85,7 +85,7 @@ export async function getProjectCandidatesForPerson(personId: string): Promise<P
 
   for (const snap of snapshots) {
     const data = snap.snapshotData as Record<string, unknown> | null;
-    if (data && typeof data.title === "string") {
+    if (data && data.isPrivate !== true && typeof data.title === "string") {
       githubProjects.push({
         title: data.title,
         description: (data.description as string) || "",
@@ -101,7 +101,11 @@ export async function getProjectCandidatesForPerson(personId: string): Promise<P
 
   for (const snap of resumeSnapshots) {
     const data = snap.snapshotData as Record<string, unknown> | null;
-    const extracted = data?.extractedProjects;
+    const extracted = data?.extractedProjects || (Array.isArray(data?.candidates)
+      ? data.candidates.filter((candidate): candidate is { category: string; value: string } =>
+        Boolean(candidate && typeof candidate === "object" && candidate.category === "project" && typeof candidate.value === "string")
+      ).map((candidate) => ({ title: candidate.value }))
+      : []);
     if (Array.isArray(extracted)) {
       for (const item of extracted) {
         const p = item as { title?: string; description?: string; technologies?: string[] };
@@ -143,7 +147,7 @@ export async function acquireGitHubDataForPerson(personId: string, username: str
       provider: "github",
       externalUsername: result.username,
       profileUrl: `https://github.com/${result.username}`,
-      status: "connected",
+      status: "reference_only",
       metadata: { repositoryCount: result.projects.length },
     });
 

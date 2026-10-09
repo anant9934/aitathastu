@@ -29,15 +29,18 @@ export async function fetchGitHubProjects(
     "User-Agent": "AI-Tathastu-Connector/1.0",
   };
 
-  const authToken = token || process.env.GITHUB_TOKEN;
+  const authToken = token;
   if (authToken) {
     headers.Authorization = `Bearer ${authToken}`;
   }
 
   try {
-    const res = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanUsername)}/repos?sort=updated&per_page=15`, {
+    const endpoint = authToken
+      ? "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member"
+      : `https://api.github.com/users/${encodeURIComponent(cleanUsername)}/repos?sort=updated&per_page=30`;
+    const res = await fetch(endpoint, {
       headers,
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
 
     if (res.status === 404) {

@@ -5,6 +5,7 @@ import { updatePersonProfileData } from "@/lib/repositories/person-repository";
 import { setActiveGoal } from "@/lib/repositories/goal-repository";
 import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
+import { validateReviewedResumeClaims } from "@/lib/services/resume-review-service";
 
 export async function readOnboardingDraft(personId: string) {
   const db = await getDb();
@@ -46,19 +47,18 @@ function allowedProfileUrl(source: string, value: string) {
 
 export async function completeOnboarding(personId: string, input: unknown) {
   const draft: OnboardingDraft = safeDraft(input);
+  await validateReviewedResumeClaims(personId, draft.resumeReviewed);
   if (draft.role !== "student") {
     throw new Error("This role's onboarding journey is coming soon. Please choose Student to continue.");
   }
   const studentName = draft.name?.trim() || "Student";
-  const degree = draft.degree?.trim() || "B.Tech";
-  const specialization = draft.specialization?.trim() || "Computer Science and Engineering";
-  const year = draft.year?.trim() || "3rd Year";
-  const goal = draft.goal?.trim() || "Get an AI/ML internship";
-  const institution = draft.institution?.trim() || "Lovely Professional University (LPU)";
+  const degree = draft.degree?.trim() || "";
+  const specialization = draft.specialization?.trim() || "";
+  const year = draft.year?.trim() || "";
+  const goal = draft.goal?.trim() || "";
+  const institution = draft.institution?.trim() || "";
 
-  const education = `${degree} · ${specialization} · ${year}${
-    draft.semester ? ` · ${draft.semester}` : ""
-  }`;
+  const education = [degree, specialization, year, draft.semester].filter(Boolean).join(" · ");
 
   const headline = draft.targetRole ? `Aspiring ${draft.targetRole}` : "AI/ML Student";
 
@@ -78,11 +78,11 @@ export async function completeOnboarding(personId: string, input: unknown) {
     expectedGraduationYear: draft.expectedGraduationYear,
   });
 
-  const goalDescription = `Target Role: ${draft.targetRole || "Generative AI Engineer"}${
+  const goalDescription = `Target Role: ${draft.targetRole || "Not selected"}${
     draft.targetTimeline ? ` · Timeline: ${draft.targetTimeline}` : ""
   }${draft.customGoalText ? ` · Note: ${draft.customGoalText}` : ""}`;
 
-  await setActiveGoal(personId, goal, goalDescription, "custom");
+  if (goal) await setActiveGoal(personId, goal, goalDescription, "custom");
 
   const add = async (
     category: "education" | "skill" | "project" | "goal" | "other",
@@ -106,16 +106,16 @@ export async function completeOnboarding(personId: string, input: unknown) {
       sourceReference,
     });
 
-  await add("education", education, education, "self_reported", "education", "Academic context confirmed during onboarding.");
-  await add(
+  if (education) await add("education", education, education, "self_reported", "education", "Academic context confirmed during onboarding.");
+  if (draft.targetRole) await add(
     "goal",
-    `Target Role: ${draft.targetRole || "AI/ML Engineer"}`,
-    draft.targetRole || "AI/ML Engineer",
+    `Target Role: ${draft.targetRole}`,
+    draft.targetRole,
     "self_reported",
     "target_role",
     "Your chosen career direction in AI/ML; it can be edited anytime."
   );
-  await add(
+  if (goal) await add(
     "goal",
     `First Goal: ${draft.goal}`,
     draft.goal,
@@ -146,6 +146,19 @@ export async function completeOnboarding(personId: string, input: unknown) {
     );
   }
 
+  for (const claim of draft.resumeReviewed) {
+    const category = claim.category === "certification" || claim.category === "experience" ? "other" : claim.category;
+    await add(
+      category,
+      claim.value,
+      claim.value,
+      claim.corrected ? "self_reported" : "resume_extracted",
+      `resume_${claim.documentId}_${claim.category}_${claim.value.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      claim.corrected ? `Student corrected an extraction candidate. Original source excerpt: ${claim.sourceSpan}` : `Student accepted an extraction candidate. Source excerpt: ${claim.sourceSpan}`,
+      `resume:sha256:${claim.documentId}`
+    );
+  }
+
   for (const certification of [...new Set(draft.certifications)]) {
     await add(
       "other",
@@ -161,8 +174,11 @@ export async function completeOnboarding(personId: string, input: unknown) {
   for (const project of draft.projects.filter((p) => p.status === "confirmed")) {
     const savedProj = await saveProject(personId, {
       title: project.title,
+      description: project.description,
       technologies: project.technologies,
       sources: project.sources,
+      repositoryUrl: project.url || null,
+      aiDetails: project.aiPurpose ? { proposedSolution: project.aiPurpose, limitations: project.uncertaintyNotes?.join("; ") } : undefined,
       status: "confirmed",
     });
     if (project.contribution.length > 0 || project.contributionNote) {
@@ -212,7 +228,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
         provider: source as "github" | "linkedin" | "leetcode" | "codechef" | "hackerrank" | "hackerearth",
         externalUsername: username,
         profileUrl: url,
-        status: "connected",
+        status: "reference_only",
       }).catch(() => null);
     }
   }

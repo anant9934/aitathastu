@@ -163,12 +163,12 @@ function buildClientComposition(
   isDemo?: boolean
 ): ComposedDashboardViewModel {
   const studentName = data?.studentName || (isDemo ? "Rahul Sharma" : "Student");
-  const targetRole = activeRole || data?.targetRole || "Generative AI Engineer";
+  const targetRole = activeRole || data?.targetRole || (isDemo ? "Generative AI Engineer" : "Still Exploring AI & ML");
   const matchedRole =
     AIML_ROLE_CATALOG.find((r) => r.title.toLowerCase() === targetRole.toLowerCase()) ||
     AIML_ROLE_CATALOG.find((r) => r.id === targetRole.toLowerCase());
-  const targetRoleId = matchedRole?.id || "genai_engineer";
-  const goal = data?.activeGoal || "Get an AI/ML internship";
+  const targetRoleId = matchedRole?.id || (isDemo ? "genai_engineer" : "exploring_aiml");
+  const goal = data?.activeGoal || (isDemo ? "Get an AI/ML internship" : "");
   const primaryInterest = normalizeInterest(activePrimary || (data?.primaryPriority as string) || "learning");
 
   const fallbackSecondary = (data?.secondaryPriorities?.map(normalizeInterest) || (isDemo ? ["projects"] : [])).filter(
@@ -183,8 +183,8 @@ function buildClientComposition(
       ? data.skillsList.map((s) => ({
           name: s.name,
           category: s.category || "skill",
-          verificationStatus: s.verificationStatus || "verified",
-          source: s.source || "github",
+          verificationStatus: s.verificationStatus || "self_reported",
+          source: s.source || "self_reported",
         }))
       : [];
 
@@ -203,7 +203,7 @@ function buildClientComposition(
           title: p.title,
           description: p.description,
           technologies: p.technologies || [],
-          sources: p.sources || ["github"],
+          sources: p.sources || ["manual"],
           status: p.status,
           url: p.repoUrl,
         }))
@@ -264,12 +264,12 @@ function buildClientComposition(
     targetRole,
     targetRoleId,
     goal,
-    targetTimeline: "Within 6 months",
+    targetTimeline: isDemo ? "Within 6 months" : "",
     primaryInterest,
     secondaryInterests,
-    degree: data?.degree || "B.Tech Computer Science and Engineering",
-    institution: data?.institution || "Lovely Professional University (LPU)",
-    cohort: data?.cohort || 2026,
+    degree: data?.degree || (isDemo ? "B.Tech Computer Science and Engineering" : ""),
+    institution: data?.institution || (isDemo ? "Lovely Professional University (LPU)" : ""),
+    cohort: data?.cohort || (isDemo ? 2026 : undefined),
     skills: isDemo ? (realSkills.length > 0 ? realSkills : demoSkills) : realSkills,
     projects: isDemo ? (realProjects.length > 0 ? realProjects : demoProjects) : realProjects,
     evidenceItems: isDemo ? demoEvidence : [],
@@ -293,6 +293,9 @@ export function Screen12StudentDashboard({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [selectedSkillNode, setSelectedSkillNode] = useState<string | null>(null);
+  const [serverComposition, setServerComposition] = useState<ComposedDashboardViewModel | undefined>(initialComposition);
+
+  useEffect(() => { setServerComposition(initialComposition); }, [initialComposition]);
 
   // Active Perspective State
   const [currentPrimary, setCurrentPrimary] = useState<CanonicalInterest>(() => {
@@ -302,18 +305,19 @@ export function Screen12StudentDashboard({
 
   const [currentSecondary, setCurrentSecondary] = useState<CanonicalInterest[]>(() => {
     if (initialComposition?.secondaryInterests) return initialComposition.secondaryInterests;
-    return (data?.secondaryPriorities?.map(normalizeInterest) || ["projects"]).filter(
+    return (data?.secondaryPriorities?.map(normalizeInterest) || (isDemo ? ["projects"] : [])).filter(
       (s) => s !== normalizeInterest(data?.primaryPriority || "learning")
     );
   });
 
   const [currentRole, setCurrentRole] = useState<string>(() => {
     if (initialComposition?.targetRole) return initialComposition.targetRole;
-    return data?.targetRole || "Generative AI Engineer";
+    return data?.targetRole || (isDemo ? "Generative AI Engineer" : "Still Exploring AI & ML");
   });
 
   // Re-compose dashboard whenever primary, secondary, or role changes
   const comp = useMemo<ComposedDashboardViewModel>(() => {
+    if (!isDemo && serverComposition) return serverComposition;
     if (
       initialComposition &&
       initialComposition.primaryInterest === currentPrimary &&
@@ -322,7 +326,7 @@ export function Screen12StudentDashboard({
       return initialComposition;
     }
     return buildClientComposition(data, currentPrimary, currentSecondary, currentRole, isDemo);
-  }, [data, currentPrimary, currentSecondary, currentRole, initialComposition, isDemo]);
+  }, [data, currentPrimary, currentSecondary, currentRole, initialComposition, serverComposition, isDemo]);
 
   // EORA Assistant Chat State
   const [chatInput, setChatInput] = useState("");
@@ -333,7 +337,7 @@ export function Screen12StudentDashboard({
   void _onBackToOnboarding;
 
   // Student Profile Values
-  const studentName = data?.studentName || (isDemo ? "Rahul Sharma" : "Student");
+  const studentName = data?.studentName || (!isDemo ? comp.hero.greeting.replace(/^Welcome,\s*/, "") : "Rahul Sharma");
   const firstName = studentName.split(" ")[0] || "Student";
   const initials =
     studentName
@@ -344,7 +348,7 @@ export function Screen12StudentDashboard({
       .join("")
       .toUpperCase() || "ST";
 
-  const institution = data?.institution || "Lovely Professional University (LPU)";
+  const institution = data?.institution || (isDemo ? "Lovely Professional University (LPU)" : "Institution not provided");
 
   // Initialize EORA Greeting Chat
   useEffect(() => {
@@ -425,6 +429,8 @@ export function Screen12StudentDashboard({
         }),
       });
       if (res.ok) {
+        const result = await res.json();
+        if (result.composition) setServerComposition(result.composition);
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 3000);
       } else {
@@ -466,16 +472,16 @@ export function Screen12StudentDashboard({
       const aiReply: ChatMessage = {
         id: `e_${Date.now()}`,
         sender: "eora",
-        text: resData.reply || "I'm analyzing your profile signals to prepare the best next recommendation.",
+        text: resData.reply || "EORA is temporarily unavailable. Please try again later.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setChatMessages((prev) => [...prev, aiReply]);
     } catch {
-      // Graceful offline fallback with role & interest context
+      // Honest offline response; do not invent profile-specific advice.
       const fallbackReply: ChatMessage = {
         id: `e_${Date.now()}`,
         sender: "eora",
-        text: `Based on your goal of ${currentRole} and focus on ${CANONICAL_INTERESTS[currentPrimary]?.title}, your next best step is: "${comp.nextBestActions[0]?.title || "Build auditable evidence"}".`,
+        text: "EORA is temporarily unavailable. Your saved profile and roadmap remain accessible. Please try again later.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setChatMessages((prev) => [...prev, fallbackReply]);
@@ -1073,7 +1079,7 @@ export function Screen12StudentDashboard({
                     </span>
                     <span className="dash-hero-badge">
                       <ShieldCheck size={14} color="#34D399" />
-                      {comp.sourceFreshness.ledgerCoverage === "verified" ? "Readiness Verified (78%)" : "Readiness Gated"}
+                      {comp.sourceFreshness.ledgerCoverage === "verified" ? `Readiness ${comp.summaryCards.find((card) => card.id === "card_readiness")?.value || "Verified"}` : "Readiness Gated"}
                     </span>
                     <span className="dash-hero-badge">
                       <BookOpen size={14} color="#A78BFA" /> {institution}
@@ -1198,15 +1204,16 @@ export function Screen12StudentDashboard({
                       Journey Progression — Student Life Cycle
                     </h3>
                     <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
-                      From academic onboarding to verified placement readiness in {comp.targetRole}.
+                      Your recorded profile and project milestones for {comp.targetRole}.
                     </p>
                   </div>
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#5642EF" }}>
-                    Stage 4 of 5
+                    {comp.journeyRecords.length} recorded milestones
                   </span>
                 </div>
 
                 <div className="dash-journey-rail">
+                  {comp.journeyRecords.length === 0 && <div style={{ color: "#64748B", fontSize: 13, padding: "18px 0" }}>No journey milestones recorded yet.</div>}
                   {comp.journeyRecords.map((jr) => (
                     <div key={jr.stepNumber} className="dash-journey-step">
                       <div className={`dash-journey-dot ${jr.status}`}>
@@ -1233,7 +1240,7 @@ export function Screen12StudentDashboard({
                       AI/ML Skills Map — Knowledge Architecture
                     </h3>
                     <p style={{ fontSize: 12.5, color: "#64748B", margin: 0 }}>
-                      Interactive nodes mapped to verified evidence and core competencies for <strong>{comp.targetRole}</strong>.
+                      Interactive nodes show role requirements and recorded evidence states for <strong>{comp.targetRole}</strong>.
                     </p>
                   </div>
                   <span style={{ fontSize: 12, color: "#64748B" }}>
@@ -1562,7 +1569,7 @@ export function Screen12StudentDashboard({
                             </div>
                             <h4 className="dash-card-title-text">Achievements & Awards</h4>
                           </div>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "#D97706" }}>Verified</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#D97706" }}>Recorded</span>
                         </div>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
@@ -1577,7 +1584,7 @@ export function Screen12StudentDashboard({
                             <div style={{ padding: 14, background: "#F8FAFC", borderRadius: 10, textAlign: "center", color: "#64748B", fontSize: 12 }}>
                               No awards or verified certificates added yet.
                               <Link href="/student/skills" style={{ display: "block", color: "#5642EF", fontWeight: 700, marginTop: 4, textDecoration: "none" }}>
-                                Explore Assessments & Challenges &rarr;
+                                Review Your Skills &rarr;
                               </Link>
                             </div>
                           )}
@@ -1836,7 +1843,7 @@ export function Screen12StudentDashboard({
                   </p>
                 </div>
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "#64748B" }}>
-                  Verified university and ecosystem network
+                  Source-backed Core information
                 </span>
               </div>
 
@@ -1888,7 +1895,7 @@ export function Screen12StudentDashboard({
                           ) : (
                             <div style={{ padding: "16px 12px", background: "#F8FAFC", borderRadius: 10, border: "1px dashed #CBD5E1", textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
                               <p style={{ margin: 0, fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>
-                                Live internship feed pending institutional sync. Build your portfolio to be discoverable once recruitment opens.
+                                No internship feed is connected to Core. You can prepare your project evidence here.
                               </p>
                               <Link href="/student/projects" style={{ fontSize: 11, fontWeight: 700, color: "#059669", background: "#ECFDF5", padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
                                 Prepare Project Portfolio &rarr;
@@ -1943,10 +1950,10 @@ export function Screen12StudentDashboard({
                           ) : (
                             <div style={{ padding: "16px 12px", background: "#F8FAFC", borderRadius: 10, border: "1px dashed #CBD5E1", textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
                               <p style={{ margin: 0, fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>
-                                No open collaborative repositories listed right now. Start an open project and invite peers.
+                                No collaboration listings are connected to Core. Record your own project and contribution details.
                               </p>
                               <Link href="/student/projects?action=new" style={{ fontSize: 11, fontWeight: 700, color: "#D97706", background: "#FFFBEB", padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
-                                Start Collaboration &rarr;
+                                Add a Project &rarr;
                               </Link>
                             </div>
                           )}
@@ -1993,10 +2000,10 @@ export function Screen12StudentDashboard({
                           ) : (
                             <div style={{ padding: "16px 12px", background: "#F8FAFC", borderRadius: 10, border: "1px dashed #CBD5E1", textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
                               <p style={{ margin: 0, fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>
-                                Faculty advising directory currently offline. Meet CSE department advisors during open office hours.
+                                No mentor directory is connected to Core in this phase.
                               </p>
-                              <Link href="/student/advising" style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", background: "#FAF5FF", padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
-                                View Advising Hours &rarr;
+                              <Link href="/student/profile" style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", background: "#FAF5FF", padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
+                                Review Your Profile &rarr;
                               </Link>
                             </div>
                           )}
@@ -2043,9 +2050,9 @@ export function Screen12StudentDashboard({
                           ) : (
                             <div style={{ padding: "16px 12px", background: "#F8FAFC", borderRadius: 10, border: "1px dashed #CBD5E1", textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
                               <p style={{ margin: 0, fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>
-                                No hackathons or research grants cached for this focus. Listings refresh on the next scheduled sync.
+                                No event or research opportunity feed is connected to Core.
                               </p>
-                              <span style={{ fontSize: 11, color: "#94A3B8" }}>Institutional events cache active</span>
+                              <Link href="/student/projects" style={{ fontSize: 11, color: "#0284C7", fontWeight: 700, textDecoration: "none" }}>Document Research Work &rarr;</Link>
                             </div>
                           )}
                         </div>
@@ -2079,10 +2086,10 @@ export function Screen12StudentDashboard({
                           ) : (
                             <div style={{ padding: "16px 12px", background: "#F8FAFC", borderRadius: 10, border: "1px dashed #CBD5E1", textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
                               <p style={{ margin: 0, fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>
-                                Student cohort discovery is private by default. Opt in via profile settings to connect with peers.
+                                People discovery is not connected to Core in this phase.
                               </p>
                               <Link href="/student/profile" style={{ fontSize: 11, fontWeight: 700, color: "#4F46E5", background: "#EEF2FF", padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
-                                Privacy & Cohort Settings &rarr;
+                                Review Your Profile &rarr;
                               </Link>
                             </div>
                           )}
@@ -2362,7 +2369,7 @@ export function Screen12StudentDashboard({
                     {selectedSkillNode}
                   </h3>
                   <span style={{ fontSize: 12, color: "#64748B" }}>
-                    Verified Competency Signal
+                    Competency Evidence
                   </span>
                 </div>
               </div>
@@ -2376,21 +2383,21 @@ export function Screen12StudentDashboard({
             </div>
 
             <p style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.5, marginBottom: 18 }}>
-              This node reflects demonstrated proficiency in <strong>{selectedSkillNode}</strong>. It is connected to your primary goal of <strong>{comp.targetRole}</strong> and is verified through submitted projects and assessment benchmarks.
+              <strong>{selectedSkillNode}</strong> is relevant to your selected direction of <strong>{comp.targetRole}</strong>. Its current evidence state is <strong>{comp.skillMap.nodes.find((node) => node.label === selectedSkillNode)?.tierLabel || "Insufficient Evidence"}</strong>.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "#F8FAFC", borderRadius: 10, padding: 12, marginBottom: 20, border: "1px solid #E2E8F0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                 <span style={{ color: "#64748B" }}>Verification Status</span>
-                <span style={{ color: "#059669", fontWeight: 700 }}>Verified & Audited</span>
+                <span style={{ color: "#059669", fontWeight: 700 }}>{comp.skillMap.nodes.find((node) => node.label === selectedSkillNode)?.status || "To Demonstrate"}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                 <span style={{ color: "#64748B" }}>Evidence Source</span>
-                <span style={{ color: "#0F172A", fontWeight: 600 }}>GitHub + Practical Projects</span>
+                <span style={{ color: "#0F172A", fontWeight: 600 }}>{comp.skillMap.nodes.find((node) => node.label === selectedSkillNode)?.source || "No source recorded"}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                 <span style={{ color: "#64748B" }}>Target Role Relevance</span>
-                <span style={{ color: "#4F46E5", fontWeight: 700 }}>Critical Core Competency</span>
+                <span style={{ color: "#4F46E5", fontWeight: 700 }}>Target role competency</span>
               </div>
             </div>
 

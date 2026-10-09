@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { fetchGitHubProjects } from "@/lib/connectors/github/client";
+import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
+import { getServerAuthContext } from "@/lib/auth/server-session";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (!coreIngestionReady()) return NextResponse.json({ error: "GitHub import is unavailable until credential rotation is complete." }, { status: 503 });
+  const auth = await getServerAuthContext();
+  if (!auth) return NextResponse.json({ error: "Sign in before importing GitHub repositories." }, { status: 401 });
+  if (!checkRateLimit(auth.person.id, "sync").allowed) return NextResponse.json({ error: "Please wait before retrying GitHub import." }, { status: 429 });
   try {
     const body = await request.json();
     if (body.consent !== true) {

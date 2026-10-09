@@ -8,7 +8,7 @@ import { Screen3ChooseRole } from "./Screen3ChooseRole";
 import { Screen3bAiMlDirection } from "./Screen3bAiMlDirection";
 import { Screen3aPriorities } from "./Screen3aPriorities";
 import { Screen4AcademicDetails, type AcademicDetailsData } from "./Screen4AcademicDetails";
-import { Screen5ResumeUpload } from "./Screen5ResumeUpload";
+import { Screen5ResumeUpload, type ReviewedResumeClaim } from "./Screen5ResumeUpload";
 import { Screen6DigitalFootprints } from "./Screen6DigitalFootprints";
 import { Screen7AiAnalysis } from "./Screen7AiAnalysis";
 import { Screen8ProfileInsights } from "./Screen8ProfileInsights";
@@ -36,10 +36,10 @@ export function ExactScreensContainer({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [name, setName] = useState<string>(isGalleryMode ? "Rahul Sharma" : "");
   const [role, setRole] = useState<string>("student");
-  const [targetRole, setTargetRole] = useState<string>("Generative AI Engineer");
-  const [targetRoleId, setTargetRoleId] = useState<string>("genai_engineer");
-  const [goal, setGoal] = useState<string>("Get an AI/ML internship");
-  const [targetTimeline, setTargetTimeline] = useState<string>("Within 6 months");
+  const [targetRole, setTargetRole] = useState<string>(isGalleryMode ? "Generative AI Engineer" : "");
+  const [targetRoleId, setTargetRoleId] = useState<string>(isGalleryMode ? "genai_engineer" : "");
+  const [goal, setGoal] = useState<string>(isGalleryMode ? "Get an AI/ML internship" : "");
+  const [targetTimeline, setTargetTimeline] = useState<string>(isGalleryMode ? "Within 6 months" : "");
   const [customGoalText, setCustomGoalText] = useState<string>("");
 
   const [academic, setAcademic] = useState<AcademicDetailsData>({
@@ -47,23 +47,19 @@ export function ExactScreensContainer({
     email: isGalleryMode ? "rahul.sharma@lpu.in" : "",
     mobile: isGalleryMode ? "+91 98765 43210" : "",
     role: "Student",
-    institution: "Lovely Professional University (LPU)",
-    department: "Computer Science and Engineering",
-    degree: "B.Tech",
-    currentYear: "3rd Year",
-    expectedGraduationYear: 2026,
+    institution: isGalleryMode ? "Lovely Professional University (LPU)" : "",
+    department: isGalleryMode ? "Computer Science and Engineering" : "",
+    degree: isGalleryMode ? "B.Tech" : "",
+    currentYear: isGalleryMode ? "3rd Year" : "",
+    expectedGraduationYear: isGalleryMode ? 2026 : undefined,
   });
 
   const [resumeFileName, setResumeFileName] = useState<string | null>(
     isGalleryMode ? "Rahul_Sharma_Resume.pdf" : null
   );
+  const [resumeReviewed, setResumeReviewed] = useState<ReviewedResumeClaim[]>([]);
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>({});
-  const [skills, setSkills] = useState<string[]>([
-    "Python",
-    "Machine Learning",
-    "Data Analysis",
-    "DSA",
-  ]);
+  const [skills, setSkills] = useState<string[]>(isGalleryMode ? ["Python", "Machine Learning", "Data Analysis", "DSA"] : []);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [priorities, setPriorities] = useState<string[]>([]);
   const [primaryPriority, setPrimaryPriority] = useState<string | undefined>();
@@ -115,6 +111,7 @@ export function ExactScreensContainer({
               }));
             }
             if (d.skills?.length > 0) setSkills(d.skills);
+            if (Array.isArray(d.resumeReviewed)) setResumeReviewed(d.resumeReviewed);
             if (d.projects?.length > 0) {
               setProjects(
                 d.projects.map((p: ProjectEntry) => ({
@@ -126,6 +123,9 @@ export function ExactScreensContainer({
                   status: p.status || "confirmed",
                   contribution: p.contribution || ["Machine Learning"],
                   contributionNote: p.contributionNote || "",
+                  url: p.url,
+                  aiPurpose: p.aiPurpose,
+                  uncertaintyNotes: p.uncertaintyNotes,
                 }))
               );
             }
@@ -165,12 +165,13 @@ export function ExactScreensContainer({
             targetRoleId: patch.targetRoleId ?? targetRoleId,
             targetTimeline: patch.targetTimeline ?? targetTimeline,
             customGoalText: patch.customGoalText ?? customGoalText,
-            degree: academic.degree || "B.Tech",
+            degree: academic.degree,
             specialization: academic.department,
             institution: academic.institution,
-            year: academic.currentYear || "3rd Year",
-            semester: "6th Semester",
+            year: academic.currentYear,
+            semester: "",
             skills: patch.skills ?? skills,
+            resumeReviewed: patch.resumeReviewed ?? resumeReviewed,
             projects: patch.projects ?? projects,
             profiles: patch.profiles ?? profiles,
             goal: patch.goal ?? goal,
@@ -191,6 +192,7 @@ export function ExactScreensContainer({
       projects,
       role,
       skills,
+      resumeReviewed,
       priorities,
       primaryPriority,
       targetRole,
@@ -204,21 +206,6 @@ export function ExactScreensContainer({
     setAcademic(data);
     setName(data.fullName);
     persistDraft({ name: data.fullName });
-
-    if (typeof window !== "undefined" && data.email && data.password) {
-      try {
-        localStorage.setItem(
-          "tathastu_student_auth",
-          JSON.stringify({
-            email: data.email,
-            password: data.password,
-            displayName: data.fullName,
-          })
-        );
-      } catch {
-        // Non-fatal
-      }
-    }
 
     if (!isAuthenticated && data.email && data.password && data.password.length >= 6) {
       try {
@@ -254,62 +241,43 @@ export function ExactScreensContainer({
   };
 
   const handleFinishOnboarding = async () => {
-    // Instant smooth transition to personalized workspace dashboard
-    setCurrentScreen(12);
+    if (isGalleryMode) { setCurrentScreen(12); return; }
 
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(
-          "tathastu_student_profile",
-          JSON.stringify({
-            studentName: name || academic.fullName || "Student",
-            institution: academic.institution || "Lovely Professional University (LPU)",
-            degree: academic.degree || "B.Tech",
-            activeGoal: goal || "Get an AI/ML internship",
-            targetRole: targetRole || "Generative AI Engineer",
-            targetRoleId: targetRoleId || "genai_engineer",
-            primaryPriority: primaryPriority || priorities?.[0] || "learning",
-            secondaryPriorities: priorities?.filter((p) => p !== (primaryPriority || priorities?.[0])),
-            skills,
-            projects: projects.filter((p) => p.status === "confirmed"),
-          })
-        );
-      } catch {
-        // Non-fatal
-      }
-    }
-
-    if (isGalleryMode) return;
+    setIsSubmitting(true);
 
     try {
-      await fetch("/api/onboarding-v2", {
+      const response = await fetch("/api/onboarding-v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           version: 2,
-          name: name || academic.fullName || "Student",
+          name: name || academic.fullName,
           email: academic.email,
           password: academic.password,
           role: "student",
-          targetRole: targetRole || "Generative AI Engineer",
-          targetRoleId: targetRoleId || "genai_engineer",
-          targetTimeline: targetTimeline || "Within 6 months",
+          targetRole,
+          targetRoleId,
+          targetTimeline,
           customGoalText: customGoalText || "",
-          degree: academic.degree || "B.Tech",
-          specialization: academic.department || "Computer Science and Engineering",
-          institution: academic.institution || "Lovely Professional University (LPU)",
-          year: academic.currentYear || "3rd Year",
-          semester: "6th Semester",
+          degree: academic.degree,
+          specialization: academic.department,
+          institution: academic.institution,
+          year: academic.currentYear,
+          semester: "",
           skills,
+          resumeReviewed,
           projects: projects.filter((p) => p.status === "confirmed"),
           profiles,
-          goal: goal || "Get an AI/ML internship",
+          goal,
           priorities,
           primaryPriority,
         }),
       });
+      if (!response.ok) throw new Error("Could not save onboarding. Please try again.");
+      window.location.assign("/student");
     } catch {
-      // Non-blocking background sync
+      setIsSubmitting(false);
+      alert("Could not save onboarding. Please try again.");
     }
   };
 
@@ -438,15 +406,18 @@ export function ExactScreensContainer({
         {currentScreen === 5 && (
           <Screen5ResumeUpload
             initialFileName={resumeFileName}
-            onExtractSuccess={(discovery, suggestions) => {
-              if (discovery?.fileName) setResumeFileName(discovery.fileName);
-              if (suggestions?.skills) {
-                const parsed = suggestions.skills.split(",").map((s: string) => s.trim()).filter(Boolean);
-                if (parsed.length > 0) {
-                  setSkills(parsed);
-                  persistDraft({ skills: parsed });
-                }
-              }
+            onExtractSuccess={(fileName, claims) => {
+              setResumeFileName(fileName);
+              setResumeReviewed(claims);
+              const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
+              const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
+              setSkills(nextSkills);
+              const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => ({
+                id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value, description: "", technologies: [], sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
+              }));
+              const nextProjects = [...projects.filter((project) => !project.id.startsWith("resume_")), ...resumeProjects];
+              setProjects(nextProjects);
+              persistDraft({ skills: nextSkills, projects: nextProjects, resumeReviewed: claims });
             }}
             onNext={() => setCurrentScreen(6)}
             onBack={() => setCurrentScreen(4)}
@@ -469,20 +440,14 @@ export function ExactScreensContainer({
                 description: p.description || "",
                 technologies: p.technologies || [],
                 sources: ["github"],
-                status: "confirmed",
-                contribution: ["Machine Learning", "Backend API"],
+                status: "candidate",
+                contribution: [],
                 contributionNote: "",
                 url: p.url,
               }));
               const nextProjects = [...projects, ...mapped];
               setProjects(nextProjects);
               persistDraft({ projects: nextProjects });
-              const allTechs = ghProjects.flatMap((p) => p.technologies || []);
-              if (allTechs.length > 0) {
-                const nextSkills = Array.from(new Set([...skills, ...allTechs]));
-                setSkills(nextSkills);
-                persistDraft({ skills: nextSkills });
-              }
             }}
             onNext={() => setCurrentScreen(7)}
             onBack={() => setCurrentScreen(5)}
@@ -502,12 +467,14 @@ export function ExactScreensContainer({
         {currentScreen === 8 && (
           <Screen8ProfileInsights
             studentName={name || academic.fullName || (isGalleryMode ? "Rahul Sharma" : "Student")}
-            degree={academic.degree || "B.Tech"}
-            institution={academic.institution || "Lovely Professional University (LPU)"}
-            year={academic.currentYear || "3rd Year"}
-            goal={goal || "Get an AI/ML internship"}
+            degree={academic.degree}
+            institution={academic.institution}
+            year={academic.currentYear}
+            goal={goal}
             skills={skills}
             projectsCount={projects.filter((p) => p.status === "confirmed").length}
+            projects={projects.filter((p) => p.status === "confirmed").map((p) => ({ title: p.title, description: p.description }))}
+            isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(9)}
             onBack={() => setCurrentScreen(7)}
             onJumpToStep={handleJumpToStep}
@@ -518,6 +485,7 @@ export function ExactScreensContainer({
         {currentScreen === 9 && (
           <Screen9SkillsMap
             skills={skills}
+            isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(10)}
             onBack={() => setCurrentScreen(8)}
             onJumpToStep={handleJumpToStep}

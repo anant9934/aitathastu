@@ -31,6 +31,11 @@ export async function saveExternalConnection(params: SaveConnectionParams) {
     .limit(1);
 
   if (existing.length > 0) {
+    const nextStatus = params.status || existing[0].status;
+    const previousMetadata = (existing[0].metadata || {}) as Record<string, unknown>;
+    const nextMetadata = params.provider === "github" && nextStatus !== "connected"
+      ? {}
+      : { ...previousMetadata, ...(params.metadata || {}) };
     await db
       .update(externalConnections)
       .set({
@@ -39,14 +44,14 @@ export async function saveExternalConnection(params: SaveConnectionParams) {
         displayName: params.displayName ?? existing[0].displayName,
         externalAccountId: params.externalAccountId ?? existing[0].externalAccountId,
         scopes: params.scopes ?? existing[0].scopes,
-        metadata: params.metadata || existing[0].metadata,
-        status: params.status || "connected",
+        metadata: nextMetadata,
+        status: nextStatus,
         disconnectedAt: params.status === "disconnected" ? now : null,
-        lastSyncedAt: now,
+        lastSyncedAt: params.metadata?.lastSyncedAt ? now : existing[0].lastSyncedAt,
         updatedAt: now,
       })
       .where(eq(externalConnections.id, existing[0].id));
-    return { ...existing[0], ...params, lastSyncedAt: now, updatedAt: now };
+    return { ...existing[0], ...params, metadata: nextMetadata, status: nextStatus, updatedAt: now };
   }
 
   const [created] = await db
@@ -60,9 +65,9 @@ export async function saveExternalConnection(params: SaveConnectionParams) {
       displayName: params.displayName || params.externalUsername,
       externalAccountId: params.externalAccountId || null,
       scopes: params.scopes || [],
-      status: params.status || "connected",
+      status: params.status || "reference_only",
       metadata: params.metadata || null,
-      lastSyncedAt: now,
+      lastSyncedAt: params.metadata?.lastSyncedAt ? now : null,
       disconnectedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -102,6 +107,7 @@ export async function disconnectConnection(personId: string, provider: string) {
     .update(externalConnections)
     .set({
       status: "disconnected",
+      metadata: {},
       disconnectedAt: now,
       updatedAt: now,
     })

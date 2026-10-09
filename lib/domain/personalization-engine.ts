@@ -175,6 +175,7 @@ export interface StudentPersonalizationContext {
   skills: Array<{ name: string; category?: string; verificationStatus: string; source?: string }>;
   projects: ProjectRecord[];
   evidenceItems: EvidenceItem[];
+  journeyEvents?: Array<{ title: string; description: string; timestamp: string }>;
   verifiedReadinessScore?: number | null;
   isReadinessAvailable?: boolean;
   // Authentic ecosystem records
@@ -1044,72 +1045,72 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
   if (primary === "jobs") {
     candidateActions.push({
       id: "act_career_prep",
-      title: "Practice AI/ML technical screening",
-      description: `Prepare for ${targetRoleName} interview questions covering algorithms, system design, and ML theory.`,
-      actionType: "Interview",
+      title: context.isDemo ? "Practice AI/ML technical screening" : "Review your project evidence for applications",
+      description: context.isDemo ? `Prepare for ${targetRoleName} interview questions covering algorithms, system design, and ML theory.` : "Check that each recorded project has a clear summary and your personal contribution.",
+      actionType: context.isDemo ? "Interview" : "Build",
       category: "jobs",
       relevantInterests: ["jobs", "learning"],
       relatedGoal: context.goal,
       whyAmISeeingThis: {
         goalRelevance: "Technical interviews require demonstrating problem-solving speed and clear ML reasoning.",
-        evidenceContext: "Interview practice sessions record structured competency feedback.",
-        actionOutcome: "Improves interview dimension readiness on your Person 360 graph.",
+        evidenceContext: context.isDemo ? "Interview practice sessions record structured competency feedback." : `${context.projects.length} project records are available for review.`,
+        actionOutcome: context.isDemo ? "Improves interview dimension readiness on your Person 360 graph." : "Opens your project workspace to document evidence for applications.",
       },
-      destinationUrl: "/student/interviews",
+      destinationUrl: context.isDemo ? "/student/interviews" : "/student/projects",
       score: 20,
       isEligible: true,
     });
   } else if (primary === "people") {
     candidateActions.push({
       id: "act_connect_mentor",
-      title: `Connect with a ${targetRoleName} mentor`,
-      description: "Explore verified faculty and industry advisors available for portfolio reviews.",
+      title: context.isDemo ? `Connect with a ${targetRoleName} mentor` : "Review your professional profile",
+      description: context.isDemo ? "Explore verified faculty and industry advisors available for portfolio reviews." : "Update your profile and the public links you choose to share.",
       actionType: "Connect",
       category: "people",
       relevantInterests: ["people"],
       relatedGoal: context.goal,
       whyAmISeeingThis: {
         goalRelevance: "Direct practitioner guidance helps avoid common pitfalls in AI/ML project scoping.",
-        evidenceContext: "Mentorship sessions produce verified evidence items.",
-        actionOutcome: "Connects you with experienced domain guidance.",
+        evidenceContext: context.isDemo ? "Mentorship sessions produce verified evidence items." : "No mentor availability is connected to Core yet.",
+        actionOutcome: context.isDemo ? "Connects you with experienced domain guidance." : "Opens your profile for review and correction.",
       },
-      destinationUrl: "/student/connections",
+      destinationUrl: context.isDemo ? "/student/connections" : "/student/profile",
       score: 20,
       isEligible: true,
     });
   } else if (primary === "collaboration") {
     candidateActions.push({
       id: "act_collaborate_team",
-      title: "Explore active collaboration requests",
-      description: "Find open team projects seeking AI/ML engineering contributors.",
+      title: context.isDemo ? "Explore active collaboration requests" : "Document your project contribution",
+      description: context.isDemo ? "Find open team projects seeking AI/ML engineering contributors." : "Record what you personally built or tested in a project.",
       actionType: "Collaborate",
       category: "collaboration",
       relevantInterests: ["collaboration", "projects"],
       relatedGoal: context.goal,
       whyAmISeeingThis: {
         goalRelevance: "Team collaboration proves communication, code-review hygiene, and modular integration.",
-        evidenceContext: "Multi-author repositories establish collaborative evidence.",
-        actionOutcome: "Connects you with an active project team.",
+        evidenceContext: context.isDemo ? "Multi-author repositories establish collaborative evidence." : "Your contribution is recorded separately from repository ownership.",
+        actionOutcome: context.isDemo ? "Connects you with an active project team." : "Opens your project workspace to add contribution details.",
       },
-      destinationUrl: "/student/collaborate",
+      destinationUrl: context.isDemo ? "/student/collaborate" : "/student/projects",
       score: 20,
       isEligible: true,
     });
   } else if (primary === "research_events") {
     candidateActions.push({
       id: "act_research_sota",
-      title: `Review latest ${targetRoleName} benchmark paper`,
-      description: "Explore recent open-access preprints and document experiment reproduction ideas.",
+      title: context.isDemo ? `Review latest ${targetRoleName} benchmark paper` : "Document research work in a project",
+      description: context.isDemo ? "Explore recent open-access preprints and document experiment reproduction ideas." : "Add your research method, evaluation, or reproduction notes to a recorded project.",
       actionType: "Research",
       category: "research_events",
       relevantInterests: ["research_events", "learning"],
       relatedGoal: context.goal,
       whyAmISeeingThis: {
         goalRelevance: "Keeping current with literature is essential for research rigor and novel model design.",
-        evidenceContext: "Paper summaries and reproduction notes count toward research evidence.",
-        actionOutcome: "Deepens your literature understanding and methodology.",
+        evidenceContext: context.isDemo ? "Paper summaries and reproduction notes count toward research evidence." : "Research contributions need a source and your confirmation.",
+        actionOutcome: context.isDemo ? "Deepens your literature understanding and methodology." : "Opens your project workspace to record research evidence.",
       },
-      destinationUrl: "/student/research",
+      destinationUrl: context.isDemo ? "/student/research" : "/student/projects",
       score: 20,
       isEligible: true,
     });
@@ -1120,18 +1121,18 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     const sec = secondaries[0];
     candidateActions.push({
       id: `act_joint_${primary}_${sec}`,
-      title: intersection.overlapTheme,
-      description: intersection.jointActionTemplate,
+      title: context.isDemo ? intersection.overlapTheme : `Review ${primaryDef.shortLabel} and ${CANONICAL_INTERESTS[sec].shortLabel} goals`,
+      description: context.isDemo ? intersection.jointActionTemplate : "Check your recorded goal and choose a useful next Core action for these interests.",
       actionType: "Practice",
       category: sec,
       relevantInterests: [primary, sec],
       relatedGoal: context.goal,
       whyAmISeeingThis: {
         goalRelevance: `Directly aligns with your primary (${primaryDef.title}) and secondary (${CANONICAL_INTERESTS[sec]?.title}) priorities.`,
-        evidenceContext: "Synthesizes multi-interest goals into a single cohesive activity.",
-        actionOutcome: "Advances multiple dimensions of your Person 360 profile simultaneously.",
+        evidenceContext: context.isDemo ? "Synthesizes multi-interest goals into a single cohesive activity." : "Uses your selected interest order and current recorded profile.",
+        actionOutcome: context.isDemo ? "Advances multiple dimensions of your Person 360 profile simultaneously." : "Opens an available Core workspace.",
       },
-      destinationUrl: `/student/${sec === "jobs" ? "career" : sec === "people" ? "connections" : sec === "projects" ? "projects" : "skills"}`,
+      destinationUrl: sec === "jobs" || sec === "projects" || sec === "collaboration" || sec === "research_events" ? "/student/projects" : sec === "people" ? "/student/profile" : "/student/skills",
       score: 16,
       isEligible: true,
     });
@@ -1141,7 +1142,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
   const seenTitles = new Set<string>();
   const rankedActions: NextBestAction[] = [];
   const sortedCandidates = candidateActions
-    .filter((a) => a.isEligible)
+    .filter((a) => a.isEligible && (context.isDemo || (/^\/student\/(skills|projects|profile|roadmap|connections|journey)(\/|\?|$)/.test(a.destinationUrl))))
     .sort((a, b) => b.score - a.score);
 
   for (const act of sortedCandidates) {
@@ -1165,9 +1166,9 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     },
     {
       id: "card_projects",
-      label: "Active Projects",
+      label: "Recorded Projects",
       value: context.projects.length,
-      subtext: context.projects.length === 0 ? "No repositories linked" : `${context.projects.length} repository linked`,
+      subtext: context.projects.length === 0 ? "No projects recorded" : `${context.projects.length} project records`,
       emphasis: primary === "projects" || primary === "jobs",
       provenance: "actual_records" as const,
       badge: primary === "projects" ? "Active Priority" : undefined,
@@ -1176,7 +1177,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       id: "card_evidence",
       label: "Evidence Items",
       value: context.evidenceItems.length,
-      subtext: context.evidenceItems.length === 0 ? "Awaiting source links" : `${context.evidenceItems.length} verifiable points`,
+      subtext: context.evidenceItems.length === 0 ? "Awaiting source links" : `${context.evidenceItems.filter((e) => e.verificationStatus === "verified").length} independently verified`,
       emphasis: primary === "jobs" || primary === "projects",
       provenance: "verified_ledger" as const,
     },
@@ -1192,11 +1193,11 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     {
       id: "card_network",
       label: primary === "collaboration" ? "Collaborators" : "Network & Mentors",
-      value: primary === "collaboration" ? "Active Teams" : "Opt-In",
-      subtext: primary === "people" ? "Explore authorized mentors" : primary === "collaboration" ? "Open student projects" : "Student community",
+      value: context.isDemo ? (primary === "collaboration" ? "Active Teams" : "Opt-In") : "Unavailable",
+      subtext: context.isDemo ? (primary === "people" ? "Explore authorized mentors" : primary === "collaboration" ? "Open student projects" : "Student community") : "No Core network records available",
       emphasis: primary === "people" || primary === "collaboration",
-      provenance: "actual_records" as const,
-      badge: primary === "people" || primary === "collaboration" ? "Network Active" : undefined,
+      provenance: context.isDemo ? ("actual_records" as const) : ("unavailable" as const),
+      badge: context.isDemo && (primary === "people" || primary === "collaboration") ? "Network Active" : undefined,
     },
     {
       id: "card_learning",
@@ -1210,14 +1211,12 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
   ];
 
   // EORA Personalized Insight
-  const eoraPersonalizedInsight = `You're focusing on ${targetRoleName} with a primary emphasis on ${primaryDef.title}. ${intersection.eoraFocusText} ${
-    context.projects.length > 0
-      ? `We have indexed ${context.projects.length} project repository to support your evidence ledger.`
-      : "Linking a project repository or completing initial prerequisite exercises is your most impactful next step."
-  }`;
+  const eoraPersonalizedInsight = context.isDemo
+    ? `You're focusing on ${targetRoleName} with a primary emphasis on ${primaryDef.title}. ${intersection.eoraFocusText}`
+    : `Your selected direction is ${targetRoleName}. Your interest order is ${[primary, ...secondaries].map((interest) => CANONICAL_INTERESTS[interest].title).join(", then ")}. Your profile currently records ${context.projects.length} projects and ${context.skills.length} skills. ${rankedActions[0]?.title || "Review your profile"} is an available next action.`;
 
   // Build Journey Records
-  const journeyRecords = [
+  const demoJourneyRecords = [
     {
       stepNumber: 1,
       title: "Enrollment",
@@ -1249,6 +1248,15 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       status: "upcoming" as const,
     },
   ];
+  const journeyRecords = context.isDemo ? demoJourneyRecords : (context.journeyEvents || [])
+    .slice(0, 5)
+    .reverse()
+    .map((event, index) => ({
+      stepNumber: index + 1,
+      title: event.title,
+      subtitle: event.timestamp ? new Date(event.timestamp).toLocaleDateString("en-IN") : "Recorded event",
+      status: "completed" as const,
+    }));
 
   // Dynamic Skills Map Nodes tailored to Target Role
   const skillNodesList: Array<{ id: string; label: string; category: string }> = [];
@@ -1350,7 +1358,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
   }));
 
   // Gaps tailored to target role
-  const skillGaps = [
+  const skillGaps = context.isDemo ? [
     {
       title: roleDef.id === "genai_engineer"
         ? "Model Serving & Containerization"
@@ -1371,10 +1379,10 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       explanation: `Benchmark evaluation precision against golden test sets to elevate project evidence from hobby to production grade.`,
       urgency: "recommended" as const,
     },
-  ];
+  ] : [];
 
   // Recommended Learning Paths tailored to target role
-  const recommendedLearning = [
+  const recommendedLearning = context.isDemo ? [
     {
       title: roleDef.id === "genai_engineer"
         ? "Deep Learning & Attention Mechanisms"
@@ -1399,16 +1407,21 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       actionUrl: "/student/roadmap",
       actionLabel: "Practice",
     },
-  ];
+  ] : [];
 
   // Career Stages
-  const careerStages = [
+  const careerStages = context.isDemo ? [
     { stageNumber: 1, title: "Stage 1: Python & Programming Foundations", description: "Core algorithmic problem solving and clean code hygiene.", status: "completed" as const },
     { stageNumber: 2, title: "Stage 2: Machine Learning & Math Foundations", description: "Statistical testing, loss optimization, and scikit-learn models.", status: "completed" as const },
     { stageNumber: 3, title: `Stage 3: ${roleDef.corePrerequisites[0] || "Deep Learning"} (Current)`, description: `Advanced specialization milestones for ${targetRoleName}.`, status: "in_progress" as const },
     { stageNumber: 4, title: "Stage 4: Production Deployment & Verification", description: "Docker serving, CI/CD testing, and faculty audit approval.", status: "up_next" as const },
     { stageNumber: 5, title: `Stage 5: ${primary === "jobs" ? "High-Impact Placement & Internship" : primary === "research_events" ? "Research Publication & Conference" : "Industry Leadership"}`, description: `Achievement of your active goal: ${context.goal || targetRoleName}.`, status: "up_next" as const },
-  ];
+  ] : roleDef.corePrerequisites.slice(0, 5).map((competency, index) => ({
+    stageNumber: index + 1,
+    title: `Stage ${index + 1}: ${competency}`,
+    description: `Review evidence for ${competency} and choose a practical next action.`,
+    status: (index === 0 ? "in_progress" : "up_next") as "in_progress" | "up_next",
+  }));
 
   // Ecosystem Section Cards Order & Prominence
   let ecosystemCardsOrder: ("internships" | "opportunities" | "mentors" | "people" | "collaborative_projects")[] = [
@@ -1438,24 +1451,24 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
 
   // Hero Headlines & CTA resolution
   const heroHeadline = intersection.headline || primaryDef.heroHeadline;
-  const heroSubheadline = primaryDef.heroSubheadline;
-  const focusTags = intersection.focusTags || [
+  const heroSubheadline = context.isDemo ? primaryDef.heroSubheadline : `Focus on ${[primary, ...secondaries].map((interest) => CANONICAL_INTERESTS[interest].shortLabel).join(", then ")} while reviewing recorded evidence and Core actions for ${targetRoleName}.`;
+  const focusTags = context.isDemo ? (intersection.focusTags || [
     primaryDef.shortLabel,
     "AI/ML Focus",
     "Verified Signals",
     "Goal Roadmap",
-  ];
+  ]) : [primaryDef.shortLabel, ...secondaries.map((interest) => CANONICAL_INTERESTS[interest].shortLabel), targetRoleName, context.projects.length > 0 ? "Recorded Projects" : "Project Evidence Needed"].slice(0, 4);
 
   const primaryCta = {
-    label: intersection.primaryCtaLabel || rankedActions[0]?.title || "Continue Learning Roadmap",
+    label: context.isDemo ? (intersection.primaryCtaLabel || rankedActions[0]?.title || "Continue Learning Roadmap") : (rankedActions[0]?.title || "Review your roadmap"),
     url: rankedActions[0]?.destinationUrl || "/student/skills",
   };
   const secondaryCta = {
-    label: intersection.secondaryCtaLabel || (primary === "jobs" ? "Explore Opportunities" : "View Growth Roadmap"),
-    url: primary === "jobs" ? "#ecosystem" : "/student/roadmap",
+    label: context.isDemo ? (intersection.secondaryCtaLabel || (primary === "jobs" ? "Explore Opportunities" : "View Growth Roadmap")) : "View Growth Roadmap",
+    url: context.isDemo && primary === "jobs" ? "#ecosystem" : "/student/roadmap",
   };
 
-  const eoraHeroSpeech = intersection.eoraFocusText;
+  const eoraHeroSpeech = context.isDemo ? intersection.eoraFocusText : `I can explain your recorded profile and next Core actions for ${targetRoleName}, starting with ${primaryDef.title}${secondaries.length ? ` and then ${secondaries.map((interest) => CANONICAL_INTERESTS[interest].title).join(" and ")}` : ""}.`;
 
   return {
     engineVersion: "2.0.0-aiml",
@@ -1464,7 +1477,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     secondaryInterests: secondaries,
     targetRole: targetRoleName,
     targetRoleId: roleDef.id,
-    goal: context.goal || "Get an AI/ML internship",
+    goal: context.goal || "Choose your AI/ML goal",
     hero: {
       greeting: `Welcome, ${context.name || "Student"}`,
       headline: heroHeadline,
@@ -1483,7 +1496,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     skillMap,
     evidenceSection: {
       title: "Your Evidence Ledger",
-      subtitle: "Grounded artifacts, verified repositories, research publications, and milestone achievements.",
+      subtitle: "Projects and evidence recorded in your profile.",
       cardsOrder: evidenceCardsOrder,
       prominentCard: prominentEvidenceCard,
       cardsData: {
@@ -1500,10 +1513,10 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
           })),
         },
         githubActivity: {
-          connected: context.projects.some((p) => (p.sources || []).includes("github")),
-          reposCount: context.projects.length,
-          status: context.projects.some((p) => (p.sources || []).includes("github")) ? "Connected" : "Disconnected",
-          description: "Synchronized repositories demonstrate commit frequency and code provenance.",
+          connected: Boolean(context.isDemo) && context.projects.some((p) => (p.sources || []).includes("github")),
+          reposCount: context.projects.filter((p) => (p.sources || []).includes("github")).length,
+          status: context.isDemo ? "Connected" : "Connection status available in Connections",
+          description: "Repository references require student contribution review; they do not prove authorship.",
         },
         publications: {
           items: (context.evidenceItems || [])
@@ -1512,7 +1525,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
               id: e.id,
               title: e.subject || "Research Publication",
               publisher: e.sourceReference || "Academic Archive",
-              year: "2024",
+              year: e.observedAt ? new Date(e.observedAt).getFullYear().toString() : "Unknown",
             })),
         },
         achievements: {
@@ -1523,7 +1536,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
               title: e.subject || "Achievement",
               issuer: e.source || "Academic Institution",
               status: e.verificationStatus === "verified" ? "Verified" : "Self-Reported",
-              date: "Recent",
+              date: e.observedAt ? new Date(e.observedAt).toLocaleDateString("en-IN") : "Unknown",
             })),
         },
       },
@@ -1541,7 +1554,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     },
     ecosystemSection: {
       title: "Your Ecosystem",
-      subtitle: intersection.ecosystemSubtitle || primaryDef.ecosystemFocus,
+      subtitle: context.isDemo ? (intersection.ecosystemSubtitle || primaryDef.ecosystemFocus) : "Core preparation is available. Mentors, jobs, communities, and events are not connected in this phase.",
       cardsOrder: ecosystemCardsOrder,
       prominentCard: prominentEcosystemCard,
       peopleYouShouldKnow: context.isDemo
@@ -1563,7 +1576,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     nextBestActions: rankedActions,
     eoraPersonalizedInsight,
     eoraCompanion: {
-      speech: `Every confirmed project and verified milestone brings you closer to your goal of becoming an exceptional ${targetRoleName}. Ask me anything anytime!`,
+      speech: context.isDemo ? `Every confirmed project and verified milestone brings you closer to your goal of becoming an exceptional ${targetRoleName}. Ask me anything anytime!` : `I can help you review your recorded evidence and plan your next step toward ${targetRoleName}.`,
       suggestedQuestions: [
         `What are the critical skills missing for ${targetRoleName}?`,
         "How can I improve my project portfolio for recruiters?",

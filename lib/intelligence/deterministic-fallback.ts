@@ -119,26 +119,8 @@ export function executeDeterministicFallback(request: CompletionRequest): Comple
 
     case "EORA_CHAT":
     default: {
-      const promptLower = (request.userPrompt || "").toLowerCase();
-      let content =
-        "I'm EORA, your AI copilot. I'm tracking your progress toward your AI/ML goals. You can ask me how to improve your projects, what skills to learn next, or how to get your evidence verified.";
-
-      if (promptLower.includes("verify") || promptLower.includes("verification")) {
-        content =
-          "To get your project or skill verified, navigate to the Evidence Ledger and click 'Request Verification'. Institutional reviewers (faculty or mentors) will evaluate your submitted work and issue a verified badge.";
-      } else if (promptLower.includes("project") || promptLower.includes("portfolio")) {
-        content =
-          "To strengthen your project portfolio, ensure each project has a clear problem statement, clean GitHub repository, and documented metrics (such as model accuracy or inference latency). Submitting your projects for verification in AI Tathastu will officially publish them to your evidence ledger.";
-      } else if (promptLower.includes("skill") || promptLower.includes("missing") || promptLower.includes("gap")) {
-        content =
-          "For an AI / ML Engineer role, the most impactful competencies to demonstrate are production model serving (FastAPI/Docker), vector search architectures (FAISS/RAG), and algorithmic problem solving. Focusing on one gap at a time produces the fastest verified progress.";
-      } else if (promptLower.includes("roadmap") || promptLower.includes("milestone") || promptLower.includes("next")) {
-        content =
-          "Your roadmap is structured into 5 stages: Foundations -> Core ML -> Applied Projects -> Production Deployment & Verification -> Placement. Focus on completing your current stage's primary action before advancing.";
-      }
-
       return {
-        content,
+        content: "I'm unable to provide AI guidance right now. Your saved profile, projects, and roadmap remain available. Please try this question again later.",
         provider: "deterministic_fallback",
         modelUsed: "deterministic_rule_engine",
         fallbackUsed: true,

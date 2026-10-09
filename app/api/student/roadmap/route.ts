@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
-import { getPersonProfile } from "@/lib/repositories/person-repository";
+import { getPersonProfile, getUserPreferences } from "@/lib/repositories/person-repository";
 import { getActiveGoal } from "@/lib/repositories/goal-repository";
 import { getEvidenceByPersonId } from "@/lib/repositories/evidence-repository";
+import { getProjectsByPersonId } from "@/lib/repositories/project-repository";
 import { generatePersonalizedRoadmap } from "@/lib/domain/roadmap";
 
 export const runtime = "nodejs";
@@ -14,19 +15,35 @@ export async function GET() {
   }
 
   const personId = auth.person.id;
-  const profile = await getPersonProfile(personId);
-  const activeGoal = await getActiveGoal(personId);
-  const evidenceList = await getEvidenceByPersonId(personId);
+  const [profile, activeGoal, evidenceList, preferences, projects] = await Promise.all([
+    getPersonProfile(personId), getActiveGoal(personId), getEvidenceByPersonId(personId),
+    getUserPreferences(personId), getProjectsByPersonId(personId),
+  ]);
 
-  const goalTitle = activeGoal ? activeGoal.title : "GenAI Engineer";
+  const goalTitle = activeGoal?.title || "";
+  if (!goalTitle) {
+    return NextResponse.json({ roadmap: { goal: "", totalStages: 0, currentStageIndex: -1, stages: [], primaryActions: [] }, studentName: auth.person.displayName, goal: null, cohort: profile?.expectedGraduationYear || null, message: "Choose an AI/ML goal to create your roadmap." });
+  }
   const evidencedSkills = evidenceList
-    .filter((e) => e.category === "skill")
+    .filter((e) => e.category === "skill" && e.verificationStatus === "verified")
     .map((e) => e.subject);
 
   const cohort = profile?.expectedGraduationYear || undefined;
   const placementStatus = profile?.placementStatus || undefined;
 
-  const roadmap = generatePersonalizedRoadmap(goalTitle, evidencedSkills, cohort, placementStatus);
+  const metadata = (preferences?.metadata || {}) as Record<string, unknown>;
+  const targetRole = typeof metadata.targetRole === "string" ? metadata.targetRole : "";
+  const generated = generatePersonalizedRoadmap(goalTitle, evidencedSkills, cohort, placementStatus, {
+    targetRole,
+    specificGoal: goalTitle,
+    primaryPriority: preferences?.primaryPriority || undefined,
+    confirmedProjectCount: projects.filter((project) => project.status === "confirmed").length,
+  });
+  const roadmap = {
+    ...generated,
+    stages: generated.stages.map((stage) => ({ ...stage, recommendedActions: stage.recommendedActions.filter((action) => action.sourcePlatform === "Projects") })),
+    primaryActions: generated.primaryActions.filter((action) => action.sourcePlatform === "Projects"),
+  };
 
   return NextResponse.json({
     roadmap,

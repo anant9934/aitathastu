@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Lightbulb, ArrowRight, ArrowLeft } from "lucide-react";
@@ -12,23 +12,19 @@ interface Screen7AiAnalysisProps {
 }
 
 const analysisSteps = [
-  "Reading and parsing your academic resume",
-  "Scanning verified LinkedIn credentials",
-  "Analyzing public GitHub repositories & commits",
-  "Extracting core competencies and technology stack",
-  "Mapping candidate projects into verified evidence",
-  "Synthesizing your defensible intelligence profile",
+  "Review your academic details",
+  "Confirm or correct resume suggestions",
+  "Check any linked profile references",
+  "Review imported project candidates",
+  "Describe what you personally contributed",
+  "Continue to your starting profile",
 ];
 
 export function Screen7AiAnalysis({
   onComplete,
   onBack,
 }: Screen7AiAnalysisProps) {
-  const [completedSteps, setCompletedSteps] = useState<number>(6);
-
-  useEffect(() => {
-    setCompletedSteps(6);
-  }, []);
+  const completedSteps = 0;
 
   return (
     <div
@@ -218,16 +214,16 @@ export function Screen7AiAnalysis({
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, marginBottom: 32 }}>
               <div>
                 <h1 style={{ fontSize: "clamp(26px, 2.8vw, 36px)", fontWeight: 850, color: "#FFFFFF", lineHeight: 1.25, margin: "0 0 8px", letterSpacing: "-0.025em" }}>
-                  EORA is analyzing your information...
+                  Review your starting picture
                 </h1>
                 <p style={{ fontSize: 15, color: "#94A3B8", margin: 0 }}>
-                  Extracting signals across all connected platforms
+                  Your profile will include only information you confirm.
                 </p>
               </div>
 
               {/* Glowing Circular Progress Spinner */}
               <div style={{ position: "relative", width: 52, height: 52, flexShrink: 0 }}>
-                <svg width="52" height="52" viewBox="0 0 52 52" style={{ animation: "spin 2s linear infinite" }}>
+                <svg width="52" height="52" viewBox="0 0 52 52">
                   <circle
                     cx="26"
                     cy="26"
@@ -307,7 +303,7 @@ export function Screen7AiAnalysis({
             >
               <Lightbulb size={22} color="#02C5F5" style={{ flexShrink: 0 }} />
               <p style={{ fontSize: 14, color: "#94A3B8", margin: 0, lineHeight: 1.45 }}>
-                Synthesis completed! Verified portfolio ready for review.
+                Suggestions from a resume or repository are not verified achievements. You can correct them before they appear in your profile.
               </p>
             </div>
 

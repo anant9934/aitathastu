@@ -6,6 +6,8 @@ import {
   disconnectConnection,
   getSyncRunsByPerson,
 } from "@/lib/repositories/connection-repository";
+import type { SaveConnectionParams } from "@/lib/repositories/connection-repository";
+import { disconnectGitHubAccount } from "@/lib/services/github-sync-service";
 import {
   getIdentityLinksByPersonId,
   getLearningActivitiesByPersonId,
@@ -45,8 +47,8 @@ export async function GET() {
         title: "GitHub",
         category: "Code & Projects",
         description: "Public repositories, READMEs, manifests, and personal project contributions.",
-        connectionMethod: "GitHub App / Read-only OAuth",
-        privacyNote: "Public code creates demonstrated evidence. Private repos stay private.",
+        connectionMethod: "GitHub OAuth (public repositories)",
+        privacyNote: "Repository metadata is source-detected evidence. Private code is not imported by this connection.",
         status: savedMap.get("github")?.status || "not_connected",
         externalUsername: savedMap.get("github")?.externalUsername || null,
         profileUrl: savedMap.get("github")?.profileUrl || null,
@@ -204,24 +206,27 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { provider, username, profileUrl } = body;
-
-    if (!provider) {
-      return NextResponse.json({ error: "Provider is required." }, { status: 400 });
+    const hosts: Record<string, string> = { github: "github.com", linkedin: "linkedin.com", leetcode: "leetcode.com", codechef: "codechef.com", hackerrank: "hackerrank.com", hackerearth: "hackerearth.com" };
+    if (typeof provider !== "string" || !hosts[provider]) return NextResponse.json({ error: "Unsupported profile provider." }, { status: 400 });
+    const cleanUsername = typeof username === "string" ? username.trim().slice(0, 100) : "";
+    if (!cleanUsername) return NextResponse.json({ error: "Profile username is required." }, { status: 400 });
+    const cleanUrl = typeof profileUrl === "string" && profileUrl.trim() ? profileUrl.trim() : `https://${hosts[provider]}/${cleanUsername}`;
+    let url: URL;
+    try { url = new URL(cleanUrl); } catch { return NextResponse.json({ error: "Invalid profile URL." }, { status: 400 }); }
+    if (url.protocol !== "https:" || ![hosts[provider], `www.${hosts[provider]}`].includes(url.hostname) || !url.pathname || url.pathname === "/") {
+      return NextResponse.json({ error: "Profile URL must use the selected provider's HTTPS domain." }, { status: 400 });
     }
-
-    const cleanUsername = (username || "").trim();
-    const cleanUrl = (profileUrl || "").trim() || `https://${provider}.com/${cleanUsername}`;
 
     const saved = await saveExternalConnection({
       personId: auth.person.id,
-      provider,
+      provider: provider as SaveConnectionParams["provider"],
       externalUsername: cleanUsername,
       profileUrl: cleanUrl,
       displayName: cleanUsername,
-      status: provider === "github" ? "connected" : "reference_only",
+      status: "reference_only",
     });
 
-    return NextResponse.json({ success: true, connection: saved });
+    return NextResponse.json({ success: true, connection: { id: saved.id, provider: saved.provider, status: saved.status, profileUrl: saved.profileUrl } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error saving connection.";
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -238,10 +243,14 @@ export async function DELETE(req: Request) {
     const url = new URL(req.url);
     const provider = url.searchParams.get("provider");
 
-    if (!provider) {
-      return NextResponse.json({ error: "Provider is required." }, { status: 400 });
+    if (!provider || !["github", "linkedin", "leetcode", "codechef", "hackerrank", "hackerearth"].includes(provider)) {
+      return NextResponse.json({ error: "Supported profile provider is required." }, { status: 400 });
     }
 
+    if (provider === "github") {
+      const result = await disconnectGitHubAccount(auth.person.id);
+      return NextResponse.json(result);
+    }
     await disconnectConnection(auth.person.id, provider);
     return NextResponse.json({ success: true, message: `${provider} connection disconnected.` });
   } catch (err) {

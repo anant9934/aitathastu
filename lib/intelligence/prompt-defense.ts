@@ -9,6 +9,14 @@ ${sanitized}
 </${tag}_data_untrusted>`;
 }
 
+/** Removes control characters before untrusted document text enters a model prompt. */
+export function sanitizeTextForPrompt(content: string): string {
+  return content
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .trim();
+}
+
 export function buildSafePrompt(
   trustedInstructions: string,
   untrustedInputs: Record<string, string>

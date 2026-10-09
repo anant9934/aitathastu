@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import { encryptConnectionToken, decryptConnectionToken } from "../security/connection-token";
+import { coreIngestionReady } from "../security/core-ingestion-gate";
 import { fetchGitHubProjects } from "../connectors/github/client";
 import { hasRepoMeaningfullyChanged, DiscoveredGitHubProject } from "../connectors/github/mapper";
 import {
@@ -24,7 +26,7 @@ export async function connectGitHubAccount(params: {
   personId: string;
   username: string;
   externalAccountId?: string;
-  token?: string;
+  token: string;
   scopes?: string[];
 }) {
   const cleanUsername = params.username.trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
@@ -36,10 +38,11 @@ export async function connectGitHubAccount(params: {
     externalAccountId: params.externalAccountId,
     profileUrl: `https://github.com/${cleanUsername}`,
     displayName: cleanUsername,
-    scopes: params.scopes || ["read:user", "repo:status"],
+    scopes: params.scopes || [],
     status: "connected",
     metadata: {
       connectedAt: new Date().toISOString(),
+      encryptedAccessToken: encryptConnectionToken(params.token, params.personId),
     },
   });
 
@@ -47,14 +50,44 @@ export async function connectGitHubAccount(params: {
 }
 
 export async function disconnectGitHubAccount(personId: string) {
+  const connection = await getExternalConnectionByProvider(personId, "github");
+  const encrypted = (connection?.metadata as Record<string, unknown> | null)?.encryptedAccessToken;
+  let providerRevoked = false;
+  if (typeof encrypted === "string" && process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+    try {
+      const token = decryptConnectionToken(encrypted, personId);
+      const credential = Buffer.from(`${process.env.GITHUB_CLIENT_ID}:${process.env.GITHUB_CLIENT_SECRET}`).toString("base64");
+      const response = await fetch(`https://api.github.com/applications/${encodeURIComponent(process.env.GITHUB_CLIENT_ID)}/token`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Basic ${credential}`,
+          "Content-Type": "application/json",
+          "User-Agent": "AI-Tathastu-App",
+        },
+        body: JSON.stringify({ access_token: token }),
+        signal: AbortSignal.timeout(8_000),
+      });
+      providerRevoked = response.status === 204;
+    } catch {
+      // Local access is still removed; the student must revoke the grant in GitHub settings.
+    }
+  }
   await disconnectConnection(personId, "github");
-  return { success: true, message: "GitHub connection disconnected." };
+  return {
+    success: true,
+    providerRevoked,
+    message: providerRevoked
+      ? "GitHub access revoked and local connection disconnected."
+      : "Local GitHub access removed. Revoke this app in GitHub settings to ensure provider access is removed.",
+  };
 }
 
 export async function syncGitHubConnection(
   personId: string,
   token?: string
 ): Promise<GitHubSyncResult> {
+  if (!coreIngestionReady()) return { success: false, recordsFetched: 0, recordsChanged: 0, projects: [], error: "GitHub synchronization is unavailable until credential rotation is complete." };
   const connection = await getExternalConnectionByProvider(personId, "github");
   if (!connection) {
     return {
@@ -76,11 +109,20 @@ export async function syncGitHubConnection(
     };
   }
 
+  const metadata = (connection.metadata || {}) as Record<string, unknown>;
+  const storedToken = typeof metadata.encryptedAccessToken === "string"
+    ? decryptConnectionToken(metadata.encryptedAccessToken, personId)
+    : undefined;
+  const authorizedToken = token || storedToken;
+  if (!authorizedToken) {
+    return { success: false, recordsFetched: 0, recordsChanged: 0, projects: [], error: "Reconnect GitHub to authorize repository sync." };
+  }
+
   // Start SyncRun
   const syncRun = await createSyncRun(connection.id, personId, "github");
 
   try {
-    const fetchResult = await fetchGitHubProjects(connection.externalUsername, token);
+    const fetchResult = await fetchGitHubProjects(connection.externalUsername, authorizedToken);
 
     if (!fetchResult.success) {
       await completeSyncRun(syncRun.id, {
@@ -144,6 +186,7 @@ export async function syncGitHubConnection(
       profileUrl: connection.profileUrl,
       status: "connected",
       metadata: {
+        ...metadata,
         lastSyncedAt: new Date().toISOString(),
         repositoryCount: projects.length,
         recordsChanged,

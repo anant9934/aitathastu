@@ -1,91 +1,31 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Screen12StudentDashboard, type StudentDashboardData } from "@/components/exact-screens/Screen12StudentDashboard";
+import Link from "next/link";
+import { Screen12StudentDashboard } from "@/components/exact-screens/Screen12StudentDashboard";
 import type { ComposedDashboardViewModel } from "@/lib/domain/personalization-engine";
 
 export default function StudentPage() {
   const [composition, setComposition] = useState<ComposedDashboardViewModel | null>(null);
   const [loading, setLoading] = useState(true);
-  const [localData, setLocalData] = useState<StudentDashboardData | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
+    localStorage.removeItem("tathastu_student_auth");
 
-    // 1. Read any student profile saved locally from onboarding
-    let savedProfile: StudentDashboardData | undefined;
-    if (typeof window !== "undefined") {
-      try {
-        const raw = localStorage.getItem("tathastu_student_profile");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === "object") {
-            savedProfile = {
-              studentName: parsed.studentName || "Student",
-              institution: parsed.institution,
-              degree: parsed.degree || "B.Tech",
-              activeGoal: parsed.activeGoal,
-              targetRole: parsed.targetRole,
-              primaryPriority: parsed.primaryPriority,
-              secondaryPriorities: parsed.secondaryPriorities,
-              skillsCount: Array.isArray(parsed.skills) ? parsed.skills.length : 0,
-              projectsCount: Array.isArray(parsed.projects) ? parsed.projects.length : 0,
-              evidenceCount: (Array.isArray(parsed.skills) ? parsed.skills.length : 0) + (Array.isArray(parsed.projects) ? parsed.projects.length : 0) + 1,
-              readinessPct: null,
-              primaryActions: [],
-              recentActivity: [
-                {
-                  id: "act-init",
-                  title: "Student Workspace Initialized",
-                  description: "Calibrated to your AI/ML focus and evidence ledger.",
-                  timestamp: "Just now",
-                },
-              ],
-            };
-            if (isMounted) setLocalData(savedProfile);
-          }
-        }
-      } catch {
-        // Non-fatal
-      }
-    }
-
-    // 2. Fetch active dashboard composition
+    // Fetch the authenticated student's persisted dashboard composition.
     const loadWorkspace = async () => {
       try {
-        // Auto-auth check if credentials were saved in localStorage
-        if (typeof window !== "undefined") {
-          const rawAuth = localStorage.getItem("tathastu_student_auth");
-          if (rawAuth) {
-            try {
-              const authData = JSON.parse(rawAuth);
-              if (authData?.email && authData?.password) {
-                await fetch("/api/auth/sign-in", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email: authData.email, password: authData.password }),
-                }).catch(() => null);
-              }
-            } catch {
-              // Ignore
-            }
-          }
-        }
-
         const res = await fetch("/api/student/dashboard");
         if (res.ok) {
           const data: ComposedDashboardViewModel = await res.json();
           if (isMounted) setComposition(data);
         } else {
-          // Fallback to guest composition
-          const guestRes = await fetch("/api/student/dashboard?guest=true");
-          if (guestRes.ok) {
-            const guestData: ComposedDashboardViewModel = await guestRes.json();
-            if (isMounted) setComposition(guestData);
-          }
+          if (isMounted) setLoadError(res.status === 401 ? "Sign in to view your workspace." : "Your workspace could not be loaded. Please try again.");
         }
-      } catch (err) {
-        console.warn("[Student Workspace] Offline/fallback mode active:", err);
+      } catch {
+        if (isMounted) setLoadError("Your workspace could not be loaded. Please try again.");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -98,7 +38,7 @@ export default function StudentPage() {
     };
   }, []);
 
-  if (loading && !localData) {
+  if (loading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F9F8F5", color: "#171626" }}>
         <div style={{ textAlign: "center" }}>
@@ -109,10 +49,13 @@ export default function StudentPage() {
     );
   }
 
+  if (loadError || !composition) {
+    return <main style={{ minHeight: "100vh", display: "grid", placeContent: "center", textAlign: "center", padding: 24 }}><p>{loadError || "Your workspace is unavailable."}</p><Link href="/sign-in">Sign in</Link></main>;
+  }
+
   return (
     <Screen12StudentDashboard
-      data={localData}
-      composition={composition || undefined}
+      composition={composition}
     />
   );
 }

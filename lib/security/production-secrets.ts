@@ -14,6 +14,7 @@ const REQUIRED_PRODUCTION_SECRETS = [
   "GITHUB_CLIENT_ID",
   "GITHUB_CLIENT_SECRET",
   "GITHUB_WEBHOOK_SECRET",
+  "EXTERNAL_TOKEN_ENCRYPTION_KEY",
   "STUDY_LPU_INTEGRATION_SECRET",
   "PADHO_CODE_INTEGRATION_SECRET",
   "ERIS_INTEGRATION_SECRET",
@@ -33,6 +34,7 @@ const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
     "dev_webhook_secret",
     "secret",
   ],
+  EXTERNAL_TOKEN_ENCRYPTION_KEY: ["change-me", "secret", "replace-with-random-key"],
   STUDY_LPU_INTEGRATION_SECRET: [
     "study_lpu_sec_key_tathastu_dev_2026",
     "dev_key",
@@ -89,7 +91,7 @@ export function auditProductionSecrets(
 
     // Check minimum length for cryptographic secrets
     if (
-      ["SESSION_SECRET", "HANDOFF_SIGNING_SECRET", "GITHUB_WEBHOOK_SECRET"].includes(secretKey) &&
+      ["SESSION_SECRET", "HANDOFF_SIGNING_SECRET", "GITHUB_WEBHOOK_SECRET", "EXTERNAL_TOKEN_ENCRYPTION_KEY"].includes(secretKey) &&
       val.length < 32
     ) {
       if (isProd) {

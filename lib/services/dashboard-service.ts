@@ -30,7 +30,7 @@ export interface DashboardCompositionOptions {
 }
 
 function resolveRoleId(roleTitleOrId?: string): string {
-  if (!roleTitleOrId) return "genai_engineer";
+  if (!roleTitleOrId) return "exploring_aiml";
   const cleaned = roleTitleOrId.toLowerCase().trim();
   const matchedById = AIML_ROLE_CATALOG.find((r) => r.id === cleaned);
   if (matchedById) return matchedById.id;
@@ -41,7 +41,7 @@ function resolveRoleId(roleTitleOrId?: string): string {
   if (cleaned.includes("research")) return "ai_researcher";
   if (cleaned.includes("vision")) return "computer_vision_engineer";
   if (cleaned.includes("nlp")) return "nlp_engineer";
-  return "genai_engineer";
+  return "exploring_aiml";
 }
 
 /**
@@ -58,7 +58,7 @@ export async function getStudentDashboardComposition(
     options?.role ||
     (rawMetadata.targetRole as string) ||
     person360.profile?.specialization ||
-    "Generative AI Engineer";
+    "Still Exploring AI & ML";
 
   const targetRoleId =
     options?.roleId ||
@@ -69,12 +69,12 @@ export async function getStudentDashboardComposition(
     options?.goal ||
     person360.activeGoal?.title ||
     (rawMetadata.customGoalText as string) ||
-    "Master production AI/ML workflows";
+    "Choose your AI/ML goal";
 
   const targetTimeline =
     options?.timeline ||
     (rawMetadata.targetTimeline as string) ||
-    "Within 6 months";
+    "";
 
   // Priority resolution: explicit query option > saved preference > default "learning"
   const rawPrimary =
@@ -155,12 +155,13 @@ export async function getStudentDashboardComposition(
     targetTimeline,
     primaryInterest,
     secondaryInterests,
-    degree: person360.profile?.degree || "B.Tech Computer Science and Engineering",
-    institution: person360.profile?.institution || "Lovely Professional University (LPU)",
-    cohort: person360.profile?.expectedGraduationYear || 2026,
+    degree: person360.profile?.degree || "",
+    institution: person360.profile?.institution || "",
+    cohort: person360.profile?.expectedGraduationYear || undefined,
     skills,
     projects,
     evidenceItems,
+    journeyEvents: (person360.journeySummary || []).map((event) => ({ title: event.title, description: event.description, timestamp: event.timestamp })),
     verifiedReadinessScore,
     isReadinessAvailable,
     isDemo: false,

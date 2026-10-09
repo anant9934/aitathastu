@@ -104,7 +104,8 @@ export default function ConnectionsPage() {
         method: "DELETE",
       });
       if (res.ok) {
-        setMessage(`${provider} disconnected.`);
+        const result = await res.json();
+        setMessage(result.message || `${provider} disconnected.`);
         await loadData();
       } else {
         setMessage(`Failed to disconnect ${provider}.`);

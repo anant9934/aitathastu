@@ -78,7 +78,6 @@ export async function POST(req: Request) {
       visibility = "private",
       projectType = "software",
       technologies = [],
-      sources = ["manual"],
       repositoryUrl,
       demoUrl,
       links = [],
@@ -87,7 +86,7 @@ export async function POST(req: Request) {
       aiDetails = {},
       hardwareDetails = {},
       media = [],
-      contributionRoles = ["Machine Learning"],
+      contributionRoles = [],
       contributionNote = "",
     } = body;
 
@@ -139,8 +138,8 @@ export async function POST(req: Request) {
       purpose: typeof purpose === "string" ? purpose.trim() : "personal",
       visibility: typeof visibility === "string" ? visibility.trim() : "private",
       projectType: typeof projectType === "string" ? projectType.trim() : "software",
-      technologies: Array.isArray(technologies) ? technologies.map((t) => String(t).trim()).filter(Boolean) : ["Python"],
-      sources: Array.isArray(sources) && sources.length > 0 ? sources : ["manual"],
+      technologies: Array.isArray(technologies) ? technologies.map((t) => String(t).trim()).filter(Boolean) : [],
+      sources: ["manual"],
       repositoryUrl: typeof repositoryUrl === "string" && repositoryUrl.trim() ? repositoryUrl.trim() : undefined,
       demoUrl: typeof demoUrl === "string" && demoUrl.trim() ? demoUrl.trim() : undefined,
       links: sanitizedLinks,
@@ -149,7 +148,7 @@ export async function POST(req: Request) {
       aiDetails: typeof aiDetails === "object" && aiDetails !== null ? aiDetails : {},
       hardwareDetails: typeof hardwareDetails === "object" && hardwareDetails !== null ? hardwareDetails : {},
       media: Array.isArray(media) ? media : [],
-      contributionRoles: Array.isArray(contributionRoles) && contributionRoles.length > 0 ? contributionRoles : ["Machine Learning"],
+      contributionRoles: Array.isArray(contributionRoles) ? contributionRoles.map((role) => String(role).trim()).filter(Boolean) : [],
       contributionNote: typeof contributionNote === "string" ? contributionNote.trim() : "",
     });
 

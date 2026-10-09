@@ -17,19 +17,15 @@ export async function GET(req: Request) {
 
     const auth = await getServerAuthContext();
 
-    if (isGuest || !auth) {
+    if (isGuest) {
       const demo = getDemoDashboardComposition({ primary, secondary, role, goal });
       return NextResponse.json(demo, {
         headers: { "x-guest-mode": "true" },
       });
     }
+    if (!auth) return NextResponse.json({ error: "Sign in to view your dashboard." }, { status: 401 });
 
-    const composition = await getStudentDashboardComposition(auth.person.id, {
-      primary,
-      secondary,
-      role,
-      goal,
-    });
+    const composition = await getStudentDashboardComposition(auth.person.id);
 
     return NextResponse.json(composition);
   } catch (err: unknown) {

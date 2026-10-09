@@ -26,6 +26,8 @@ export interface Screen8ProfileInsightsProps {
   goal?: string;
   skills?: string[];
   projectsCount?: number;
+  projects?: Array<{ title: string; description: string }>;
+  isGalleryMode?: boolean;
   onNext: () => void;
   onBack: () => void;
   onEdit?: () => void;
@@ -43,12 +45,14 @@ const navSections = [
 
 export function Screen8ProfileInsights({
   studentName = "Student",
-  degree = "B.Tech",
-  specialization = "Machine Learning",
-  institution = "Lovely Professional University (LPU)",
-  year = "3rd Year",
+  degree = "",
+  specialization = "",
+  institution = "",
+  year = "",
   skills = [],
-  projectsCount = 3,
+  projectsCount = 0,
+  projects = [],
+  isGalleryMode = false,
   onNext,
   onBack,
   onEdit,
@@ -71,7 +75,7 @@ export function Screen8ProfileInsights({
     "XGBoost",
   ];
 
-  const displayedSkills = skills.length > 0 ? skills : defaultSkills;
+  const displayedSkills = isGalleryMode && skills.length === 0 ? defaultSkills : skills;
 
   return (
     <div
@@ -157,7 +161,7 @@ export function Screen8ProfileInsights({
             Here&apos;s what I synthesized for you, {firstName}!
           </h1>
           <p style={{ fontSize: 15.5, color: "#64748B", maxWidth: 680, margin: "0 auto", lineHeight: 1.55 }}>
-            Verified profile evidence extracted from your resume, GitHub commits, and academic history. Click any category to review.
+            Review the information you have provided. Add or correct details before continuing.
           </p>
         </div>
 
@@ -218,10 +222,10 @@ export function Screen8ProfileInsights({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 800, marginBottom: 6, color: "#5642EF" }}>
-                <ShieldCheck size={16} /> Verified Signals
+                <ShieldCheck size={16} /> Recorded Information
               </div>
               <div style={{ color: "#64748B", lineHeight: 1.4 }}>
-                {displayedSkills.length} skills &bull; {projectsCount} confirmed projects verified
+                {displayedSkills.length} skills &bull; {projectsCount} confirmed projects
               </div>
             </div>
           </div>
@@ -273,10 +277,10 @@ export function Screen8ProfileInsights({
                       {studentName}
                     </h3>
                     <div style={{ fontSize: 14, color: "#64748B", fontWeight: 500 }}>
-                      {degree} in {specialization} • {institution}
+                      {[degree, specialization, institution].filter(Boolean).join(" · ") || "Academic details not added"}
                     </div>
                     <div style={{ fontSize: 12.5, color: "#5642EF", fontWeight: 750, marginTop: 4 }}>
-                      🎓 {year}
+                      {year || "Academic year not added"}
                     </div>
                   </div>
                 </div>
@@ -319,7 +323,7 @@ export function Screen8ProfileInsights({
                         Institution
                       </div>
                       <div style={{ fontSize: 16, fontWeight: 750, color: "#1E1B4B" }}>
-                        {institution}
+                        {institution || "Not added"}
                       </div>
                     </div>
 
@@ -328,7 +332,7 @@ export function Screen8ProfileInsights({
                         Degree & Year
                       </div>
                       <div style={{ fontSize: 16, fontWeight: 750, color: "#1E1B4B" }}>
-                        {degree} ({year})
+                        {[degree, year].filter(Boolean).join(" · ") || "Not added"}
                       </div>
                     </div>
 
@@ -337,7 +341,7 @@ export function Screen8ProfileInsights({
                         Department / Domain
                       </div>
                       <div style={{ fontSize: 16, fontWeight: 750, color: "#1E1B4B" }}>
-                        {specialization}
+                        {specialization || "Not added"}
                       </div>
                     </div>
 
@@ -347,7 +351,7 @@ export function Screen8ProfileInsights({
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: "#059669", display: "flex", alignItems: "center", gap: 6 }}>
                         <FileCheck size={16} />
-                        <span>Verified via Document Extraction</span>
+                        <span>Student provided; verification pending</span>
                       </div>
                     </div>
                   </div>
@@ -357,6 +361,7 @@ export function Screen8ProfileInsights({
                       Identified Core Competencies
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {displayedSkills.length === 0 && <span style={{ color: "#64748B" }}>No skills confirmed yet.</span>}
                       {displayedSkills.map((s) => (
                         <span
                           key={s}
@@ -384,15 +389,12 @@ export function Screen8ProfileInsights({
                   <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                       <div>
-                        <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>{degree} in {specialization}</h4>
+                        <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>{[degree, specialization].filter(Boolean).join(" in ") || "Education not added"}</h4>
                         <p style={{ fontSize: 13.5, color: "#64748B", margin: "2px 0 0" }}>{institution}</p>
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 10px", borderRadius: 6 }}>
-                        2023 - 2026 Expected
+                        {year || "Year not added"}
                       </span>
-                    </div>
-                    <div style={{ fontSize: 13, color: "#475569", marginTop: 8 }}>
-                      &bull; CGPA: 8.8 / 10 &bull; Focus: Machine Learning, Neural Systems, Data Structures & Algorithms
                     </div>
                   </div>
                 </div>
@@ -401,7 +403,7 @@ export function Screen8ProfileInsights({
               {/* Tab 3: Experience */}
               {activeTab === "experience" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                  {isGalleryMode ? <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                       <div>
                         <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>AI Research Contributor</h4>
@@ -414,7 +416,7 @@ export function Screen8ProfileInsights({
                     <p style={{ fontSize: 13, color: "#475569", margin: "6px 0 0", lineHeight: 1.45 }}>
                       Implemented deep learning models, benchmarked Transformer models vs CNN baselines, and contributed to research manuscript draft.
                     </p>
-                  </div>
+                  </div> : <p style={{ color: "#64748B" }}>No experience has been confirmed yet.</p>}
                 </div>
               )}
 
@@ -429,7 +431,7 @@ export function Screen8ProfileInsights({
                       <div key={sk} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
                         <span style={{ fontSize: 13.5, fontWeight: 750, color: "#1E1B4B" }}>{sk}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#10B981", display: "flex", alignItems: "center", gap: 4 }}>
-                          <CheckCircle2 size={13} /> 90%+
+                          <CheckCircle2 size={13} /> Recorded
                         </span>
                       </div>
                     ))}
@@ -440,27 +442,28 @@ export function Screen8ProfileInsights({
               {/* Tab 5: Projects */}
               {activeTab === "projects" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {isGalleryMode ? <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1E1B4B" }}>CoRXGB Classification</div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>CNN + Bi-LSTM + XGBoost Ensemble</div>
                     </div>
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 8px", borderRadius: 6 }}>AI Impact 94</span>
-                  </div>
-                  <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  </div> : null}
+                  {isGalleryMode ? <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1E1B4B" }}>Medical Image Segmentation</div>
                       <div style={{ fontSize: 12, color: "#64748B" }}>Vision Transformers &amp; OpenCV</div>
                     </div>
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 8px", borderRadius: 6 }}>AI Impact 88</span>
-                  </div>
+                  </div> : null}
+                  {!isGalleryMode && (projects.length ? projects.map((project) => <div key={project.title} style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0" }}><strong>{project.title}</strong><div style={{ color: "#64748B" }}>{project.description}</div></div>) : <p style={{ color: "#64748B" }}>No projects confirmed yet.</p>)}
                 </div>
               )}
 
               {/* Tab 6: Achievements */}
               {activeTab === "achievements" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {isGalleryMode ? <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Award size={18} color="#F59E0B" />
                       <div>
@@ -469,17 +472,17 @@ export function Screen8ProfileInsights({
                       </div>
                     </div>
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>Verified</span>
-                  </div>
+                  </div> : <p style={{ color: "#64748B" }}>No achievements confirmed yet.</p>}
                 </div>
               )}
             </div>
 
             <div style={{ paddingTop: 20, borderTop: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: 13, color: "#64748B" }}>
-                All extracted signals are cryptographically hashed into your evidence profile.
+                Review these details before saving your profile.
               </span>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#10B981", display: "flex", alignItems: "center", gap: 4 }}>
-                <CheckCircle2 size={16} /> 100% Ready
+                <CheckCircle2 size={16} /> Ready for review
               </span>
             </div>
           </div>

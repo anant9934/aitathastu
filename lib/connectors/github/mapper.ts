@@ -180,6 +180,6 @@ export function mapGitHubRepoToProject(repo: RawGitHubRepo): DiscoveredGitHubPro
 
 export function mapGitHubReposToProjects(repos: RawGitHubRepo[]): DiscoveredGitHubProject[] {
   return repos
-    .filter((repo) => !repo.fork) // prioritize original repositories
+    .filter((repo) => !repo.fork && !repo.private) // public repositories only until private access has a separate consent flow
     .map(mapGitHubRepoToProject);
 }

@@ -114,46 +114,7 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!auth) {
-    const fallbackEmail =
-      body.email && typeof body.email === "string" && body.email.includes("@")
-        ? body.email.trim()
-        : `student_${Date.now()}_${Math.floor(Math.random() * 1000)}@aitathastu.internal`;
-    const fallbackPassword =
-      body.password && typeof body.password === "string" && body.password.length >= 6
-        ? body.password
-        : `Tathastu@${Math.floor(100000 + Math.random() * 900000)}`;
-
-    const existingUser = await findUserByEmail(fallbackEmail);
-    let userId: string;
-    let personId: string;
-    let displayName: string;
-
-    if (existingUser) {
-      userId = existingUser.id;
-      personId = existingUser.personId || existingUser.id;
-      displayName = existingUser.displayName || (body.name as string) || "Student";
-    } else {
-      const passwordHash = await hashPassword(fallbackPassword);
-      const created = await createUser({
-        email: fallbackEmail,
-        passwordHash,
-        displayName: (body.name as string) || "Student",
-      });
-      userId = created.userId;
-      personId = created.personId;
-      displayName = created.displayName;
-    }
-
-    const sess = await createSession(userId);
-    sessionToken = sess.token;
-    sessionExpires = sess.expiresAt;
-    auth = {
-      user: { id: userId, email: fallbackEmail },
-      person: { id: personId, displayName },
-      session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-    };
-  }
+  if (!auth) return NextResponse.json({ error: "Sign in before completing onboarding." }, { status: 401 });
 
   try {
     const result = await completeOnboarding(auth.person.id, body);

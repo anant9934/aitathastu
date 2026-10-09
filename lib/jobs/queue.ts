@@ -53,11 +53,6 @@ export class BackgroundJobQueue {
   private isProcessing = false;
 
   constructor() {
-    this.registerHandler("GITHUB_SYNC", async () => ({ synced: true, timestamp: new Date().toISOString() }));
-    this.registerHandler("RESUME_INTERPRETATION", async () => ({ extracted: true, timestamp: new Date().toISOString() }));
-    this.registerHandler("RECOMPUTE_PERSONALIZATION", async () => ({ recomputed: true, timestamp: new Date().toISOString() }));
-    this.registerHandler("INTEGRATION_EVENT", async () => ({ processed: true, timestamp: new Date().toISOString() }));
-    this.registerHandler("RESOURCE_INGESTION", async () => ({ ingested: true, timestamp: new Date().toISOString() }));
     this.startStuckJobMonitor();
   }
 
@@ -132,6 +127,7 @@ export class BackgroundJobQueue {
     if (!handler) {
       job.state = "failed";
       job.error = `No registered worker handler for job type: ${job.jobType}`;
+      job.completedAt = new Date();
       return;
     }
 

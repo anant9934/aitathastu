@@ -7,6 +7,7 @@ import { ScreenFooter } from "./ScreenFooter";
 
 interface Screen9SkillsMapProps {
   skills?: string[];
+  isGalleryMode?: boolean;
   goal?: string;
   onNext: () => void;
   onBack: () => void;
@@ -166,15 +167,30 @@ const skillNodes: SkillNode[] = [
   },
 ];
 
-export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9SkillsMapProps) {
-  const [selectedNode, setSelectedNode] = useState<SkillNode>(skillNodes[0]);
+export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, onBack, onJumpToStep }: Screen9SkillsMapProps) {
+  const displayNodes: SkillNode[] = isGalleryMode ? skillNodes : skills.slice(0, 8).map((skill, index) => ({
+    ...skillNodes[index],
+    id: `recorded_${index}`,
+    label: skill,
+    level: "Emerging",
+    confidence: 0,
+    evidence: ["Student confirmed during onboarding; independent verification pending"],
+    techs: [],
+    description: `${skill} is recorded in your profile. Add project or document evidence to show how you used it.`,
+    metrics: { githubCommits: 0, benchmarkPercentile: 0, courseCredentials: 0 },
+  }));
+  const [selectedNode, setSelectedNode] = useState<SkillNode>(displayNodes[0] || {
+    ...skillNodes[0], id: "empty", label: "No skills recorded", confidence: 0,
+    evidence: [], techs: [], description: "Add or confirm a skill to begin your map.",
+    metrics: { githubCommits: 0, benchmarkPercentile: 0, courseCredentials: 0 },
+  });
   const [activeFilter, setActiveFilter] = useState<string>("All");
 
   const categories = ["All", "Core", "Specialized", "Tooling", "Theoretical"];
 
   const filteredNodes = activeFilter === "All"
-    ? skillNodes
-    : skillNodes.filter((n) => n.category === activeFilter);
+    ? displayNodes
+    : displayNodes.filter((n) => n.category === activeFilter);
 
   return (
     <div
@@ -244,10 +260,10 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
               <span>Step 6 · Skills Intelligence Map</span>
             </div>
             <h1 style={{ fontSize: "clamp(26px, 3vw, 36px)", fontWeight: 850, color: "#171626", margin: "0 0 6px", letterSpacing: "-0.03em" }}>
-              Your AI-Inferred Skills & Evidence Network
+              Your Skills & Evidence Network
             </h1>
             <p style={{ fontSize: 14.5, color: "#64748B", margin: 0 }}>
-              Interactive knowledge constellation synthesized from your code repositories, publications, and verified coursework.
+              {isGalleryMode ? "Interactive knowledge constellation for design preview." : "Skills you confirmed during onboarding. Evidence and proficiency need separate review."}
             </p>
           </div>
 
@@ -318,7 +334,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
               <circle cx="50%" cy="50%" r="240" fill="none" stroke="#F8FAFC" strokeWidth="1.5" />
 
               {/* Connecting constellation lines */}
-              {skillNodes.map((node) => {
+              {displayNodes.map((node) => {
                 const isSelected = selectedNode.id === node.id;
                 return (
                   <g key={node.id}>
@@ -375,9 +391,9 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
               }}
             >
               <Cpu size={16} style={{ marginBottom: 2 }} />
-              <span>GenAI / ML</span>
+              <span>{isGalleryMode ? "GenAI / ML" : "Your Skills"}</span>
               <span style={{ fontSize: 9.5, opacity: 0.9, fontWeight: 700, letterSpacing: "0.02em" }}>
-                Core Anchor
+                Profile Map
               </span>
             </div>
 
@@ -432,7 +448,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
                   }}
                 >
                   <span style={{ maxWidth: diameter - 12, wordBreak: "break-word" }}>{node.label}</span>
-                  <span
+                  {isGalleryMode && <span
                     style={{
                       fontSize: 9.5,
                       fontWeight: 800,
@@ -443,13 +459,13 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
                     }}
                   >
                     {node.confidence}%
-                  </span>
+                  </span>}
                 </button>
               );
             })}
 
             {/* Bottom Canvas Legend */}
-            <div
+            {isGalleryMode && <div
               style={{
                 position: "absolute",
                 bottom: 16,
@@ -479,7 +495,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#D97706" }} />
                 <span>Proficient (80-84%)</span>
               </div>
-            </div>
+            </div>}
           </div>
 
           {/* Right Region: Evidence Detail & Knowledge Card */}
@@ -511,7 +527,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
                       borderRadius: 6,
                     }}
                   >
-                    {selectedNode.level} Level
+                    {isGalleryMode ? `${selectedNode.level} Level` : "Recorded skill"}
                   </span>
                   <span
                     style={{
@@ -529,7 +545,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
 
                 <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 800, color: "#10B981" }}>
                   <ShieldCheck size={16} />
-                  <span>{selectedNode.confidence}% Grounded</span>
+                  <span>{isGalleryMode ? `${selectedNode.confidence}% Grounded` : "Review pending"}</span>
                 </div>
               </div>
 
@@ -542,7 +558,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
               </p>
 
               {/* Metric Highlights */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, padding: 12, background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", marginBottom: 18 }}>
+              {isGalleryMode && <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, padding: 12, background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", marginBottom: 18 }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 16, fontWeight: 850, color: "#5642EF" }}>{selectedNode.metrics.githubCommits}+</div>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#64748B", textTransform: "uppercase" }}>Commits</div>
@@ -555,7 +571,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
                   <div style={{ fontSize: 16, fontWeight: 850, color: "#0284C7" }}>{selectedNode.metrics.courseCredentials}</div>
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#64748B", textTransform: "uppercase" }}>Certificates</div>
                 </div>
-              </div>
+              </div>}
 
               {/* Evidence Sources */}
               <div style={{ marginBottom: 16 }}>
@@ -613,7 +629,7 @@ export function Screen9SkillsMap({ onNext, onBack, onJumpToStep }: Screen9Skills
                 color: "#1E1B4B",
               }}
             >
-              <span style={{ fontWeight: 600 }}>Recommended project next step is ready</span>
+              <span style={{ fontWeight: 600 }}>{isGalleryMode ? "Recommended project next step is ready" : "Add evidence to support a recorded skill"}</span>
               <ArrowUpRight size={14} color="#5642EF" />
             </div>
           </div>

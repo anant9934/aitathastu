@@ -4,7 +4,8 @@
 **Report Date:** October 9, 2026  
 **Repository:** `/Users/quantumanant/aitathastu`  
 **Production Domain:** `https://www.aitathastu.com`  
-**Starting V3.5 Baseline Commit:** `a3d87f6`  
+**Starting V3.5 Baseline Commit:** `f62d828` (originally reported as `a3d87f6`)  
+**Actual V3.6 Deployment Commit:** `a0dd2b1`  
 **Final Release Category:** **CONTROLLED PILOT READY** (Gated for 5–10 Consenting Testers)
 
 ---
@@ -25,7 +26,7 @@ The V3.5 release established baseline production stability with 10 passing accep
 - **Health Status:** HTTP 200 `{"status":"ok","uptime":...,"version":"0.1.0"}`
 - **Active Tables in Neon PostgreSQL:** 41 tables verified
 - **Build Status:** 73/73 static and dynamic routes compiled cleanly via `next build`
-- **Release Commit:** V3.6 Hardening (`feat(core-v3.6): production hardening, least-privilege github app, frozen holdout benchmark, and queue recovery`)
+- **Release Commit:** `a0dd2b1` (`feat(core-v3.6): production hardening, least-privilege github app, frozen holdout benchmark, and queue recovery`)
 
 ---
 

@@ -32,6 +32,9 @@ export function ExactScreensContainer({
   const [currentScreen, setCurrentScreen] = useState<number>(initialScreen);
   // ── EORA wiring ─────────────────────────────────────────────────────────
   const eora = useEoraSafe();
+  // Dedup refs — prevent firing success signals more than once per event
+  const resumeSignalFiredRef = React.useRef(false);
+  const githubSignalFiredRef = React.useRef(false);
 
   // Notify EORA whenever the onboarding screen changes
   useEffect(() => {
@@ -467,8 +470,11 @@ export function ExactScreensContainer({
                 resumeReviewed: claims,
                 discoveredResumeProfiles: nextDiscoveredProfiles,
               });
-              // Signal confirmed backend extraction success to EORA
-              eora?.signalSuccess("resume_uploaded");
+              // Signal confirmed backend extraction success to EORA (once per upload)
+              if (!resumeSignalFiredRef.current) {
+                resumeSignalFiredRef.current = true;
+                eora?.signalSuccess("resume_uploaded");
+              }
             }}
             onNext={() => setCurrentScreen(6)}
             onBack={() => setCurrentScreen(4)}
@@ -500,8 +506,11 @@ export function ExactScreensContainer({
               const nextProjects = [...projects, ...mapped];
               setProjects(nextProjects);
               persistDraft({ projects: nextProjects });
-              // Signal GitHub connection success to EORA
-              if (mapped.length > 0) eora?.signalSuccess("github_connected");
+              // Signal GitHub projects discovered to EORA (once per session)
+              if (mapped.length > 0 && !githubSignalFiredRef.current) {
+                githubSignalFiredRef.current = true;
+                eora?.signalSuccess("projects_discovered");
+              }
             }}
             onNext={() => setCurrentScreen(7)}
             onBack={() => setCurrentScreen(5)}

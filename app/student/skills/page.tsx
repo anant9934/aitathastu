@@ -226,7 +226,7 @@ export default function SkillsPage() {
                 {data.stats.demonstratedSkills}
               </span>
             </div>
-            <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+            <div data-eora-id="eora-skill-verification" style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
                 Verified Skills
               </span>

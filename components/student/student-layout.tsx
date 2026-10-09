@@ -35,7 +35,6 @@ export function StudentLayout({ children }: StudentLayoutProps) {
   const [evidenceDrawerOpen, setEvidenceDrawerOpen] = useState(false);
   const [comingSoonFeature, setComingSoonFeature] = useState<string | null>(null);
 
-  // Wire signalSuccess for workspace events when EORA is available
   const handleRestoreEora = async () => {
     eora?.restore();
     await restoreEora();
@@ -43,18 +42,12 @@ export function StudentLayout({ children }: StudentLayoutProps) {
 
   return (
     <div className="student-workspace-root">
-      {/* Feed real Person 360 data into EORA — no tokens/secrets */}
-      <EoraStudentBridge
-        workspace={workspace}
-        hydrated={hydrated}
-        primaryPriority={null}
-        secondaryPriorities={[]}
-        targetRole={activeGoal?.title ?? null}
-        nextMilestoneTitle={null}
-        isProcessing={false}
-        connectedSources={[]}
-        isFirstSession={false}
-      />
+      {/*
+       * EoraStudentBridge fetches /api/eora/context (authenticated, tenant-isolated)
+       * and feeds the safe context into EoraProvider.
+       * Fires once on hydration, then on tab-visibility change.
+       */}
+      <EoraStudentBridge hydrated={hydrated} />
 
       <StudentTopbar
         person={workspace?.person || null}

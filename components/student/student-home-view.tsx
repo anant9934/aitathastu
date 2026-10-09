@@ -83,6 +83,7 @@ export function StudentHomeView() {
           {/* Section B: Current Goal */}
           <div
             id="goal-card-section"
+            data-eora-id="eora-active-goal"
             className={`section-wrapper ${highlightedSection === "goal-card-section" ? "pulse-highlight" : ""}`}
           >
             <GoalCard
@@ -104,6 +105,7 @@ export function StudentHomeView() {
           {/* Section D: WHAT MATTERS NOW */}
           <section
             id="what-matters-now"
+            data-eora-id="eora-next-actions"
             className={`workspace-section-group ${highlightedSection === "what-matters-now" ? "pulse-highlight" : ""}`}
             aria-labelledby="what-matters-now-title"
           >

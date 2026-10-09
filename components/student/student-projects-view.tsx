@@ -765,7 +765,7 @@ export function StudentProjectsView() {
 
       {/* Projects List */}
       {!loading && projects.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div data-eora-id="eora-projects-list" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {projects.map((project) => {
             const isFromGitHub = project.sources?.includes("github");
             const hasRoles = project.contributionRoles && project.contributionRoles.length > 0;
@@ -920,7 +920,7 @@ export function StudentProjectsView() {
 
                 {/* Contribution Breakdown */}
                 {hasRoles && (
-                  <div style={{ paddingTop: 12, borderTop: "1px solid #F3F4F6", marginBottom: hasSavedLinks ? 12 : 0 }}>
+                  <div data-eora-id="eora-contribution-note" style={{ paddingTop: 12, borderTop: "1px solid #F3F4F6", marginBottom: hasSavedLinks ? 12 : 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#171626", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
                       <Sparkles size={13} color="#5942DC" /> Personal Contribution (Self-Reported Claim)
                     </div>

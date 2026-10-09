@@ -341,8 +341,12 @@ export function getTinyVictoryMessage(action: string): EoraMessage {
   const messages: Record<string, string> = {
     resume_uploaded: "Resume received! I'm reviewing it now.",
     github_connected: "GitHub connected! Discovering your projects.",
+    projects_discovered: "Projects found from GitHub. Review and confirm your contributions.",
+    extraction_completed: "Extraction complete. Review the findings in your profile.",
     skill_confirmed: "Skill confirmed. Your profile just got stronger.",
     project_confirmed: "Project confirmed. Great contribution documented.",
+    project_saved: "Project saved. Your contribution is on record.",
+    roadmap_milestone_completed: "Milestone complete! Your roadmap has been updated.",
     onboarding_complete: "You did it! Your workspace is ready to explore.",
     goal_set: "Goal set! Your roadmap is being calibrated.",
     evidence_verified: "Evidence verified! This adds real credibility to your profile.",

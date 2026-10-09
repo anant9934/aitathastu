@@ -49,7 +49,9 @@ import { processUserInput, getProactiveDecision } from "@/lib/eora/brain";
 import type { EoraPreferences } from "@/lib/eora/engagement";
 import {
   loadPreferences,
+  loadPreferencesForPerson,
   savePreferences,
+  savePreferencesForPerson,
   markTourCompleted,
   snoozeEora,
   isEoraSnoozed,
@@ -57,6 +59,7 @@ import {
   recordNudgeSent,
   recordInteraction,
   resetPreferences,
+  clearPreferencesForPerson,
   detectReducedMotionPreference,
 } from "@/lib/eora/engagement";
 import type { TourDefinition } from "@/lib/eora/tours";
@@ -487,10 +490,20 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     setOnboardingStepState(step);
   }, []);
 
-  // ── Live student context (from WorkspaceProvider / student pages) ─────────
+  // ── Live student context (from EoraStudentBridge) ────────────────────────
   const updateLiveStudentContext = useCallback(
     (data: EoraLiveStudentData) => {
       // Security: never store tokens, passwords, or raw secrets
+      // Load person-scoped preferences on first auth context arrival
+      const personPrefs = loadPreferencesForPerson(data.personId);
+      setPreferences((prev) => {
+        // Only switch to person-scoped prefs if they're different from current
+        if (prev.tourCompletedIds !== personPrefs.tourCompletedIds) {
+          return personPrefs;
+        }
+        return prev;
+      });
+
       setLiveStudent({
         personId: data.personId,
         displayName: data.displayName,
@@ -502,21 +515,24 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         skillsCount: data.skillsCount,
         projectsCount: data.projectsCount,
         verifiedEvidenceCount: data.verifiedEvidenceCount,
-        completedTourIds: preferences.tourCompletedIds,
-        dismissedSuggestionIds: preferences.dismissedSuggestionIds,
+        completedTourIds: personPrefs.tourCompletedIds,
+        dismissedSuggestionIds: personPrefs.dismissedSuggestionIds,
         isProcessing: data.isProcessing,
         connectedSources: data.connectedSources,
         nextMilestoneTitle: data.nextMilestoneTitle,
       });
       setHasLiveStudentData(true);
     },
-    [preferences.tourCompletedIds, preferences.dismissedSuggestionIds]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   const clearStudentContext = useCallback(() => {
     setLiveStudent(createEmptyStudentContext());
     setHasLiveStudentData(false);
     hasShownWelcomeBack.current = false;
+    // Revert to generic preferences on sign-out
+    setPreferences(loadPreferences());
     // Clear any personal message
     setCurrentMessage({ text: "", animationState: "IDLE" });
     setAnimationState("IDLE");
@@ -624,13 +640,21 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Preferences ────────────────────────────────────────────────────────────
-  const updatePreferences = useCallback((patch: Partial<EoraPreferences>) => {
-    setPreferences((prev) => {
-      const updated = { ...prev, ...patch };
-      savePreferences(updated);
-      return updated;
-    });
-  }, []);
+  const updatePreferences = useCallback(
+    (patch: Partial<EoraPreferences>) => {
+      setPreferences((prev) => {
+        const updated = { ...prev, ...patch };
+        // Save to person-scoped key if authenticated, otherwise generic
+        if (liveStudent.personId && liveStudent.isAuthenticated) {
+          savePreferencesForPerson(liveStudent.personId, updated);
+        } else {
+          savePreferences(updated);
+        }
+        return updated;
+      });
+    },
+    [liveStudent.personId, liveStudent.isAuthenticated]
+  );
 
   const updateStudentContext = useCallback(
     (patch: Partial<EoraPreferences>) => {
@@ -640,8 +664,12 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resetAllPreferences = useCallback(() => {
-    setPreferences(resetPreferences());
-  }, []);
+    const defaults = resetPreferences();
+    if (liveStudent.personId) {
+      clearPreferencesForPerson(liveStudent.personId);
+    }
+    setPreferences(defaults);
+  }, [liveStudent.personId]);
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const isQuiet = shouldEoraBeQuiet(context);

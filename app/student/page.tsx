@@ -61,54 +61,14 @@ export default function StudentPage() {
     );
   }
 
-  // ── Build safe EORA context from the composition ─────────────────────────
-  // WorkspaceState is not available here; we derive from ComposedDashboardViewModel.
-  // person data comes from summaryCards and hero section.
-  const skillsCount = composition.summaryCards.find((c) => c.id === "skills")?.value;
-  const projectsCount = composition.summaryCards.find((c) => c.id === "projects")?.value;
-  const verifiedCount = composition.summaryCards.find((c) => c.id === "verified")?.value;
-  // Next active roadmap milestone
-  const nextMilestone =
-    composition.journeyRecords?.find((r) => r.status === "active")?.title ??
-    composition.journeyRecords?.find((r) => r.status === "upcoming")?.title ??
-    null;
-
-  // WorkspaceState mock for bridge (we have the composition, not raw workspace)
-  const bridgeWorkspace = {
-    version: 1 as const,
-    person: {
-      id: "current",
-      name: composition.hero.greeting.replace(/^Hey,?\s*/i, "").replace(/[!.].*$/, "").trim() || "Student",
-      education: "",
-      experience: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    goal: { id: "g", title: composition.goal, description: "", status: "active" as const, source: "custom" as const, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    evidence: [],
-    journeyEvents: [],
-    actionStates: {},
-    eoraDismissed: false,
-    lastUpdated: new Date().toISOString(),
-  };
-
   return (
     <>
-      {/* Feed real student data into EORA — no secrets, no tokens */}
-      <EoraStudentBridge
-        workspace={bridgeWorkspace}
-        hydrated={true}
-        primaryPriority={composition.primaryInterest}
-        secondaryPriorities={composition.secondaryInterests}
-        targetRole={composition.targetRole}
-        nextMilestoneTitle={nextMilestone}
-        isProcessing={false}
-        connectedSources={[]}
-        isFirstSession={false}
-        skillsCountOverride={typeof skillsCount === "number" ? skillsCount : 0}
-        projectsCountOverride={typeof projectsCount === "number" ? projectsCount : 0}
-        verifiedCountOverride={typeof verifiedCount === "number" ? verifiedCount : 0}
-      />
+      {/*
+       * EoraStudentBridge is hydrated=true immediately because we know
+       * the dashboard loaded successfully (auth confirmed above).
+       * It fetches /api/eora/context for the real, full EORA context.
+       */}
+      <EoraStudentBridge hydrated={true} />
       <Screen12StudentDashboard composition={composition} />
     </>
   );

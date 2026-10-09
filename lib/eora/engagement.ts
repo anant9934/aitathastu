@@ -44,6 +44,15 @@ export function createDefaultPreferences(): EoraPreferences {
 const STORAGE_KEY = "eora_preferences_v1";
 
 /**
+ * Returns the localStorage key scoped to an authenticated person.
+ * This prevents cross-user contamination on shared devices.
+ * Non-sensitive settings only — never includes tokens or private data.
+ */
+export function getPersonScopedKey(personId: string): string {
+  return `eora_prefs_v1_${personId}`;
+}
+
+/**
  * Loads EORA preferences from localStorage (client-side only).
  * Falls back to defaults if nothing is stored.
  */
@@ -61,6 +70,25 @@ export function loadPreferences(): EoraPreferences {
 }
 
 /**
+ * Loads EORA preferences scoped to an authenticated person.
+ * Falls back to the generic store, then to defaults.
+ */
+export function loadPreferencesForPerson(personId: string): EoraPreferences {
+  if (typeof window === "undefined") return createDefaultPreferences();
+  try {
+    const raw = window.localStorage.getItem(getPersonScopedKey(personId));
+    if (!raw) {
+      // Migrate from generic key on first person-scoped access
+      return loadPreferences();
+    }
+    const parsed = JSON.parse(raw);
+    return { ...createDefaultPreferences(), ...parsed };
+  } catch {
+    return createDefaultPreferences();
+  }
+}
+
+/**
  * Saves EORA preferences to localStorage.
  * Never logs raw form content.
  */
@@ -70,6 +98,38 @@ export function savePreferences(prefs: EoraPreferences): void {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch {
     // Storage unavailable — fail silently
+  }
+}
+
+/**
+ * Saves EORA preferences scoped to an authenticated person.
+ * Only non-sensitive settings (mode, language, tour completions, dismissals).
+ */
+export function savePreferencesForPerson(
+  personId: string,
+  prefs: EoraPreferences
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      getPersonScopedKey(personId),
+      JSON.stringify(prefs)
+    );
+  } catch {
+    // Storage unavailable — fail silently
+  }
+}
+
+/**
+ * Clears EORA preferences for a specific person.
+ * Called on logout or account switch.
+ */
+export function clearPreferencesForPerson(personId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(getPersonScopedKey(personId));
+  } catch {
+    // Ignore
   }
 }
 

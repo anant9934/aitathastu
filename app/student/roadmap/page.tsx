@@ -244,6 +244,7 @@ export default function RoadmapPage() {
                 {data.roadmap.primaryActions.map((act, idx) => (
                   <div
                     key={idx}
+                    data-eora-id={idx === 0 ? "eora-roadmap-next" : undefined}
                     style={{
                       padding: 18,
                       borderRadius: 14,

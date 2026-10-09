@@ -573,20 +573,102 @@
   .eora-avatar-trigger--full { transition: none; }
 }
 
-/* ── Mobile: safe area + repositioning ──────────────────────────────────── */
+/* ── Mobile: safe area + collision avoidance ────────────────────────────── */
 @media (max-width: 480px) {
   .eora-floating-root {
     right: 12px;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 70px); /* above mobile nav */
+    /* Above mobile nav (≈56px) + safe area, with room for content */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+    /* Limit height so panel never covers full screen */
+    max-height: calc(100dvh - 140px);
   }
 
   .eora-panel {
     width: calc(100vw - 40px);
     max-width: 300px;
+    /* Prevent panel from exceeding viewport height */
+    max-height: calc(100dvh - 200px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .eora-speech-bubble {
-    max-width: 200px;
+    max-width: 195px;
+    /* Prevent bubble from reaching over form buttons */
+    max-height: 120px;
+    overflow: hidden;
+  }
+
+  /* On very narrow screens (320px) reduce the avatar size */
+  .eora-avatar-img {
+    width: 58px;
+  }
+
+  .eora-avatar-trigger--full {
+    filter: drop-shadow(0 2px 8px rgba(89, 66, 220, 0.2));
+  }
+}
+
+/* ── 320px micro-breakpoint ───────────────────────────────────────────────── */
+@media (max-width: 340px) {
+  .eora-floating-root {
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
+  }
+
+  .eora-panel {
+    width: calc(100vw - 20px);
+    max-width: 285px;
+  }
+
+  .eora-avatar-img {
+    width: 50px;
+  }
+
+  .eora-avatar-badge {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+  }
+
+  .eora-speech-bubble {
+    max-width: 170px;
+  }
+}
+
+/* ── 768px tablet ─────────────────────────────────────────────────────────── */
+@media (min-width: 481px) and (max-width: 768px) {
+  .eora-floating-root {
+    right: 16px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  }
+
+  .eora-panel {
+    width: 260px;
+  }
+}
+
+/* ── Keyboard-aware: when virtual keyboard is open, float higher ─────────── */
+@media (max-width: 480px) and (max-height: 450px) {
+  .eora-floating-root {
+    /* Collapse to minimized-style when keyboard is open */
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  }
+
+  .eora-panel {
+    display: none; /* Close panel when keyboard takes over the screen */
+  }
+}
+
+/* ── Landscape mobile ────────────────────────────────────────────────────── */
+@media (max-height: 500px) and (max-width: 900px) {
+  .eora-floating-root {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  }
+
+  .eora-panel {
+    max-height: calc(100dvh - 100px);
+    overflow-y: auto;
   }
 }
 

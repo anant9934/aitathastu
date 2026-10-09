@@ -173,6 +173,7 @@ export function Screen2EoraIntro({
               >
                 <input
                   id="student-name-input"
+                  data-eora-id="eora-name-input"
                   type="text"
                   style={{
                     border: "none",

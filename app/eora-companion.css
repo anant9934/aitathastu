@@ -1,0 +1,601 @@
+/* ==========================================================================
+   EORA FLOATING COMPANION — UI STYLES v1.0
+   Warm Ivory, Violet intelligence accent. Accessible, mobile-safe.
+   ========================================================================== */
+
+/* ── Root container ─────────────────────────────────────────────────────── */
+.eora-floating-root {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  right: 24px;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none; /* children opt-in via pointer-events: auto */
+}
+
+.eora-floating-root > * {
+  pointer-events: auto;
+}
+
+/* ── Minimized state ────────────────────────────────────────────────────── */
+.eora-floating-root--minimized {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  right: 20px;
+}
+
+/* ── Avatar row ─────────────────────────────────────────────────────────── */
+.eora-floating-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* ── Avatar trigger button ──────────────────────────────────────────────── */
+.eora-avatar-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 50%;
+}
+
+.eora-avatar-trigger:focus-visible {
+  outline: 3px solid #5942dc;
+  outline-offset: 4px;
+}
+
+/* Full avatar */
+.eora-avatar-trigger--full {
+  filter: drop-shadow(0 4px 12px rgba(89, 66, 220, 0.25));
+  transition: transform 0.2s ease;
+}
+
+.eora-avatar-trigger--full:hover {
+  transform: scale(1.06);
+}
+
+.eora-avatar-trigger--full:active,
+.eora-avatar-trigger--active {
+  transform: scale(0.96);
+}
+
+/* Mini avatar image */
+.eora-avatar-img {
+  object-fit: contain;
+  width: 72px;
+  height: auto;
+  max-height: 90px;
+}
+
+.eora-avatar-img--animated {
+  animation: eora-float 3.5s ease-in-out infinite;
+}
+
+/* Mini (minimized) image */
+.eora-avatar-mini-img {
+  object-fit: contain;
+  width: 52px;
+  height: auto;
+  border-radius: 50%;
+  box-shadow: 0 3px 10px rgba(89, 66, 220, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.eora-avatar-mini-img:hover {
+  transform: scale(1.08);
+}
+
+/* Sparkle badge */
+.eora-avatar-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #02c5f5, #5942dc);
+  color: #fff;
+  font-size: 10px;
+  box-shadow: 0 2px 6px rgba(89, 66, 220, 0.4);
+}
+
+/* Avatar wrapper (for controls underneath) */
+.eora-avatar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Control row ─────────────────────────────────────────────────────────── */
+.eora-ctrl-row {
+  display: flex;
+  gap: 4px;
+}
+
+.eora-ctrl-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(89, 66, 220, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #696778;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+
+.eora-ctrl-btn:hover {
+  background: #f4f1ff;
+  color: #5942dc;
+}
+
+.eora-ctrl-btn:focus-visible {
+  outline: 2px solid #5942dc;
+  outline-offset: 2px;
+}
+
+.eora-ctrl-btn--dismiss:hover {
+  background: #fff0f0;
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* ── Speech bubble ───────────────────────────────────────────────────────── */
+.eora-speech-bubble {
+  position: relative;
+  max-width: 260px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1.5px solid rgba(89, 66, 220, 0.15);
+  border-radius: 16px 16px 4px 16px;
+  box-shadow: 0 8px 24px rgba(89, 66, 220, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.eora-speech-bubble--visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.eora-speech-bubble--no-motion {
+  transition: none;
+  opacity: 1;
+  transform: none;
+}
+
+.eora-speech-bubble__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #171626;
+  padding-right: 16px;
+}
+
+.eora-speech-bubble__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: none;
+  color: #9994a8;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.eora-speech-bubble__close:hover {
+  background: #f4f1ff;
+  color: #5942dc;
+}
+
+.eora-speech-bubble__close:focus-visible {
+  outline: 2px solid #5942dc;
+}
+
+.eora-speech-bubble__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #f4f1ff;
+  color: #5942dc;
+  font-size: 11.5px;
+  font-weight: 650;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.eora-speech-bubble__action:hover {
+  background: #ebe7fe;
+}
+
+/* ── Clarifying options ──────────────────────────────────────────────────── */
+.eora-clarifying-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 220px;
+  padding: 8px;
+  background: #fff;
+  border: 1.5px solid rgba(89, 66, 220, 0.15);
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(89, 66, 220, 0.1);
+}
+
+.eora-clarifying-btn {
+  padding: 6px 10px;
+  background: #f8f7ff;
+  border: 1px solid rgba(89, 66, 220, 0.12);
+  border-radius: 8px;
+  color: #3b3267;
+  font-size: 12px;
+  font-weight: 580;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.eora-clarifying-btn:hover {
+  background: #ede9ff;
+  color: #5942dc;
+}
+
+/* ── Expanded panel ──────────────────────────────────────────────────────── */
+.eora-panel {
+  width: 280px;
+  background: #ffffff;
+  border: 1.5px solid rgba(89, 66, 220, 0.14);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(89, 66, 220, 0.14), 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  animation: eora-panel-enter 0.2s ease;
+}
+
+@keyframes eora-panel-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.eora-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #f0eee9;
+  background: linear-gradient(135deg, #f9f7ff 0%, #f4f1ff 100%);
+}
+
+.eora-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #5942dc;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.eora-panel-subtitle {
+  color: #8985a0;
+  font-size: 10.5px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.eora-panel-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.eora-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(89, 66, 220, 0.08);
+  color: #5942dc;
+  font-size: 11px;
+  font-weight: 620;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.eora-panel-btn:hover {
+  background: rgba(89, 66, 220, 0.14);
+}
+
+.eora-panel-btn--close {
+  background: none;
+  color: #9994a8;
+}
+
+.eora-panel-btn--close:hover {
+  background: #f4f1ff;
+  color: #5942dc;
+}
+
+/* ── Tour controls ───────────────────────────────────────────────────────── */
+.eora-tour-controls {
+  padding: 8px 12px;
+  background: #f9f7ff;
+  border-bottom: 1px solid #ede9fd;
+  font-size: 11.5px;
+}
+
+.eora-tour-progress {
+  display: block;
+  color: #696778;
+  margin-bottom: 6px;
+}
+
+.eora-tour-nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.eora-tour-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(89, 66, 220, 0.18);
+  background: #fff;
+  color: #5942dc;
+  font-size: 11.5px;
+  font-weight: 630;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.eora-tour-btn:hover {
+  background: #f4f1ff;
+}
+
+.eora-tour-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.eora-tour-btn--primary {
+  background: #5942dc;
+  color: #fff;
+  border-color: transparent;
+}
+
+.eora-tour-btn--primary:hover {
+  background: #4931c6;
+}
+
+.eora-tour-btn--exit {
+  color: #9994a8;
+  border-color: transparent;
+  background: none;
+  margin-left: auto;
+}
+
+/* ── Quick actions ───────────────────────────────────────────────────────── */
+.eora-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid #f0eee9;
+}
+
+.eora-quick-btn {
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid #e8e4f0;
+  background: #fafafe;
+  color: #4b4770;
+  font-size: 11px;
+  font-weight: 580;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.eora-quick-btn:hover {
+  background: #f0ecff;
+  border-color: rgba(89, 66, 220, 0.2);
+  color: #5942dc;
+}
+
+/* ── Input row ───────────────────────────────────────────────────────────── */
+.eora-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0eee9;
+}
+
+.eora-input {
+  flex: 1;
+  border: 1px solid #e8e4f0;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: #171626;
+  background: #fafafe;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.eora-input:focus {
+  border-color: #5942dc;
+  background: #fff;
+}
+
+.eora-input::placeholder {
+  color: #b0abbe;
+}
+
+.eora-input-send {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #5942dc;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.eora-input-send:hover {
+  background: #4931c6;
+}
+
+.eora-input-send:disabled {
+  background: #c9c5e0;
+  cursor: not-allowed;
+}
+
+/* ── Panel footer ────────────────────────────────────────────────────────── */
+.eora-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #fafafe;
+}
+
+.eora-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: #9994a8;
+  font-size: 10.5px;
+  font-weight: 550;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.12s;
+  text-transform: capitalize;
+}
+
+.eora-footer-link:hover {
+  color: #5942dc;
+}
+
+/* ── Restore wrapper ─────────────────────────────────────────────────────── */
+.eora-restore-wrapper {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  right: 20px;
+  z-index: 900;
+  pointer-events: auto;
+}
+
+.eora-restore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1.5px solid rgba(89, 66, 220, 0.2);
+  color: #5942dc;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(89, 66, 220, 0.14);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.eora-restore-btn:hover {
+  background: #f4f1ff;
+  box-shadow: 0 6px 18px rgba(89, 66, 220, 0.2);
+}
+
+/* ── Celebration overlay ─────────────────────────────────────────────────── */
+.eora-celebration {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.eora-confetti {
+  position: absolute;
+  top: -10%;
+  font-size: 20px;
+  animation: eora-confetti-fall 2.5s ease-in forwards;
+}
+
+/* ── Floating animation ──────────────────────────────────────────────────── */
+@keyframes eora-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes eora-confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ── Reduced motion overrides ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .eora-avatar-img--animated { animation: none; }
+  .eora-speech-bubble { transition: none; }
+  .eora-panel { animation: none; }
+  .eora-confetti { animation: none; }
+  .eora-avatar-trigger--full { transition: none; }
+}
+
+/* ── Mobile: safe area + repositioning ──────────────────────────────────── */
+@media (max-width: 480px) {
+  .eora-floating-root {
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 70px); /* above mobile nav */
+  }
+
+  .eora-panel {
+    width: calc(100vw - 40px);
+    max-width: 300px;
+  }
+
+  .eora-speech-bubble {
+    max-width: 200px;
+  }
+}
+
+/* ── Spotlight for tour targets ──────────────────────────────────────────── */
+[data-eora-spotlight="true"] {
+  outline: 3px solid #5942dc !important;
+  outline-offset: 5px !important;
+  box-shadow: 0 0 0 8px rgba(89, 66, 220, 0.12), 0 8px 24px rgba(89, 66, 220, 0.2) !important;
+  border-radius: 4px;
+  position: relative;
+  z-index: 850;
+}

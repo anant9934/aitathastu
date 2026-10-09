@@ -125,6 +125,7 @@ export function Screen3ChooseRole({
 
         {/* 3x2 Role Grid in Glass Card Container */}
         <div
+          data-eora-id="eora-role-select"
           style={{
             background: "#FFFFFF",
             borderRadius: 24,

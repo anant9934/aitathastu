@@ -156,6 +156,7 @@ export function Screen4AcademicDetails({
 
         {/* Card Container covering page gracefully */}
         <div
+          data-eora-id="eora-academic-form"
           style={{
             background: "rgba(255, 255, 255, 0.95)",
             backdropFilter: "blur(16px)",

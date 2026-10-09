@@ -520,7 +520,7 @@ export function Screen12StudentDashboard({
   return (
     <div className="dash-shell">
       {/* 1. LEFT SIDEBAR: DARK NAVY PERSISTENT NAVIGATION (DESIGN LOCKED) */}
-      <aside className={`dash-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
+      <aside data-eora-id="eora-sidebar" className={`dash-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div>
           {/* Brand Logo in Sidebar */}
           <div className="dash-sidebar-brand">
@@ -1031,7 +1031,7 @@ export function Screen12StudentDashboard({
             {/* =========================================================
                 SECTION 1: OVERVIEW (Hero, Metrics, Journey, Skills Map)
             ========================================================= */}
-            <section id="overview" className="dash-section">
+            <section id="overview" data-eora-id="eora-overview" className="dash-section">
               {/* 5.1 Hero Banner with Atmospheric Art & New EORA Open-Hand Mascot */}
               <div className="dash-hero-banner">
                 <div className="dash-hero-glow-1" />
@@ -1345,7 +1345,7 @@ export function Screen12StudentDashboard({
             {/* =========================================================
                 SECTION 2: YOUR EVIDENCE (Reordered by Interest Prominence)
             ========================================================= */}
-            <section id="evidence" className="dash-section">
+            <section id="evidence" data-eora-id="eora-evidence-panel" className="dash-section">
               <div className="dash-section-header">
                 <div>
                   <h2 className="dash-section-title">{comp.evidenceSection.title}</h2>

@@ -3,6 +3,9 @@ import "./globals.css";
 import "./reference-refresh.css";
 import "./student-workspace.css";
 import "./exact-screens.css";
+import "./eora-companion.css";
+import { EoraProvider } from "@/components/eora/eora-provider";
+import { EoraFloatingCompanion } from "@/components/eora/eora-floating-companion";
 
 export const metadata: Metadata = {
   title: "AI Tathastu — You imagine. AI makes it happen.",
@@ -13,7 +16,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <EoraProvider>
+          {children}
+          <EoraFloatingCompanion />
+        </EoraProvider>
+      </body>
     </html>
   );
 }

@@ -190,6 +190,7 @@ export function Screen5ResumeUpload({
 
       <main
         className="screen-body"
+        data-eora-id="eora-resume-upload"
         style={{
           position: "relative",
           zIndex: 1,

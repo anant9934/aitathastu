@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { connectGitHubAccount, syncGitHubConnection } from "@/lib/services/github-sync-service";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
+import { getCanonicalOrigin } from "@/lib/auth/origin";
 
 export async function GET(req: Request) {
   if (!coreIngestionReady()) return NextResponse.json({ error: "GitHub connection is unavailable until credential rotation is complete." }, { status: 503 });
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
   const encodedState = url.searchParams.get("state");
   const errorParam = url.searchParams.get("error");
 
-  const baseUrl = process.env.APP_BASE_URL?.trim() || `${url.protocol}//${url.host}`;
+  const baseUrl = getCanonicalOrigin(req);
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
   if (errorParam) {

@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, syncRuns } from "@/lib/db";
 import { and, eq, lt } from "drizzle-orm";
+import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // seconds
@@ -51,12 +52,15 @@ export async function GET(request: NextRequest) {
       fixed++;
     }
 
+    const recoveredJobs = await SourceProcessingJobService.recoverStuckJobs(15);
+
     const duration = Date.now() - startTime;
-    console.log(`[Cron] cleanup-stuck-syncs done in ${duration}ms. Fixed: ${fixed} stuck runs.`);
+    console.log(`[Cron] cleanup-stuck-syncs done in ${duration}ms. Fixed syncRuns: ${fixed}, recoveredJobs: ${recoveredJobs}.`);
 
     return NextResponse.json({
       ok: true,
-      fixed,
+      fixedSyncRuns: fixed,
+      recoveredJobs,
       duration_ms: duration,
       timestamp: new Date().toISOString(),
     });

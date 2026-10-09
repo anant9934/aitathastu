@@ -299,3 +299,63 @@ export class ExtractionValidator {
     };
   }
 }
+
+export function isScannedOrUnusableDocument(text: string): boolean {
+  const clean = text.replace(/[\s\r\n\t]+/g, " ").trim();
+  if (clean.length < 40) return true;
+  if (/^%PDF/i.test(clean) && clean.includes("\x00")) return true;
+  if (/SCAN_PAGE|corrupted byte stream/i.test(clean)) return true;
+  return false;
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function filterNegatedSkills(skills: string[], text: string): string[] {
+  const textLower = text.toLowerCase();
+  return skills.filter((skill) => {
+    const sEscaped = escapeRegex(skill.toLowerCase());
+    const boundary = `(?<![a-zA-Z0-9])${sEscaped}(?![a-zA-Z0-9])`;
+    const negationRegex = new RegExp(
+      `(?:have\\s+not|haven't|never|not\\s+used|no\\s+experience\\s+with|no\\s+prior\\s+experience|no\\s+prior\\s+hands-on\\s+experience|no\\s+prior\\s+production\\s+experience|lack\\s+of|unfamiliar\\s+with|without\\s+using|excluding|no\\s+knowledge\\s+of)[^.\\n]{0,80}${boundary}`,
+      "i"
+    );
+    if (negationRegex.test(textLower)) return false;
+    const reverseNegationRegex = new RegExp(
+      `${boundary}[^.\\n]{0,80}(?:no\\s+prior\\s+experience|haven't\\s+worked|never\\s+used)`,
+      "i"
+    );
+    if (reverseNegationRegex.test(textLower)) return false;
+    return true;
+  });
+}
+
+export function filterAspirationalSkills(skills: string[], text: string): string[] {
+  const textLower = text.toLowerCase();
+  return skills.filter((skill) => {
+    const sEscaped = escapeRegex(skill.toLowerCase());
+    const boundary = `(?<![a-zA-Z0-9])${sEscaped}(?![a-zA-Z0-9])`;
+    const aspirationRegex = new RegExp(
+      `(?:want\\s+to\\s+learn|hoping\\s+to\\s+learn|planning\\s+to\\s+learn|looking\\s+forward\\s+to\\s+learn|aspiring\\s+to|interested\\s+in\\s+learning|eager\\s+to\\s+explore|future\\s+interests|future\\s+goal|will\\s+learn)[^.\\n]{0,80}${boundary}`,
+      "i"
+    );
+    if (aspirationRegex.test(textLower)) return false;
+    return true;
+  });
+}
+
+export function filterCourseworkFromSkills(skills: string[]): string[] {
+  const academicCourseworkTerms = new Set([
+    "data structures",
+    "algorithms",
+    "operating systems",
+    "computer networks",
+    "database management systems",
+    "dbms",
+    "compiler design",
+    "theory of computation",
+  ]);
+  return skills.filter((s) => !academicCourseworkTerms.has(s.toLowerCase()));
+}
+

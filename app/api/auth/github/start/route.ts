@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
+import { getCanonicalOrigin } from "@/lib/auth/origin";
 
 export async function GET(req: Request) {
   if (!coreIngestionReady()) return NextResponse.json({ error: "GitHub connection is unavailable until credential rotation is complete." }, { status: 503 });
   const url = new URL(req.url);
-  const baseUrl = process.env.APP_BASE_URL?.trim() || `${url.protocol}//${url.host}`;
+  const baseUrl = getCanonicalOrigin(req);
 
   const auth = await getServerAuthContext();
   if (!auth) {
@@ -34,8 +35,8 @@ export async function GET(req: Request) {
   const ghAuthUrl = new URL("https://github.com/login/oauth/authorize");
   ghAuthUrl.searchParams.set("client_id", clientId);
   ghAuthUrl.searchParams.set("redirect_uri", redirectUri);
-  // GitHub's no-scope OAuth grant covers public profile and repository metadata.
-  // Private repository contents require a separate, explicit fine-grained GitHub App flow.
+  // Least-privilege: request strictly read-only user identity without broad repo write permissions
+  ghAuthUrl.searchParams.set("scope", "read:user");
   ghAuthUrl.searchParams.set("state", encodedState);
 
   const response = NextResponse.redirect(ghAuthUrl.toString());

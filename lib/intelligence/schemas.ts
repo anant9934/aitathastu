@@ -110,7 +110,7 @@ export const GitHubProjectInterpretationSchema = z.object({
   architectureFindings: z.array(
     z.object({
       component: z.string().min(1).max(100),
-      status: z.enum(["OBSERVED", "DOCUMENTED", "INFERRED", "NOT_FOUND", "UNAVAILABLE"]),
+      status: z.enum(["OBSERVED", "DOCUMENTED", "STUDENT_CONFIRMED", "INFERRED", "UNKNOWN", "NOT_FOUND", "UNAVAILABLE"]),
       evidence: z.string().max(300).optional(),
     })
   ).default([]),

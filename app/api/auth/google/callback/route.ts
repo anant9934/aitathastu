@@ -4,6 +4,7 @@ import { findUserByEmail, createUser } from "@/lib/repositories/user-repository"
 import { createSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { saveExternalConnection } from "@/lib/repositories/connection-repository";
 import { getDb, journeyEvents } from "@/lib/db";
+import { getCanonicalOrigin } from "@/lib/auth/origin";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
   const encodedState = url.searchParams.get("state");
   const errorParam = url.searchParams.get("error");
 
-  const baseUrl = process.env.APP_BASE_URL?.trim() || `${url.protocol}//${url.host}`;
+  const baseUrl = getCanonicalOrigin(req);
   const redirectUri = `${baseUrl}/api/auth/google/callback`;
 
   if (errorParam) {

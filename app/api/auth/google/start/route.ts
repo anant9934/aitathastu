@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { getCanonicalOrigin } from "@/lib/auth/origin";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const from = url.searchParams.get("from") || "/student";
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
 
-  const baseUrl = process.env.APP_BASE_URL?.trim() || `${url.protocol}//${url.host}`;
+  const baseUrl = getCanonicalOrigin(req);
   const redirectUri = `${baseUrl}/api/auth/google/callback`;
 
   if (!clientId) {

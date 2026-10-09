@@ -13,7 +13,7 @@
  */
 
 import crypto from "node:crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { getDb, sourceProcessingJobs } from "@/lib/db";
 
 export type ProcessingStage =
@@ -153,5 +153,38 @@ export class SourceProcessingJobService {
       .where(eq(sourceProcessingJobs.personId, personId))
       .orderBy(desc(sourceProcessingJobs.startedAt))
       .limit(limit);
+  }
+
+  /**
+   * Recovers stuck processing jobs that have exceeded threshold runtime.
+   */
+  static async recoverStuckJobs(thresholdMinutes = 15): Promise<number> {
+    const db = await getDb();
+    const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+    const stuck = await db
+      .select({ id: sourceProcessingJobs.id, personId: sourceProcessingJobs.personId })
+      .from(sourceProcessingJobs)
+      .where(
+        and(
+          eq(sourceProcessingJobs.status, "running"),
+          lt(sourceProcessingJobs.startedAt, cutoff)
+        )
+      )
+      .limit(50);
+
+    let recovered = 0;
+    for (const job of stuck) {
+      await db
+        .update(sourceProcessingJobs)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+          errorCode: "TIMEOUT",
+          errorMessage: `Processing job timed out after ${thresholdMinutes} minutes and was recovered.`,
+        })
+        .where(eq(sourceProcessingJobs.id, job.id));
+      recovered++;
+    }
+    return recovered;
   }
 }

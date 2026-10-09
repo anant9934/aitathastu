@@ -109,7 +109,7 @@ export function analyzeArchitecturalComponents(
   languages: Record<string, number>
 ): Array<{
   component: string;
-  status: "OBSERVED" | "DOCUMENTED" | "INFERRED" | "NOT_FOUND" | "UNAVAILABLE";
+  status: "OBSERVED" | "DOCUMENTED" | "STUDENT_CONFIRMED" | "INFERRED" | "UNKNOWN" | "NOT_FOUND" | "UNAVAILABLE";
   evidence?: string;
 }> {
   const lowerFiles = files.map((f) => f.toLowerCase());
@@ -123,7 +123,7 @@ export function analyzeArchitecturalComponents(
     documentedKeywords: string[]
   ): {
     component: string;
-    status: "OBSERVED" | "DOCUMENTED" | "INFERRED" | "NOT_FOUND" | "UNAVAILABLE";
+    status: "OBSERVED" | "DOCUMENTED" | "STUDENT_CONFIRMED" | "INFERRED" | "UNKNOWN" | "NOT_FOUND" | "UNAVAILABLE";
     evidence?: string;
   } => {
     // 1. Observed directly in repository files
@@ -172,7 +172,7 @@ export function generateImprovementSuggestions(
   const deployFinding = findings.find((f) => f.component === "deployment");
   const testFinding = findings.find((f) => f.component === "tests");
 
-  if (evalFinding && evalFinding.status === "NOT_FOUND") {
+  if (evalFinding && (evalFinding.status === "UNKNOWN" || evalFinding.status === "NOT_FOUND")) {
     suggestions.push({
       suggestion: "Add quantitative evaluation benchmarks and grounding metrics",
       targetRole: classification.includes("Generative") ? "GenAI Engineer" : "Machine Learning Engineer",
@@ -181,7 +181,7 @@ export function generateImprovementSuggestions(
     });
   }
 
-  if (deployFinding && deployFinding.status === "NOT_FOUND") {
+  if (deployFinding && (deployFinding.status === "UNKNOWN" || deployFinding.status === "NOT_FOUND")) {
     suggestions.push({
       suggestion: "Package repository with a Dockerfile or deployment configuration",
       targetRole: "MLOps Engineer",
@@ -190,7 +190,7 @@ export function generateImprovementSuggestions(
     });
   }
 
-  if (testFinding && testFinding.status === "NOT_FOUND") {
+  if (testFinding && (testFinding.status === "UNKNOWN" || testFinding.status === "NOT_FOUND")) {
     suggestions.push({
       suggestion: "Add unit tests covering data preprocessing and inference handlers",
       targetRole: "AI Engineer",

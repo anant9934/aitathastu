@@ -19,19 +19,19 @@ export interface ValidationResult {
 
 // Negation patterns in English
 const NEGATION_PATTERNS = [
-  /\b(?:have\s+not|haven't|never|not\s+used|no\s+experience\s+with|haven't\s+worked\s+with|lack\s+of|unfamiliar\s+with|did\s+not\s+use|didn't\s+use)\b/i,
-  /\b(?:no\s+knowledge\s+of|without\s+using|excluding)\b/i,
+  /\b(?:have\s+not|haven't|never|not\s+used|no\s+experience\s+with|no\s+prior\s+experience|no\s+commercial\s+experience|haven't\s+worked\s+with|lack\s+of|unfamiliar\s+with|did\s+not\s+use|didn't\s+use)\b/i,
+  /\b(?:no\s+knowledge\s+of|without\s+using|excluding|excluded\s+.*?\s+from)\b/i,
 ];
 
 // Aspiration / future learning patterns
 const ASPIRATION_PATTERNS = [
-  /\b(?:want\s+to\s+learn|hoping\s+to\s+learn|planning\s+to\s+learn|looking\s+forward\s+to\s+learn|aspiring\s+to|aiming\s+for|aiming\s+to|interested\s+in\s+learning|eager\s+to\s+explore)\b/i,
-  /\b(?:future\s+goal|will\s+learn|would\s+like\s+to\s+master)\b/i,
+  /\b(?:want\s+to\s+learn|hoping\s+to\s+learn|planning\s+to\s+learn|planning\s+to\s+master|looking\s+forward\s+to\s+learn|aspiring\s+to|aiming\s+for|aiming\s+to|interested\s+in\s+learning|eager\s+to\s+explore)\b/i,
+  /\b(?:future\s+goal|will\s+learn|would\s+like\s+to\s+master|aiming\s+to\s+build|hope\s+to\s+explore)\b/i,
 ];
 
 // Coursework-only patterns
 const COURSEWORK_PATTERNS = [
-  /\b(?:enrolled\s+in|theory\s+course|curriculum\s+subject|syllabus|lecture\s+topic|lecture\s+on|introductory\s+lecture|attended\s+seminar\s+on)\b/i,
+  /\b(?:enrolled\s+in|theory\s+course|curriculum\s+subject|syllabus|lecture\s+topic|lecture\s+on|introductory\s+lecture|attended\s+seminar\s+on|lab\s+exercises\s+in)\b/i,
 ];
 
 // Canonical technology dictionary for normalization
@@ -265,7 +265,7 @@ export class ExtractionValidator {
       return { valid: false, confidence: 0.1, flag: "unsupported", reason: "Exaggerated seniority level unsupported by student profile.", normalizedValue: val };
     }
 
-    if (field === "achievement" && /turing|nobel|fields\s+medal/i.test(valLower)) {
+    if (field === "achievement" && (/turing|nobel|fields\s+medal/i.test(valLower) || (/grandmaster|winner|gold/i.test(valLower) && /browsed|read|studied|inspired|watched/i.test(span.toLowerCase())))) {
       return { valid: false, confidence: 0, flag: "unsupported", reason: "Extraordinary unevidenced honor flagged for student verification.", normalizedValue: val };
     }
 

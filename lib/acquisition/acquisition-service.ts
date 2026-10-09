@@ -2,6 +2,7 @@ import { fetchGitHubProjects } from "../connectors/github/client";
 import { saveSourceSnapshot, saveExternalConnection, getSourceSnapshots } from "../repositories/connection-repository";
 import { saveProject, saveProjectContribution, getProjectsByPersonId, type CreateProjectInput } from "../repositories/project-repository";
 import { createEvidenceRecord } from "../repositories/evidence-repository";
+import { CrossSourceFusionService } from "../services/cross-source-fusion-service";
 
 export type ProjectCandidate = {
   id: string;
@@ -261,6 +262,19 @@ export async function confirmDiscoveredProject(
       importKey: `acq_skill_${personId}_${slug}`,
     });
   }
+
+  // 6. Record Person 360 Profile Version update
+  await CrossSourceFusionService.recordProfileVersion(
+    personId,
+    "project_confirmed",
+    `Confirmed project: ${project.title} with sources [${project.sources.join(", ")}].`,
+    {
+      projectId: savedProject.id,
+      title: project.title,
+      sources: project.sources,
+      technologies: project.technologies,
+    }
+  );
 
   return savedProject;
 }

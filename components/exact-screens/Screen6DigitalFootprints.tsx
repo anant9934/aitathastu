@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Check, Loader2, Sparkles, Plus, Globe, Trash2, X } from "lucide-react";
+import { Check, Loader2, Sparkles, Plus, Globe, Trash2, X, Upload, ExternalLink, AlertCircle } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 
@@ -15,6 +15,24 @@ interface Screen6DigitalFootprintsProps {
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
 }
+
+export type FootprintHonestStatus =
+  | "Not Connected"
+  | "Profile Linked"
+  | "Connected"
+  | "Importing"
+  | "Import Completed"
+  | "Review Required"
+  | "Import Failed"
+  | "Permission Required"
+  | "Unsupported";
+
+export type SupportedCapability =
+  | "Connect Account"
+  | "Import Authorized Export"
+  | "Add Profile URL"
+  | "Enter Details"
+  | "Review Imported Data";
 
 // Official brand SVG icons
 function LinkedInIcon() {
@@ -76,24 +94,51 @@ function CodeChefIcon() {
   );
 }
 
-function GoogleScholarIcon() {
+function HuggingFaceIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="#4285F4">
-      <path d="M12 3L1 9l11 6 9-4.91V17h2V9M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFD21E">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-3 8c.83 0 1.5.67 1.5 1.5S9.83 13 9 13s-1.5-.67-1.5-1.5S8.17 10 9 10zm6 0c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5zm-3 7.5c-2.33 0-4.31-1.46-5.11-3.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5z" />
     </svg>
   );
 }
 
-const platforms = [
-  {
-    id: "linkedin",
-    name: "LinkedIn",
-    placeholder: "LinkedIn profile URL or username (e.g. in/anant or anant-kumar)",
-    prefix: "linkedin.com/in/",
-    renderIcon: LinkedInIcon,
-    color: "#0A66C2",
-    bg: "#E8F4FD",
-  },
+function OrcidIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#A6CE39">
+      <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zM7.369 4.378c.525 0 .947.431.947.947s-.422.947-.947.947a.95.95 0 0 1-.947-.947c0-.516.422-.947.947-.947zm-.722 3.038h1.444v10.156H6.647V7.416zm3.562 0h3.9c3.712 0 5.344 2.653 5.344 5.081 0 2.578-2.016 5.075-5.353 5.075h-3.891V7.416zm1.444 1.303v7.55h2.378c2.597 0 3.791-1.778 3.791-3.775 0-2.141-1.328-3.775-3.844-3.775h-2.325z" />
+    </svg>
+  );
+}
+
+function KaggleIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#20BEFF">
+      <path d="M18.825 23.859c-.022.092-.117.141-.281.141h-3.139c-.187 0-.351-.082-.492-.246l-5.367-6.914-1.43 1.383v5.485c0 .211-.105.316-.316.316H5.117c-.211 0-.316-.105-.316-.316V.316C4.801.105.492 0 .703 0h2.684c.211 0 .316.105.316.316v14.414l6.547-6.539c.141-.164.305-.246.492-.246h3.256c.164 0 .258.059.281.176.023.094-.023.187-.141.281l-6.727 6.492 7.043 8.789c.117.117.152.211.117.305z" />
+    </svg>
+  );
+}
+
+function DevToIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="#0A0A0A">
+      <path d="M7.42 10.05c-.18-.16-.46-.23-.84-.23H5.34v4.36h1.24c.38 0 .66-.08.84-.24.18-.16.27-.41.27-.75v-2.39c0-.34-.09-.59-.27-.75zm13.14-5.55H3.44C2.09 4.5 1 5.59 1 6.94v10.12C1 18.41 2.09 19.5 3.44 19.5h17.12c1.35 0 2.44-1.09 2.44-2.44V6.94c0-1.35-1.09-2.44-2.44-2.44zM8.84 13.19c0 .72-.25 1.28-.75 1.68-.5.4-1.2.6-2.1.6H3.84V8.53h2.15c.9 0 1.6.2 2.1.6.5.4.75.96.75 1.68v2.38zm5.55-3.37h-3.11v1.89h2.39v1.29h-2.39v1.94h3.11v1.29H9.77V8.53h4.62v1.29zm4.24 3.01l-1.57-4.3h1.61l.78 2.52.78-2.52h1.61l-1.57 4.3v2.93h-1.64v-2.93z" />
+    </svg>
+  );
+}
+
+interface PlatformConfig {
+  id: string;
+  name: string;
+  placeholder: string;
+  prefix: string;
+  renderIcon: React.ComponentType;
+  color: string;
+  bg: string;
+  supportedCapability: SupportedCapability;
+  supportsExportUpload?: boolean;
+}
+
+const platforms: PlatformConfig[] = [
   {
     id: "github",
     name: "GitHub",
@@ -102,51 +147,7 @@ const platforms = [
     renderIcon: GitHubIcon,
     color: "#181717",
     bg: "#F3F4F6",
-  },
-  {
-    id: "leetcode",
-    name: "LeetCode",
-    placeholder: "LeetCode username (e.g. anant99)",
-    prefix: "leetcode.com/",
-    renderIcon: LeetCodeIcon,
-    color: "#FFA116",
-    bg: "#FFF7ED",
-  },
-  {
-    id: "hackerrank",
-    name: "HackerRank",
-    placeholder: "HackerRank username",
-    prefix: "hackerrank.com/",
-    renderIcon: HackerRankIcon,
-    color: "#00EA64",
-    bg: "#ECFDF5",
-  },
-  {
-    id: "hackerearth",
-    name: "HackerEarth",
-    placeholder: "HackerEarth handle",
-    prefix: "hackerearth.com/@",
-    renderIcon: HackerEarthIcon,
-    color: "#3253DC",
-    bg: "#EFF6FF",
-  },
-  {
-    id: "codechef",
-    name: "CodeChef",
-    placeholder: "CodeChef handle",
-    prefix: "codechef.com/users/",
-    renderIcon: CodeChefIcon,
-    color: "#5B4638",
-    bg: "#FEF3C7",
-  },
-  {
-    id: "googlescholar",
-    name: "Google Scholar",
-    placeholder: "Scholar profile link or User ID",
-    prefix: "scholar.google.com/citations?user=",
-    renderIcon: GoogleScholarIcon,
-    color: "#4285F4",
-    bg: "#EFF6FF",
+    supportedCapability: "Connect Account",
   },
   {
     id: "portfolio",
@@ -156,6 +157,98 @@ const platforms = [
     renderIcon: Globe,
     color: "#7C3AED",
     bg: "#F5F3FF",
+    supportedCapability: "Add Profile URL",
+  },
+  {
+    id: "linkedin",
+    name: "LinkedIn",
+    placeholder: "LinkedIn profile URL or username (e.g. in/anant or anant-kumar)",
+    prefix: "linkedin.com/in/",
+    renderIcon: LinkedInIcon,
+    color: "#0A66C2",
+    bg: "#E8F4FD",
+    supportedCapability: "Import Authorized Export",
+    supportsExportUpload: true,
+  },
+  {
+    id: "leetcode",
+    name: "LeetCode",
+    placeholder: "LeetCode username (e.g. anant99)",
+    prefix: "leetcode.com/",
+    renderIcon: LeetCodeIcon,
+    color: "#FFA116",
+    bg: "#FFF7ED",
+    supportedCapability: "Enter Details",
+  },
+  {
+    id: "huggingface",
+    name: "Hugging Face",
+    placeholder: "Hugging Face handle (e.g. username)",
+    prefix: "huggingface.co/",
+    renderIcon: HuggingFaceIcon,
+    color: "#FFD21E",
+    bg: "#FFFBEB",
+    supportedCapability: "Enter Details",
+  },
+  {
+    id: "orcid",
+    name: "ORCID Academic Record",
+    placeholder: "0000-0002-1825-0097 or orcid.org/...",
+    prefix: "orcid.org/",
+    renderIcon: OrcidIcon,
+    color: "#A6CE39",
+    bg: "#F7FEE7",
+    supportedCapability: "Enter Details",
+  },
+  {
+    id: "hackerrank",
+    name: "HackerRank",
+    placeholder: "HackerRank username",
+    prefix: "hackerrank.com/",
+    renderIcon: HackerRankIcon,
+    color: "#00EA64",
+    bg: "#ECFDF5",
+    supportedCapability: "Enter Details",
+  },
+  {
+    id: "codechef",
+    name: "CodeChef",
+    placeholder: "CodeChef handle",
+    prefix: "codechef.com/users/",
+    renderIcon: CodeChefIcon,
+    color: "#5B4638",
+    bg: "#FEF3C7",
+    supportedCapability: "Add Profile URL",
+  },
+  {
+    id: "hackerearth",
+    name: "HackerEarth",
+    placeholder: "HackerEarth handle",
+    prefix: "hackerearth.com/@",
+    renderIcon: HackerEarthIcon,
+    color: "#3253DC",
+    bg: "#EFF6FF",
+    supportedCapability: "Add Profile URL",
+  },
+  {
+    id: "kaggle",
+    name: "Kaggle",
+    placeholder: "Kaggle username",
+    prefix: "kaggle.com/",
+    renderIcon: KaggleIcon,
+    color: "#20BEFF",
+    bg: "#F0F9FF",
+    supportedCapability: "Add Profile URL",
+  },
+  {
+    id: "devto",
+    name: "DEV Community",
+    placeholder: "DEV.to username",
+    prefix: "dev.to/",
+    renderIcon: DevToIcon,
+    color: "#0A0A0A",
+    bg: "#F3F4F6",
+    supportedCapability: "Enter Details",
   },
 ];
 
@@ -168,17 +261,27 @@ export function Screen6DigitalFootprints({
   onJumpToStep,
 }: Screen6DigitalFootprintsProps) {
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>(initialProfiles);
+  const [statuses, setStatuses] = useState<Partial<Record<string, FootprintHonestStatus>>>(() => {
+    const init: Partial<Record<string, FootprintHonestStatus>> = {};
+    for (const [k, v] of Object.entries(initialProfiles)) {
+      if (v) init[k] = "Profile Linked";
+    }
+    return init;
+  });
+
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [inputVal, setInputVal] = useState<string>("");
-  const [isFetchingGithub, setIsFetchingGithub] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadFile, setUploadFile] = useState<{ name: string; content: string } | null>(null);
 
   const handleOpenPrompt = (platformId: string) => {
     setActivePrompt(platformId);
     setInputVal(profiles[platformId] || "");
     setStatusMessage(null);
     setErrorMessage(null);
+    setUploadFile(null);
   };
 
   const handleClosePrompt = () => {
@@ -186,16 +289,35 @@ export function Screen6DigitalFootprints({
     setInputVal("");
     setStatusMessage(null);
     setErrorMessage(null);
+    setUploadFile(null);
   };
 
   const handleDisconnectPlatform = (platformId: string) => {
-    const next = { ...profiles };
-    delete next[platformId];
-    setProfiles(next);
-    onProfilesChange?.(next);
+    const nextProfiles = { ...profiles };
+    delete nextProfiles[platformId];
+    setProfiles(nextProfiles);
+
+    const nextStatuses = { ...statuses };
+    delete nextStatuses[platformId];
+    setStatuses(nextStatuses);
+
+    onProfilesChange?.(nextProfiles);
     if (activePrompt === platformId) {
       handleClosePrompt();
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setUploadFile({ name: file.name, content: text });
+      setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import to parse.`);
+    };
+    reader.readAsText(file);
   };
 
   const handleSavePlatform = async (platformId: string) => {
@@ -203,28 +325,19 @@ export function Screen6DigitalFootprints({
     setStatusMessage(null);
     const rawVal = inputVal.trim();
 
-    if (!rawVal) {
+    if (!rawVal && !uploadFile) {
       handleDisconnectPlatform(platformId);
       return;
     }
 
-    // Clean up URLs into standard clean links/handles
-    let cleanVal = rawVal;
-    if (platformId === "github") {
-      cleanVal = rawVal.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
-    } else if (platformId === "linkedin") {
-      cleanVal = rawVal.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//i, "").replace(/\/$/, "");
-      if (!cleanVal.startsWith("https://")) {
-        cleanVal = `https://linkedin.com/in/${cleanVal}`;
-      }
-    } else if (platformId === "leetcode") {
-      cleanVal = rawVal.replace(/^https?:\/\/leetcode\.com\//i, "").replace(/\/$/, "");
-    }
+    setIsSyncing(true);
+    setStatuses((prev) => ({ ...prev, [platformId]: "Importing" }));
+    setStatusMessage(`Verifying and syncing ${platformId}...`);
 
-    if (platformId === "github") {
-      setIsFetchingGithub(true);
-      setStatusMessage("Looking up public GitHub repositories...");
-      try {
+    try {
+      if (platformId === "github") {
+        // GitHub specialized discovery
+        const cleanVal = rawVal.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
         const res = await fetch("/api/onboarding-v2/github", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -233,25 +346,58 @@ export function Screen6DigitalFootprints({
         const data = await res.json();
         if (res.ok && data.projects) {
           onGitHubProjectsDiscovered?.(data.projects);
-          setStatusMessage(`GitHub profile linked. Found ${data.projects.length} public repository candidates for review.`);
+          setStatuses((prev) => ({ ...prev, [platformId]: "Connected" }));
+          setStatusMessage(`GitHub connected. Found ${data.projects.length} repository candidates for review.`);
         } else {
-          setStatusMessage(data.error || "Linked GitHub profile.");
+          setStatuses((prev) => ({ ...prev, [platformId]: "Profile Linked" }));
+          setStatusMessage(data.error || "GitHub profile linked.");
         }
-      } catch {
-        setStatusMessage("GitHub profile linked. Automatic sync is unavailable until you authorize your account.");
-      } finally {
-        setIsFetchingGithub(false);
-      }
-    } else {
-      setStatusMessage(`Linked ${platforms.find((p) => p.id === platformId)?.name} profile.`);
-    }
+        const next = { ...profiles, [platformId]: cleanVal };
+        setProfiles(next);
+        onProfilesChange?.(next);
+      } else {
+        // Universal Footprint Sync Endpoint
+        const res = await fetch("/api/student/footprints/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: platformId,
+            identifier: rawVal,
+            exportFilename: uploadFile?.name,
+            exportContent: uploadFile?.content,
+            consent: true,
+          }),
+        });
 
-    const next = { ...profiles, [platformId]: cleanVal };
-    setProfiles(next);
-    onProfilesChange?.(next);
-    setTimeout(() => {
-      handleClosePrompt();
-    }, 1200);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to sync digital footprint.");
+        }
+
+        const isLive = data.acquisitionStatus === "LIVE_VERIFIED";
+        const newStatus: FootprintHonestStatus = isLive
+          ? uploadFile ? "Review Required" : "Connected"
+          : "Profile Linked";
+
+        setStatuses((prev) => ({ ...prev, [platformId]: newStatus }));
+        setStatusMessage(data.summary || `Successfully synced ${platformId}.`);
+
+        const nextVal = uploadFile ? `Archive: ${uploadFile.name}` : rawVal;
+        const next = { ...profiles, [platformId]: nextVal };
+        setProfiles(next);
+        onProfilesChange?.(next);
+      }
+
+      setTimeout(() => {
+        handleClosePrompt();
+      }, 1500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed.";
+      setErrorMessage(msg);
+      setStatuses((prev) => ({ ...prev, [platformId]: "Import Failed" }));
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const connectedCount = Object.keys(profiles).filter((k) => Boolean(profiles[k])).length;
@@ -342,7 +488,7 @@ export function Screen6DigitalFootprints({
               lineHeight: 1.55,
             }}
           >
-            Bring your verified code, competitive programming stats, and research links so EORA can construct your authentic evidence ledger.
+            Bring your verified code, competitive programming stats, ML models, and research links so EORA can construct your authentic evidence ledger.
           </p>
         </div>
 
@@ -401,6 +547,7 @@ export function Screen6DigitalFootprints({
             {platforms.map((p) => {
               const IconComponent = p.renderIcon;
               const isConnected = Boolean(profiles[p.id]);
+              const currentStatus: FootprintHonestStatus = statuses[p.id] || "Not Connected";
               const isCurrentOpen = activePrompt === p.id;
 
               return (
@@ -462,19 +609,21 @@ export function Screen6DigitalFootprints({
                       <IconComponent />
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 750, color: "#1E1B4B" }}>{p.name}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 750, color: "#1E1B4B" }}>{p.name}</span>
+                      </div>
                       <div
                         style={{
-                          fontSize: 12.5,
+                          fontSize: 12,
                           color: isConnected ? "#059669" : "#64748B",
                           fontWeight: isConnected ? 650 : 400,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          maxWidth: 140,
+                          maxWidth: 130,
                         }}
                       >
-                        {isConnected ? profiles[p.id] : "Not connected"}
+                        {isConnected ? currentStatus : p.supportedCapability}
                       </div>
                     </div>
                   </div>
@@ -487,9 +636,9 @@ export function Screen6DigitalFootprints({
                         handleOpenPrompt(p.id);
                       }}
                       style={{
-                        padding: "7px 16px",
+                        padding: "7px 14px",
                         borderRadius: 9999,
-                        fontSize: 12.5,
+                        fontSize: 12,
                         fontWeight: 700,
                         border: "1px solid",
                         borderColor: isConnected ? "#86EFAC" : "#FFFFFF",
@@ -510,12 +659,12 @@ export function Screen6DigitalFootprints({
                       {isConnected ? (
                         <>
                           <Check size={13} strokeWidth={3} />
-                          <span>Linked</span>
+                          <span>{currentStatus === "Review Required" ? "Review" : "Linked"}</span>
                         </>
                       ) : (
                         <>
                           <Plus size={13} strokeWidth={2.5} />
-                          <span>Connect</span>
+                          <span>{p.supportedCapability.split(" ")[0]}</span>
                         </>
                       )}
                     </button>
@@ -529,8 +678,8 @@ export function Screen6DigitalFootprints({
                         }}
                         title="Disconnect profile"
                         style={{
-                          width: 30,
-                          height: 30,
+                          width: 28,
+                          height: 28,
                           borderRadius: "50%",
                           background: "#FEE2E2",
                           border: "1px solid #FECACA",
@@ -541,7 +690,7 @@ export function Screen6DigitalFootprints({
                           transition: "transform 0.15s ease",
                         }}
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={12} />
                       </button>
                     )}
                   </div>
@@ -570,9 +719,9 @@ export function Screen6DigitalFootprints({
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div
                     style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 8,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
                       background: activePlatform.bg,
                       display: "grid",
                       placeItems: "center",
@@ -581,11 +730,32 @@ export function Screen6DigitalFootprints({
                     <activePlatform.renderIcon />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
-                      Link {activePlatform.name} Profile
-                    </h3>
-                    <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
-                      EORA will discover your public repositories and evidence automatically.
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h3 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                        {activePlatform.name} — {activePlatform.supportedCapability}
+                      </h3>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "#EEF2FF",
+                          color: "#4338CA",
+                          border: "1px solid #C7D2FE",
+                        }}
+                      >
+                        {statuses[activePlatform.id] || "Not Connected"}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 12, color: "#64748B", margin: "2px 0 0" }}>
+                      {activePlatform.id === "linkedin"
+                        ? "Connect via profile link or import student-authorized export archive (Positions.csv / export.json)."
+                        : activePlatform.id === "github"
+                        ? "Connect authorized GitHub profile to inspect public repositories, READMEs, and tech stack."
+                        : activePlatform.id === "portfolio"
+                        ? "SSRF-protected public metadata and project links extraction."
+                        : "Permitted public data acquisition. Unverified signals will be recorded for your review."}
                     </p>
                   </div>
                 </div>
@@ -609,7 +779,8 @@ export function Screen6DigitalFootprints({
                 </button>
               </div>
 
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {/* Input Row or Upload Option */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                 <input
                   type="text"
                   placeholder={activePlatform.placeholder}
@@ -637,36 +808,64 @@ export function Screen6DigitalFootprints({
                   }}
                 />
 
+                {activePlatform.supportsExportUpload && (
+                  <label
+                    style={{
+                      height: 48,
+                      padding: "0 18px",
+                      borderRadius: 12,
+                      background: "#F8FAFC",
+                      border: "1.5px dashed #94A3B8",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 650,
+                      color: "#475569",
+                    }}
+                  >
+                    <Upload size={15} />
+                    <span>{uploadFile ? uploadFile.name : "Upload Archive (.csv/.json)"}</span>
+                    <input
+                      type="file"
+                      accept=".csv,.json"
+                      onChange={handleFileUpload}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                )}
+
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     type="button"
                     onClick={() => handleSavePlatform(activePrompt)}
-                    disabled={isFetchingGithub}
+                    disabled={isSyncing}
                     style={{
                       height: 48,
-                      padding: "0 26px",
+                      padding: "0 24px",
                       borderRadius: 12,
                       background: "linear-gradient(135deg, #5942DC 0%, #4564FF 100%)",
                       color: "#FFFFFF",
                       fontWeight: 750,
                       fontSize: 14,
                       border: "1.5px solid #FFFFFF",
-                      cursor: isFetchingGithub ? "not-allowed" : "pointer",
+                      cursor: isSyncing ? "not-allowed" : "pointer",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 8,
                       boxShadow: "0 4px 14px rgba(89, 66, 220, 0.35)",
                     }}
                   >
-                    {isFetchingGithub ? (
+                    {isSyncing ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        <span>Syncing GitHub...</span>
+                        <span>Syncing...</span>
                       </>
                     ) : (
                       <>
                         <Check size={16} strokeWidth={2.5} />
-                        <span>Save &amp; Connect</span>
+                        <span>{uploadFile ? "Import & Extract" : "Save & Connect"}</span>
                       </>
                     )}
                   </button>
@@ -677,7 +876,7 @@ export function Screen6DigitalFootprints({
                       onClick={() => handleDisconnectPlatform(activePrompt)}
                       style={{
                         height: 48,
-                        padding: "0 18px",
+                        padding: "0 16px",
                         borderRadius: 12,
                         background: "#FEE2E2",
                         color: "#DC2626",
@@ -723,9 +922,13 @@ export function Screen6DigitalFootprints({
                     padding: "8px 14px",
                     borderRadius: 8,
                     fontWeight: 650,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                   }}
                 >
-                  {errorMessage}
+                  <AlertCircle size={15} />
+                  <span>{errorMessage}</span>
                 </div>
               )}
             </div>

@@ -18,7 +18,8 @@ export const maxDuration = 60; // seconds
 export async function GET(request: NextRequest) {
   // Verify this is called by Vercel Cron (not a random user)
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = (process.env.CRON_SECRET || "").trim();
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

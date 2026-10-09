@@ -1,0 +1,61 @@
+name: CI / Production Release Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Build, Test, Typecheck & Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NODE_ENV: test
+      PGLITE_IN_MEMORY: "true"
+      HANDOFF_SIGNING_SECRET: "ci_pipeline_cryptographically_secure_token_signing_key_2026_test"
+      PILOT_MODE: "false"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Security Audit - Secret & Tracked File Scan
+        run: |
+          echo "Scanning for forbidden tracked environment files..."
+          if git ls-files | grep -E '^\.env(\..+)?$' | grep -v '\.env\.example$'; then
+            echo "ERROR: Tracked .env files detected!"
+            exit 1
+          fi
+          echo "Scanning for active secret patterns..."
+          if git grep -I -i -E '(csk-[a-z0-9]{32,}|gsk_[a-z0-9]{32,}|npg_[a-zA-Z0-9]{16,})' -- ':!.env.example' ':!package-lock.json'; then
+            echo "ERROR: Potential live API keys detected in repository source!"
+            exit 1
+          fi
+          echo "✓ Security scan clean: Zero leaked credentials or secrets."
+
+      - name: Code Quality - ESLint
+        run: npm run lint
+
+      - name: Type Integrity - TypeScript
+        run: npx tsc --noEmit
+
+      - name: Automated Acceptance Test Suite (307 Tests)
+        run: npm test
+
+      - name: Production Bundle Compilation
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build

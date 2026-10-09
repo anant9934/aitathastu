@@ -4,7 +4,7 @@ import { getDb, externalConnections, sourceSnapshots, syncRuns } from "../db";
 
 export type SaveConnectionParams = {
   personId: string;
-  provider: "github" | "linkedin" | "leetcode" | "codechef" | "hackerrank" | "hackerearth" | "eris" | "mentormaze" | "padho_code" | "study_lpu";
+  provider: "google" | "github" | "linkedin" | "leetcode" | "codechef" | "hackerrank" | "hackerearth" | "eris" | "mentormaze" | "padho_code" | "study_lpu";
   externalUsername: string;
   profileUrl: string;
   externalAccountId?: string;

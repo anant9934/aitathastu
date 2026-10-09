@@ -339,6 +339,13 @@ export const MIGRATION_SQL_STATEMENTS = [
   `ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "ai_details" jsonb DEFAULT '{}'::jsonb;`,
   `ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "hardware_details" jsonb DEFAULT '{}'::jsonb;`,
   `ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "media" jsonb DEFAULT '[]'::jsonb;`,
+  `ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "primary_priority" text;`,
+  `ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "secondary_priorities" jsonb;`,
+  `ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "preference_source" text DEFAULT 'user_selected';`,
+  `ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "metadata" jsonb;`,
+  `ALTER TABLE "external_connections" ADD COLUMN IF NOT EXISTS "external_account_id" text;`,
+  `ALTER TABLE "external_connections" ADD COLUMN IF NOT EXISTS "display_name" text;`,
+  `ALTER TABLE "external_connections" ADD COLUMN IF NOT EXISTS "scopes" jsonb DEFAULT '[]'::jsonb;`,
   `CREATE TABLE IF NOT EXISTS "sync_runs" (
     "id" text PRIMARY KEY NOT NULL,
     "connection_id" text NOT NULL REFERENCES "external_connections"("id") ON DELETE CASCADE,

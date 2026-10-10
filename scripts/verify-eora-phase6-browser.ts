@@ -11,6 +11,7 @@ const consoleErrors: string[] = [];
 const failedResponses: string[] = [];
 const eoraRequests: string[] = [];
 const credential = `eora_phase6_${Date.now()}@aitathastu.test`;
+let secondEmail = "";
 
 function record(check: string, passed: boolean, detail = "") {
   results.push({ check, passed, detail });
@@ -268,7 +269,7 @@ async function main() {
     const signedOutStatus = await page.evaluate(async () => (await fetch("/api/eora/context")).status);
     record("Context inaccessible after logout", signedOutStatus === 401, String(signedOutStatus));
 
-    const secondEmail = `eora_phase6_second_${Date.now()}@aitathastu.test`;
+    secondEmail = `eora_phase6_second_${Date.now()}@aitathastu.test`;
     const signupStatus = await page.evaluate(async (email) => {
       const response = await fetch("/api/auth/sign-up", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -295,6 +296,16 @@ async function main() {
     record("Journey completion", false, String(error));
     await shot(page, "failure-state").catch(() => {});
   } finally {
+    try {
+      if (process.env.DATABASE_URL) {
+        const { getDb, users } = await import("../lib/db");
+        const { eq, or } = await import("drizzle-orm");
+        const db = await getDb();
+        await db.delete(users).where(or(eq(users.email, credential), eq(users.email, secondEmail))).catch(() => {});
+      }
+    } catch {
+      // non-fatal cleanup
+    }
     await context.close();
     await browser.close();
     writeFileSync(path.join(output, "results.json"), JSON.stringify({ results, consoleErrors, failedResponses, eoraRequests }, null, 2));

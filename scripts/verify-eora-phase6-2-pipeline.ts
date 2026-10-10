@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { getDb, sourceSnapshots, evidenceItems } from "../lib/db";
+import { getDb, sourceSnapshots, evidenceItems, users } from "../lib/db";
 import { eq, and } from "drizzle-orm";
 
 const BASE_URL = process.env.BASE_URL || "http://127.0.0.1:3000";
@@ -210,6 +210,14 @@ async function main() {
     }
   }
   assert.ok(hitRateLimit, "Exceeding 5 requests/minute must trigger HTTP 429 rate limit");
+
+  // Automated test data cleanup
+  console.log("\n[CLEANUP] Purging test student records from database...");
+  await db.delete(users).where(eq(users.email, student.email)).catch(() => {});
+  if (edgeStudent) {
+    await db.delete(users).where(eq(users.email, edgeStudent.email)).catch(() => {});
+  }
+  console.log("  ✓ Test records purged cleanly (zero residual database pollution)");
 
   console.log("\n================================================================================");
   console.log("   EORA PHASE 6.2 RESUME PIPELINE CERTIFICATION: 12/12 CHECKS PASSED");

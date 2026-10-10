@@ -22,7 +22,7 @@ export interface AcademicDetailsData {
 interface Screen4AcademicDetailsProps {
   initialData?: Partial<AcademicDetailsData>;
   isAuthenticated?: boolean;
-  onSave?: (data: AcademicDetailsData) => void;
+  onSave?: (data: AcademicDetailsData) => void | Promise<void>;
   onNext: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
@@ -102,12 +102,12 @@ export function Screen4AcademicDetails({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!validate()) {
       return;
     }
-    onSave?.(formData);
+    await onSave?.(formData);
     onNext();
   };
 

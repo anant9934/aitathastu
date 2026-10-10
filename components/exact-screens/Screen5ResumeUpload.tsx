@@ -39,6 +39,7 @@ interface Screen5ResumeUploadProps {
     }
   ) => void;
   onNext: () => void;
+  onExtractionReady?: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
 }
@@ -47,6 +48,7 @@ export function Screen5ResumeUpload({
   initialFileName,
   onExtractSuccess,
   onNext,
+  onExtractionReady,
   onBack,
   onJumpToStep,
 }: Screen5ResumeUploadProps) {
@@ -136,6 +138,7 @@ export function Screen5ResumeUpload({
         }
       }
       setCandidates(rows);
+      onExtractionReady?.();
     } catch {
       setErrorMessage("Network error during file upload. You can continue manually.");
       setIsProcessing(false);

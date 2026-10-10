@@ -102,25 +102,25 @@ export function Screen2EoraIntro({
             margin: "auto 0",
           }}
         >
-          {/* Left Column: Massive EORA Mascot with Ambient Glow Halo */}
+          {/* Approved EORA pose, kept compact outside the landing hero. */}
           <div style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
             <div
               style={{
                 position: "absolute",
-                width: 440,
-                height: 440,
+                width: 220,
+                height: 220,
                 borderRadius: "50%",
                 background: "radial-gradient(circle, rgba(2, 197, 245, 0.22) 0%, rgba(89, 66, 220, 0.14) 50%, transparent 75%)",
                 filter: "blur(40px)",
                 zIndex: 0,
               }}
             />
-            <div style={{ position: "relative", width: "100%", maxWidth: 520, height: 540, zIndex: 1 }}>
+            <div style={{ position: "relative", width: "100%", maxWidth: 190, height: 210, zIndex: 1 }}>
               <Image
                 src="/assets/eora/waving.png"
                 alt="EORA waving"
                 fill
-                sizes="(max-width: 768px) 100vw, 520px"
+                sizes="190px"
                 style={{ objectFit: "contain" }}
                 priority
               />

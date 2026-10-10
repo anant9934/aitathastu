@@ -103,6 +103,8 @@ export interface EoraControllerState {
   isQuiet: boolean;
   activeTour: TourDefinition | null;
   tourStepIndex: number;
+  tourPaused: boolean;
+  tourTargetAvailable: boolean;
   /** Current spotlight target data-eora-id (null when not in tour) */
   tourSpotlightTargetId: string | null;
   isMinimized: boolean;
@@ -123,6 +125,7 @@ export interface EoraControllerState {
 export interface EoraController extends EoraControllerState {
   handleUserMessage: (text: string) => void;
   handleClarifyingChoice: (text: string) => void;
+  clearMessage: () => void;
   openPanel: () => void;
   closePanel: () => void;
   dismiss: () => void;
@@ -133,6 +136,8 @@ export interface EoraController extends EoraControllerState {
   startTour: (tourId: string) => void;
   nextTourStep: () => void;
   prevTourStep: () => void;
+  pauseTour: () => void;
+  resumeTour: () => void;
   exitTour: () => void;
   /** Called by ExactScreensContainer on each screen transition */
   setOnboardingStep: (step: OnboardingStep) => void;
@@ -148,6 +153,7 @@ export interface EoraController extends EoraControllerState {
   clearFieldError: (fieldId?: string) => void;
   /** Marks user as actively typing (suppresses proactive nudges) */
   setUserFocused: (focused: boolean) => void;
+  focusField: (fieldId: string, label: string) => void;
   updatePreferences: (patch: Partial<EoraPreferences>) => void;
   resetAllPreferences: () => void;
   /** Deprecated compat shim — use updateLiveStudentContext instead */
@@ -180,6 +186,8 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const [animationState, setAnimationState] = useState<EoraAnimationState>("IDLE");
   const [activeTour, setActiveTour] = useState<TourDefinition | null>(null);
   const [tourStepIndex, setTourStepIndex] = useState(0);
+  const [tourPaused, setTourPaused] = useState(false);
+  const [tourTargetAvailable, setTourTargetAvailable] = useState(true);
   const [tourSpotlightTargetId, setTourSpotlightTargetId] =
     useState<string | null>(null);
   const [onboardingStep, setOnboardingStepState] =
@@ -207,6 +215,20 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const lastNudgeTimestamp = useRef<number | null>(null);
   const proactiveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownWelcomeBack = useRef(false);
+  const managedTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  const schedule = useCallback((callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      managedTimers.current.delete(timer);
+      callback();
+    }, delay);
+    managedTimers.current.add(timer);
+  }, []);
+
+  useEffect(() => () => {
+    managedTimers.current.forEach(clearTimeout);
+    managedTimers.current.clear();
+  }, []);
 
   // ── Context construction ───────────────────────────────────────────────────
   const context = useMemo<EoraContext>(
@@ -255,7 +277,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       route === "sign-up"
     )
       return;
-    if (shouldEoraBeQuiet(context)) return;
+    if (shouldEoraBeQuiet(context) || activeTour || !isVisible) return;
     if (isEoraSnoozed(preferences)) return;
 
     proactiveTimer.current = setTimeout(() => {
@@ -304,18 +326,18 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       if (proactiveTimer.current) clearTimeout(proactiveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, onboardingStep, lastSuccessfulAction, hasLiveStudentData]);
+  }, [pathname, onboardingStep, lastSuccessfulAction, hasLiveStudentData, activeTour, isVisible]);
 
   // ── Onboarding step change → EORA message ─────────────────────────────────
   useEffect(() => {
-    if (onboardingStep === "none") return;
+    if (onboardingStep === "none" || activeTour || preferences.assistanceMode === "quiet") return;
     const msg = getOnboardingStepMessage(onboardingStep);
     if (msg.text) {
       setCurrentMessage(msg);
       setAnimationState(msg.animationState);
       setClarifyingOptions(null);
     }
-  }, [onboardingStep]);
+  }, [onboardingStep, activeTour, preferences.assistanceMode]);
 
   // ── Clear celebration after 3s ────────────────────────────────────────────
   useEffect(() => {
@@ -344,13 +366,15 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       });
 
     // Apply new spotlight + scroll into view
-    const target = document.querySelector(
-      `[data-eora-id="${tourSpotlightTargetId}"]`
-    ) as HTMLElement | null;
+    const target = Array.from(document.querySelectorAll<HTMLElement>("[data-eora-id]"))
+      .find((element) => element.dataset.eoraId === tourSpotlightTargetId && element.getClientRects().length > 0);
 
     if (target) {
+      setTourTargetAvailable(true);
       target.setAttribute("data-eora-spotlight", "true");
-      target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      target.scrollIntoView({ behavior: preferences.reducedMotion ? "instant" : "smooth", block: "nearest" });
+    } else {
+      setTourTargetAvailable(false);
     }
 
     return () => {
@@ -361,7 +385,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
           (el as HTMLElement).removeAttribute("data-eora-spotlight");
         });
     };
-  }, [tourSpotlightTargetId]);
+  }, [tourSpotlightTargetId, onboardingStep, pathname, preferences.reducedMotion]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // CALLBACKS
@@ -390,7 +414,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (intentResult.intent === "DISMISS_ASSISTANT") {
-        setTimeout(() => setIsVisible(false), 800);
+        schedule(() => setIsVisible(false), 800);
       }
       if (intentResult.intent === "PAUSE_ASSISTANT") {
         setPreferences((p) => snoozeEora(p, 60));
@@ -410,7 +434,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [context, activeTour]
+    [context, activeTour, schedule]
   );
 
   const handleClarifyingChoice = useCallback(
@@ -420,12 +444,19 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     [handleUserMessage]
   );
 
+  const clearMessage = useCallback(() => {
+    setCurrentMessage({ text: "", animationState: "IDLE" });
+    setAnimationState("IDLE");
+    setClarifyingOptions(null);
+  }, []);
+
   // ── Tour controls ──────────────────────────────────────────────────────────
   const startTour = useCallback((tourId: string) => {
     const tour = getTourById(tourId);
     if (!tour) return;
     setActiveTour(tour);
     setTourStepIndex(0);
+    setTourPaused(false);
     const firstStep = tour.steps[0];
     setCurrentMessage({
       text: firstStep?.explanation ?? tour.description,
@@ -437,12 +468,24 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const nextTourStep = useCallback(() => {
-    if (!activeTour) return;
+    if (!activeTour || tourPaused) return;
     const nextIndex = tourStepIndex + 1;
+    if (activeTour.tourId === "onboarding-welcome" && nextIndex < activeTour.steps.length) {
+      const nextTarget = activeTour.steps[nextIndex].targetId;
+      if (!document.querySelector(`[data-eora-id="${nextTarget}"]`)) {
+        setCurrentMessage({
+          text: "Complete this step in the form to continue the tour. I'll follow you to the next screen.",
+          animationState: "WAITING",
+        });
+        setAnimationState("WAITING");
+        return;
+      }
+    }
     if (nextIndex >= activeTour.steps.length) {
       setPreferences((p) => markTourCompleted(p, activeTour.tourId));
       setActiveTour(null);
       setTourStepIndex(0);
+      setTourPaused(false);
       setTourSpotlightTargetId(null);
       setCurrentMessage({
         text: "Tour complete! You know this page well now.",
@@ -459,7 +502,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     });
     setAnimationState("POINTING");
     setTourSpotlightTargetId(step.targetId);
-  }, [activeTour, tourStepIndex]);
+  }, [activeTour, tourStepIndex, tourPaused]);
 
   const prevTourStep = useCallback(() => {
     if (!activeTour || tourStepIndex === 0) return;
@@ -477,13 +520,54 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const exitTour = useCallback(() => {
     setActiveTour(null);
     setTourStepIndex(0);
+    setTourPaused(false);
     setTourSpotlightTargetId(null);
     setCurrentMessage({
       text: "Tour ended. I'm here whenever you need me.",
-      animationState: "IDLE",
+      animationState: "WAVING",
     });
-    setAnimationState("IDLE");
+    setAnimationState("WAVING");
   }, []);
+
+  useEffect(() => {
+    if (activeTour && pathname !== activeTour.validRoute) exitTour();
+  }, [activeTour, pathname, exitTour]);
+
+  const pauseTour = useCallback(() => {
+    setTourPaused(true);
+    setTourSpotlightTargetId(null);
+    setCurrentMessage({ text: "Tour paused. Continue when you're ready.", animationState: "WAITING" });
+    setAnimationState("WAITING");
+  }, []);
+
+  const resumeTour = useCallback(() => {
+    if (!activeTour) return;
+    const step = activeTour.steps[tourStepIndex];
+    setTourPaused(false);
+    setTourSpotlightTargetId(step?.targetId ?? null);
+    setCurrentMessage({ text: step?.explanation ?? activeTour.description, animationState: "EXPLAINING" });
+    setAnimationState("EXPLAINING");
+  }, [activeTour, tourStepIndex]);
+
+  // Onboarding targets live on separate screens. Following the student's own
+  // navigation keeps the tour aligned without advancing or submitting a form.
+  useEffect(() => {
+    if (!activeTour || activeTour.tourId !== "onboarding-welcome" || tourPaused) return;
+    const targetByStep: Partial<Record<OnboardingStep, string>> = {
+      welcome: "eora-name-input", "role-select": "eora-role-select",
+      "ai-direction": "eora-ai-direction", priorities: "eora-priorities",
+      academic: "eora-academic-form", resume: "eora-resume-upload",
+      "digital-footprints": "eora-digital-footprints",
+    };
+    const targetId = targetByStep[onboardingStep];
+    if (!targetId) return;
+    const index = activeTour.steps.findIndex((step) => step.targetId === targetId);
+    if (index < 0 || index === tourStepIndex) return;
+    setTourStepIndex(index);
+    setTourSpotlightTargetId(targetId);
+    setCurrentMessage({ text: activeTour.steps[index].explanation, animationState: "EXPLAINING" });
+    setAnimationState("EXPLAINING");
+  }, [activeTour, onboardingStep, tourPaused, tourStepIndex]);
 
   // ── Onboarding step external setter ──────────────────────────────────────
   const setOnboardingStep = useCallback((step: OnboardingStep) => {
@@ -540,15 +624,19 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
 
   // ── Visibility controls ────────────────────────────────────────────────────
   const dismiss = useCallback(() => {
-    setIsVisible(false);
     setIsPanelOpen(false);
     exitTour();
-  }, [exitTour]);
+    setCurrentMessage({ text: "", animationState: "EXITING" });
+    setAnimationState("EXITING");
+    schedule(() => setIsVisible(false), 180);
+  }, [exitTour, schedule]);
 
   const restore = useCallback(() => {
     setIsVisible(true);
     setIsMinimized(false);
-  }, []);
+    setAnimationState("ENTERING");
+    schedule(() => setAnimationState("IDLE"), 500);
+  }, [schedule]);
 
   const minimize = useCallback(() => {
     setIsMinimized(true);
@@ -566,11 +654,11 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       animationState: "QUIET",
     });
     setAnimationState("QUIET");
-    setTimeout(() => {
+    schedule(() => {
       setCurrentMessage({ text: "", animationState: "IDLE" });
       setAnimationState("IDLE");
     }, minutes * 60 * 1000);
-  }, []);
+  }, [schedule]);
 
   // ── Success signals (must originate from verified backend results) ─────────
   const signalSuccess = useCallback(
@@ -589,15 +677,16 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         setCurrentMessage(celebMsg);
         setAnimationState(celebMsg.animationState);
       } else {
+        if (action === "project_saved") setShowCelebration(true);
         const msg = getTinyVictoryMessage(action);
         setCurrentMessage(msg);
         setAnimationState(msg.animationState);
       }
 
       // Clear signal after animation cycle
-      setTimeout(() => setLastSuccessfulAction(null), 5000);
+      schedule(() => setLastSuccessfulAction(null), 5000);
     },
-    [liveStudent.displayName]
+    [liveStudent.displayName, schedule]
   );
 
   // ── Field validation signals ──────────────────────────────────────────────
@@ -612,10 +701,10 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       });
       // Show EORA reassurance message for the field
       setCurrentMessage({
-        text: `"${label}": ${error}`,
-        animationState: "REASSURING",
+        text: `Please check "${label}": ${error}`,
+        animationState: "POINTING",
       });
-      setAnimationState("REASSURING");
+      setAnimationState("POINTING");
     },
     []
   );
@@ -625,18 +714,22 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       if (!fieldId || prev?.fieldId === fieldId) return null;
       return prev;
     });
-    // Return to idle only if current message is a field error
+    // Return to idle only if the current message belongs to field validation.
     setCurrentMessage((prev) => {
-      if (prev.animationState === "REASSURING") {
+      if (prev.text.startsWith("Please check \"")) {
         return { text: "", animationState: "IDLE" };
       }
       return prev;
     });
-    setAnimationState((prev) => (prev === "REASSURING" ? "IDLE" : prev));
+    setAnimationState((prev) => (prev === "POINTING" ? "IDLE" : prev));
   }, []);
 
   const setUserFocused = useCallback((focused: boolean) => {
     setUserIsFocused(focused);
+  }, []);
+
+  const focusField = useCallback((fieldId: string, label: string) => {
+    setFocusedField({ fieldId, label, isValid: true, isEmpty: false });
   }, []);
 
   // ── Preferences ────────────────────────────────────────────────────────────
@@ -685,6 +778,8 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     isQuiet,
     activeTour,
     tourStepIndex,
+    tourPaused,
+    tourTargetAvailable,
     tourSpotlightTargetId,
     isMinimized,
     onboardingStep,
@@ -697,6 +792,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     context,
     handleUserMessage,
     handleClarifyingChoice,
+    clearMessage,
     openPanel,
     closePanel,
     dismiss,
@@ -707,6 +803,8 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     startTour,
     nextTourStep,
     prevTourStep,
+    pauseTour,
+    resumeTour,
     exitTour,
     setOnboardingStep,
     updateLiveStudentContext,
@@ -715,6 +813,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     signalFieldError,
     clearFieldError,
     setUserFocused,
+    focusField,
     updateStudentContext,
     updatePreferences,
     resetAllPreferences,

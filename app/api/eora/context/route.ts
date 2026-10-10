@@ -28,6 +28,7 @@ import { normalizeInterest } from "@/lib/domain/personalization-engine";
 import type { CanonicalInterest } from "@/lib/domain/personalization-engine";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export interface EoraContextResponse {
   personId: string;
@@ -161,8 +162,8 @@ export async function GET() {
 
     return NextResponse.json(response, {
       headers: {
-        // Cache for 60 seconds — stale-while-revalidate acceptable for EORA guidance
-        "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+        // Person-specific guidance must never survive sign-out or account switching.
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (err: unknown) {

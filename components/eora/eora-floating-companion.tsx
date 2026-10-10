@@ -31,12 +31,17 @@ import {
 import { useEoraSafe } from "./eora-provider";
 import { EoraSpeechBubble } from "./eora-speech-bubble";
 import { getEoraAsset } from "@/lib/eora/avatar-registry";
+import { EoraMotionAvatar } from "./eora-motion-avatar";
+
+type Placement = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
 export function EoraFloatingCompanion() {
   const eora = useEoraSafe();
   const [inputText, setInputText] = useState("");
+  const [placement, setPlacement] = useState<Placement>("bottom-right");
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // ── Keyboard: Escape closes panel ─────────────────────────────────────────
   useEffect(() => {
@@ -47,7 +52,7 @@ export function EoraFloatingCompanion() {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [eora]);
+  }, [eora?.isPanelOpen, eora?.closePanel]);
 
   // ── Track user typing focus globally to suppress nudges ──────────────────
   useEffect(() => {
@@ -62,6 +67,9 @@ export function EoraFloatingCompanion() {
       const isEoraInput = containerRef.current?.contains(target);
       if (isInput && !isEoraInput) {
         eora.setUserFocused(true);
+        const field = target as HTMLInputElement;
+        const label = field.labels?.[0]?.textContent?.trim() || field.getAttribute("aria-label") || field.getAttribute("placeholder") || "this field";
+        eora.focusField(field.id || field.name || "focused-field", label.slice(0, 80));
       }
     };
     const handleFocusOut = () => {
@@ -73,7 +81,63 @@ export function EoraFloatingCompanion() {
       document.removeEventListener("focusin", handleFocusIn);
       document.removeEventListener("focusout", handleFocusOut);
     };
-  }, [eora]);
+  }, [eora?.setUserFocused, eora?.focusField]);
+
+  // Keep the compact trigger clear of visible controls at each viewport size.
+  // The panel is user opened and closes on outside interaction.
+  useEffect(() => {
+    if (!eora?.isVisible || eora.isPanelOpen) return;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const size = width <= 480 ? 58 : 72;
+        const bottom = width <= 480 ? 76 : 24;
+        const candidates: Placement[] = ["bottom-right", "bottom-left", "top-right", "top-left"];
+        const controls = Array.from(document.querySelectorAll<HTMLElement>("button, input, textarea, select, a, [role='button']"))
+          .filter((el) => !containerRef.current?.contains(el) && el.getClientRects().length > 0);
+        const scored = candidates.map((candidate, index) => {
+          const left = candidate.endsWith("right") ? width - size - 16 : 16;
+          const top = candidate.startsWith("bottom") ? height - bottom - size : 82;
+          const box = { left: left - 6, top: top - 6, right: left + size + 6, bottom: top + size + 6 };
+          const collisions = controls.reduce((count, control) => {
+            const r = control.getBoundingClientRect();
+            return count + (r.left < box.right && r.right > box.left && r.top < box.bottom && r.bottom > box.top ? 1 : 0);
+          }, 0);
+          return { candidate, score: collisions * 100 + index };
+        });
+        scored.sort((a, b) => a.score - b.score);
+        setPlacement((current) => current === scored[0].candidate ? current : scored[0].candidate);
+      });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [eora?.isVisible, eora?.isPanelOpen, eora?.onboardingStep, eora?.context.route]);
+
+  useEffect(() => {
+    if (!eora?.isPanelOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) eora.closePanel();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [eora?.isPanelOpen, eora?.closePanel]);
+
+  useEffect(() => {
+    if (!eora?.isPanelOpen || !eora.currentMessage.text) return;
+    const frame = requestAnimationFrame(() => {
+      if (panelRef.current) panelRef.current.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [eora?.isPanelOpen, eora?.currentMessage.text]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -117,12 +181,13 @@ export function EoraFloatingCompanion() {
   const pose = (eora.currentPose as Parameters<typeof getEoraAsset>[0]) ?? "avatar";
   const asset = getEoraAsset(pose);
   const reducedMotion = eora.preferences.reducedMotion;
+  const motionPaused = reducedMotion || eora.context.userIsFocused || eora.preferences.assistanceMode === "quiet";
 
   // ── Minimized — just the avatar ────────────────────────────────────────────
   if (eora.isMinimized) {
     return (
       <div
-        className={`eora-floating-root eora-floating-root--minimized ${
+        className={`eora-floating-root eora-floating-root--minimized eora-place-${placement} ${
           reducedMotion ? "eora-no-motion" : ""
         }`}
         ref={containerRef}
@@ -135,14 +200,7 @@ export function EoraFloatingCompanion() {
           aria-label="Expand EORA companion"
           aria-expanded="false"
         >
-          <Image
-            src={asset.src}
-            alt={asset.alt}
-            width={52}
-            height={65}
-            className="eora-avatar-mini-img"
-            priority={false}
-          />
+          <Image src={getEoraAsset("avatar").src} alt="" width={48} height={48} className="eora-avatar-mini-img" />
         </button>
       </div>
     );
@@ -169,54 +227,14 @@ export function EoraFloatingCompanion() {
   // ── Full floating companion ────────────────────────────────────────────────
   return (
     <div
-      className={`eora-floating-root ${reducedMotion ? "eora-no-motion" : ""}`}
+      className={`eora-floating-root eora-place-${placement} ${eora.isPanelOpen ? "eora-panel-open" : ""} ${motionPaused ? "eora-no-motion" : ""}`}
       ref={containerRef}
       data-eora-id="eora-floating-companion"
+      data-eora-route={route}
       aria-label="EORA AI companion"
     >
       {/* ── AVATAR + SPEECH BUBBLE ROW ──────────────────────────────────── */}
       <div className="eora-floating-row">
-        {/* Speech bubble */}
-        {eora.currentMessage.text && (
-          <EoraSpeechBubble
-            text={eora.currentMessage.text}
-            actionLabel={eora.pendingNavLabel ?? undefined}
-            actionUrl={eora.pendingNavUrl ?? undefined}
-            onActionClick={(url) => {
-              window.location.assign(url);
-              eora.closePanel();
-            }}
-            onClose={() => {
-              // Dismiss just the bubble text (keep EORA visible)
-              eora.handleUserMessage("ok thanks");
-            }}
-            ariaLive="polite"
-            reducedMotion={reducedMotion}
-          />
-        )}
-
-        {/* Clarifying options */}
-        {eora.clarifyingOptions && eora.clarifyingOptions.length > 0 && (
-          <div
-            className="eora-clarifying-options"
-            role="listbox"
-            aria-label="Choose what you need"
-          >
-            {eora.clarifyingOptions.map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="option"
-                aria-selected="false"
-                className="eora-clarifying-btn"
-                onClick={() => handleClarifyChoice(option)}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Avatar trigger */}
         <div className="eora-avatar-wrapper">
           <button
@@ -237,23 +255,14 @@ export function EoraFloatingCompanion() {
             aria-label={`EORA — ${eora.isPanelOpen ? "close" : "open"} help panel`}
             aria-expanded={eora.isPanelOpen}
           >
-            <Image
-              src={asset.src}
-              alt={asset.alt}
-              width={72}
-              height={90}
-              className={`eora-avatar-img ${
-                reducedMotion ? "" : "eora-avatar-img--animated"
-              }`}
-              priority={false}
-            />
+            <EoraMotionAvatar pose={asset.pose} state={eora.animationState} reducedMotion={motionPaused} />
             <span className="eora-avatar-badge" aria-hidden="true">
               <Sparkles size={10} />
             </span>
           </button>
 
           {/* Control row */}
-          <div className="eora-ctrl-row" aria-label="EORA controls">
+          {eora.isPanelOpen && <div className="eora-ctrl-row" aria-label="EORA controls">
             <button
               type="button"
               className="eora-ctrl-btn"
@@ -298,7 +307,7 @@ export function EoraFloatingCompanion() {
             >
               <X size={12} aria-hidden="true" />
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -306,6 +315,7 @@ export function EoraFloatingCompanion() {
       {eora.isPanelOpen && (
         <div
           className="eora-panel"
+          ref={panelRef}
           role="dialog"
           aria-label="EORA help panel"
           aria-modal="false"
@@ -348,6 +358,31 @@ export function EoraFloatingCompanion() {
             </div>
           </div>
 
+          {eora.currentMessage.text && !eora.context.userIsFocused && (
+            <EoraSpeechBubble
+              text={eora.currentMessage.text}
+              actionLabel={eora.pendingNavLabel ?? undefined}
+              actionUrl={eora.pendingNavUrl ?? undefined}
+              onActionClick={(url) => {
+                window.location.assign(url);
+                eora.closePanel();
+              }}
+              onClose={eora.clearMessage}
+              ariaLive="polite"
+              reducedMotion={reducedMotion}
+            />
+          )}
+
+          {eora.clarifyingOptions && eora.clarifyingOptions.length > 0 && (
+            <div className="eora-clarifying-options" role="listbox" aria-label="Choose what you need">
+              {eora.clarifyingOptions.map((option) => (
+                <button key={option} type="button" role="option" aria-selected="false" className="eora-clarifying-btn" onClick={() => handleClarifyChoice(option)}>
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Active tour controls */}
           {eora.activeTour && (
             <div
@@ -363,6 +398,7 @@ export function EoraFloatingCompanion() {
                 </strong>
               </span>
               <div className="eora-tour-nav">
+                {!eora.tourTargetAvailable && !eora.tourPaused && <span className="eora-tour-unavailable">This section is not visible yet. Continue in the page or skip ahead.</span>}
                 <button
                   type="button"
                   className="eora-tour-btn"
@@ -376,20 +412,21 @@ export function EoraFloatingCompanion() {
                 <button
                   type="button"
                   className="eora-tour-btn eora-tour-btn--primary"
-                  onClick={eora.nextTourStep}
+                  onClick={eora.tourPaused ? eora.resumeTour : eora.nextTourStep}
                   aria-label={
-                    eora.tourStepIndex === eora.activeTour.steps.length - 1
+                    eora.tourPaused ? "Resume tour" : eora.tourStepIndex === eora.activeTour.steps.length - 1
                       ? "Finish tour"
                       : "Next step"
                   }
                 >
                   <span>
-                    {eora.tourStepIndex === eora.activeTour.steps.length - 1
+                    {eora.tourPaused ? "Resume" : eora.tourStepIndex === eora.activeTour.steps.length - 1
                       ? "Finish"
                       : "Next"}
                   </span>
                   <ChevronRight size={13} aria-hidden="true" />
                 </button>
+                {!eora.tourPaused && <button type="button" className="eora-tour-btn" onClick={eora.pauseTour} aria-label="Pause tour">Pause</button>}
                 <button
                   type="button"
                   className="eora-tour-btn eora-tour-btn--exit"
@@ -515,25 +552,7 @@ export function EoraFloatingCompanion() {
       )}
 
       {/* ── CELEBRATION OVERLAY ──────────────────────────────────────────── */}
-      {eora.showCelebration && !reducedMotion && (
-        <div
-          className="eora-celebration"
-          aria-live="polite"
-          aria-label="Celebration"
-          aria-hidden="true"
-        >
-          {["✨", "🎉", "⭐", "✨", "🎊"].map((emoji, i) => (
-            <span
-              key={i}
-              className="eora-confetti"
-              style={{ left: `${10 + i * 20}%`, animationDelay: `${i * 0.1}s` }}
-              aria-hidden="true"
-            >
-              {emoji}
-            </span>
-          ))}
-        </div>
-      )}
+      {eora.showCelebration && !motionPaused && <span className="eora-tiny-sparkle" aria-hidden="true">✦</span>}
     </div>
   );
 }

@@ -197,12 +197,12 @@ export function Screen7AiAnalysis({
             </div>
 
             {/* Mascot Avatar */}
-            <div style={{ position: "relative", width: 480, height: 520, zIndex: 2 }}>
+            <div style={{ position: "relative", width: 190, height: 210, zIndex: 2 }}>
               <Image
                 src="/assets/eora/holding-tablet.png"
                 alt="EORA analyzing your information"
                 fill
-                sizes="(max-width: 768px) 100vw, 480px"
+                sizes="190px"
                 style={{ objectFit: "contain" }}
                 priority
               />

@@ -45,9 +45,7 @@ export function StudentTopbar({
     <header className="student-topbar" aria-label="Student workspace topbar">
       <div className="topbar-inner">
         <div className="topbar-left">
-          <Link href="/student" className="topbar-brand-link" aria-label="AI Tathastu Home">
-            <Brand compact />
-          </Link>
+          <Brand compact href="/student" className="topbar-brand-link" />
           <span className="workspace-badge">
             <Sparkles size={13} aria-hidden="true" /> Workspace
           </span>

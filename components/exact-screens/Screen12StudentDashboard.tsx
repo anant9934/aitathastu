@@ -1073,7 +1073,7 @@ export function Screen12StudentDashboard({
                   )}
 
                   {/* Context Badges */}
-                  <div className="dash-hero-badges">
+                  <div className="dash-hero-badges" data-eora-id="eora-active-goal">
                     <span className="dash-hero-badge">
                       <Target size={14} color="#38BDF8" /> Target: {comp.targetRole}
                     </span>
@@ -2289,7 +2289,7 @@ export function Screen12StudentDashboard({
             </div>
 
             {/* Your Next Best Actions Card (Right Panel) */}
-            <div className="dash-right-actions-card">
+            <div className="dash-right-actions-card" data-eora-id="eora-next-actions">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>Your Next Best Actions</div>
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#5642EF", background: "#EEF2FF", padding: "2px 6px", borderRadius: 4 }}>

@@ -33,22 +33,25 @@ export function EoraStudentBridge({
   isFirstSession = false,
 }: EoraStudentBridgeProps) {
   const eora = useEoraSafe();
+  const updateLiveStudentContext = eora?.updateLiveStudentContext;
+  const clearStudentContext = eora?.clearStudentContext;
   const fetchedPersonId = useRef<string | null>(null);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchAndUpdateContext = useCallback(async () => {
-    if (!eora) return;
+    if (!updateLiveStudentContext || !clearStudentContext) return;
 
     try {
       const res = await fetch("/api/eora/context", {
         // Credentials: same-origin (session cookie is sent automatically)
         credentials: "same-origin",
+        cache: "no-store",
       });
 
       if (!res.ok) {
         // 401 means signed out — clear any existing context
         if (res.status === 401) {
-          eora.clearStudentContext();
+          clearStudentContext();
           fetchedPersonId.current = null;
         }
         return;
@@ -61,7 +64,7 @@ export function EoraStudentBridge({
         fetchedPersonId.current &&
         fetchedPersonId.current !== data.personId
       ) {
-        eora.clearStudentContext();
+        clearStudentContext();
       }
       fetchedPersonId.current = data.personId;
 
@@ -82,17 +85,17 @@ export function EoraStudentBridge({
         isFirstSession,
       };
 
-      eora.updateLiveStudentContext(liveData);
+      updateLiveStudentContext(liveData);
     } catch {
       // Network error — EORA continues with stale or empty context gracefully
     }
-  }, [eora, isFirstSession]);
+  }, [updateLiveStudentContext, clearStudentContext, isFirstSession]);
 
   // Initial fetch when workspace is hydrated
   useEffect(() => {
-    if (!hydrated || !eora) return;
+    if (!hydrated || !updateLiveStudentContext) return;
     fetchAndUpdateContext();
-  }, [hydrated, eora, fetchAndUpdateContext]);
+  }, [hydrated, updateLiveStudentContext, fetchAndUpdateContext]);
 
   // Re-fetch when the tab becomes visible (handles long sessions)
   useEffect(() => {

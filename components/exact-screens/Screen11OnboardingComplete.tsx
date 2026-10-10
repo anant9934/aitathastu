@@ -116,25 +116,25 @@ export function Screen11OnboardingComplete({
       >
         <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1.2fr", alignItems: "center", gap: 56, margin: "auto 0" }}>
           
-          {/* Left Column: EORA Mascot Celebrating with ambient halo */}
+          {/* Approved celebration pose, compact outside the landing hero. */}
           <div style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
             <div
               style={{
                 position: "absolute",
-                width: 460,
-                height: 460,
+                width: 220,
+                height: 220,
                 borderRadius: "50%",
                 background: "radial-gradient(circle, rgba(2, 197, 245, 0.22) 0%, rgba(147, 53, 232, 0.16) 50%, transparent 75%)",
                 filter: "blur(40px)",
                 zIndex: 0,
               }}
             />
-            <div style={{ position: "relative", width: "100%", maxWidth: 460, height: 500, zIndex: 1 }}>
+            <div style={{ position: "relative", width: "100%", maxWidth: 190, height: 210, zIndex: 1 }}>
               <Image
                 src="/assets/eora/celebrating.png"
                 alt="EORA celebrating"
                 fill
-                sizes="(max-width: 768px) 100vw, 460px"
+                sizes="190px"
                 style={{ objectFit: "contain" }}
                 priority
               />

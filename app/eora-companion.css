@@ -14,7 +14,17 @@
   align-items: flex-end;
   gap: 8px;
   pointer-events: none; /* children opt-in via pointer-events: auto */
+  transition: inset 220ms ease, opacity 180ms ease;
 }
+
+.eora-floating-root.eora-place-bottom-left,
+.eora-floating-root.eora-place-top-left { right: auto; left: 16px; align-items: flex-start; }
+.eora-floating-root.eora-place-top-left,
+.eora-floating-root.eora-place-top-right { bottom: auto; top: 82px; }
+.eora-floating-root.eora-place-top-left .eora-floating-row,
+.eora-floating-root.eora-place-top-right .eora-floating-row { flex-direction: row-reverse; }
+.eora-floating-root.eora-place-top-left .eora-speech-bubble,
+.eora-floating-root.eora-place-top-right .eora-speech-bubble { border-radius: 4px 16px 16px 16px; }
 
 .eora-floating-root > * {
   pointer-events: auto;
@@ -56,7 +66,43 @@
 .eora-avatar-trigger--full {
   filter: drop-shadow(0 4px 12px rgba(89, 66, 220, 0.25));
   transition: transform 0.2s ease;
+  animation: eora-root-enter 280ms ease-out both;
 }
+
+.eora-motion-stage {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 72px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #f7f5ff, #e8f8ff);
+  border: 1px solid #e4dcf5;
+  box-shadow: 0 8px 24px #473b9129, inset 0 1px #fff;
+}
+.eora-motion-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
+.eora-motion-image--incoming { animation: eora-pose-in 260ms ease-out both; }
+.eora-motion-image--outgoing { animation: eora-pose-out 260ms ease-in both; }
+.eora-motion-stage[data-motion-state="IDLE"] .eora-motion-image,
+.eora-motion-stage[data-motion-state="WAITING"] .eora-motion-image { animation: eora-breathe 5s ease-in-out infinite; }
+.eora-motion-stage[data-motion-state="WAVING"] .eora-motion-image--incoming { animation: eora-wave-in 360ms ease-out both; }
+.eora-motion-stage[data-motion-state="POINTING"] .eora-motion-image--incoming,
+.eora-motion-stage[data-motion-state="EXPLAINING"] .eora-motion-image--incoming { animation: eora-guide-in 300ms ease-out both; }
+.eora-motion-stage[data-motion-state="THINKING"] .eora-motion-image--incoming { animation: eora-think-in 320ms ease-out both; }
+.eora-motion-stage[data-motion-state="CELEBRATING"] .eora-motion-image--incoming,
+.eora-motion-stage[data-motion-state="HAPPY"] .eora-motion-image--incoming { animation: eora-joy-in 360ms ease-out both; }
+.eora-motion-stage[data-motion-state="QUIET"] { filter: saturate(.78); }
+.eora-motion-stage[data-motion-state="EXITING"] .eora-motion-image { animation: eora-exit 180ms ease-in both; }
+
+@keyframes eora-root-enter { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes eora-pose-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes eora-pose-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.03); } }
+@keyframes eora-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes eora-wave-in { from { opacity: 0; transform: rotate(-4deg) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes eora-guide-in { from { opacity: 0; transform: translateX(-4px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes eora-think-in { from { opacity: 0; transform: rotate(3deg); } to { opacity: 1; transform: none; } }
+@keyframes eora-joy-in { from { opacity: 0; transform: translateY(4px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes eora-exit { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(.96); } }
 
 .eora-avatar-trigger--full:hover {
   transform: scale(1.06);
@@ -165,6 +211,7 @@
   opacity: 0;
   transform: translateY(6px) scale(0.97);
   transition: opacity 0.22s ease, transform 0.22s ease;
+  backdrop-filter: blur(12px);
 }
 
 .eora-speech-bubble--visible {
@@ -264,13 +311,24 @@
 
 /* ── Expanded panel ──────────────────────────────────────────────────────── */
 .eora-panel {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 78px);
+  right: 24px;
   width: 280px;
   background: #ffffff;
   border: 1.5px solid rgba(89, 66, 220, 0.14);
   border-radius: 18px;
   box-shadow: 0 16px 40px rgba(89, 66, 220, 0.14), 0 4px 12px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
+  max-height: min(220px, calc(100dvh - 120px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: eora-panel-enter 0.2s ease;
+}
+
+.eora-panel .eora-speech-bubble { margin: 8px 10px; max-width: none; }
+.eora-panel .eora-clarifying-options { margin: 8px 10px; }
+@media (min-width: 769px) {
+  .eora-floating-root[data-eora-route="onboarding"] .eora-panel { left: 24px; right: auto; }
 }
 
 @keyframes eora-panel-enter {
@@ -516,6 +574,10 @@
   pointer-events: auto;
 }
 
+.eora-tiny-sparkle { position: absolute; right: -5px; top: -14px; color: #7961e9; font-size: 23px; pointer-events: none; animation: eora-sparkle 650ms ease-out both; }
+@keyframes eora-sparkle { from { opacity: 0; transform: translateY(5px) scale(.5); } 40% { opacity: 1; } to { opacity: 0; transform: translateY(-12px) scale(1); } }
+.eora-tour-unavailable { width: 100%; color: #6b6182; font-size: 11px; line-height: 1.4; }
+
 .eora-restore-btn {
   display: inline-flex;
   align-items: center;
@@ -571,7 +633,11 @@
   .eora-panel { animation: none; }
   .eora-confetti { animation: none; }
   .eora-avatar-trigger--full { transition: none; }
+  .eora-floating-root, .eora-motion-image, .eora-tiny-sparkle { animation: none !important; transition: none !important; transform: none !important; }
 }
+
+.eora-no-motion .eora-floating-root,
+.eora-no-motion .eora-motion-image { animation: none !important; transition: none !important; }
 
 /* ── Mobile: safe area + collision avoidance ────────────────────────────── */
 @media (max-width: 480px) {
@@ -583,11 +649,18 @@
     max-height: calc(100dvh - 140px);
   }
 
+  .eora-floating-root.eora-place-bottom-left { right: auto; left: 12px; }
+  .eora-floating-root.eora-place-top-left { right: auto; left: 12px; top: 82px; bottom: auto; }
+  .eora-floating-root.eora-place-top-right { top: 82px; bottom: auto; }
+  .eora-motion-stage { width: 52px; height: 58px; border-radius: 17px; }
+  .eora-floating-root:not(.eora-panel-open) .eora-speech-bubble { display: none; }
+
   .eora-panel {
+    right: 12px;
+    top: calc(env(safe-area-inset-top, 0px) + 74px);
     width: calc(100vw - 40px);
     max-width: 300px;
-    /* Prevent panel from exceeding viewport height */
-    max-height: calc(100dvh - 200px);
+    max-height: min(220px, calc(100dvh - 120px));
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -619,6 +692,7 @@
   .eora-panel {
     width: calc(100vw - 20px);
     max-width: 285px;
+    right: 10px;
   }
 
   .eora-avatar-img {

@@ -336,7 +336,10 @@ export function ExactScreensContainer({
         )}
 
         {currentScreen === 1 && (
-          <Screen1Landing onStartJourney={() => setCurrentScreen(2)} />
+          <Screen1Landing onStartJourney={() => {
+            if (isGalleryMode) setCurrentScreen(2);
+            else window.location.assign("/onboarding");
+          }} />
         )}
 
         {currentScreen === 2 && (
@@ -426,6 +429,9 @@ export function ExactScreensContainer({
         {currentScreen === 5 && (
           <Screen5ResumeUpload
             initialFileName={resumeFileName}
+            onExtractionReady={() => {
+              eora?.signalSuccess("extraction_completed");
+            }}
             onExtractSuccess={(fileName, claims, extraData) => {
               setResumeFileName(fileName);
               setResumeReviewed(claims);

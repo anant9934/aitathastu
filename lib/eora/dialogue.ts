@@ -339,10 +339,10 @@ export function getFieldErrorMessage(
 
 export function getTinyVictoryMessage(action: string): EoraMessage {
   const messages: Record<string, string> = {
-    resume_uploaded: "Resume received! I'm reviewing it now.",
+    resume_uploaded: "Resume claims saved. You can review them in your profile.",
     github_connected: "GitHub connected! Discovering your projects.",
     projects_discovered: "Projects found from GitHub. Review and confirm your contributions.",
-    extraction_completed: "Extraction complete. Review the findings in your profile.",
+    extraction_completed: "Extraction complete. Please review the suggested claims below before saving.",
     skill_confirmed: "Skill confirmed. Your profile just got stronger.",
     project_confirmed: "Project confirmed. Great contribution documented.",
     project_saved: "Project saved. Your contribution is on record.",

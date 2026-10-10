@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-export function Brand({ compact = false }: { compact?: boolean }) {
+export function Brand({ compact = false, href = "/", className = "" }: { compact?: boolean; href?: string; className?: string }) {
   return (
-    <Link href="/" className="brand" aria-label="AI Tathastu, home">
+    <Link href={href} className={`brand ${className}`} aria-label="AI Tathastu, home">
       <span className="brand-mark" aria-hidden="true" style={{ width: 36, height: 36, flex: "none", display: "inline-grid", placeItems: "center" }}>
         <svg width="36" height="36" viewBox="0 0 52 52" fill="none" style={{ width: 36, height: 36, display: "block" }}>
           <path d="M25.5 2.5c2.4 12.7 4.8 16 17.2 18.2-12.4 2.2-14.8 5.6-17.2 18.1C23.1 26.3 20.7 22.9 8.3 20.7 20.7 18.5 23.1 15.2 25.5 2.5Z" fill="url(#brand-gradient)"/>

@@ -1,0 +1,259 @@
+{
+  "results": [
+    {
+      "check": "Landing hero",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No trigger collision: desktop landing",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Onboarding welcome",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Single floating assistant",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Tour highlights actual name input",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Tour pauses",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Onboarding tour waits for form navigation",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Role tour target",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Direction tour target",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Priorities tour target",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Academic tour target",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No help panel collision: desktop academic form",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Field guidance available on request",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Validation blocks missing credentials",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Academic form advances after correction",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Resume tour target",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Resume extraction and review",
+      "passed": false,
+      "detail": "HTTP 503: credential rotation required"
+    },
+    {
+      "check": "Footprints tour target",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Profile review rendered",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Authenticated dashboard",
+      "passed": true,
+      "detail": "dashboard rendered"
+    },
+    {
+      "check": "Dashboard tour: eora-active-goal",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Dashboard tour: eora-next-actions",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Dashboard tour: eora-evidence-panel",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Dashboard tour: eora-sidebar",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Skills tour: eora-skills-list",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Skills tour: eora-skill-verification",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Projects tour: eora-projects-list",
+      "passed": true,
+      "detail": "unavailable notice shown"
+    },
+    {
+      "check": "Projects tour: eora-contribution-note",
+      "passed": true,
+      "detail": "unavailable notice shown"
+    },
+    {
+      "check": "Project save confirmed by server",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Projects populated tour: eora-projects-list",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Projects populated tour: eora-contribution-note",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Roadmap tour: eora-roadmap-milestones",
+      "passed": true,
+      "detail": "highlighted"
+    },
+    {
+      "check": "Roadmap tour: eora-roadmap-next",
+      "passed": true,
+      "detail": "unavailable notice shown"
+    },
+    {
+      "check": "Roadmap assistance rendered",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No trigger collision: 768px onboarding",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No trigger collision: 390px onboarding",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No trigger collision: 320px onboarding",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No help panel collision: 320px onboarding",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Quiet mode preference",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Quiet mode pauses avatar motion",
+      "passed": true,
+      "detail": "none"
+    },
+    {
+      "check": "Escape closes help panel",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Dismiss and restore available",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "No significant EORA layout shift",
+      "passed": true,
+      "detail": "0.006562633364030458"
+    },
+    {
+      "check": "Authenticated EORA context contains no credentials",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Context inaccessible after logout",
+      "passed": true,
+      "detail": "401"
+    },
+    {
+      "check": "Person-specific context isolation",
+      "passed": true,
+      "detail": "second sign-up 200"
+    },
+    {
+      "check": "Routine EORA LLM requests",
+      "passed": true,
+      "detail": "0"
+    },
+    {
+      "check": "Browser page errors",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Server 5xx responses",
+      "passed": false,
+      "detail": "503 http://127.0.0.1:3000/api/resume/extract"
+    },
+    {
+      "check": "System reduced-motion preference",
+      "passed": true,
+      "detail": "none"
+    }
+  ],
+  "consoleErrors": [],
+  "failedResponses": [
+    "503 http://127.0.0.1:3000/api/resume/extract"
+  ],
+  "eoraRequests": []
+}

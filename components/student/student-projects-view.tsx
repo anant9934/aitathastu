@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useEoraSafe } from "@/components/eora/eora-provider";
 import {
   FolderGit2,
   Plus,
@@ -72,6 +73,7 @@ interface ProjectItem {
 }
 
 export function StudentProjectsView() {
+  const eora = useEoraSafe();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -603,6 +605,7 @@ export function StudentProjectsView() {
       }
 
       await fetchProjects();
+      eora?.signalSuccess("project_saved");
       setShowModal(false);
       resetForm();
     } catch (err) {

@@ -96,16 +96,40 @@ export async function getStudentDashboardComposition(
   // Deduplicate and cap to 2
   secondaryInterests = Array.from(new Set(secondaryInterests)).slice(0, 2);
 
-  // Extract skills from evidence ledger
-  const skills: Array<{ name: string; category?: string; verificationStatus: string; source?: string }> =
-    (person360.evidence || [])
-      .filter((e) => e.category === "skill")
-      .map((e) => ({
-        name: e.subject || e.value,
+  // Extract skills from evidence ledger deduplicated by normalized name (representing unique tracked skills)
+  const uniqueSkillsMap = new Map<string, { name: string; category?: string; verificationStatus: string; source?: string }>();
+  for (const e of (person360.evidence || []).filter((e) => e.category === "skill")) {
+    const rawName = (e.subject || e.value || "").trim();
+    if (!rawName) continue;
+    const norm = rawName.toLowerCase();
+    const existing = uniqueSkillsMap.get(norm);
+    if (!existing || (e.verificationStatus === "verified" && existing.verificationStatus !== "verified")) {
+      uniqueSkillsMap.set(norm, {
+        name: rawName,
         category: e.category,
         verificationStatus: e.verificationStatus,
         source: e.source,
-      }));
+      });
+    }
+  }
+
+  // Also include skills demonstrated in confirmed projects to maintain canonical alignment with PersonGraph
+  for (const p of (person360.projects || []).filter((p) => p.status === "confirmed")) {
+    for (const tech of (p.technologies || [])) {
+      const rawName = (tech || "").trim();
+      if (!rawName) continue;
+      const norm = rawName.toLowerCase();
+      if (!uniqueSkillsMap.has(norm)) {
+        uniqueSkillsMap.set(norm, {
+          name: rawName,
+          category: "project_technology",
+          verificationStatus: "unverified",
+          source: "project",
+        });
+      }
+    }
+  }
+  const skills = Array.from(uniqueSkillsMap.values());
 
   // Map projects
   const projects: ProjectRecord[] = (person360.projects || []).map((p) => ({
@@ -146,6 +170,22 @@ export async function getStudentDashboardComposition(
       : null;
   const isReadinessAvailable = readinessResult.publishable && readinessResult.score !== undefined;
 
+  // Resolve institution with fallback to profile.education string or education evidence
+  let resolvedInstitution = person360.profile?.institution?.trim() || "";
+  if (!resolvedInstitution && person360.profile?.education) {
+    const parts = person360.profile.education.split("·").map((s) => s.trim());
+    const instPart = parts.find((p) => /university|college|institute|iit|nit|iiit|bits|lpu/i.test(p));
+    if (instPart) resolvedInstitution = instPart;
+  }
+  if (!resolvedInstitution) {
+    const eduEvidence = (person360.evidence || []).find((e) => e.category === "education");
+    if (eduEvidence) {
+      const parts = (eduEvidence.value || eduEvidence.subject || "").split("·").map((s) => s.trim());
+      const instPart = parts.find((p) => /university|college|institute|iit|nit|iiit|bits|lpu/i.test(p));
+      resolvedInstitution = instPart || eduEvidence.subject || "";
+    }
+  }
+
   const context: StudentPersonalizationContext = {
     personId,
     name: options?.name || person360.person.displayName || "Student",
@@ -156,7 +196,7 @@ export async function getStudentDashboardComposition(
     primaryInterest,
     secondaryInterests,
     degree: person360.profile?.degree || "",
-    institution: person360.profile?.institution || "",
+    institution: resolvedInstitution,
     cohort: person360.profile?.expectedGraduationYear || undefined,
     skills,
     projects,

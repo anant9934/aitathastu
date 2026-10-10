@@ -373,6 +373,7 @@ async function runCertification() {
     projects: [{ title: "Vision Transformer Edge", description: "Edge inference", technologies: ["PyTorch", "ONNX"], sourceSpan: "Vision Transformer Edge: Edge inference" }],
     skills: [{ name: "PyTorch", category: "framework", proficiencyHint: "intermediate", sourceSpan: "Vision Transformer Edge: PyTorch edge inference" }],
     certifications: [],
+    achievements: [],
   });
 
   await validateReviewedResumeClaims(studentAId, [

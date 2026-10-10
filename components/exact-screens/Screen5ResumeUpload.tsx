@@ -51,6 +51,8 @@ interface Screen5ResumeUploadProps {
       discoveredProfiles?: Partial<Record<string, string>>;
       extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
       extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; gpa?: string }>;
+      extractedExperience?: Array<{ company: string; role: string; duration?: string; highlights?: string[]; sourceSpan: string }>;
+      extractedAchievements?: Array<{ title: string; category?: string; issuer?: string; date?: string; description?: string; sourceSpan: string }>;
     }
   ) => Promise<boolean> | boolean;
   onNext: () => void;
@@ -91,6 +93,8 @@ export function Screen5ResumeUpload({
     discoveredProfiles?: Partial<Record<string, string>>;
     extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
     extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; gpa?: string }>;
+    extractedExperience?: Array<{ company: string; role: string; duration?: string; highlights?: string[]; sourceSpan: string }>;
+    extractedAchievements?: Array<{ title: string; category?: string; issuer?: string; date?: string; description?: string; sourceSpan: string }>;
   }>({});
   // null = probing, true = gate open, false = gate closed
   const [ingestionReady, setIngestionReady] = useState<boolean | null>(null);
@@ -232,7 +236,7 @@ export function Screen5ResumeUpload({
             const sourceSpan = item.sourceSpan;
             if (
               !documentId ||
-              !["education", "experience", "project", "skill", "certification"].includes(String(category)) ||
+              !["education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
               typeof candidateId !== "string" ||
               typeof value !== "string" ||
               typeof sourceSpan !== "string"
@@ -274,6 +278,8 @@ export function Screen5ResumeUpload({
         discoveredProfiles: data.discoveredProfiles,
         extractedProjects: Array.isArray(data.structured?.projects) ? data.structured.projects : [],
         extractedEducation: Array.isArray(data.structured?.education) ? data.structured.education : [],
+        extractedExperience: Array.isArray(data.structured?.experience) ? data.structured.experience : [],
+        extractedAchievements: Array.isArray(data.structured?.achievements) ? data.structured.achievements : [],
       });
       setCandidates(rows);
 

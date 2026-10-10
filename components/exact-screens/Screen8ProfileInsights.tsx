@@ -43,6 +43,23 @@ export interface Screen8TechCandidate {
   sourceFile?: string;
 }
 
+export interface Screen8ExperienceEntry {
+  company: string;
+  role: string;
+  duration?: string;
+  highlights?: string[];
+  status?: "candidate" | "confirmed";
+}
+
+export interface Screen8AchievementEntry {
+  title: string;
+  category?: string;
+  issuer?: string;
+  date?: string;
+  description?: string;
+  status?: "candidate" | "confirmed";
+}
+
 export interface Screen8ProfileInsightsProps {
   studentName?: string;
   degree?: string;
@@ -53,6 +70,8 @@ export interface Screen8ProfileInsightsProps {
   goal?: string;
   skills?: string[];
   educationEntries?: Screen8EducationEntry[];
+  experiences?: Screen8ExperienceEntry[];
+  achievements?: Screen8AchievementEntry[];
   projectsCount?: number;
   projects?: Screen8ProjectEntry[];
   technologyCandidates?: Screen8TechCandidate[];
@@ -61,6 +80,9 @@ export interface Screen8ProfileInsightsProps {
   onBack: () => void;
   onEdit?: () => void;
   onJumpToStep?: (step: number) => void;
+  onToggleConfirmProject?: (title: string) => void;
+  onToggleConfirmExperience?: (company: string, role: string) => void;
+  onToggleConfirmAchievement?: (title: string) => void;
 }
 
 const navSections = [
@@ -80,6 +102,8 @@ export function Screen8ProfileInsights({
   year = "",
   skills = [],
   educationEntries = [],
+  experiences = [],
+  achievements = [],
   projectsCount = 0,
   projects = [],
   technologyCandidates = [],
@@ -88,6 +112,9 @@ export function Screen8ProfileInsights({
   onBack,
   onEdit,
   onJumpToStep,
+  onToggleConfirmProject,
+  onToggleConfirmExperience,
+  onToggleConfirmAchievement,
 }: Screen8ProfileInsightsProps) {
   const [activeTab, setActiveTab] = useState("personal");
   const firstName = studentName.trim().split(" ")[0] || "Student";
@@ -513,9 +540,55 @@ export function Screen8ProfileInsights({
                         Implemented deep learning models, benchmarked Transformer models vs CNN baselines, and contributed to research manuscript draft.
                       </p>
                     </div>
-                  ) : (
-                    <p style={{ color: "#64748B" }}>No experience has been confirmed yet.</p>
-                  )}
+                  ) : null}
+                  {!isGalleryMode && experiences && experiences.length > 0 ? (
+                    experiences.map((exp, idx) => (
+                      <div
+                        key={exp.company + exp.role + idx}
+                        style={{
+                          padding: "16px 20px",
+                          borderRadius: 14,
+                          background: "#F8FAFC",
+                          border: "1px solid #E2E8F0",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                          <div>
+                            <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                              {exp.role}
+                            </h4>
+                            <p style={{ fontSize: 13, color: "#64748B", margin: "3px 0 0" }}>
+                              {exp.company} {exp.duration ? `• ${exp.duration}` : ""}
+                            </p>
+                          </div>
+                          <span
+                            onClick={() => onToggleConfirmExperience?.(exp.company, exp.role)}
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: exp.status === "confirmed" ? "#059669" : "#4338CA",
+                              background: exp.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                              border: `1px solid ${exp.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                              padding: "3px 9px",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {exp.status === "confirmed" ? "Confirmed" : "Candidate (Click to Confirm)"}
+                          </span>
+                        </div>
+                        {exp.highlights && exp.highlights.length > 0 && (
+                          <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, color: "#475569", lineHeight: 1.45 }}>
+                            {exp.highlights.map((h, i) => (
+                              <li key={i}>{h}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))
+                  ) : !isGalleryMode ? (
+                    <p style={{ color: "#64748B" }}>No experience records confirmed yet.</p>
+                  ) : null}
                 </div>
               )}
 
@@ -742,16 +815,87 @@ export function Screen8ProfileInsights({
               {/* Tab 6: Achievements */}
               {activeTab === "achievements" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {isGalleryMode ? <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <Award size={18} color="#F59E0B" />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#1E1B4B" }}>Smart India Hackathon Finalist</div>
-                        <div style={{ fontSize: 12, color: "#64748B" }}>Ministry of Education Innovation Cell &bull; 2024</div>
+                  {isGalleryMode ? (
+                    <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <Award size={18} color="#F59E0B" />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#1E1B4B" }}>Smart India Hackathon Finalist</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>Ministry of Education Innovation Cell &bull; 2024</div>
+                        </div>
                       </div>
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>Verified</span>
                     </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>Verified</span>
-                  </div> : <p style={{ color: "#64748B" }}>No achievements confirmed yet.</p>}
+                  ) : null}
+                  {!isGalleryMode && achievements && achievements.length > 0 ? (
+                    achievements.map((ach, idx) => (
+                      <div
+                        key={ach.title + idx}
+                        style={{
+                          padding: "16px 20px",
+                          borderRadius: 14,
+                          background: "#F8FAFC",
+                          border: "1px solid #E2E8F0",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                          <Award size={20} color="#6366F1" style={{ marginTop: 2, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <h4 style={{ fontSize: 15, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                                {ach.title}
+                              </h4>
+                              {ach.category && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#6D28D9",
+                                    background: "#F5F3FF",
+                                    border: "1px solid #DDD6FE",
+                                    padding: "1px 7px",
+                                    borderRadius: 6,
+                                    textTransform: "capitalize",
+                                  }}
+                                >
+                                  {ach.category}
+                                </span>
+                              )}
+                            </div>
+                            <p style={{ fontSize: 13, color: "#475569", margin: "4px 0 0", lineHeight: 1.45 }}>
+                              {ach.description}
+                            </p>
+                            {ach.date && (
+                              <span style={{ fontSize: 12, color: "#64748B", display: "block", marginTop: 4 }}>
+                                {ach.date}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          onClick={() => onToggleConfirmAchievement?.(ach.title)}
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: ach.status === "confirmed" ? "#059669" : "#4338CA",
+                            background: ach.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                            border: `1px solid ${ach.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                            padding: "3px 9px",
+                            borderRadius: 6,
+                            flexShrink: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {ach.status === "confirmed" ? "Confirmed" : "Candidate (Click to Confirm)"}
+                        </span>
+                      </div>
+                    ))
+                  ) : !isGalleryMode ? (
+                    <p style={{ color: "#64748B" }}>No achievements confirmed yet.</p>
+                  ) : null}
                 </div>
               )}
             </div>

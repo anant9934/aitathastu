@@ -13,7 +13,7 @@ import { Screen4AcademicDetails, type AcademicDetailsData } from "./Screen4Acade
 import { Screen5ResumeUpload, type ReviewedResumeClaim } from "./Screen5ResumeUpload";
 import { Screen6DigitalFootprints } from "./Screen6DigitalFootprints";
 import { Screen7AiAnalysis } from "./Screen7AiAnalysis";
-import { Screen8ProfileInsights } from "./Screen8ProfileInsights";
+import { Screen8ProfileInsights, type Screen8ExperienceEntry, type Screen8AchievementEntry } from "./Screen8ProfileInsights";
 import { Screen9SkillsMap } from "./Screen9SkillsMap";
 import { Screen10GitHubProjects, type ProjectEntry } from "./Screen10GitHubProjects";
 import { Screen11OnboardingComplete } from "./Screen11OnboardingComplete";
@@ -111,6 +111,8 @@ export function ExactScreensContainer({
       sourceFile?: string;
     }>
   >([]);
+  const [experienceEntries, setExperienceEntries] = useState<Screen8ExperienceEntry[]>([]);
+  const [achievementEntries, setAchievementEntries] = useState<Screen8AchievementEntry[]>([]);
 
   // Restore draft or session on mount
   useEffect(() => {
@@ -187,6 +189,12 @@ export function ExactScreensContainer({
             if (Array.isArray(d.techCandidates) && d.techCandidates.length > 0) {
               setTechCandidates(d.techCandidates);
             }
+            if (Array.isArray((d as any).experiences) && (d as any).experiences.length > 0) {
+              setExperienceEntries((d as any).experiences);
+            }
+            if (Array.isArray((d as any).achievements) && (d as any).achievements.length > 0) {
+              setAchievementEntries((d as any).achievements);
+            }
           }
         }
       } catch {
@@ -230,6 +238,8 @@ export function ExactScreensContainer({
             projects: patch.projects ?? projects,
             education: patch.education ?? educationEntries,
             techCandidates: patch.techCandidates ?? techCandidates,
+            experiences: patch.experiences ?? experienceEntries,
+            achievements: patch.achievements ?? achievementEntries,
             profiles: patch.profiles ?? profiles,
             discoveredResumeProfiles: patch.discoveredResumeProfiles ?? discoveredResumeProfiles,
             goal: patch.goal ?? goal,
@@ -250,6 +260,8 @@ export function ExactScreensContainer({
       profiles,
       discoveredResumeProfiles,
       projects,
+      experienceEntries,
+      achievementEntries,
       role,
       skills,
       educationEntries,
@@ -335,6 +347,8 @@ export function ExactScreensContainer({
 
     setIsSubmitting(true);
 
+    const effectiveInstitution = (academic.institution || educationEntries[0]?.institution || "").trim();
+
     try {
       const response = await fetch("/api/onboarding-v2", {
         method: "POST",
@@ -351,12 +365,15 @@ export function ExactScreensContainer({
           customGoalText: customGoalText || "",
           degree: academic.degree,
           specialization: academic.department,
-          institution: academic.institution,
+          institution: effectiveInstitution,
           year: academic.currentYear,
           semester: "",
           skills,
           resumeReviewed,
           projects: projects.filter((p) => p.status === "confirmed"),
+          experiences: experienceEntries.filter((e) => e.status === "confirmed"),
+          achievements: achievementEntries.filter((a) => a.status === "confirmed"),
+          education: educationEntries,
           profiles,
           goal,
           priorities,
@@ -520,25 +537,54 @@ export function ExactScreensContainer({
               };
               const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
               const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
+              // Resume-extracted projects must start as "candidate", not automatically "confirmed"
               const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => {
                 const extracted = extraData?.extractedProjects?.find((project) => project.sourceSpan === claim.sourceSpan);
                 return {
                   id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value,
                   description: extracted?.description || "", technologies: extracted?.technologies || [],
-                  sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
+                  sources: ["resume"], status: "candidate", contribution: [], contributionNote: "",
                   url: extracted?.repositoryUrl,
                 };
               });
               const nextProjects = [...projects.filter((project) => !project.id.startsWith("resume_")), ...resumeProjects];
+
+              // Map resume-extracted experience as candidates
+              const nextExperiences: Screen8ExperienceEntry[] = (extraData?.extractedExperience || []).map((exp) => ({
+                company: exp.company || "Organization",
+                role: exp.role || "Role",
+                duration: exp.duration,
+                highlights: exp.highlights,
+                status: "candidate" as const,
+              }));
+              setExperienceEntries(nextExperiences);
+
+              // Map resume-extracted achievements (patents, books, publications, awards) as candidates
+              const nextAchievements: Screen8AchievementEntry[] = (extraData?.extractedAchievements || []).map((ach) => ({
+                title: ach.title,
+                category: ach.category || "honor",
+                issuer: ach.issuer,
+                date: ach.date,
+                description: ach.description,
+                status: "candidate" as const,
+              }));
+              setAchievementEntries(nextAchievements);
+
+              const resolvedInstitution =
+                academic.institution ||
+                extraData?.extractedProfile?.institution ||
+                extraData?.extractedEducation?.[0]?.institution ||
+                "";
+
               const nextEducation = Array.isArray(extraData?.extractedEducation) && extraData.extractedEducation.length > 0
                 ? extraData.extractedEducation
-                : academic.institution || academic.degree
+                : resolvedInstitution || academic.degree
                 ? [
                     {
-                      institution: academic.institution || "",
-                      degree: academic.degree || "",
-                      fieldOfStudy: academic.department,
-                      graduationYear: academic.expectedGraduationYear?.toString(),
+                      institution: resolvedInstitution || "",
+                      degree: academic.degree || extraData?.extractedProfile?.degree || "",
+                      fieldOfStudy: academic.department || extraData?.extractedProfile?.specialization,
+                      graduationYear: (academic.expectedGraduationYear || extraData?.extractedProfile?.expectedGraduationYear)?.toString(),
                     },
                   ]
                 : [];
@@ -548,16 +594,18 @@ export function ExactScreensContainer({
               const saved = await persistDraft({
                 skills: nextSkills,
                 projects: nextProjects,
+                experiences: nextExperiences,
+                achievements: nextAchievements,
                 education: nextEducation.length > 0 ? nextEducation : undefined,
                 resumeReviewed: claims,
                 discoveredResumeProfiles: nextDiscoveredProfiles,
-                ...(extraData?.extractedProfile ? {
-                  name: name || extraData.extractedProfile.fullName || academic.fullName,
-                  degree: academic.degree || extraData.extractedProfile.degree || "",
-                  specialization: academic.department || extraData.extractedProfile.specialization || "",
-                  institution: academic.institution || extraData.extractedProfile.institution || "",
-                  year: academic.currentYear || extraData.extractedProfile.currentYear || "",
-                  expectedGraduationYear: academic.expectedGraduationYear || extraData.extractedProfile.expectedGraduationYear,
+                ...(extraData?.extractedProfile || resolvedInstitution ? {
+                  name: name || extraData?.extractedProfile?.fullName || academic.fullName,
+                  degree: academic.degree || extraData?.extractedProfile?.degree || "",
+                  specialization: academic.department || extraData?.extractedProfile?.specialization || "",
+                  institution: resolvedInstitution,
+                  year: academic.currentYear || extraData?.extractedProfile?.currentYear || "",
+                  expectedGraduationYear: academic.expectedGraduationYear || extraData?.extractedProfile?.expectedGraduationYear,
                 } : {}),
               });
               if (!saved) return false;
@@ -705,11 +753,40 @@ export function ExactScreensContainer({
             studentName={name || academic.fullName || (isGalleryMode ? "Rahul Sharma" : "Student")}
             degree={academic.degree}
             specialization={academic.department}
-            institution={academic.institution}
+            institution={academic.institution || educationEntries[0]?.institution}
             year={academic.currentYear}
             goal={goal}
             skills={skills}
             educationEntries={educationEntries.length > 0 ? educationEntries : undefined}
+            experiences={experienceEntries}
+            achievements={achievementEntries}
+            onToggleConfirmExperience={(company, role) => {
+              setExperienceEntries((prev) =>
+                prev.map((e) =>
+                  e.company === company && e.role === role
+                    ? { ...e, status: e.status === "confirmed" ? "candidate" : "confirmed" }
+                    : e
+                )
+              );
+            }}
+            onToggleConfirmAchievement={(title) => {
+              setAchievementEntries((prev) =>
+                prev.map((a) =>
+                  a.title === title
+                    ? { ...a, status: a.status === "confirmed" ? "candidate" : "confirmed" }
+                    : a
+                )
+              );
+            }}
+            onToggleConfirmProject={(title) => {
+              setProjects((prev) =>
+                prev.map((p) =>
+                  p.title === title
+                    ? { ...p, status: p.status === "confirmed" ? "candidate" : "confirmed" }
+                    : p
+                )
+              );
+            }}
             projectsCount={projects.filter((p) => p.status !== "removed").length}
             projects={projects
               .filter((p) => p.status !== "removed")

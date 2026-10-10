@@ -41,6 +41,9 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
   add("project", extracted.projects.map((x) => ({ value: x.title, sourceSpan: x.sourceSpan })));
   add("skill", extracted.skills.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan })));
   add("certification", extracted.certifications.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan })));
+  if (Array.isArray(extracted.achievements)) {
+    add("achievement", extracted.achievements.map((x) => ({ value: `${x.title} (${x.category})`, sourceSpan: x.sourceSpan })));
+  }
   return candidates;
 }
 

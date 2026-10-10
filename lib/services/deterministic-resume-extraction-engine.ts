@@ -32,7 +32,7 @@ export interface ExtractedAcademicInfo {
 
 export interface StructuredExtractionCandidate {
   candidateId: string;
-  category: "education" | "experience" | "project" | "skill" | "certification" | "research" | "profile";
+  category: "education" | "experience" | "project" | "skill" | "certification" | "research" | "profile" | "achievement";
   value: string;
   sourceSpan: string;
   ruleId: string;
@@ -798,7 +798,76 @@ export function extractCertifications(lines: string[]): ResumeInterpretationOutp
 }
 
 // ============================================================================
-// 8. CANONICAL ZERO-LLM EXTRACTION ENGINE
+// 8. ACHIEVEMENTS & RESEARCH EXTRACTOR
+// ============================================================================
+
+export function extractAchievements(
+  lines: string[],
+  researchLines: string[] = [],
+  rawText: string = ""
+): ResumeInterpretationOutput["achievements"] {
+  const achievements: ResumeInterpretationOutput["achievements"] = [];
+  const combined = [...lines, ...researchLines];
+
+  for (const line of combined) {
+    if (!line || line.trim().length < 4) continue;
+    const cleaned = line.replace(/^[•\-*–—\d.]+\s*/, "").trim();
+    const isSectionHeader = /^(research|patents?|books?|publications?|papers?|awards?|honors?|certifications?|achievements?|education|experience|technical\s*skills|skills|projects|selected\s*projects|work\s*experience|academic\s*projects)$/i.test(cleaned) ||
+      /^(research,\s*patents\s*&\s*books|research\s*&\s*publications|patents\s*&\s*books|honors\s*&\s*awards|awards\s*&\s*achievements)$/i.test(cleaned);
+    if (isSectionHeader) continue;
+
+    let category: "patent" | "publication" | "book" | "award" | "hackathon" | "honor" = "award";
+    if (/\b(patent|patent\s*application|patent\s*granted|indian\s*patent|us\s*patent)\b/i.test(cleaned)) {
+      category = "patent";
+    } else if (/\b(book|book\s*chapter|isbn|monograph|co-authored\s*book)\b/i.test(cleaned)) {
+      category = "book";
+    } else if (/\b(publication|research\s*paper|published\s*in|conference|journal|ieee|springer|acm|arxiv|doi)\b/i.test(cleaned)) {
+      category = "publication";
+    } else if (/\b(hackathon|smart\s*india|finalist|contest|competition|codechef|leetcode)\b/i.test(cleaned)) {
+      category = "hackathon";
+    } else if (/\b(honor|award|scholarship|gold\s*medalist|distinction|rank\s*\d)\b/i.test(cleaned)) {
+      category = "honor";
+    }
+
+    const dateMatch = cleaned.match(/\b(20\d\d)\b/);
+    const parts = cleaned.split(/[:|—–-]\s*/);
+    const hasLabelPrefix = parts.length > 1 && /^(patent|book|paper|publication|award|honor|hackathon)$/i.test(parts[0]);
+    const title = (hasLabelPrefix ? parts.slice(1).join(" — ") : parts[0] && parts[0].length >= 4 ? parts[0] : cleaned).slice(0, 150).trim();
+    const description = parts.length > 1 ? parts.slice(hasLabelPrefix ? 2 : 1).join(" — ").slice(0, 350).trim() || cleaned.slice(0, 350) : cleaned.slice(0, 350);
+
+    achievements.push({
+      title,
+      category,
+      date: dateMatch ? dateMatch[1] : undefined,
+      description,
+      sourceSpan: line.slice(0, 250),
+    });
+
+    if (achievements.length >= 10) break;
+  }
+
+  // Fallback: If no achievements found yet, scan rawText for explicit patents or papers
+  if (achievements.length === 0 && rawText) {
+    const patentRegex = /(?:Indian\s+Patent\s+Application|Patent\s+Application|Patent\s+Granted|Patent)[\s:]+([^\n\r.]+)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = patentRegex.exec(rawText)) !== null) {
+      if (match[1] && match[1].trim().length > 4) {
+        achievements.push({
+          title: match[1].trim().slice(0, 150),
+          category: "patent",
+          description: match[0].trim().slice(0, 350),
+          sourceSpan: match[0].trim().slice(0, 250),
+        });
+        if (achievements.length >= 5) break;
+      }
+    }
+  }
+
+  return achievements;
+}
+
+// ============================================================================
+// 9. CANONICAL ZERO-LLM EXTRACTION ENGINE
 // ============================================================================
 
 export class DeterministicResumeExtractionEngine {
@@ -830,6 +899,7 @@ export class DeterministicResumeExtractionEngine {
     const projects = extractProjects(sectionMap.projects || [], footprints.repositories);
     const experience = extractExperience(sectionMap.experience || []);
     const certifications = extractCertifications(sectionMap.certifications || []);
+    const achievements = extractAchievements(sectionMap.achievements || [], sectionMap.research || [], rawText);
 
     // Step 4: Pick best academic profile
     const primaryEdu = educationEntries[0];
@@ -847,6 +917,7 @@ export class DeterministicResumeExtractionEngine {
       projects,
       experience,
       certifications,
+      achievements,
     };
 
     // Step 6: Build structured candidate ledger
@@ -885,6 +956,9 @@ export class DeterministicResumeExtractionEngine {
     }
     for (const e of experience) {
       addCandidate("experience", `${e.role} · ${e.company}`, e.sourceSpan, "exp_role_company_v3_9", 0.9);
+    }
+    for (const a of achievements) {
+      addCandidate("achievement", `${a.title} (${a.category})`, a.sourceSpan, "ach_line_v4_4", 0.9);
     }
     for (const c of certifications) {
       addCandidate("certification", c.name, c.sourceSpan, "cert_line_v3_9", 0.9);

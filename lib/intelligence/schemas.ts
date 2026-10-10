@@ -55,6 +55,16 @@ export const ResumeInterpretationSchema = z.object({
       sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
+  achievements: z.array(
+    z.object({
+      title: z.string().min(1).max(250),
+      category: z.enum(["patent", "publication", "book", "award", "hackathon", "honor"]).default("award"),
+      issuer: z.string().max(150).optional(),
+      date: z.string().max(30).optional(),
+      description: z.string().max(500).default(""),
+      sourceSpan: z.string().min(3).max(300),
+    })
+  ).default([]),
 });
 
 export type ResumeInterpretationOutput = z.infer<typeof ResumeInterpretationSchema>;

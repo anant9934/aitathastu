@@ -55,6 +55,7 @@ export function groundResumeInterpretation(
     projects: data.projects.filter((p) => lowerSource.includes(p.title.toLowerCase())),
     experience: data.experience.filter((ex) => lowerSource.includes(ex.company.toLowerCase()) || lowerSource.includes(ex.role.toLowerCase())),
     certifications: data.certifications.filter((c) => lowerSource.includes(c.name.toLowerCase())),
+    achievements: (data.achievements || []).filter((a) => lowerSource.includes(a.title.toLowerCase())),
   };
 }
 

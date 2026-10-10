@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, onboardingDrafts, userPreferences } from "@/lib/db";
 import { safeDraft, type OnboardingDraft } from "@/lib/onboarding-v2";
-import { updatePersonProfileData } from "@/lib/repositories/person-repository";
+import { updatePersonProfileData, getPersonProfile } from "@/lib/repositories/person-repository";
 import { setActiveGoal } from "@/lib/repositories/goal-repository";
 import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
@@ -51,14 +51,44 @@ export async function completeOnboarding(personId: string, input: unknown) {
   if (draft.role !== "student") {
     throw new Error("This role's onboarding journey is coming soon. Please choose Student to continue.");
   }
-  const studentName = draft.name?.trim() || "Student";
-  const degree = draft.degree?.trim() || "";
-  const specialization = draft.specialization?.trim() || "";
-  const year = draft.year?.trim() || "";
-  const goal = draft.goal?.trim() || "";
-  const institution = draft.institution?.trim() || "";
+  const rawInput = (input && typeof input === "object") ? (input as Record<string, unknown>) : {};
+  const existingProfile = await getPersonProfile(personId);
 
-  const education = [degree, specialization, year, draft.semester].filter(Boolean).join(" · ");
+  const studentName = draft.name?.trim() || "Student";
+  const degree = draft.degree?.trim() || existingProfile?.degree || "";
+  const specialization = draft.specialization?.trim() || existingProfile?.specialization || "";
+  const year = draft.year?.trim() || existingProfile?.currentYear || "";
+  const goal = draft.goal?.trim() || "";
+
+  let institution = draft.institution?.trim() || "";
+  if (!institution && Array.isArray(rawInput.education) && rawInput.education.length > 0) {
+    const firstEdu = rawInput.education[0] as Record<string, unknown>;
+    if (typeof firstEdu?.institution === "string") {
+      institution = firstEdu.institution.trim();
+    }
+  }
+  if (!institution && existingProfile?.institution) {
+    institution = existingProfile.institution.trim();
+  }
+
+  // Conflict detection: if existing profile has a different institution and incoming is non-empty
+  if (
+    existingProfile?.institution &&
+    institution &&
+    existingProfile.institution.trim().toLowerCase() !== institution.toLowerCase()
+  ) {
+    const { CrossSourceFusionService } = await import("@/lib/services/cross-source-fusion-service");
+    await CrossSourceFusionService.recordConflictIfDifferent(
+      personId,
+      "institution",
+      "existing_profile",
+      existingProfile.institution,
+      "onboarding_update",
+      institution
+    ).catch(() => null);
+  }
+
+  const education = [degree, institution, specialization, year, draft.semester].filter(Boolean).join(" · ");
 
   const headline = draft.targetRole ? `Aspiring ${draft.targetRole}` : "AI/ML Student";
 
@@ -75,7 +105,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
     institution,
     currentYear: year,
     semester: draft.semester,
-    expectedGraduationYear: draft.expectedGraduationYear,
+    expectedGraduationYear: draft.expectedGraduationYear || existingProfile?.expectedGraduationYear || undefined,
   });
 
   const goalDescription = `Target Role: ${draft.targetRole || "Not selected"}${
@@ -85,7 +115,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
   if (goal) await setActiveGoal(personId, goal, goalDescription, "custom");
 
   const add = async (
-    category: "education" | "skill" | "project" | "goal" | "other",
+    category: "education" | "skill" | "project" | "goal" | "experience" | "other",
     subject: string,
     value: string,
     source: "self_reported" | "resume_extracted",
@@ -149,7 +179,10 @@ export async function completeOnboarding(personId: string, input: unknown) {
   }
 
   for (const claim of draft.resumeReviewed) {
-    const category = claim.category === "certification" || claim.category === "experience" ? "other" : claim.category;
+    const category: "education" | "skill" | "project" | "goal" | "experience" | "other" =
+      claim.category === "certification" || claim.category === "achievement"
+        ? "other"
+        : claim.category;
     await add(
       category,
       claim.value,
@@ -159,6 +192,44 @@ export async function completeOnboarding(personId: string, input: unknown) {
       claim.corrected ? `Student corrected an extraction candidate. Original source excerpt: ${claim.sourceSpan}` : `Student accepted an extraction candidate. Source excerpt: ${claim.sourceSpan}`,
       `resume:sha256:${claim.documentId}`
     );
+  }
+
+  // Record confirmed student experiences
+  const inputExperiences = Array.isArray(rawInput.experiences) ? rawInput.experiences : [];
+  for (const exp of inputExperiences) {
+    if (exp && typeof exp === "object") {
+      const company = String((exp as any).company || (exp as any).organization || "").trim();
+      const role = String((exp as any).role || "").trim();
+      if (company || role) {
+        const title = `${role ? role + " at " : ""}${company}`;
+        await add(
+          "experience",
+          title,
+          `${title}${(exp as any).duration ? " (" + (exp as any).duration + ")" : ""}`,
+          "self_reported",
+          `exp_${company.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${role.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          "Experience entry confirmed by student during onboarding."
+        );
+      }
+    }
+  }
+
+  // Record confirmed student achievements (patents, publications, awards, books)
+  const inputAchievements = Array.isArray(rawInput.achievements) ? rawInput.achievements : [];
+  for (const ach of inputAchievements) {
+    if (ach && typeof ach === "object") {
+      const title = String((ach as any).title || "").trim();
+      if (title) {
+        await add(
+          "other",
+          title,
+          `${title}${(ach as any).issuer ? " · " + (ach as any).issuer : ""}${(ach as any).date ? " (" + (ach as any).date + ")" : ""}`,
+          "self_reported",
+          `ach_${title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          (ach as any).description || "Achievement or honor confirmed by student during onboarding."
+        );
+      }
+    }
   }
 
   for (const certification of [...new Set(draft.certifications)]) {
@@ -277,6 +348,22 @@ export async function completeOnboarding(personId: string, input: unknown) {
         updatedAt: new Date(),
       },
     });
+
+  const { CrossSourceFusionService } = await import("@/lib/services/cross-source-fusion-service");
+  await CrossSourceFusionService.recordProfileVersion(
+    personId,
+    "onboarding",
+    "Onboarding canonical data reconciled",
+    {
+      displayName: studentName,
+      headline,
+      institution,
+      degree,
+      specialization,
+      year,
+      projectsCount: draft.projects.filter((p) => p.status === "confirmed").length,
+    }
+  ).catch(() => null);
 
   draft.completed = true;
   draft.stage = "reveal";

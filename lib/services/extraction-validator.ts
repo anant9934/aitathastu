@@ -12,7 +12,7 @@
 export interface ValidationResult {
   valid: boolean;
   confidence: number;
-  flag?: "negation" | "aspiration" | "coursework_only" | "missing_evidence" | "unsupported";
+  flag?: "negation" | "aspiration" | "coursework_only" | "missing_evidence" | "unsupported" | "invalid_heading";
   reason?: string;
   normalizedValue: string;
 }
@@ -159,12 +159,45 @@ export class ExtractionValidator {
     };
   }
 
+  static isHeadingOrNonProject(title: string): boolean {
+    const cleaned = title
+      .replace(/^[*_#:\-•—–\s]+|[*_#:\-•—–\s]+$/g, "")
+      .replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g, "$1$2")
+      .replace(/\b([A-Za-z]\s+){2,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ""))
+      .toLowerCase()
+      .trim();
+
+    if (/^(research|patents?|books?|publications?|papers?|awards?|honors?|certifications?|achievements?|education|experience|technical\s*skills|skills|projects|selected\s*projects|work\s*experience|academic\s*projects)$/i.test(cleaned)) {
+      return true;
+    }
+    if (/^(research,\s*patents\s*&\s*books|research\s*&\s*publications|patents\s*&\s*books|honors\s*&\s*awards|awards\s*&\s*achievements)$/i.test(cleaned)) {
+      return true;
+    }
+    if (/^(patent|book|paper|publication|honor|award)\s*:/i.test(cleaned)) {
+      return true;
+    }
+    if (/\b(?:patent\s+(?:application|no|grant|granted)|published\s+in|accepted\s+at\s+ieee|springer|packt\s+publishing|isbn\b)/i.test(cleaned)) {
+      return true;
+    }
+    return false;
+  }
+
   /**
    * Validates a project claim against the document.
    */
   static validateProjectClaim(title: string, sourceSpan: string, fullDocText?: string): ValidationResult {
     const trimmedTitle = title.trim();
     const span = sourceSpan.trim();
+
+    if (this.isHeadingOrNonProject(trimmedTitle)) {
+      return {
+        valid: false,
+        confidence: 0,
+        flag: "invalid_heading",
+        reason: `'${trimmedTitle}' is a section heading or publication/patent category, not a technical project.`,
+        normalizedValue: trimmedTitle,
+      };
+    }
 
     if (fullDocText && !fullDocText.toLowerCase().includes(span.toLowerCase())) {
       return {

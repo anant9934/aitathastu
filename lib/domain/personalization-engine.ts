@@ -214,6 +214,9 @@ export interface ComposedDashboardViewModel {
   targetRole: string;
   targetRoleId: string;
   goal: string;
+  institution?: string;
+  degree?: string;
+  studentName?: string;
   hero: {
     greeting: string;
     headline: string;
@@ -1157,9 +1160,11 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
   const summaryCards = [
     {
       id: "card_skills",
-      label: "Documented Skills",
+      label: "Tracked Skills",
       value: context.skills.length,
-      subtext: context.skills.length === 0 ? "Add your first skill" : `${context.skills.filter((s) => s.verificationStatus === "verified").length} verified`,
+      subtext: context.skills.length === 0
+        ? "Add your first skill"
+        : `${context.evidenceItems.filter((e) => e.category === "skill").length} evidence points (${context.skills.filter((s) => s.verificationStatus === "verified").length} verified)`,
       emphasis: primary === "learning",
       provenance: "actual_records" as const,
       badge: primary === "learning" ? "Primary Focus" : undefined,
@@ -1478,6 +1483,9 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     targetRole: targetRoleName,
     targetRoleId: roleDef.id,
     goal: context.goal || "Choose your AI/ML goal",
+    institution: context.institution,
+    degree: context.degree,
+    studentName: context.name,
     hero: {
       greeting: `Welcome, ${context.name || "Student"}`,
       headline: heroHeadline,

@@ -348,7 +348,11 @@ export function Screen12StudentDashboard({
       .join("")
       .toUpperCase() || "ST";
 
-  const institution = data?.institution || (isDemo ? "Lovely Professional University (LPU)" : "Institution not provided");
+  const institution =
+    data?.institution ||
+    initialComposition?.institution ||
+    comp?.institution ||
+    (isDemo ? "Lovely Professional University (LPU)" : "Institution not provided");
 
   // Initialize EORA Greeting Chat
   useEffect(() => {

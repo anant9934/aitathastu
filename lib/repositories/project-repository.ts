@@ -54,11 +54,11 @@ export async function saveProject(personId: string, input: CreateProjectInput) {
     .limit(1);
 
   if (existing.length > 0) {
-    if (existing[0].status === "confirmed" && input.status === "candidate") return existing[0];
     const existingSources = (existing[0].sources as string[]) || [];
     const mergedSources = Array.from(new Set([...existingSources, ...(input.sources || [])]));
     const existingTechs = (existing[0].technologies as string[]) || [];
     const mergedTechs = Array.from(new Set([...existingTechs, ...(input.technologies || [])]));
+    const targetStatus = existing[0].status === "confirmed" ? "confirmed" : (input.status ?? existing[0].status);
 
     const [updated] = await db
       .update(projects)
@@ -73,7 +73,7 @@ export async function saveProject(personId: string, input: CreateProjectInput) {
         demoUrl: input.demoUrl !== undefined ? input.demoUrl : existing[0].demoUrl,
         technologies: mergedTechs,
         sources: mergedSources,
-        status: existing[0].status === "confirmed" && input.status === "candidate" ? "confirmed" : (input.status ?? existing[0].status),
+        status: targetStatus,
         links: input.links ?? existing[0].links,
         timeline: input.timeline ?? existing[0].timeline,
         team: input.team ?? existing[0].team,

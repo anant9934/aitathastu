@@ -15,7 +15,7 @@ export type EoraAssistanceMode = "quiet" | "balanced" | "playful";
 
 export interface EoraPreferences {
   assistanceMode: EoraAssistanceMode;
-  language: "en" | "hi" | "hinglish";
+  language: "en" | "hi" | "hinglish" | "english";
   tourCompletedIds: string[];
   dismissedSuggestionIds: string[];
   reducedMotion: boolean;
@@ -81,8 +81,13 @@ export function loadPreferencesForPerson(personId: string): EoraPreferences {
       // Migrate from generic key on first person-scoped access
       return loadPreferences();
     }
+    const generic = loadPreferences();
     const parsed = JSON.parse(raw);
-    return { ...createDefaultPreferences(), ...parsed };
+    return {
+      ...createDefaultPreferences(),
+      ...parsed,
+      language: generic.language || parsed.language || "en",
+    };
   } catch {
     return createDefaultPreferences();
   }
@@ -195,6 +200,22 @@ export function snoozeEora(
 export function isEoraSnoozed(prefs: EoraPreferences): boolean {
   if (!prefs.snoozedUntil) return false;
   return Date.now() < prefs.snoozedUntil;
+}
+
+/**
+ * Updates the user's language preference (English vs Hinglish).
+ */
+export function setLanguagePreference(
+  prefs: EoraPreferences,
+  language: "en" | "hi" | "hinglish" | "english"
+): EoraPreferences {
+  const updated = {
+    ...prefs,
+    language,
+    lastInteractionAt: Date.now(),
+  };
+  savePreferences(updated);
+  return updated;
 }
 
 /**

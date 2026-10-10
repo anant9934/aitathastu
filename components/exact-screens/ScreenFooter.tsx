@@ -60,6 +60,8 @@ export function ScreenFooter({
         {showBack && onBack ? (
           <button
             type="button"
+            id="eora-onboarding-back-btn"
+            data-eora-id="eora-onboarding-back-btn"
             className="stepper-circle-btn group"
             onClick={onBack}
             aria-label="Previous step"
@@ -241,6 +243,8 @@ export function ScreenFooter({
         {showNext && onNext ? (
           <button
             type="button"
+            id="eora-onboarding-next-btn"
+            data-eora-id="eora-onboarding-next-btn"
             className="btn-purple-next group"
             onClick={onNext}
             disabled={isNextDisabled}

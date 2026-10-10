@@ -19,8 +19,10 @@ import {
 import { useWorkspace } from "./student-context";
 import { getSourceLabel, getVerificationStatusLabel, type EvidenceItem } from "@/lib/domain";
 import { RequestVerificationModal } from "./request-verification-modal";
+import { useEora } from "@/components/eora/eora-provider";
 
 export function StudentProfileView() {
+  const eora = useEora();
   const {
     workspace,
     user,
@@ -66,6 +68,7 @@ export function StudentProfileView() {
       });
       setIsEditingProfile(false);
       setProfileSuccessMsg("Profile details saved to Tathastu Core.");
+      eora?.signalSuccess("profile_updated");
       setTimeout(() => setProfileSuccessMsg(null), 4000);
     } catch (err) {
       console.error("Save profile error", err);
@@ -142,10 +145,14 @@ export function StudentProfileView() {
           </div>
 
           <button
+            data-eora-id="eora-profile-edit-btn"
             onClick={() => {
               setDisplayName(workspace?.person.name || "");
               setEducation(workspace?.person.education || "");
               setExperience(workspace?.person.experience || "");
+              if (!isEditingProfile) {
+                eora?.notifyTaskEvent("profile_edit_started");
+              }
               setIsEditingProfile(!isEditingProfile);
             }}
             className="ws-btn ws-btn-secondary"
@@ -186,6 +193,7 @@ export function StudentProfileView() {
                 <label className="auth-label">Display Name</label>
                 <input
                   type="text"
+                  data-eora-id="eora-profile-input-name"
                   className="auth-input"
                   style={{ paddingLeft: 14 }}
                   value={displayName}
@@ -226,6 +234,7 @@ export function StudentProfileView() {
               </button>
               <button
                 type="submit"
+                data-eora-id="eora-profile-save-btn"
                 disabled={savingProfile}
                 className="ws-btn ws-btn-primary"
                 style={{ minHeight: 38, fontSize: 13 }}

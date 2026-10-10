@@ -38,10 +38,10 @@ export function ExactScreensContainer({
 
   // Notify EORA whenever the onboarding screen changes
   useEffect(() => {
-    if (isGalleryMode || !eora) return;
+    if (!eora) return;
     const step = screenNumberToOnboardingStep(currentScreen);
     eora.setOnboardingStep(step);
-  }, [currentScreen, eora, isGalleryMode]);
+  }, [currentScreen, eora]);
 
   useEffect(() => {
     setCurrentScreen(initialScreen);

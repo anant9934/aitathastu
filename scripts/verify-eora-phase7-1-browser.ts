@@ -50,13 +50,16 @@ async function shot(page: Page, name: string) {
 
 async function openHelpPanel(page: Page) {
   const panel = page.locator(".eora-panel");
-  if (!(await panel.isVisible())) {
-    const trigger = page.getByRole("button", { name: /EORA — open help panel/i });
-    if (await trigger.isVisible().catch(() => false)) {
-      await trigger.click();
-    } else {
-      await page.locator(".eora-avatar-trigger").first().click({ timeout: 5000 });
-    }
+  if (await panel.isVisible()) return;
+
+  const trigger = page.locator(".eora-avatar-trigger").first();
+  await trigger.waitFor({ state: "visible", timeout: 8000 });
+
+  // Retry click up to 3 times to ensure Next.js hydration has bound onClick
+  for (let i = 0; i < 3; i++) {
+    if (await panel.isVisible()) break;
+    await trigger.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(500);
   }
   await panel.waitFor({ state: "visible", timeout: 8000 });
 }
@@ -183,7 +186,7 @@ async function main() {
     // 3. Start task via Guide button
     const guideBtn = page.locator('[data-eora-id="eora-start-task-btn"]');
     record("Guide button '✨ Guide: Add & Document Project' visible", await guideBtn.isVisible());
-    await guideBtn.click();
+    await guideBtn.click({ force: true });
     await page.waitForTimeout(500);
 
     // 4. Verify Task Step 1 (Open Project Form)
@@ -216,7 +219,7 @@ async function main() {
     record("Project modal opened", await modalHeading.isVisible());
 
     // Step 2 (Title) — reached via project_modal_opened event or next
-    const nextStepBtn = taskCard.getByRole("button", { name: /Next/i }).first();
+    const nextStepBtn = page.locator("#eora-task-next-btn");
     const onTitleStep = await taskCard.locator("div").filter({ hasText: "Project Title" }).first().isVisible();
     if (!onTitleStep) {
       if (await nextStepBtn.isVisible()) {
@@ -230,6 +233,7 @@ async function main() {
     await shot(page, "03_task_step2_title_entered");
 
     // 6. Advance to Step 3 (Summary)
+    await nextStepBtn.scrollIntoViewIfNeeded().catch(() => {});
     await nextStepBtn.click();
     await page.waitForTimeout(400);
 
@@ -238,6 +242,7 @@ async function main() {
     await summaryInput.fill("Autonomous agent for real-time visual reasoning and tool calling.");
 
     // 7. Advance to Step 4 (Contribution Note)
+    await nextStepBtn.scrollIntoViewIfNeeded().catch(() => {});
     await nextStepBtn.click();
     await page.waitForTimeout(400);
 
@@ -247,6 +252,7 @@ async function main() {
     await shot(page, "04_task_step4_contribution_entered");
 
     // 8. Advance to Step 5 (Repository URL)
+    await nextStepBtn.scrollIntoViewIfNeeded().catch(() => {});
     await nextStepBtn.click();
     await page.waitForTimeout(400);
 
@@ -255,6 +261,7 @@ async function main() {
     await repoInput.fill("https://github.com/example/vision-agent");
 
     // 9. Advance to Step 6 (Review & Save Project - Confirmation Required)
+    await nextStepBtn.scrollIntoViewIfNeeded().catch(() => {});
     await nextStepBtn.click();
     await page.waitForTimeout(400);
 
@@ -266,11 +273,10 @@ async function main() {
     await shot(page, "05_task_step6_ready_to_save");
 
     // 10. Click Save Project to trigger save
-    const finishBtn = taskCard.locator("button.eora-tour-btn--primary");
-    await finishBtn.scrollIntoViewIfNeeded().catch(() => {});
-    record("Finish button in task card requires confirmation", await finishBtn.isVisible());
-    await finishBtn.click();
-    await page.waitForTimeout(500);
+    await nextStepBtn.scrollIntoViewIfNeeded().catch(() => {});
+    record("Finish button in task card requires confirmation", await nextStepBtn.isVisible());
+    await nextStepBtn.click();
+    await page.waitForTimeout(600);
 
     // Verify task celebration message
     const speechBubble = page.locator(".eora-speech-bubble");
@@ -374,7 +380,9 @@ async function main() {
       await chatInput.click();
       await chatInput.fill(query);
       await page.waitForTimeout(200);
+      await chatSendBtn.waitFor({ state: "visible" });
       await chatSendBtn.click();
+      await chatInput.evaluate((el: HTMLElement) => el.blur()).catch(() => {});
       await page.waitForTimeout(900);
       return (await bubble.textContent()) || "";
     };

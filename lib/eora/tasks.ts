@@ -13,6 +13,7 @@
  */
 
 import type { EoraAnimationState } from "./identity";
+import { getPageContract } from "./page-registry";
 
 export type EoraTaskState =
   | "IDLE"
@@ -55,6 +56,7 @@ export interface EoraTaskDefinition {
   taskId: string;
   pageId: string;
   route: string;
+  routeAliases?: string[];
   title: string;
   description: string;
   prerequisites: string[];
@@ -183,27 +185,27 @@ export const REGISTERED_TASKS: Record<string, EoraTaskDefinition> = {
       {
         stepId: "skill-step-list",
         stepNumber: 1,
-        title: "Inspect Skill Map",
-        instruction: "Review all skills detected from your resume and GitHub. Green badges represent verified evidence; gray are self-reported or pending.",
-        hinglishInstruction: "Resume aur GitHub se extract hui skills check kijiye. Green badges verified hain, gray abhi review pending hain.",
-        targetId: "eora-skills-list",
+        title: "Inspect Skills Overview",
+        instruction: "Review all skills detected from your resume and GitHub. The overview distinguishes total, demonstrated, and verified competencies.",
+        hinglishInstruction: "Resume aur GitHub se extract hui skills check kijiye. Overview me total, demonstrated aur verified counts dikhte hain.",
+        targetId: "eora-skills-overview",
         animationPose: "EXPLAINING",
       },
       {
         stepId: "skill-step-deepdive",
         stepNumber: 2,
-        title: "Explore Skill Deep-Dive",
-        instruction: "Click any skill to view 'Why Tathastu Thinks This', supporting code commits, and missing evidence guidance.",
-        hinglishInstruction: "Kisi bhi skill par click karke dekhiye ki system ne ye skill kyu detect ki aur kaunsa proof attached hai.",
-        targetId: "eora-skill-detail-card",
+        title: "Explore Skill Provenance",
+        instruction: "Inspect individual skills and source tags. Merely viewing a skill does NOT verify it; verification requires faculty evaluation or code artifact demonstration.",
+        hinglishInstruction: "Har skill ka source dekhiye. Bas dekh lene se skill verify nahi hoti; verification ke liye code proof ya faculty review chahiye.",
+        targetId: "eora-skills-list",
         animationPose: "POINTING",
       },
       {
         stepId: "skill-step-verification",
         stepNumber: 3,
         title: "Verify Skill Evidence",
-        instruction: "Remember: missing evidence does NOT mean low ability. It only means proof has not been formally verified by faculty yet. Submit your project links to verify.",
-        hinglishInstruction: "Dhyan rahe: evidence na hone ka matlab ye nahi ki ability kam hai. Bas faculty review baki hai. Project proof submit karke verify karwayein.",
+        instruction: "Remember: missing evidence does NOT mean low ability. It only means proof has not been formally evaluated yet. Link project repositories to build verified proof.",
+        hinglishInstruction: "Dhyan rahe: evidence na hone ka matlab ye nahi ki ability kam hai. Project code attach karke verified proof banayein.",
         targetId: "eora-skill-verification",
         animationPose: "REASSURING",
       },
@@ -316,36 +318,41 @@ export const REGISTERED_TASKS: Record<string, EoraTaskDefinition> = {
         stepId: "prof-step-header",
         stepNumber: 1,
         title: "Profile Header & Identity",
-        instruction: "Review your student identity, graduation cohort, and placement preferences. Update details as your academic standing changes.",
-        hinglishInstruction: "Apna student info, graduation year aur preferences check kijiye.",
+        instruction: "Review your student identity, graduation cohort, and placement preferences. Click 'Edit Profile' to update self-managed details.",
+        hinglishInstruction: "Apna student info, graduation year aur preferences check kijiye. Details update karne ke liye 'Edit Profile' click kijiye.",
         targetId: "eora-profile-header",
+        fieldId: "eora-profile-edit-btn",
+        expectedEvent: "profile_edit_started",
         animationPose: "EXPLAINING",
       },
       {
         stepId: "prof-step-goals",
         stepNumber: 2,
-        title: "Target Career Direction",
-        instruction: "Your active AI/ML goal dictates your personalized curriculum and benchmark opportunities. Change goals anytime without losing past evidence.",
-        hinglishInstruction: "Aapka target AI/ML goal yahan dikhta hai. Iske hisaab se roadmap calibrate hota hai.",
+        title: "Target Career Direction & Evidence",
+        instruction: "Your active AI/ML goal dictates your personalized curriculum. Notice the distinction between self-reported claims and verified badges.",
+        hinglishInstruction: "Aapka target goal yahan dikhta hai. Self-reported claims aur verified badges ka fark samjhiye.",
         targetId: "eora-profile-goals",
         animationPose: "POINTING",
       },
       {
-        stepId: "prof-step-evidence",
+        stepId: "prof-step-save",
         stepNumber: 3,
-        title: "Evidence Provenance",
-        instruction: "Every item indicates its origin: resume extraction, GitHub sync, or faculty verified. Verified evidence builds highest employer confidence.",
-        hinglishInstruction: "Har proof ka source yahan dikhta hai. Verified items par recruiters sabse zyada trust karte hain.",
-        targetId: "eora-profile-evidence",
+        title: "Save Profile Details",
+        instruction: "Update self-managed details and click 'Save to Database' to persist your Person 360 changes. EORA never auto-submits.",
+        hinglishInstruction: "Apne fields update karke 'Save to Database' par click kijiye. Data safely persist ho jayega.",
+        targetId: "eora-profile-save-btn",
+        fieldId: "eora-profile-save-btn",
+        requiresUserConfirmation: true,
+        expectedEvent: "profile_updated",
         animationPose: "REASSURING",
       },
     ],
     completionCelebration: {
-      message: "Profile audit complete! Your Person 360 profile is grounded and ready to share.",
-      hinglishMessage: "Profile audit pura hua! Aapka Person 360 profile ready hai.",
+      message: "Person 360 audit complete! Your self-managed profile updates are saved to Tathastu Core.",
+      hinglishMessage: "Profile audit pura hua! Aapke details safely save ho gaye hain.",
       nextRecommendedAction: "Back to Workspace",
       nextRoute: "/student",
-      animationPose: "HAPPY",
+      animationPose: "CELEBRATING",
     },
   },
 
@@ -354,36 +361,50 @@ export const REGISTERED_TASKS: Record<string, EoraTaskDefinition> = {
     taskId: "task-verification-guide",
     pageId: "verification",
     route: "/verification",
-    title: "Evidence Verification Queue",
-    description: "Understand faculty verification standards, submission criteria, and audit requirements for high-trust credentials.",
-    prerequisites: ["Evidence items submitted"],
-    requiredPermissions: ["student", "faculty"],
+    routeAliases: ["/faculty/verification"],
+    title: "Evidence Verification Guide",
+    description: "Guide authorized faculty through reviewing student evidence, checking repository artifacts, and issuing explicit audit decisions.",
+    prerequisites: ["Authorized faculty or evaluator session"],
+    requiredPermissions: ["faculty", "admin"],
     steps: [
       {
         stepId: "veri-step-queue",
         stepNumber: 1,
-        title: "Review Queue",
-        instruction: "Inspect pending and decided verification requests. Decisions include verified, rejected, or additional evidence requested.",
-        hinglishInstruction: "Pending aur approved verification requests yahan track kijiye.",
+        title: "Review Queue & Rubric",
+        instruction: "Inspect pending evidence items submitted by students. Filter by status or select an item to examine student code and references.",
+        hinglishInstruction: "Pending student submissions inspect kijiye. Review start karne ke liye kisi bhi submission par click kijiye.",
         targetId: "eora-verification-queue",
+        expectedEvent: "verification_review_opened",
         animationPose: "EXPLAINING",
       },
       {
         stepId: "veri-step-action",
         stepNumber: 2,
-        title: "Trust Standard",
-        instruction: "Verification requires reproducible code, working demos, or direct faculty confirmation. We maintain strict integrity standards.",
-        hinglishInstruction: "Verification ke liye working code ya faculty review zaroori hota hai.",
+        title: "Examine Code & Set Decision",
+        instruction: "Check repository URLs and personal contribution boundaries. Select Verified, Changes Requested, or Rejected, and enter mandatory constructive feedback.",
+        hinglishInstruction: "Student ka code aur repo check kijiye. Decision select karke constructive feedback note enter kijiye.",
         targetId: "eora-verification-action",
+        fieldId: "reason",
         animationPose: "POINTING",
+      },
+      {
+        stepId: "veri-step-confirm",
+        stepNumber: 3,
+        title: "Authorize Decision",
+        instruction: "Submit your final faculty evaluation. EORA strictly requires your explicit decision; reviews are never auto-approved.",
+        hinglishInstruction: "Apna decision confirm kijiye. System kabhi automatic decision submit nahi karta.",
+        targetId: "eora-verification-submit-btn",
+        requiresUserConfirmation: true,
+        expectedEvent: "verification_decision_submitted",
+        animationPose: "REASSURING",
       },
     ],
     completionCelebration: {
-      message: "Verification guidelines clear! Verified items permanently strengthen your portfolio.",
-      hinglishMessage: "Verification standard clear hai! Verified proof aapke career me bahut help karega.",
-      nextRecommendedAction: "Return to Projects",
-      nextRoute: "/student/projects",
-      animationPose: "HAPPY",
+      message: "Verification decision recorded! The student's Person 360 evidence ledger and badges have been updated.",
+      hinglishMessage: "Verification decision record ho gaya! Student ke badges aur evidence update ho gaye hain.",
+      nextRecommendedAction: "Review next submission",
+      nextRoute: "/verification",
+      animationPose: "CELEBRATING",
     },
   },
 };
@@ -399,10 +420,14 @@ export function getTaskById(taskId: string): EoraTaskDefinition | null {
 export function getTasksForRoute(route: string): EoraTaskDefinition[] {
   const normalized = route.split("?")[0].replace(/\/$/, "") || "/";
   const asToken = normalized.replace(/^\//, "").replace(/\//g, "-");
+  const contract = getPageContract(normalized);
+
   return Object.values(REGISTERED_TASKS).filter((task) => {
     if (task.route === normalized || task.pageId === normalized) return true;
     if (task.pageId === asToken) return true;
     if (task.pageId === route || task.route === route) return true;
+    if (task.routeAliases && task.routeAliases.includes(normalized)) return true;
+    if (contract && (contract.pageId === task.pageId || contract.pageId === task.route.replace(/^\//, ""))) return true;
     if (task.route.endsWith("/*") && normalized.startsWith(task.route.replace("/*", ""))) return true;
     return false;
   });
@@ -482,6 +507,14 @@ export function canResumeTask(
   const normalized = currentRoute.split("?")[0].replace(/\/$/, "") || "/";
   const asToken = normalized.replace(/^\//, "").replace(/\//g, "-");
   const sessionToken = session.route.replace(/^\//, "").replace(/\//g, "-");
+
+  const taskDef = getTaskById(session.taskId);
+  if (taskDef?.routeAliases && taskDef.routeAliases.includes(normalized)) return true;
+
+  const currentContract = getPageContract(normalized);
+  const sessionContract = getPageContract(session.route);
+  if (currentContract && sessionContract && currentContract.pageId === sessionContract.pageId) return true;
+
   return (
     session.route === normalized ||
     sessionToken === asToken ||

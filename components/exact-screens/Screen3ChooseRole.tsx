@@ -142,6 +142,8 @@ export function Screen3ChooseRole({
               return (
                 <div
                   key={r.id}
+                  id={`eora-role-${r.id}`}
+                  data-eora-id={`eora-role-${r.id}`}
                   onClick={() => handleSelect(r.id, r.available)}
                   role="button"
                   tabIndex={0}

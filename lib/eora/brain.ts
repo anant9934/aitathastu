@@ -62,6 +62,9 @@ export function processUserInput(
   intentResult: IntentRecognitionResult,
   context: EoraContext
 ): EoraDecision {
+  if (typeof window !== "undefined") {
+    console.log("[BRAIN_INPUT]", { rawInput, intent: intentResult.intent, conf: intentResult.confidence, isConf: isIntentConfident(intentResult) });
+  }
   // 1. Safety check on input
   const inputSafety = checkInputSafety(rawInput);
   if (!inputSafety.safe) {

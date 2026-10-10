@@ -13,6 +13,7 @@ import type { EoraContext, OnboardingStep } from "./context";
 import type { EoraAnimationState } from "./identity";
 import type { EoraIntent } from "./intent";
 import { getPageContract } from "./page-registry";
+import { HINGLISH_ONBOARDING_GUIDE, getHinglishIntentResponse } from "./hinglish";
 
 export interface EoraMessage {
   text: string;
@@ -166,11 +167,23 @@ export function getIntentResponse(
   context: EoraContext,
   params?: Record<string, string>
 ): EoraMessage {
+  const isHinglish = context?.language === "hinglish";
+  if (isHinglish && intent !== "SWITCH_LANGUAGE") {
+    const hinglishRes = getHinglishIntentResponse(intent, context, params);
+    if (hinglishRes) return hinglishRes;
+  }
+
   const name = context?.student?.displayName
     ? context.student.displayName.split(" ")[0]
     : "there";
 
   switch (intent) {
+    case "SKIP_STEP":
+      return {
+        text: "Skipping this step. Moving ahead!",
+        animationState: "POINTING",
+      };
+
     case "EXPLAIN_CURRENT_PAGE":
     case "EXPLAIN_PAGE":
       return getRouteWelcomeMessage(context);
@@ -236,6 +249,14 @@ export function getIntentResponse(
         animationState: "WORKING",
       };
     }
+
+    case "PLAYFUL_CLICK":
+      return {
+        text: isHinglish
+          ? "Boop! 😊 Main yahin hoon, guidance chahiye toh batao!"
+          : "Boop! 😊 I'm right here! Ready for guidance or have questions?",
+        animationState: "HAPPY",
+      };
 
     case "EXPLAIN_ERROR":
       return {
@@ -451,21 +472,31 @@ export function getIntentResponse(
 // MICRO-INTERACTION MESSAGES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function getOnboardingStepMessage(step: OnboardingStep): EoraMessage {
+export function getOnboardingStepMessage(step: OnboardingStep, isHinglish = false): EoraMessage {
+  if (isHinglish && HINGLISH_ONBOARDING_GUIDE[step]) {
+    const guide = HINGLISH_ONBOARDING_GUIDE[step];
+    return {
+      text: `${guide.characterGreeting} ${guide.actionInstruction}`,
+      animationState: ONBOARDING_MESSAGES[step]?.animationState ?? "EXPLAINING",
+    };
+  }
   return ONBOARDING_MESSAGES[step] ?? ONBOARDING_MESSAGES.none;
 }
 
 export function getFieldErrorMessage(
   fieldLabel: string,
-  errorMessage: string
+  errorMessage: string,
+  isHinglish = false
 ): EoraMessage {
   return {
-    text: `Looks like "${fieldLabel}" needs attention: ${errorMessage}`,
+    text: isHinglish
+      ? `"${fieldLabel}" par dhyan dijiye: ${errorMessage}`
+      : `Looks like "${fieldLabel}" needs attention: ${errorMessage}`,
     animationState: "REASSURING",
   };
 }
 
-export function getTinyVictoryMessage(action: string): EoraMessage {
+export function getTinyVictoryMessage(action: string, isHinglish = false): EoraMessage {
   const messages: Record<string, string> = {
     resume_uploaded: "Resume claims saved. You can review them in your profile.",
     github_connected: "GitHub connected! Discovering your projects.",
@@ -479,38 +510,62 @@ export function getTinyVictoryMessage(action: string): EoraMessage {
     goal_set: "Goal set! Your roadmap is being calibrated.",
     evidence_verified: "Evidence verified! This adds real credibility to your profile.",
   };
+  const hinglishMessages: Record<string, string> = {
+    resume_uploaded: "Resume claims save ho gaye hain. Profile me review kar sakte hain.",
+    github_connected: "GitHub connect ho gaya! Projects discover kar rahi hoon.",
+    projects_discovered: "GitHub se projects mil gaye. Apne contribution note confirm kijiye.",
+    extraction_completed: "Extraction pura hua. Suggested claims check karke save kijiye.",
+    skill_confirmed: "Skill confirm ho gaya! Profile aur strong ban gayi.",
+    project_confirmed: "Project confirm ho gaya. Contribution note successfully saved.",
+    project_saved: "Project safely save ho gaya! Next step: skills se link karna.",
+    roadmap_milestone_completed: "Milestone complete! Roadmap update ho gaya.",
+    onboarding_complete: "Onboarding complete! Workspace explore karne ke liye ready hai.",
+    goal_set: "Goal set ho gaya! Roadmap calibrate ho raha hai.",
+    evidence_verified: "Evidence verified! Isse aapki profile ki credibility badhegi.",
+  };
   return {
-    text: messages[action] ?? "Done! Nice work.",
+    text: (isHinglish ? hinglishMessages[action] : messages[action]) ?? (isHinglish ? "Kaam ho gaya! Shabaash." : "Done! Nice work."),
     animationState: "HAPPY",
   };
 }
 
-export function getCelebrationMessage(studentName: string): EoraMessage {
+export function getCelebrationMessage(studentName: string, isHinglish = false): EoraMessage {
   const firstName = studentName.split(" ")[0];
   return {
-    text: `Congratulations, ${firstName}! You've completed onboarding. Your personalized AI Tathastu workspace is ready.`,
+    text: isHinglish
+      ? `Badhaai ho, ${firstName}! Onboarding complete ho gayi. Aapka personalized AI Tathastu workspace taiyaar hai!`
+      : `Congratulations, ${firstName}! You've completed onboarding. Your personalized AI Tathastu workspace is ready.`,
     animationState: "CELEBRATING",
   };
 }
 
-export function getWelcomeBackMessage(studentName: string): EoraMessage {
+export function getWelcomeBackMessage(studentName: string, isHinglish = false): EoraMessage {
   const firstName = studentName.split(" ")[0];
   return {
-    text: `Welcome back, ${firstName}! Ready to continue your journey?`,
+    text: isHinglish
+      ? `Welcome back, ${firstName}! Aage continue karne ke liye taiyaar?`
+      : `Welcome back, ${firstName}! Ready to continue your journey?`,
     animationState: "WAVING",
   };
 }
 
-export function getPlayfulClickMessage(): EoraMessage {
-  const messages = [
+export function getPlayfulClickMessage(isHinglish = false): EoraMessage {
+  const messagesEn = [
     "Oh hey, you found me! What's up?",
-    "You clicked! Consider this your daily EORA interaction.",
+    "Boop! 😊 Consider this your daily EORA interaction.",
     "Hi there! Need guidance or just saying hello?",
     "Here if you need me. Always.",
   ];
-  const randomIndex = Math.floor(Math.random() * messages.length);
+  const messagesHinglish = [
+    "Arre, aapne click kiya! Kya chal raha hai?",
+    "Boop! 😊 Main yahan hoon, guidance chahiye toh batao!",
+    "Namaste! Koi madad chahiye ya bas hello bolne aaye?",
+    "Main har step par aapke saath hoon!",
+  ];
+  const list = isHinglish ? messagesHinglish : messagesEn;
+  const randomIndex = Math.floor(Math.random() * list.length);
   return {
-    text: messages[randomIndex],
+    text: list[randomIndex],
     animationState: "HAPPY",
   };
 }

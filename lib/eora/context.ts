@@ -116,6 +116,8 @@ export interface EoraContext {
   processingState: string | null;
   /** Timestamp of last EORA interaction */
   lastEoraInteractionAt: number | null;
+  /** Language preference: english or hinglish */
+  language?: "english" | "hinglish";
 }
 
 /**
@@ -164,7 +166,7 @@ export function resolveRouteFromPathname(pathname: string): EoraRoute {
   if (pathname === "/" || pathname === "") return "landing";
   if (pathname.startsWith("/sign-in")) return "sign-in";
   if (pathname.startsWith("/sign-up")) return "sign-up";
-  if (pathname.startsWith("/onboarding")) return "onboarding";
+  if (pathname.startsWith("/onboarding") || pathname.startsWith("/screens")) return "onboarding";
   if (pathname === "/student" || pathname === "/student/") return "student-home";
   if (pathname.startsWith("/student/profile")) return "student-profile";
   if (pathname.startsWith("/student/skills")) return "student-skills";
@@ -174,8 +176,8 @@ export function resolveRouteFromPathname(pathname: string): EoraRoute {
   if (pathname.startsWith("/student/assessments")) return "student-assessments";
   if (pathname.startsWith("/student/interviews")) return "student-interviews";
   if (pathname.startsWith("/student/connections")) return "student-connections";
-  if (pathname.startsWith("/dashboard")) return "dashboard";
-  if (pathname.startsWith("/verification")) return "verification";
+  if (pathname.startsWith("/dashboard")) return "student-home";
+  if (pathname.startsWith("/verification") || pathname.startsWith("/faculty/verification")) return "verification";
   return "unknown";
 }
 

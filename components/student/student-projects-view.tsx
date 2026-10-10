@@ -483,8 +483,12 @@ export function StudentProjectsView() {
   };
 
   const handleSubmit = async (asDraft: boolean = false) => {
+    if (isSubmitting) return;
+
     if (!title.trim()) {
-      setFormError("Project title is required.");
+      const msg = "Project title is required.";
+      setFormError(msg);
+      eora?.signalFieldError("eora-project-input-title", "Project Title", "A clear working title is required to document this project.");
       return;
     }
 
@@ -492,7 +496,9 @@ export function StudentProjectsView() {
     if (repositoryUrl.trim()) {
       const v = validateProjectUrl(repositoryUrl.trim());
       if (!v.valid) {
-        setFormError(`Repository URL error: ${v.error}`);
+        const msg = `Repository URL error: ${v.error}`;
+        setFormError(msg);
+        eora?.signalFieldError("eora-project-input-repo", "Repository URL", v.error || "Please check your repository URL.");
         return;
       }
     }
@@ -500,7 +506,9 @@ export function StudentProjectsView() {
     if (demoUrl.trim()) {
       const v = validateProjectUrl(demoUrl.trim());
       if (!v.valid) {
-        setFormError(`Demo URL error: ${v.error}`);
+        const msg = `Demo URL error: ${v.error}`;
+        setFormError(msg);
+        eora?.signalFieldError("demoUrl", "Demo URL", v.error || "Please check your demo URL.");
         return;
       }
     }
@@ -509,7 +517,9 @@ export function StudentProjectsView() {
       if (l.url) {
         const v = validateProjectUrl(l.url);
         if (!v.valid) {
-          setFormError(`Link "${l.label || l.url}" error: ${v.error}`);
+          const msg = `Link "${l.label || l.url}" error: ${v.error}`;
+          setFormError(msg);
+          eora?.signalFieldError(l.id, l.label || "Project Link", v.error || "Invalid link URL.");
           return;
         }
       }
@@ -610,7 +620,9 @@ export function StudentProjectsView() {
       setShowModal(false);
       resetForm();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Error saving project.");
+      const msg = err instanceof Error ? err.message : "Error saving project.";
+      setFormError(msg);
+      eora?.signalFieldError("eora-project-save-btn", "Project Form", msg);
     } finally {
       setIsSubmitting(false);
     }

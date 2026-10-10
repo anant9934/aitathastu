@@ -19,6 +19,7 @@ export type EoraIntent =
   | "PREVIOUS_TOUR_STEP"
   | "REPEAT_INSTRUCTION"
   | "SIMPLIFY_EXPLANATION"
+  | "SKIP_STEP"
   | "VALIDATE_FIELD"
   | "HELP_WITH_FORM"
   | "OPEN_RELEVANT_SECTION"
@@ -50,6 +51,7 @@ export type EoraIntent =
   | "EXPLAIN_FIELD_REQUIREMENT"
   | "EXPLAIN_WHY_NOT_SAVING"
   | "SWITCH_LANGUAGE"
+  | "PLAYFUL_CLICK"
   | "UNKNOWN_INTENT"
   | "UNKNOWN";
 
@@ -97,8 +99,8 @@ function normalizeInput(raw: string): string {
     "dobara": "repeat",
     "chup": "quiet",
     "band": "stop",
-    "ruko": "stop",
-    "rukao": "stop",
+    "ruko": "pause",
+    "rukao": "pause",
     "shuru": "start",
     "tour": "tour",
     "help": "help",
@@ -127,6 +129,7 @@ const INTENT_PATTERNS: Array<{
       /\bwhat is this page\b/,
       /\bwhat does this page do\b/,
       /\bexplain this page\b/,
+      /\bexplain page\b/,
       /\bexplain this screen\b/,
       /\bexplain screen\b/,
       /\bwhat am i looking at\b/,
@@ -163,6 +166,24 @@ const INTENT_PATTERNS: Array<{
     ],
     weight: 0.88,
   },
+  // EXPLAIN_COMPONENT
+  {
+    intent: "EXPLAIN_COMPONENT",
+    patterns: [
+      /\byeh? button kya karta hai\b/,
+      /\byeh? button kya\b/,
+      /\bwhat does this button do\b/,
+      /\bwhat is this button\b/,
+      /\b(ye|yeh) kya hai\b/,
+      /\b(ye|yeh) kya\b/,
+      /\bmujhe (yeh|ye) samjhao\b/,
+      /\b(yeh|ye) samjhao\b/,
+      /\bwhat is this element\b/,
+      /\bexplain this element\b/,
+      /\bwhat is this (card|section|box)\b/,
+    ],
+    weight: 0.95,
+  },
   // EXPLAIN_FIELD_REQUIREMENT
   {
     intent: "EXPLAIN_FIELD_REQUIREMENT",
@@ -185,23 +206,36 @@ const INTENT_PATTERNS: Array<{
       /\btour the (whole|entire|full)\b/,
       /\bwalk me through everything\b/,
       /\btake me on a tour\b/,
+      /\bpura website (tour|dikhao|tour karao|ghomao)?\b/,
+      /\bpura website\b/,
+      /\bexplore ai tathastu\b/,
+      /\bexplore tathastu\b/,
+      /\bexplore (the )?website\b/,
+      /\bwebsite tour\b/,
     ],
-    weight: 0.9,
+    weight: 0.95,
   },
   // START_PAGE_TOUR
   {
     intent: "START_PAGE_TOUR",
     patterns: [
+      /\btour me\b/,
+      /\btour karao\b/,
       /\bstart tour\b/,
       /\bpage tour\b/,
       /\btour this page\b/,
       /\bguide me\b/,
+      /\beora,? guide me\b/,
+      /\bcan you guide me\b/,
+      /\b(mujhe|me) guide (karo|kariye)?\b/,
+      /\bguide karo\b/,
       /\bshow me around\b/,
       /\b(mujhe|me) start se (samjhao|explain)\b/,
+      /\b(mujhe|me) shuru se (samjhao|explain)\b/,
       /\bexplain (from|from the) start\b/,
       /\bstart se batao\b/,
+      /\bstart se samjhao\b/,
       /\bbegin from start\b/,
-      /\btour karao\b/,
       /\btour shuru\b/,
       /\bshuru karo tour\b/,
       /\btour\b/,
@@ -209,12 +243,15 @@ const INTENT_PATTERNS: Array<{
       /\bhow do i use this\b/,
       /\bhelp me navigate\b/,
     ],
-    weight: 0.9,
+    weight: 0.92,
   },
   // NEXT_TOUR_STEP
   {
     intent: "NEXT_TOUR_STEP",
     patterns: [
+      /\bnext dikhao\b/,
+      /\baage dikhao\b/,
+      /\baage chalo\b/,
       /\bnext step\b/,
       /\bnext\b/,
       /\bcontinue\b/,
@@ -223,7 +260,7 @@ const INTENT_PATTERNS: Array<{
       /\baage\b/,
       /\bkeep going\b/,
     ],
-    weight: 0.75,
+    weight: 0.85,
   },
   // PREVIOUS_TOUR_STEP
   {
@@ -242,6 +279,8 @@ const INTENT_PATTERNS: Array<{
     intent: "REPEAT_INSTRUCTION",
     patterns: [
       /\brepeat\b/,
+      /\brepeat karo\b/,
+      /\bdobara batao\b/,
       /\bsay that again\b/,
       /\brepeat that\b/,
       /\bexplain again\b/,
@@ -250,7 +289,7 @@ const INTENT_PATTERNS: Array<{
       /\bphir se\b/,
       /\bonce more\b/,
     ],
-    weight: 0.85,
+    weight: 0.92,
   },
   // SHOW_ACTUAL_SKILLS
   {
@@ -335,6 +374,9 @@ const INTENT_PATTERNS: Array<{
   {
     intent: "SHOW_NEXT_ACTION",
     patterns: [
+      /\bab aage kya karna hai\b/,
+      /\bab aage kya\b/,
+      /\bab aage\b/,
       /\bnext kya karna hai\b/,
       /\bab kya karu\b/,
       /\bab what karu\b/,
@@ -342,7 +384,6 @@ const INTENT_PATTERNS: Array<{
       /\bkya karu\b/,
       /\bnext what\b/,       // normalized form of "next kya"
       /\bwhat's next\b/,
-
       /\bwhats next\b/,      // normalized form after punctuation removal
       /\bwhat s next\b/,     // normalized form: apostrophe → space
       /\bwhat next\b/,       // further normalized
@@ -368,6 +409,10 @@ const INTENT_PATTERNS: Array<{
   {
     intent: "PAUSE_ASSISTANT",
     patterns: [
+      /\bruko\b/,
+      /\bbaad mein continue karenge\b/,
+      /\bbaad me continue karenge\b/,
+      /\bbaad me\b/,
       /\bstop showing tips\b/,
       /\bstop tips\b/,
       /\bquiet\b/,
@@ -378,7 +423,20 @@ const INTENT_PATTERNS: Array<{
       /\bstop bothering\b/,
       /\bnot now\b/,
     ],
-    weight: 0.85,
+    weight: 0.92,
+  },
+  // SKIP_STEP
+  {
+    intent: "SKIP_STEP",
+    patterns: [
+      /\bskip\b/,
+      /\bskip step\b/,
+      /\bskip karo\b/,
+      /\bise chhodo\b/,
+      /\bchhodo\b/,
+      /\bignore this step\b/,
+    ],
+    weight: 0.95,
   },
   // DISMISS_ASSISTANT
   {
@@ -430,6 +488,10 @@ const INTENT_PATTERNS: Array<{
       /\b(stop|end|exit|quit|cancel) tour\b/,
       /\btour (band|stop|ruko)\b/,
       /\bband karo tour\b/,
+      /\bstop\b/,
+      /\bband karo\b/,
+      /\bexit\b/,
+      /\bquit\b/,
     ],
     weight: 0.95,
   },
@@ -437,6 +499,9 @@ const INTENT_PATTERNS: Array<{
   {
     intent: "SIMPLIFY_EXPLANATION",
     patterns: [
+      /\b(mujhe|me) nahi samajh aaya\b/,
+      /\b(mujhe|me) samajh nahi aaya\b/,
+      /\bsamajh nahi aaya\b/,
       /\bi don ?t understand\b/,
       /\bi dont understand\b/,
       /\bdo not understand\b/,
@@ -453,6 +518,18 @@ const INTENT_PATTERNS: Array<{
       /\bsamajh not aa raha\b/,
     ],
     weight: 0.95,
+  },
+  // PLAYFUL_CLICK
+  {
+    intent: "PLAYFUL_CLICK",
+    patterns: [
+      /\bboop\b/i,
+      /\bboop!\b/i,
+      /\bhello eora\b/i,
+      /\bhi eora\b/i,
+      /\bhey eora\b/i,
+    ],
+    weight: 0.96,
   },
   // HELP_WITH_FORM
   {
@@ -722,6 +799,11 @@ export function recognizeIntent(
       params.pageContext = "connections";
       params.suggestedAction = "link_github";
     }
+  }
+
+  // Debug log for browser intent tracking
+  if (typeof window !== "undefined") {
+    console.log("[EORA_INTENT]", { raw, bestIntent, bestConfidence, pathname: routeOrPathname });
   }
 
   return {

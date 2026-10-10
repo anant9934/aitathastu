@@ -455,7 +455,7 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
   // 5. STUDENT DASHBOARD (HOME)
   "student-home": {
     pageId: "student-home",
-    routePattern: /^\/student\/?$/,
+    routePattern: /^\/(student|dashboard)(\/dashboard)?\/?$/,
     routePath: "/student",
     pageTitle: "Student Workspace | AI Tathastu",
     pagePurpose:
@@ -1273,6 +1273,7 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
       title: "Faculty Verification Queue",
       description: "Reviewing student evidence submissions.",
       validRoute: "/verification",
+      validRouteAliases: ["/faculty/verification"],
       persistent: false,
       steps: [
         { stepId: "v-queue", targetId: "eora-verification-queue", title: "Review Queue", explanation: "Inspect pending evidence items submitted by students." },

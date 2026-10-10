@@ -61,7 +61,9 @@ import {
   resetPreferences,
   clearPreferencesForPerson,
   detectReducedMotionPreference,
+  setLanguagePreference,
 } from "@/lib/eora/engagement";
+import { getPageContract } from "@/lib/eora/page-registry";
 import type { TourDefinition } from "@/lib/eora/tours";
 import { getTourById } from "@/lib/eora/tours";
 import type { EoraAnimationState } from "@/lib/eora/identity";
@@ -176,6 +178,11 @@ export interface EoraController extends EoraControllerState {
   focusField: (fieldId: string, label: string) => void;
   updatePreferences: (patch: Partial<EoraPreferences>) => void;
   resetAllPreferences: () => void;
+  /** Language toggling */
+  setLanguage: (lang: "english" | "hinglish") => void;
+  toggleLanguage: () => void;
+  /** Playful avatar boop reaction */
+  boop: () => void;
   /** Deprecated compat shim — use updateLiveStudentContext instead */
   updateStudentContext: (patch: Partial<EoraPreferences>) => void;
   context: EoraContext;
@@ -240,9 +247,14 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const hasShownWelcomeBack = useRef(false);
   const managedTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const startTaskRef = useRef<(taskId: string) => void>(() => {});
+  const advanceTaskRef = useRef<() => void>(() => {});
+  const startTourRef = useRef<(tourId: string) => void>(() => {});
+  const pauseTourRef = useRef<() => void>(() => {});
+  const resumeTourRef = useRef<() => void>(() => {});
   const exitTourRef = useRef<() => void>(() => {});
   const nextTourStepRef = useRef<() => void>(() => {});
   const prevTourStepRef = useRef<() => void>(() => {});
+  const setLanguageRef = useRef<(lang: "english" | "hinglish") => void>(() => {});
 
   const schedule = useCallback((callback: () => void, delay: number) => {
     const timer = setTimeout(() => {
@@ -272,6 +284,10 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       lastSuccessfulAction,
       processingState: liveStudent.isProcessing ? "Processing..." : null,
       lastEoraInteractionAt: preferences.lastInteractionAt,
+      language:
+        preferences.language === "hinglish" || preferences.language === "hi"
+          ? "hinglish"
+          : "english",
     }),
     [
       pathname,
@@ -281,17 +297,62 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       preferences.tourCompletedIds,
       preferences.dismissedSuggestionIds,
       preferences.lastInteractionAt,
+      preferences.language,
       userIsFocused,
       lastSuccessfulAction,
     ]
   );
 
-  // ── Init: load preferences and detect reduced motion ──────────────────────
   useEffect(() => {
     const prefs = loadPreferences();
     const rm = detectReducedMotionPreference();
     setPreferences({ ...prefs, reducedMotion: prefs.reducedMotion || rm });
   }, []);
+
+  // ── Automatic quiet behavior during typing and focused work ────────────────
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        if (target instanceof Element && target.closest(".eora-floating-root, .eora-panel")) {
+          return;
+        }
+        setUserIsFocused(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        setUserIsFocused(false);
+      }
+    };
+
+    window.addEventListener("focusin", handleFocusIn);
+    window.addEventListener("focusout", handleFocusOut);
+
+    return () => {
+      window.removeEventListener("focusin", handleFocusIn);
+      window.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
+
+  // ── Task account isolation guard ───────────────────────────────────────────
+  useEffect(() => {
+    if (activeTask && activeTask.personId && liveStudent.personId && activeTask.personId !== liveStudent.personId) {
+      setActiveTask(null);
+      setActiveTaskDef(null);
+      setTourSpotlightTargetId(null);
+    }
+  }, [liveStudent.personId, activeTask]);
 
   // ── Proactive nudge on route / step change ────────────────────────────────
   useEffect(() => {
@@ -358,13 +419,14 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   // ── Onboarding step change → EORA message ─────────────────────────────────
   useEffect(() => {
     if (onboardingStep === "none" || activeTour || preferences.assistanceMode === "quiet") return;
-    const msg = getOnboardingStepMessage(onboardingStep);
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+    const msg = getOnboardingStepMessage(onboardingStep, isHinglish);
     if (msg.text) {
       setCurrentMessage(msg);
       setAnimationState(msg.animationState);
       setClarifyingOptions(null);
     }
-  }, [onboardingStep, activeTour, preferences.assistanceMode]);
+  }, [onboardingStep, activeTour, preferences.assistanceMode, preferences.language]);
 
   // ── Clear celebration after 3s ────────────────────────────────────────────
   useEffect(() => {
@@ -449,14 +511,73 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         schedule(() => setIsVisible(false), 800);
       }
       if (intentResult.intent === "PAUSE_ASSISTANT" || intentResult.intent === "QUIET_MODE") {
+        if (activeTour) {
+          pauseTourRef.current();
+          return;
+        }
         setPreferences((p) => snoozeEora(p, 60));
       }
       if (intentResult.intent === "RESUME_ASSISTANT" || intentResult.intent === "RESUME") {
+        if (activeTour && tourPaused) {
+          resumeTourRef.current();
+          return;
+        }
         setIsVisible(true);
         setIsMinimized(false);
       }
-      if (intentResult.intent === "STOP_TOUR" && activeTour) {
-        exitTourRef.current();
+      if (intentResult.intent === "STOP_TOUR") {
+        if (activeTour) {
+          exitTourRef.current();
+          return;
+        }
+      }
+      if (intentResult.intent === "START_FULL_TOUR") {
+        startTourRef.current("explore-ai-tathastu");
+        return;
+      }
+      if (intentResult.intent === "START_PAGE_TOUR" || intentResult.intent === "START_TOUR") {
+        const route = context.route;
+        const pageContract = getPageContract(route);
+        const tourIdForRoute: Record<string, string> = {
+          "student-home": "student-home",
+          "student-skills": "student-skills",
+          "student-projects": "student-projects",
+          "student-roadmap": "student-roadmap",
+          "onboarding": "onboarding-welcome",
+        };
+        const targetTour = pageContract?.guidedTour?.tourId || tourIdForRoute[route] || "student-home";
+        startTourRef.current(targetTour);
+        return;
+      }
+      if (intentResult.intent === "SKIP_STEP") {
+        if (activeTour) {
+          nextTourStepRef.current();
+          return;
+        }
+        if (activeTask) {
+          advanceTaskRef.current();
+          return;
+        }
+      }
+      if (intentResult.intent === "REPEAT_INSTRUCTION") {
+        if (activeTour) {
+          const step = activeTour.steps[tourStepIndex];
+          if (step) {
+            const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+            setCurrentMessage({
+              text: isHinglish ? (step.hinglishExplanation ?? step.explanation) : step.explanation,
+              animationState: "POINTING",
+            });
+            setAnimationState("POINTING");
+            setTourSpotlightTargetId(step.targetId);
+          }
+          return;
+        }
+      }
+      if (intentResult.intent === "SWITCH_LANGUAGE") {
+        const lower = text.toLowerCase();
+        const nextLang = lower.includes("hinglish") ? "hinglish" : "english";
+        setLanguageRef.current(nextLang);
         return;
       }
       if (intentResult.intent === "NEXT_TOUR_STEP" && activeTour) {
@@ -503,6 +624,59 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     setClarifyingOptions(null);
   }, []);
 
+  // ── Language controls ──────────────────────────────────────────────────────
+  const setLanguage = useCallback((lang: "english" | "hinglish") => {
+    setPreferences((prev) => {
+      const updated = setLanguagePreference(prev, lang);
+      if (liveStudent.personId) {
+        savePreferencesForPerson(liveStudent.personId, updated);
+      }
+      return updated;
+    });
+
+    if (activeTour) {
+      const step = activeTour.steps[tourStepIndex];
+      if (step) {
+        const text = lang === "hinglish" ? (step.hinglishExplanation ?? step.explanation) : step.explanation;
+        setCurrentMessage({ text, animationState: "POINTING" });
+      }
+      return;
+    }
+
+    if (onboardingStep && onboardingStep !== "none") {
+      const msg = getOnboardingStepMessage(onboardingStep, lang === "hinglish");
+      setCurrentMessage(msg);
+      setAnimationState(msg.animationState);
+      return;
+    }
+
+    setCurrentMessage({
+      text:
+        lang === "hinglish"
+          ? "Bilkul! Ab main aapse Hinglish me baat karungi. Kahiye, kya guide karoon?"
+          : "Switched to English! How can I guide you today?",
+      animationState: "HAPPY",
+    });
+    setAnimationState("HAPPY");
+  }, [activeTour, tourStepIndex, onboardingStep, liveStudent.personId]);
+
+  const toggleLanguage = useCallback(() => {
+    const nextLang = preferences.language === "hinglish" || preferences.language === "hi" ? "english" : "hinglish";
+    setLanguage(nextLang);
+  }, [preferences.language, setLanguage]);
+
+  const boop = useCallback(() => {
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+    setCurrentMessage({
+      text: isHinglish
+        ? "Boop! 😊 Main yahin hoon, guidance chahiye toh batao!"
+        : "Boop! 😊 I'm right here with you. What can I help guide?",
+      animationState: "HAPPY",
+    });
+    setAnimationState("HAPPY");
+    setIsPanelOpen(false);
+  }, [preferences.language]);
+
   // ── Tour controls ──────────────────────────────────────────────────────────
   const startTour = useCallback((tourId: string) => {
     const tour = getTourById(tourId);
@@ -511,23 +685,30 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     setTourStepIndex(0);
     setTourPaused(false);
     const firstStep = tour.steps[0];
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+    const text = isHinglish
+      ? (firstStep?.hinglishExplanation ?? firstStep?.explanation ?? "Chaliye main aapko is page ka interactive tour karwati hoon!")
+      : (firstStep?.explanation ?? tour.description);
     setCurrentMessage({
-      text: firstStep?.explanation ?? tour.description,
-      animationState: "EXPLAINING",
+      text,
+      animationState: "POINTING",
     });
-    setAnimationState("EXPLAINING");
+    setAnimationState("POINTING");
     setTourSpotlightTargetId(firstStep?.targetId ?? null);
-    setIsPanelOpen(true);
-  }, []);
+    setIsPanelOpen(false);
+  }, [preferences.language]);
 
   const nextTourStep = useCallback(() => {
     if (!activeTour || tourPaused) return;
     const nextIndex = tourStepIndex + 1;
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
     if (activeTour.tourId === "onboarding-welcome" && nextIndex < activeTour.steps.length) {
       const nextTarget = activeTour.steps[nextIndex].targetId;
-      if (!document.querySelector(`[data-eora-id="${nextTarget}"]`)) {
+      if (!document.querySelector(`[data-eora-id="${nextTarget}"], #${nextTarget}`)) {
         setCurrentMessage({
-          text: "Complete this step in the form to continue the tour. I'll follow you to the next screen.",
+          text: isHinglish
+            ? "Pehle is step ka action complete kijiye. Main aapke saath agle screen par chalungi!"
+            : "Complete this step in the form to continue the tour. I'll follow you to the next screen.",
           animationState: "WAITING",
         });
         setAnimationState("WAITING");
@@ -541,7 +722,9 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       setTourPaused(false);
       setTourSpotlightTargetId(null);
       setCurrentMessage({
-        text: "Tour complete! You know this page well now.",
+        text: isHinglish
+          ? "Tour complete ho gaya! Ab aap is page ko acche se samajh gaye hain. Shabaash!"
+          : "Tour complete! You know this page well now.",
         animationState: "HAPPY",
       });
       setAnimationState("HAPPY");
@@ -550,62 +733,80 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     setTourStepIndex(nextIndex);
     const step = activeTour.steps[nextIndex];
     setCurrentMessage({
-      text: step.explanation,
+      text: isHinglish ? (step.hinglishExplanation ?? step.explanation) : step.explanation,
       animationState: "POINTING",
     });
     setAnimationState("POINTING");
     setTourSpotlightTargetId(step.targetId);
-  }, [activeTour, tourStepIndex, tourPaused]);
+  }, [activeTour, tourStepIndex, tourPaused, preferences.language]);
 
   const prevTourStep = useCallback(() => {
     if (!activeTour || tourStepIndex === 0) return;
     const prevIndex = tourStepIndex - 1;
     setTourStepIndex(prevIndex);
     const step = activeTour.steps[prevIndex];
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
     setCurrentMessage({
-      text: step.explanation,
+      text: isHinglish ? (step.hinglishExplanation ?? step.explanation) : step.explanation,
       animationState: "EXPLAINING",
     });
     setAnimationState("EXPLAINING");
     setTourSpotlightTargetId(step.targetId);
-  }, [activeTour, tourStepIndex]);
+  }, [activeTour, tourStepIndex, preferences.language]);
 
   const exitTour = useCallback(() => {
     setActiveTour(null);
     setTourStepIndex(0);
     setTourPaused(false);
     setTourSpotlightTargetId(null);
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
     setCurrentMessage({
-      text: "Tour ended. I'm here whenever you need me.",
+      text: isHinglish
+        ? "Tour band kar diya gaya hai. Main yahin hoon, jab bhi zaroorat ho bula lena!"
+        : "Tour ended. I'm here whenever you need me.",
       animationState: "WAVING",
     });
     setAnimationState("WAVING");
-  }, []);
+  }, [preferences.language]);
 
   useEffect(() => {
     if (!activeTour) return;
     const isValid =
       activeTour.validRoute === "/"
         ? pathname === "/" || pathname === ""
-        : pathname.startsWith(activeTour.validRoute);
+        : pathname.startsWith(activeTour.validRoute) ||
+          activeTour.validRouteAliases?.some((alias) => pathname.startsWith(alias)) ||
+          (activeTour.validRoute === "/verification" && pathname.startsWith("/faculty/verification"));
     if (!isValid) exitTour();
   }, [activeTour, pathname, exitTour]);
 
   const pauseTour = useCallback(() => {
     setTourPaused(true);
     setTourSpotlightTargetId(null);
-    setCurrentMessage({ text: "Tour paused. Continue when you're ready.", animationState: "WAITING" });
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+    setCurrentMessage({
+      text: isHinglish
+        ? "Tour pause ho gaya hai. Jab aap tayyar hon, 'Resume' dabayein ya 'Next' bolein."
+        : "Tour paused. Continue when you're ready.",
+      animationState: "WAITING",
+    });
     setAnimationState("WAITING");
-  }, []);
+  }, [preferences.language]);
 
   const resumeTour = useCallback(() => {
     if (!activeTour) return;
     const step = activeTour.steps[tourStepIndex];
     setTourPaused(false);
-    setTourSpotlightTargetId(step?.targetId ?? null);
-    setCurrentMessage({ text: step?.explanation ?? activeTour.description, animationState: "EXPLAINING" });
-    setAnimationState("EXPLAINING");
-  }, [activeTour, tourStepIndex]);
+    if (step) {
+      const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+      setCurrentMessage({
+        text: isHinglish ? (step.hinglishExplanation ?? step.explanation) : step.explanation,
+        animationState: "POINTING",
+      });
+      setAnimationState("POINTING");
+      setTourSpotlightTargetId(step.targetId);
+    }
+  }, [activeTour, tourStepIndex, preferences.language]);
 
   // ── Phase 7.1 Guided Task State Machine ──────────────────────────────────
   const startTask = useCallback(
@@ -615,6 +816,9 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       const session = createInitialTaskSession(taskDef, liveStudent.personId || undefined);
       setActiveTask(session);
       setActiveTaskDef(taskDef);
+      setClarifyingOptions(null);
+      setPendingNavUrl(null);
+      setPendingNavLabel(null);
       setIsPanelOpen(true);
       const firstStep = taskDef.steps[0];
       if (firstStep) {
@@ -722,7 +926,34 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       if (!activeTask || !activeTaskDef) return;
       const currentStep = activeTaskDef.steps[activeTask.currentStepIndex];
       if (currentStep && currentStep.expectedEvent === eventName) {
-        advanceTask();
+        if (activeTask.currentStepIndex >= activeTaskDef.steps.length - 1) {
+          // Final step completed via event!
+          setActiveTask((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  state: "COMPLETED",
+                  lastUpdatedAt: Date.now(),
+                }
+              : null
+          );
+          const celebration = activeTaskDef.completionCelebration;
+          setCurrentMessage({
+            text: celebration.message,
+            animationState: celebration.animationPose,
+            actionUrl: celebration.nextRoute,
+            actionLabel: celebration.nextRecommendedAction,
+          });
+          setAnimationState(celebration.animationPose);
+          setTourSpotlightTargetId(null);
+          setShowCelebration(true);
+          if (celebration.nextRoute) {
+            setPendingNavUrl(celebration.nextRoute);
+            setPendingNavLabel(celebration.nextRecommendedAction);
+          }
+        } else {
+          advanceTask();
+        }
       } else if (eventName === "project_saved" && activeTask.taskId === "task-add-project") {
         setActiveTask((prev) =>
           prev
@@ -766,10 +997,25 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     startTaskRef.current = startTask;
+    advanceTaskRef.current = advanceTask;
+    startTourRef.current = startTour;
+    pauseTourRef.current = pauseTour;
+    resumeTourRef.current = resumeTour;
     exitTourRef.current = exitTour;
     nextTourStepRef.current = nextTourStep;
     prevTourStepRef.current = prevTourStep;
-  }, [startTask, exitTour, nextTourStep, prevTourStep]);
+    setLanguageRef.current = setLanguage;
+  }, [
+    startTask,
+    advanceTask,
+    startTour,
+    pauseTour,
+    resumeTour,
+    exitTour,
+    nextTourStep,
+    prevTourStep,
+    setLanguage,
+  ]);
 
   // Onboarding targets live on separate screens. Following the student's own
   // navigation keeps the tour aligned without advancing or submitting a form.
@@ -787,14 +1033,24 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     if (index < 0 || index === tourStepIndex) return;
     setTourStepIndex(index);
     setTourSpotlightTargetId(targetId);
-    setCurrentMessage({ text: activeTour.steps[index].explanation, animationState: "EXPLAINING" });
+    const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+    const text = isHinglish
+      ? (activeTour.steps[index].hinglishExplanation ?? activeTour.steps[index].explanation)
+      : activeTour.steps[index].explanation;
+    setCurrentMessage({ text, animationState: "EXPLAINING" });
     setAnimationState("EXPLAINING");
-  }, [activeTour, onboardingStep, tourPaused, tourStepIndex]);
+  }, [activeTour, onboardingStep, tourPaused, tourStepIndex, preferences.language]);
 
   // ── Onboarding step external setter ──────────────────────────────────────
   const setOnboardingStep = useCallback((step: OnboardingStep) => {
     setOnboardingStepState(step);
-  }, []);
+    if (step && step !== "none") {
+      const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
+      const msg = getOnboardingStepMessage(step, isHinglish);
+      setCurrentMessage(msg);
+      setAnimationState(msg.animationState);
+    }
+  }, [preferences.language]);
 
   // ── Live student context (from EoraStudentBridge) ────────────────────────
   const updateLiveStudentContext = useCallback(
@@ -803,11 +1059,12 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       // Load person-scoped preferences on first auth context arrival
       const personPrefs = loadPreferencesForPerson(data.personId);
       setPreferences((prev) => {
+        const activeLang = prev.language || personPrefs.language || "en";
         // Only switch to person-scoped prefs if they're different from current
         if (prev.tourCompletedIds !== personPrefs.tourCompletedIds) {
-          return personPrefs;
+          return { ...personPrefs, language: activeLang };
         }
-        return prev;
+        return { ...prev, language: activeLang };
       });
 
       setLiveStudent({
@@ -895,14 +1152,20 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         "goal_achieved",
       ]);
 
+      const isHandledByActiveTask =
+        (action === "project_saved" && activeTask?.taskId === "task-add-project") ||
+        (action === "profile_updated" && activeTask?.taskId === "task-audit-profile") ||
+        (action === "verification_decision_submitted" && activeTask?.taskId === "task-verification-guide");
+
       if (celebrateActions.has(action)) {
         setShowCelebration(true);
         const name = studentName || liveStudent.displayName || "Student";
         const celebMsg = getCelebrationMessage(name);
         setCurrentMessage(celebMsg);
         setAnimationState(celebMsg.animationState);
+      } else if (isHandledByActiveTask) {
+        // Active task notification below will set the single authoritative celebration
       } else {
-        if (action === "project_saved") setShowCelebration(true);
         const msg = getTinyVictoryMessage(action);
         setCurrentMessage(msg);
         setAnimationState(msg.animationState);
@@ -914,7 +1177,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       // Clear signal after animation cycle
       schedule(() => setLastSuccessfulAction(null), 5000);
     },
-    [liveStudent.displayName, schedule, notifyTaskEvent]
+    [liveStudent.displayName, schedule, notifyTaskEvent, activeTask?.taskId]
   );
 
   // ── Field validation signals ──────────────────────────────────────────────
@@ -1054,6 +1317,9 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     updateStudentContext,
     updatePreferences,
     resetAllPreferences,
+    setLanguage,
+    toggleLanguage,
+    boop,
   };
 
   return <EoraCtx.Provider value={value}>{children}</EoraCtx.Provider>;

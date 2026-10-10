@@ -14,6 +14,7 @@ import {
   FileCheck,
   RefreshCw,
 } from "lucide-react";
+import { useEora } from "@/components/eora/eora-provider";
 
 type QueueItem = {
   id: string;
@@ -34,6 +35,7 @@ type QueueItem = {
 };
 
 export default function VerificationPage() {
+  const eora = useEora();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState<boolean | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -85,6 +87,7 @@ export default function VerificationPage() {
     setMethod("code_review");
     setReason("");
     setModalError(null);
+    eora?.notifyTaskEvent("verification_review_opened");
   };
 
   const handleCloseReview = () => {
@@ -122,6 +125,7 @@ export default function VerificationPage() {
       }
 
       setSuccessMsg(`Decision "${decision.replace("_", " ")}" recorded for ${activeItem.evidenceSubject}.`);
+      eora?.signalSuccess("verification_decision_submitted");
       setActiveItem(null);
       await fetchQueue();
       setTimeout(() => setSuccessMsg(null), 5000);
@@ -797,6 +801,7 @@ export default function VerificationPage() {
                 </button>
                 <button
                   type="submit"
+                  data-eora-id="eora-verification-submit-btn"
                   disabled={submitting}
                   className="ws-btn ws-btn-primary"
                   style={{ minHeight: 38, fontSize: 13 }}

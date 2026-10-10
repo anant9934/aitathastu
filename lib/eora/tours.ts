@@ -15,11 +15,14 @@ export interface TourStep {
   /** data-eora-id value of the target element */
   targetId: string;
   title: string;
+  hinglishTitle?: string;
   explanation: string;
+  hinglishExplanation?: string;
   /** Optional: URL to navigate to before highlighting */
   requiresRoute?: string;
   /** Optional: action label EORA can offer */
   actionLabel?: string;
+  hinglishActionLabel?: string;
   actionUrl?: string;
 }
 
@@ -29,6 +32,8 @@ export interface TourDefinition {
   description: string;
   /** Route where this tour is valid */
   validRoute: string;
+  /** Optional route aliases where this tour is also valid */
+  validRouteAliases?: string[];
   steps: TourStep[];
   /** Whether completing this tour should be recorded */
   persistent: boolean;
@@ -47,6 +52,7 @@ export const TOUR_REGISTRY: TourDefinition[] = [
     title: "Onboarding Introduction",
     description: "A quick walkthrough of the onboarding steps.",
     validRoute: "/onboarding",
+    validRouteAliases: ["/screens"],
     persistent: true,
     steps: [
       {
@@ -58,7 +64,7 @@ export const TOUR_REGISTRY: TourDefinition[] = [
       },
       {
         stepId: "ob-role",
-        targetId: "eora-role-select",
+        targetId: "eora-role-student",
         title: "Choose Your Role",
         explanation:
           "Tell us how you're using AI Tathastu — Student, Faculty, or Professional. Your workspace is tailored to your role.",
@@ -215,6 +221,97 @@ export const TOUR_REGISTRY: TourDefinition[] = [
         title: "Next Action",
         explanation:
           "Your personalized next action is highlighted. Click it to start working on it directly.",
+        hinglishExplanation:
+          "Aapka next recommended action highlighted hai. Is par click karke direct start kar sakte hain.",
+      },
+    ],
+  },
+  // ──────────────────────────────
+  // CROSS-PAGE COMPLETE WEBSITE TOUR
+  // ──────────────────────────────
+  {
+    tourId: "explore-ai-tathastu",
+    title: "Explore AI Tathastu",
+    description: "An interactive journey across all primary modules of AI Tathastu.",
+    validRoute: "/student",
+    validRouteAliases: [
+      "/dashboard",
+      "/student/projects",
+      "/student/skills",
+      "/student/roadmap",
+      "/student/connections",
+      "/student/profile",
+      "/verification",
+      "/faculty/verification",
+      "/screens",
+    ],
+    persistent: false,
+    steps: [
+      {
+        stepId: "exp-home",
+        targetId: "eora-active-goal",
+        title: "Student Workspace",
+        hinglishTitle: "Student Workspace",
+        explanation: "This is your primary command center. Your active goal calibrates your entire learning trajectory.",
+        hinglishExplanation: "Yeh aapka main workspace hai. Yahan aapka active AI/ML goal aapki puri learning trajectory calibrate karta hai.",
+        actionUrl: "/student",
+        actionLabel: "Workspace",
+        hinglishActionLabel: "Workspace",
+      },
+      {
+        stepId: "exp-projects",
+        targetId: "eora-projects-list",
+        title: "Verified Projects",
+        hinglishTitle: "Verified Projects",
+        explanation: "Showcase your real machine learning repositories with verified personal contribution notes.",
+        hinglishExplanation: "Yahan apne AI/ML projects document kijiye aur apna specific contribution note attach kijiye.",
+        actionUrl: "/student/projects",
+        actionLabel: "View Projects",
+        hinglishActionLabel: "Projects Dekhein",
+      },
+      {
+        stepId: "exp-skills",
+        targetId: "eora-skills-list",
+        title: "Skills Map",
+        hinglishTitle: "Skills Map",
+        explanation: "View your verified and self-reported technical capabilities across NLP, Computer Vision, and Systems.",
+        hinglishExplanation: "Apne technical skills aur faculty-verified badges yahan check kijiye.",
+        actionUrl: "/student/skills",
+        actionLabel: "View Skills",
+        hinglishActionLabel: "Skills Dekhein",
+      },
+      {
+        stepId: "exp-roadmap",
+        targetId: "eora-roadmap-milestones",
+        title: "Personalized Roadmap",
+        hinglishTitle: "Personalized Roadmap",
+        explanation: "A sequential path tailored to your target engineering role. Complete milestones in order.",
+        hinglishExplanation: "Aapke target role ke mutabiq step-by-step roadmap. Milestones sequence me complete kijiye.",
+        actionUrl: "/student/roadmap",
+        actionLabel: "View Roadmap",
+        hinglishActionLabel: "Roadmap Dekhein",
+      },
+      {
+        stepId: "exp-footprints",
+        targetId: "eora-connections-grid",
+        title: "Digital Footprints",
+        hinglishTitle: "Digital Footprints",
+        explanation: "Sync GitHub commits and authorized developer profiles for authentic proof.",
+        hinglishExplanation: "GitHub aur developer profiles connect karke real code evidence attach kijiye.",
+        actionUrl: "/student/connections",
+        actionLabel: "View Footprints",
+        hinglishActionLabel: "Footprints Dekhein",
+      },
+      {
+        stepId: "exp-profile",
+        targetId: "eora-profile-header",
+        title: "Person 360",
+        hinglishTitle: "Person 360 Profile",
+        explanation: "Your comprehensive identity, verified badges, and placement readiness in one place.",
+        hinglishExplanation: "Aapki comprehensive profile, verified badges aur placement readiness yahan dikhti hai.",
+        actionUrl: "/student/profile",
+        actionLabel: "View Profile",
+        hinglishActionLabel: "Profile Dekhein",
       },
     ],
   },
@@ -251,7 +348,9 @@ export function getToursForRoute(route: string): TourDefinition[] {
     if (t.validRoute === "/") {
       return route === "/" || route === "";
     }
-    return route.startsWith(t.validRoute);
+    if (route.startsWith(t.validRoute)) return true;
+    if (t.validRouteAliases?.some((alias) => route.startsWith(alias))) return true;
+    return false;
   });
 }
 

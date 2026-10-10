@@ -118,6 +118,25 @@ const navSections = [
   { id: "achievements", label: "Achievements", icon: Award },
 ];
 
+function formatSource(source?: string): string {
+  if (!source) return "Source: CV";
+  const s = source.toLowerCase();
+  if (s.includes("github")) return "Source: GitHub";
+  if (s.includes("linkedin")) return "Source: LinkedIn Export";
+  if (s.includes("huggingface") || s.includes("hugging face")) return "Source: Hugging Face";
+  if (s.includes("orcid")) return "Source: ORCID";
+  if (s.includes("devto") || s.includes("dev.to")) return "Source: DEV Community";
+  if (s.includes("stackoverflow") || s.includes("stack overflow")) return "Source: Stack Overflow";
+  if (s.includes("leetcode")) return "Source: LeetCode";
+  if (s.includes("hackerrank")) return "Source: HackerRank";
+  if (s.includes("codechef")) return "Source: CodeChef";
+  if (s.includes("kaggle")) return "Source: Kaggle";
+  if (s.includes("portfolio")) return "Source: Portfolio";
+  if (s.includes("scholar")) return "Source: Google Scholar";
+  if (s.includes("resume") || s.includes("cv")) return "Source: CV";
+  return `Source: ${source}`;
+}
+
 export function Screen8ProfileInsights({
   studentName = "Student",
   degree = "",
@@ -552,7 +571,7 @@ export function Screen8ProfileInsights({
                                   borderRadius: 6,
                                 }}
                               >
-                                Source: CV
+                                {formatSource(edu.source)}
                               </span>
                             </div>
                             <p style={{ fontSize: 13.5, color: "#64748B", margin: "4px 0 0", fontWeight: 550 }}>
@@ -574,7 +593,7 @@ export function Screen8ProfileInsights({
                                 cursor: "pointer",
                               }}
                             >
-                              {edu.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                              {edu.status === "confirmed" ? "Confirmed" : `Suggested from ${formatSource(edu.source).replace("Source: ", "")}`}
                             </span>
                             {onRemoveEducation && (
                               <button
@@ -750,7 +769,7 @@ export function Screen8ProfileInsights({
                                   borderRadius: 6,
                                 }}
                               >
-                                Source: CV
+                                {formatSource(exp.source)}
                               </span>
                             </div>
                             <p style={{ fontSize: 13, color: "#64748B", margin: "3px 0 0", fontWeight: 550 }}>
@@ -772,7 +791,7 @@ export function Screen8ProfileInsights({
                                 cursor: "pointer",
                               }}
                             >
-                              {exp.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                              {exp.status === "confirmed" ? "Confirmed" : `Suggested from ${formatSource(exp.source).replace("Source: ", "")}`}
                             </span>
                             {onRemoveExperience && (
                               <button
@@ -968,6 +987,48 @@ export function Screen8ProfileInsights({
                                   }}
                                 >
                                   GitHub
+                                </span>
+                              )}
+                              {project.sources && project.sources.some((s) => s.toLowerCase().includes("huggingface") || s.toLowerCase().includes("hugging face")) && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#B45309",
+                                    background: "#FEF3C7",
+                                    padding: "2px 7px",
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  Hugging Face
+                                </span>
+                              )}
+                              {project.sources && project.sources.some((s) => s.toLowerCase().includes("kaggle")) && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#0369A1",
+                                    background: "#E0F2FE",
+                                    padding: "2px 7px",
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  Kaggle
+                                </span>
+                              )}
+                              {project.sources && project.sources.some((s) => s.toLowerCase().includes("portfolio")) && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#6D28D9",
+                                    background: "#F5F3FF",
+                                    padding: "2px 7px",
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  Portfolio
                                 </span>
                               )}
                               {project.sources && project.sources.includes("resume") && (
@@ -1186,7 +1247,7 @@ export function Screen8ProfileInsights({
                                   borderRadius: 6,
                                 }}
                               >
-                                Source: CV
+                                {formatSource(ach.source)}
                               </span>
                             </div>
                             <p style={{ fontSize: 13, color: "#475569", margin: "4px 0 0", lineHeight: 1.45 }}>
@@ -1214,7 +1275,7 @@ export function Screen8ProfileInsights({
                               cursor: "pointer",
                             }}
                           >
-                            {ach.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                            {ach.status === "confirmed" ? "Confirmed" : `Suggested from ${formatSource(ach.source).replace("Source: ", "")}`}
                           </span>
                           {onRemoveAchievement && (
                             <button

@@ -681,6 +681,129 @@ export function ExactScreensContainer({
               setProfiles(p);
               persistDraft({ profiles: p });
             }}
+            onCandidatesDiscovered={(cands) => {
+              // 1. Projects
+              let nextProjects = [...projects];
+              if (cands.projects && cands.projects.length > 0) {
+                const mappedProjects: ProjectEntry[] = cands.projects.map((p, idx) => ({
+                  id: p.id || `proj_${Date.now()}_${idx}`,
+                  title: p.title,
+                  description: p.description || "",
+                  technologies: p.technologies || [],
+                  sources: ["import"],
+                  status: "candidate" as const,
+                  contribution: [],
+                  contributionNote: "",
+                  url: p.url,
+                  aiPurpose: p.aiMlCategories?.join(", "),
+                }));
+                for (const proj of mappedProjects) {
+                  if (
+                    !nextProjects.some(
+                      (existing) =>
+                        (existing.url && existing.url === proj.url) ||
+                        existing.title.toLowerCase().trim() === proj.title.toLowerCase().trim()
+                    )
+                  ) {
+                    nextProjects.push(proj);
+                  }
+                }
+                setProjects(nextProjects);
+              }
+
+              // 2. Skills
+              let nextSkills = [...skills];
+              if (cands.skills && cands.skills.length > 0) {
+                nextSkills = Array.from(new Set([...skills, ...cands.skills]));
+                setSkills(nextSkills);
+              }
+
+              // 3. Experiences
+              let nextExperiences = [...experienceEntries];
+              if (cands.experiences && cands.experiences.length > 0) {
+                for (const exp of cands.experiences) {
+                  if (
+                    !nextExperiences.some(
+                      (existing) =>
+                        existing.company.toLowerCase().trim() === exp.company.toLowerCase().trim() &&
+                        existing.role.toLowerCase().trim() === exp.role.toLowerCase().trim()
+                    )
+                  ) {
+                    nextExperiences.push({
+                      company: exp.company,
+                      role: exp.role,
+                      type: exp.employmentType || "employment",
+                      startDate: exp.startDate,
+                      endDate: exp.endDate,
+                      highlights: exp.description ? [exp.description] : [],
+                      status: "candidate" as const,
+                      source: exp.source || "Digital Import",
+                    });
+                  }
+                }
+                setExperienceEntries(nextExperiences);
+              }
+
+              // 4. Education
+              let nextEducation = [...educationEntries];
+              if (cands.educations && cands.educations.length > 0) {
+                for (const edu of cands.educations) {
+                  if (
+                    !nextEducation.some(
+                      (existing) =>
+                        existing.institution.toLowerCase().trim() === edu.institution.toLowerCase().trim() &&
+                        (!edu.degree || (existing.degree || "").toLowerCase().trim() === edu.degree.toLowerCase().trim())
+                    )
+                  ) {
+                    nextEducation.push({
+                      institution: edu.institution,
+                      degree: edu.degree,
+                      fieldOfStudy: edu.fieldOfStudy,
+                      graduationYear: edu.graduationYear,
+                      startDate: edu.startDate,
+                      endDate: edu.endDate,
+                      gpa: edu.gpa,
+                      percentage: edu.percentage,
+                      academicLevel: edu.academicLevel,
+                      status: "candidate" as const,
+                      source: edu.source || "Digital Import",
+                    });
+                  }
+                }
+                setEducationEntries(nextEducation);
+              }
+
+              // 5. Achievements
+              let nextAchievements = [...achievementEntries];
+              if (cands.achievements && cands.achievements.length > 0) {
+                for (const ach of cands.achievements) {
+                  if (
+                    !nextAchievements.some(
+                      (existing) => existing.title.toLowerCase().trim() === ach.title.toLowerCase().trim()
+                    )
+                  ) {
+                    nextAchievements.push({
+                      title: ach.title,
+                      issuer: ach.issuer,
+                      date: ach.issueDate,
+                      category: ach.category || "other",
+                      subType: ach.category,
+                      status: "candidate" as const,
+                      source: ach.source || "Digital Import",
+                    });
+                  }
+                }
+                setAchievementEntries(nextAchievements);
+              }
+
+              persistDraft({
+                projects: nextProjects,
+                skills: nextSkills,
+                experiences: nextExperiences,
+                education: nextEducation,
+                achievements: nextAchievements,
+              });
+            }}
             onGitHubProjectsDiscovered={(ghProjects, ghTech) => {
               const mapped: ProjectEntry[] = ghProjects.map((p) => ({
                 id: p.id,

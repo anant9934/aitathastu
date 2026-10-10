@@ -1,15 +1,79 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Check, Loader2, Sparkles, Plus, Globe, Trash2, X, Upload, AlertCircle } from "lucide-react";
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  Check,
+  Loader2,
+  Sparkles,
+  Plus,
+  Globe,
+  Trash2,
+  X,
+  Upload,
+  AlertCircle,
+  RefreshCw,
+  ShieldCheck,
+  CheckCircle2,
+  FileText,
+  Clock,
+  ExternalLink,
+} from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 import { ProcessingActivity } from "./ProcessingActivity";
+
+export interface DiscoveredCandidates {
+  projects?: Array<{
+    id?: string;
+    title: string;
+    description?: string;
+    technologies?: string[];
+    url?: string;
+    primaryLanguage?: string | null;
+    aiMlCategories?: string[];
+    technologyFindings?: Array<{
+      name: string;
+      category?: string;
+      sourceFile?: string;
+      confidence?: string;
+    }>;
+  }>;
+  skills?: string[];
+  experiences?: Array<{
+    company: string;
+    role: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+    employmentType?: string;
+    source?: string;
+  }>;
+  educations?: Array<{
+    institution: string;
+    degree?: string;
+    fieldOfStudy?: string;
+    startDate?: string;
+    endDate?: string;
+    graduationYear?: string;
+    gpa?: string;
+    percentage?: string;
+    academicLevel?: "secondary" | "higher_secondary" | "undergraduate" | "postgraduate" | "doctorate";
+    source?: string;
+  }>;
+  achievements?: Array<{
+    title: string;
+    issuer?: string;
+    issueDate?: string;
+    category?: "award" | "certification" | "hackathon" | "publication" | "academic_distinction" | "patent" | "other";
+    source?: string;
+  }>;
+}
 
 interface Screen6DigitalFootprintsProps {
   initialProfiles?: Partial<Record<string, string>>;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
   onProfilesChange?: (profiles: Partial<Record<string, string>>) => void;
+  onCandidatesDiscovered?: (candidates: DiscoveredCandidates) => void;
   onGitHubProjectsDiscovered?: (
     projects: Array<{
       id: string;
@@ -42,8 +106,16 @@ export type FootprintHonestStatus =
   | "Import Completed"
   | "Review Required"
   | "Import Failed"
+  | "Disconnected"
   | "Permission Required"
   | "Unsupported";
+
+export type ProviderType =
+  | "PUBLIC_API"
+  | "PUBLIC_SCRAPE"
+  | "EXPORT_REQUIRED"
+  | "REFERENCE_ONLY"
+  | "OAUTH_REQUIRED";
 
 export type SupportedCapability =
   | "Connect Account"
@@ -144,7 +216,7 @@ function DevToIcon() {
   );
 }
 
-interface PlatformConfig {
+export interface PlatformConfig {
   id: string;
   name: string;
   placeholder: string;
@@ -152,8 +224,13 @@ interface PlatformConfig {
   renderIcon: React.ComponentType;
   color: string;
   bg: string;
+  type: ProviderType;
+  primaryActionLabel: string;
   supportedCapability: SupportedCapability;
   supportsExportUpload?: boolean;
+  dataCollected: string[];
+  strictGuarantees: string[];
+  privacyNotice: string;
 }
 
 const platforms: PlatformConfig[] = [
@@ -165,7 +242,22 @@ const platforms: PlatformConfig[] = [
     renderIcon: GitHubIcon,
     color: "#181717",
     bg: "#F3F4F6",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Connect Account",
+    dataCollected: [
+      "Public account bio, followers & public repositories",
+      "Permitted manifests: package.json, requirements.txt, pyproject.toml, Dockerfile",
+      "Observed programming languages & declared frameworks",
+      "Identified candidate AI/ML project architectures",
+    ],
+    strictGuarantees: [
+      "Strictly public repositories only.",
+      "Zero private code accessed without explicit GitHub App authorization.",
+      "Read-only metadata inspection; no code execution.",
+      "Newly imported records immediately propagated to Step 8 Review.",
+    ],
+    privacyNotice: "Retrieved via GitHub Public REST API & raw permitted content.",
   },
   {
     id: "portfolio",
@@ -175,7 +267,19 @@ const platforms: PlatformConfig[] = [
     renderIcon: Globe,
     color: "#7C3AED",
     bg: "#F5F3FF",
+    type: "PUBLIC_SCRAPE",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Add Profile URL",
+    dataCollected: [
+      "Website title, meta description & author attribution",
+      "Verified outward project links and live demonstrations",
+      "Detected client-side frameworks and libraries",
+    ],
+    strictGuarantees: [
+      "Strict SSRF defense actively blocks private IP networks, loopback & localhost.",
+      "No JavaScript execution; static HTML metadata extraction only.",
+    ],
+    privacyNotice: "Retrieved directly from your public HTTPS portfolio website.",
   },
   {
     id: "linkedin",
@@ -185,8 +289,23 @@ const platforms: PlatformConfig[] = [
     renderIcon: LinkedInIcon,
     color: "#0A66C2",
     bg: "#E8F4FD",
+    type: "EXPORT_REQUIRED",
+    primaryActionLabel: "Import Your Data",
     supportedCapability: "Import Authorized Export",
     supportsExportUpload: true,
+    dataCollected: [
+      "Employment history & work positions (from Positions.csv)",
+      "Academic degrees & institutions (from Education.csv)",
+      "Reported skills & endorsements (from Skills.csv)",
+      "Project descriptions & certifications (from Projects.csv)",
+    ],
+    strictGuarantees: [
+      "Automated scraping is strictly avoided per LinkedIn Terms of Service.",
+      "Uses student-authorized archive export (.zip or .csv) for 100% legal compliance.",
+      "Candidate records created with line-level provenance.",
+      "Re-import supported without duplicating existing records.",
+    ],
+    privacyNotice: "Export archives are parsed deterministically on-demand; raw files are not permanently stored.",
   },
   {
     id: "leetcode",
@@ -196,8 +315,20 @@ const platforms: PlatformConfig[] = [
     renderIcon: LeetCodeIcon,
     color: "#FFA116",
     bg: "#FFF7ED",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Import Authorized Export",
     supportsExportUpload: true,
+    dataCollected: [
+      "Total solved problems by difficulty (Easy, Medium, Hard)",
+      "Contest rating and global ranking",
+      "Topic tags & algorithmic skill distribution",
+    ],
+    strictGuarantees: [
+      "Public GraphQL profile stats or student-provided export.",
+      "No session cookies or login credentials required.",
+    ],
+    privacyNotice: "Retrieved via public profile GraphQL stats.",
   },
   {
     id: "huggingface",
@@ -207,7 +338,20 @@ const platforms: PlatformConfig[] = [
     renderIcon: HuggingFaceIcon,
     color: "#FFD21E",
     bg: "#FFFBEB",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Enter Details",
+    dataCollected: [
+      "Public AI/ML models, architectures & pipelines",
+      "Public datasets authored or contributed to",
+      "Model tags, task categories & community likes",
+    ],
+    strictGuarantees: [
+      "Official Hugging Face Hub API.",
+      "Public models and datasets only.",
+      "No private models, weights, or tokens accessed.",
+    ],
+    privacyNotice: "Retrieved via the official Hugging Face Hub API.",
   },
   {
     id: "orcid",
@@ -217,7 +361,20 @@ const platforms: PlatformConfig[] = [
     renderIcon: OrcidIcon,
     color: "#A6CE39",
     bg: "#F7FEE7",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Enter Details",
+    dataCollected: [
+      "Verified scholarly works, papers & publications",
+      "DOIs, external citations & publication years",
+      "Research organization affiliations",
+    ],
+    strictGuarantees: [
+      "Official ORCID Public v3.0 REST API.",
+      "ISO 7064 Mod 11,2 checksum validation.",
+      "Authentic academic provenance without scraping.",
+    ],
+    privacyNotice: "Retrieved from the international ORCID scholarly record registry.",
   },
   {
     id: "hackerrank",
@@ -227,8 +384,20 @@ const platforms: PlatformConfig[] = [
     renderIcon: HackerRankIcon,
     color: "#00EA64",
     bg: "#ECFDF5",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Import Authorized Export",
     supportsExportUpload: true,
+    dataCollected: [
+      "Verified domain skill badges (Python, Problem Solving, SQL)",
+      "Stars earned & badge levels",
+      "Contest rating & badges summary",
+    ],
+    strictGuarantees: [
+      "Official public badge endpoints or authorized badge export.",
+      "No unauthorized scraping.",
+    ],
+    privacyNotice: "Retrieved via official public HackerRank badge endpoints.",
   },
   {
     id: "codechef",
@@ -238,8 +407,19 @@ const platforms: PlatformConfig[] = [
     renderIcon: CodeChefIcon,
     color: "#5B4638",
     bg: "#FEF3C7",
+    type: "EXPORT_REQUIRED",
+    primaryActionLabel: "Import Your Data",
     supportedCapability: "Import Authorized Export",
     supportsExportUpload: true,
+    dataCollected: [
+      "Contest division, star rating & global rank",
+      "Problems solved breakdown",
+    ],
+    strictGuarantees: [
+      "Student-authorized contest summary upload or profile reference.",
+      "Truthful linking without simulated API calls.",
+    ],
+    privacyNotice: "Parsed from student-provided contest export or linked profile.",
   },
   {
     id: "hackerearth",
@@ -249,8 +429,18 @@ const platforms: PlatformConfig[] = [
     renderIcon: HackerEarthIcon,
     color: "#3253DC",
     bg: "#EFF6FF",
+    type: "EXPORT_REQUIRED",
+    primaryActionLabel: "Import Your Data",
     supportedCapability: "Import Authorized Export",
     supportsExportUpload: true,
+    dataCollected: [
+      "Hackathon participation & problem solving score",
+      "Competitive programming ratings",
+    ],
+    strictGuarantees: [
+      "Authorized practice summary upload or profile reference.",
+    ],
+    privacyNotice: "Parsed from student-provided practice export or linked profile.",
   },
   {
     id: "kaggle",
@@ -260,8 +450,20 @@ const platforms: PlatformConfig[] = [
     renderIcon: KaggleIcon,
     color: "#20BEFF",
     bg: "#F0F9FF",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Connect Account",
     supportsExportUpload: true,
+    dataCollected: [
+      "Competition, dataset & notebook tier badges",
+      "Medals won & community achievements",
+      "Public data science notebooks",
+    ],
+    strictGuarantees: [
+      "Public metadata retrieval only.",
+      "Public data science portfolio links.",
+    ],
+    privacyNotice: "Retrieved from public Kaggle metadata.",
   },
   {
     id: "devto",
@@ -271,17 +473,62 @@ const platforms: PlatformConfig[] = [
     renderIcon: DevToIcon,
     color: "#0A0A0A",
     bg: "#F3F4F6",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Enter Details",
+    dataCollected: [
+      "Published technical articles, titles & URLs",
+      "Topic tags, reading time & publication dates",
+      "Community reactions & comments count",
+    ],
+    strictGuarantees: [
+      "Official Forem Public API.",
+      "Public technical blog posts only.",
+    ],
+    privacyNotice: "Retrieved via the official Forem API.",
   },
   {
-    id: "stackoverflow", name: "Stack Overflow", placeholder: "Stack Overflow profile URL or user ID",
-    prefix: "stackoverflow.com/users/", renderIcon: Globe, color: "#F48024", bg: "#FFF7ED",
+    id: "stackoverflow",
+    name: "Stack Overflow",
+    placeholder: "Stack Overflow profile URL or user ID",
+    prefix: "stackoverflow.com/users/",
+    renderIcon: Globe,
+    color: "#F48024",
+    bg: "#FFF7ED",
+    type: "PUBLIC_API",
+    primaryActionLabel: "Connect & Import",
     supportedCapability: "Add Profile URL",
+    dataCollected: [
+      "Public developer reputation score",
+      "Top answered topic tags (e.g. Python, PyTorch, React)",
+      "Gold, silver, and bronze badge totals",
+    ],
+    strictGuarantees: [
+      "Official Stack Exchange API v2.3.",
+      "Public developer profile statistics only.",
+    ],
+    privacyNotice: "Retrieved via the official Stack Exchange API v2.3.",
   },
   {
-    id: "google_scholar", name: "Google Scholar", placeholder: "Google Scholar profile URL or user ID",
-    prefix: "scholar.google.com/", renderIcon: Globe, color: "#4285F4", bg: "#EFF6FF",
+    id: "google_scholar",
+    name: "Google Scholar",
+    placeholder: "Google Scholar profile URL or user ID",
+    prefix: "scholar.google.com/",
+    renderIcon: Globe,
+    color: "#4285F4",
+    bg: "#EFF6FF",
+    type: "REFERENCE_ONLY",
+    primaryActionLabel: "Connect Profile",
     supportedCapability: "Add Profile URL",
+    dataCollected: [
+      "Scholar profile reference URL & researcher identifier",
+      "Legitimate DOI & Crossref publication cross-referencing",
+    ],
+    strictGuarantees: [
+      "Strictly adheres to policy: no unauthorized automated Google Scholar scraping.",
+      "Matches publications via legitimate DOI/Crossref/ORCID metadata.",
+    ],
+    privacyNotice: "Profile reference linked; scholarly works matched via DOI/Crossref.",
   },
 ];
 
@@ -289,6 +536,7 @@ export function Screen6DigitalFootprints({
   initialProfiles = {},
   discoveredResumeProfiles = {},
   onProfilesChange,
+  onCandidatesDiscovered,
   onGitHubProjectsDiscovered,
   onNext,
   onBack,
@@ -303,31 +551,55 @@ export function Screen6DigitalFootprints({
     return init;
   });
   const [ignoredResumeCandidates, setIgnoredResumeCandidates] = useState<Set<string>>(new Set());
+  const [lastSyncedTimes, setLastSyncedTimes] = useState<Record<string, string>>({});
+  const [syncSummaries, setSyncSummaries] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/student/connections", { cache: "no-store" }).then((res) => res.ok ? res.json() : null).then((data) => {
-      if (cancelled || !Array.isArray(data?.connectors)) return;
-      const found: Record<string, string> = {};
-      const nextStatuses: Partial<Record<string, FootprintHonestStatus>> = {};
-      for (const connection of data.connectors) {
-        if (connection.status === "not_connected" || !connection.profileUrl || !platforms.some((p) => p.id === connection.provider)) continue;
-        found[connection.provider] = connection.profileUrl;
-        nextStatuses[connection.provider] = connection.lastSyncedAt ? "Connected" : "Profile Linked";
-      }
-      if (Object.keys(found).length) {
-        setProfiles((prev) => ({ ...found, ...prev }));
-        setStatuses((prev) => ({ ...nextStatuses, ...prev }));
-      }
-    }).catch(() => null);
-    return () => { cancelled = true; };
+    fetch("/api/student/connections", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !Array.isArray(data?.connectors)) return;
+        const found: Record<string, string> = {};
+        const nextStatuses: Partial<Record<string, FootprintHonestStatus>> = {};
+        const nextSyncTimes: Record<string, string> = {};
+        const nextSummaries: Record<string, string> = {};
+
+        for (const connection of data.connectors) {
+          if (
+            connection.status === "not_connected" ||
+            !connection.profileUrl ||
+            !platforms.some((p) => p.id === connection.provider)
+          ) {
+            continue;
+          }
+          found[connection.provider] = connection.profileUrl;
+          nextStatuses[connection.provider] = connection.lastSyncedAt ? "Import Completed" : "Connected";
+          if (connection.lastSyncedAt) {
+            const date = new Date(connection.lastSyncedAt);
+            nextSyncTimes[connection.provider] = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          }
+          if (connection.metadata?.summary) {
+            nextSummaries[connection.provider] = connection.metadata.summary;
+          } else if (connection.metadata?.totalPublicRepos) {
+            nextSummaries[connection.provider] = `${connection.metadata.totalPublicRepos} public repositories`;
+          }
+        }
+        if (Object.keys(found).length) {
+          setProfiles((prev) => ({ ...found, ...prev }));
+          setStatuses((prev) => ({ ...nextStatuses, ...prev }));
+          setLastSyncedTimes((prev) => ({ ...nextSyncTimes, ...prev }));
+          setSyncSummaries((prev) => ({ ...nextSummaries, ...prev }));
+        }
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleConfirmResumeCandidate = (platformId: string, url: string) => {
-    const nextProfiles = { ...profiles, [platformId]: url };
-    setProfiles(nextProfiles);
-    setStatuses((prev) => ({ ...prev, [platformId]: "Profile Linked" }));
-    onProfilesChange?.(nextProfiles);
+    handleOpenPrompt(platformId, url);
   };
 
   const handleRemoveResumeCandidate = (platformId: string) => {
@@ -337,15 +609,17 @@ export function Screen6DigitalFootprints({
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [inputVal, setInputVal] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncingProvider, setSyncingProvider] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<{ name: string; content: string } | null>(null);
 
-  const handleOpenPrompt = (platformId: string) => {
+  const handleOpenPrompt = (platformId: string, overrideValue?: string) => {
     setActivePrompt(platformId);
     setInputVal(
-      profiles[platformId] ||
-        (!ignoredResumeCandidates.has(platformId) ? discoveredResumeProfiles?.[platformId] : "") ||
+      overrideValue ??
+        profiles[platformId] ??
+        (!ignoredResumeCandidates.has(platformId) ? discoveredResumeProfiles?.[platformId] : "") ??
         ""
     );
     setStatusMessage(null);
@@ -367,12 +641,11 @@ export function Screen6DigitalFootprints({
     setProfiles(nextProfiles);
 
     const nextStatuses = { ...statuses };
-    delete nextStatuses[platformId];
+    nextStatuses[platformId] = "Disconnected";
     setStatuses(nextStatuses);
 
     onProfilesChange?.(nextProfiles);
 
-    // Call persistent disconnect endpoint
     fetch(`/api/student/connections?provider=${encodeURIComponent(platformId)}`, {
       method: "DELETE",
     }).catch(() => null);
@@ -394,14 +667,14 @@ export function Screen6DigitalFootprints({
         const result = (event.target?.result as string) || "";
         const base64 = result.includes(",") ? result.split(",")[1] : result;
         setUploadFile({ name: file.name, content: base64 });
-        setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import to parse.`);
+        setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import.`);
       };
       reader.readAsDataURL(file);
     } else {
       reader.onload = (event) => {
         const text = (event.target?.result as string) || "";
         setUploadFile({ name: file.name, content: text });
-        setStatusMessage(`Loaded archive: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import to parse.`);
+        setStatusMessage(`Loaded export: ${file.name} (${Math.round(file.size / 1024)} KB). Click Import.`);
       };
       reader.readAsText(file);
     }
@@ -411,80 +684,69 @@ export function Screen6DigitalFootprints({
     setErrorMessage(null);
     setStatusMessage(null);
     const rawVal = (suppliedValue ?? inputVal).trim();
-
     const selectedUpload = suppliedValue === undefined ? uploadFile : null;
+
     if (!rawVal && !selectedUpload) {
       handleDisconnectPlatform(platformId);
       return;
     }
 
     setIsSyncing(true);
+    setSyncingProvider(platformId);
     setStatuses((prev) => ({ ...prev, [platformId]: "Importing" }));
-    setStatusMessage(`Verifying and syncing ${platformId}...`);
+    setStatusMessage(`Initializing import for ${platformId} and capturing consent...`);
 
     try {
-      const jobResponse = await fetch("/api/student/processing-jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceId: platformId }) });
+      // 1. Create or audit processing job
+      const jobResponse = await fetch("/api/student/processing-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceId: platformId }),
+      });
       const job = await jobResponse.json();
       if (!jobResponse.ok || !job.jobId) throw new Error(job.error || "Could not start import.");
-      if (platformId === "github") {
-        // GitHub specialized discovery
-        const cleanVal = rawVal.replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, "").split("/")[0];
-        const res = await fetch("/api/onboarding-v2/github", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: cleanVal, consent: true, jobId: job.jobId }),
-        });
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.projects)) {
-          onGitHubProjectsDiscovered?.(data.projects, data.technologies);
-          setStatuses((prev) => ({ ...prev, [platformId]: "Public Data Imported" }));
-          setStatusMessage(
-            `GitHub public data imported. Found ${data.projects.length} repository candidates and ${
-              data.technologies?.length || 0
-            } technologies.`
-          );
-        } else {
-          setStatuses((prev) => ({ ...prev, [platformId]: "Import Failed" }));
-          throw new Error(data.error || "GitHub import failed.");
+
+      // 2. Execute unified sync endpoint (Delegates directly to DigitalSourceImportOrchestrator)
+      setStatusMessage(`Fetching authorized real data from ${platformId}...`);
+      const res = await fetch("/api/student/footprints/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: platformId,
+          jobId: job.jobId,
+          identifier: rawVal,
+          exportFilename: selectedUpload?.name,
+          exportContent: selectedUpload?.content,
+          consent: true,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to sync ${platformId}.`);
+      }
+
+      // 3. Update status & UI summaries
+      const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setStatuses((prev) => ({ ...prev, [platformId]: "Import Completed" }));
+      setLastSyncedTimes((prev) => ({ ...prev, [platformId]: nowTime }));
+      setSyncSummaries((prev) => ({
+        ...prev,
+        [platformId]: data.summary || `${data.recordsCreated || 0} records imported`,
+      }));
+      setStatusMessage(data.summary || `Successfully imported ${platformId}.`);
+
+      const nextVal = selectedUpload ? `Archive: ${selectedUpload.name}` : rawVal;
+      const nextProfiles = { ...profiles, [platformId]: nextVal };
+      setProfiles(nextProfiles);
+      onProfilesChange?.(nextProfiles);
+
+      // 4. Pass candidates to parent container & Step 8 Review
+      if (data.candidates) {
+        onCandidatesDiscovered?.(data.candidates);
+        if (platformId === "github" && Array.isArray(data.candidates.projects)) {
+          onGitHubProjectsDiscovered?.(data.candidates.projects, data.candidates.skills);
         }
-        const next = { ...profiles, [platformId]: `https://github.com/${cleanVal}` };
-        setProfiles(next);
-        onProfilesChange?.(next);
-      } else {
-        // Universal Footprint Sync Endpoint
-        const res = await fetch("/api/student/footprints/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            provider: platformId,
-            jobId: job.jobId,
-            identifier: rawVal,
-            exportFilename: selectedUpload?.name,
-            exportContent: selectedUpload?.content,
-            consent: true,
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || "Failed to sync digital footprint.");
-        }
-
-        const isLive = data.acquisitionStatus === "LIVE_VERIFIED" || data.acquisitionStatus === "API_PUBLIC_UNVERIFIED_OWNERSHIP";
-        const isArchive = data.acquisitionStatus === "MANUAL_ARCHIVE_VERIFIED" || Boolean(selectedUpload);
-        const newStatus: FootprintHonestStatus = isArchive
-          ? "Review Required"
-          : isLive
-          ? "Connected"
-          : "Profile Linked";
-
-        setStatuses((prev) => ({ ...prev, [platformId]: newStatus }));
-        setStatusMessage(data.summary || `Successfully synced ${platformId}.`);
-
-        const nextVal = selectedUpload ? `Archive: ${selectedUpload.name}` : rawVal;
-        const next = { ...profiles, [platformId]: nextVal };
-        setProfiles(next);
-        onProfilesChange?.(next);
       }
 
       setTimeout(() => {
@@ -496,6 +758,7 @@ export function Screen6DigitalFootprints({
       setStatuses((prev) => ({ ...prev, [platformId]: "Import Failed" }));
     } finally {
       setIsSyncing(false);
+      setSyncingProvider(null);
     }
   };
 
@@ -507,9 +770,21 @@ export function Screen6DigitalFootprints({
   };
 
   const connectedCount = Object.keys(profiles).filter((k) => Boolean(profiles[k])).length;
-  const connectedAccounts = Object.entries(statuses).filter(([_, s]) => s === "Connected" || s === "Public Data Imported").length;
-  const importedSources = Object.entries(statuses).filter(([_, s]) => s === "Import Completed" || s === "Review Required" || s === "Public Data Imported").length;
-  const linkedProfiles = Object.entries(statuses).filter(([k, s]) => Boolean(profiles[k]) && s !== "Connected" && s !== "Public Data Imported" && s !== "Import Completed" && s !== "Review Required").length;
+  const connectedAccounts = Object.entries(statuses).filter(
+    ([_, s]) => s === "Connected" || s === "Public Data Imported" || s === "Import Completed"
+  ).length;
+  const importedSources = Object.entries(statuses).filter(
+    ([_, s]) => s === "Import Completed" || s === "Review Required" || s === "Public Data Imported"
+  ).length;
+  const linkedProfiles = Object.entries(statuses).filter(
+    ([k, s]) =>
+      Boolean(profiles[k]) &&
+      s !== "Connected" &&
+      s !== "Public Data Imported" &&
+      s !== "Import Completed" &&
+      s !== "Review Required"
+  ).length;
+
   const activePlatform = platforms.find((p) => p.id === activePrompt);
 
   return (
@@ -593,12 +868,12 @@ export function Screen6DigitalFootprints({
             style={{
               fontSize: 16,
               color: "#64748B",
-              maxWidth: 640,
+              maxWidth: 680,
               margin: "0 auto",
               lineHeight: 1.55,
             }}
           >
-            Bring your verified code, competitive programming stats, ML models, and research links so EORA can construct your authentic evidence ledger.
+            One click to connect and import verified code, competitive programming stats, ML models, and research links so EORA can construct your authentic evidence ledger.
           </p>
         </div>
 
@@ -620,6 +895,8 @@ export function Screen6DigitalFootprints({
               alignItems: "center",
               justifyContent: "space-between",
               marginBottom: 24,
+              flexWrap: "wrap",
+              gap: 12,
             }}
           >
             <div>
@@ -627,11 +904,11 @@ export function Screen6DigitalFootprints({
                 Connected Platforms ({connectedCount})
               </h2>
               <p style={{ fontSize: 13.5, color: "#64748B", margin: 0 }}>
-                Link any profiles you have. All connections are optional and can be managed anytime.
+                Link any profiles you have. All connections are consent-based and reviewable anytime.
               </p>
             </div>
             {connectedCount > 0 && (
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 {connectedAccounts > 0 && (
                   <span
                     style={{
@@ -681,11 +958,40 @@ export function Screen6DigitalFootprints({
             )}
           </div>
 
-          {connectedCount > 0 && <button type="button" disabled={isSyncing} onClick={() => void syncLinkedProfiles()}
-            style={{ marginBottom: 18, padding: "10px 16px", borderRadius: 10, border: "1px solid #C7D2FE", background: "#EEF2FF", color: "#4338CA", fontWeight: 700, cursor: "pointer" }}>
-            {isSyncing ? "Syncing sources…" : "Extract from all linked profiles"}
-          </button>}
+          {connectedCount > 0 && (
+            <button
+              type="button"
+              disabled={isSyncing}
+              onClick={() => void syncLinkedProfiles()}
+              style={{
+                marginBottom: 18,
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: "1px solid #C7D2FE",
+                background: "#EEF2FF",
+                color: "#4338CA",
+                fontWeight: 700,
+                cursor: isSyncing ? "not-allowed" : "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Syncing sources…</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={15} />
+                  <span>Extract from all linked profiles</span>
+                </>
+              )}
+            </button>
+          )}
 
+          {/* Grid of Profile Cards */}
           <div
             style={{
               display: "grid",
@@ -698,9 +1004,50 @@ export function Screen6DigitalFootprints({
               const isConnected = Boolean(profiles[p.id]);
               const currentStatus: FootprintHonestStatus = statuses[p.id] || "Not Connected";
               const isCurrentOpen = activePrompt === p.id;
-              const resumeCandidate = !ignoredResumeCandidates.has(p.id) ? discoveredResumeProfiles?.[p.id] : undefined;
+              const resumeCandidate = !ignoredResumeCandidates.has(p.id)
+                ? discoveredResumeProfiles?.[p.id]
+                : undefined;
               const isCandidateOnly = !isConnected && Boolean(resumeCandidate);
               const hasConflict = isConnected && Boolean(resumeCandidate) && profiles[p.id] !== resumeCandidate;
+              const isSyncingThis = isSyncing && syncingProvider === p.id;
+
+              // Compute Card Action State based on exact V4.6 specification
+              let actionLabel: string;
+              let actionStyleType: "primary" | "refresh" | "candidate" | "retry" | "syncing";
+
+              if (isSyncingThis) {
+                actionLabel = "Importing...";
+                actionStyleType = "syncing";
+              } else if (currentStatus === "Import Failed") {
+                actionLabel = "Retry";
+                actionStyleType = "retry";
+              } else if (currentStatus === "Disconnected") {
+                actionLabel = "Reconnect";
+                actionStyleType = "primary";
+              } else if (
+                isConnected ||
+                currentStatus === "Import Completed" ||
+                currentStatus === "Public Data Imported" ||
+                currentStatus === "Connected"
+              ) {
+                actionLabel = "Refresh";
+                actionStyleType = "refresh";
+              } else if (isCandidateOnly) {
+                actionLabel = "Review Profile";
+                actionStyleType = "candidate";
+              } else if (p.type === "EXPORT_REQUIRED") {
+                actionLabel = "Import Your Data";
+                actionStyleType = "primary";
+              } else if (p.type === "OAUTH_REQUIRED") {
+                actionLabel = "Authorize & Import";
+                actionStyleType = "primary";
+              } else {
+                actionLabel = "Connect & Import";
+                actionStyleType = "primary";
+              }
+
+              const lastSynced = lastSyncedTimes[p.id];
+              const summaryText = syncSummaries[p.id];
 
               return (
                 <div
@@ -782,7 +1129,7 @@ export function Screen6DigitalFootprints({
                               width: "fit-content",
                             }}
                           >
-                            Found in your resume
+                            Found in CV
                           </span>
                           <span
                             style={{
@@ -807,10 +1154,18 @@ export function Screen6DigitalFootprints({
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
-                            maxWidth: 130,
+                            maxWidth: 140,
                           }}
                         >
-                          {isConnected ? currentStatus : p.supportedCapability}
+                          {isConnected ? (
+                            lastSynced ? (
+                              `Synced ${lastSynced}`
+                            ) : (
+                              currentStatus
+                            )
+                          ) : (
+                            p.supportedCapability
+                          )}
                         </div>
                       )}
                       {hasConflict && (
@@ -835,48 +1190,34 @@ export function Screen6DigitalFootprints({
                     </div>
                   </div>
 
+                  {/* Action Buttons Column */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     {isCandidateOnly ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: 4 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           type="button"
                           onClick={() => handleConfirmResumeCandidate(p.id, resumeCandidate!)}
                           style={{
-                            padding: "5px 10px",
+                            padding: "6px 12px",
                             borderRadius: 9999,
-                            fontSize: 11,
+                            fontSize: 11.5,
                             fontWeight: 750,
-                            background: "#10B981",
+                            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
                             color: "#FFFFFF",
                             border: "none",
                             cursor: "pointer",
+                            boxShadow: "0 2px 6px rgba(37, 99, 235, 0.25)",
                           }}
                         >
-                          Confirm
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleOpenPrompt(p.id);
-                            setInputVal(resumeCandidate!);
-                          }}
-                          style={{
-                            padding: "5px 8px",
-                            borderRadius: 9999,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: "#F1F5F9",
-                            color: "#334155",
-                            border: "1px solid #CBD5E1",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Edit
+                          Review Profile
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRemoveResumeCandidate(p.id)}
-                          title="Remove or skip suggestion"
+                          title="Skip candidate suggestion"
                           style={{
                             padding: "4px 6px",
                             borderRadius: 9999,
@@ -910,23 +1251,39 @@ export function Screen6DigitalFootprints({
                           gap: 5,
                           background: isConnected
                             ? "#DCFCE7"
+                            : actionStyleType === "retry"
+                            ? "#FEE2E2"
                             : "linear-gradient(135deg, #5942DC 0%, #4564FF 100%)",
-                          color: isConnected ? "#15803D" : "#FFFFFF",
+                          color: isConnected
+                            ? "#15803D"
+                            : actionStyleType === "retry"
+                            ? "#DC2626"
+                            : "#FFFFFF",
                           boxShadow: isConnected
                             ? "none"
                             : "0 2px 8px rgba(89, 66, 220, 0.25)",
                           transition: "transform 0.15s ease",
                         }}
                       >
-                        {isConnected ? (
+                        {isSyncingThis ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            <span>Importing</span>
+                          </>
+                        ) : isConnected ? (
                           <>
                             <Check size={13} strokeWidth={3} />
-                            <span>{currentStatus === "Review Required" ? "Review" : "Linked"}</span>
+                            <span>Refresh</span>
+                          </>
+                        ) : actionStyleType === "retry" ? (
+                          <>
+                            <RefreshCw size={13} />
+                            <span>Retry</span>
                           </>
                         ) : (
                           <>
                             <Plus size={13} strokeWidth={2.5} />
-                            <span>{p.supportedCapability.split(" ")[0]}</span>
+                            <span>{actionLabel}</span>
                           </>
                         )}
                       </button>
@@ -962,7 +1319,7 @@ export function Screen6DigitalFootprints({
             })}
           </div>
 
-          {/* Active Connector Floating Input Drawer */}
+          {/* Active Connector Floating Input Drawer with Full Consent Disclosure */}
           {activePrompt && activePlatform && (
             <div
               style={{
@@ -974,17 +1331,18 @@ export function Screen6DigitalFootprints({
                 boxShadow: "0 16px 40px rgba(89, 66, 220, 0.15)",
                 display: "flex",
                 flexDirection: "column",
-                gap: 14,
+                gap: 16,
                 animation: "fadeIn 0.2s ease-out",
               }}
             >
+              {/* Drawer Header */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
                       background: activePlatform.bg,
                       display: "grid",
                       placeItems: "center",
@@ -994,8 +1352,8 @@ export function Screen6DigitalFootprints({
                   </div>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <h3 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
-                        {activePlatform.name} — {activePlatform.supportedCapability}
+                      <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                        {activePlatform.name} — {activePlatform.primaryActionLabel}
                       </h3>
                       <span
                         style={{
@@ -1003,23 +1361,20 @@ export function Screen6DigitalFootprints({
                           fontWeight: 700,
                           padding: "2px 8px",
                           borderRadius: 9999,
-                          background: "#EEF2FF",
-                          color: "#4338CA",
-                          border: "1px solid #C7D2FE",
+                          background: statuses[activePlatform.id] === "Import Completed" ? "#ECFDF5" : "#EEF2FF",
+                          color: statuses[activePlatform.id] === "Import Completed" ? "#059669" : "#4338CA",
+                          border: `1px solid ${statuses[activePlatform.id] === "Import Completed" ? "#A7F3D0" : "#C7D2FE"}`,
                         }}
                       >
                         {statuses[activePlatform.id] || "Not Connected"}
                       </span>
                     </div>
-                    <p style={{ fontSize: 12, color: "#64748B", margin: "2px 0 0" }}>
-                      {activePlatform.id === "linkedin"
-                        ? "Connect via profile link or import student-authorized export archive (Positions.csv / export.json)."
-                        : activePlatform.id === "github"
-                        ? "Inspect public repositories, READMEs, manifests (package.json, requirements.txt, pyproject.toml, etc.) and AI/ML project architecture. No private code accessed or executed."
-                        : activePlatform.id === "portfolio"
-                        ? "SSRF-protected public metadata and project links extraction."
-                        : "Permitted public data acquisition. Unverified signals will be recorded for your review."}
-                    </p>
+                    {syncSummaries[activePlatform.id] && (
+                      <p style={{ fontSize: 12.5, color: "#059669", fontWeight: 600, margin: "2px 0 0" }}>
+                        ✓ {syncSummaries[activePlatform.id]}
+                        {lastSyncedTimes[activePlatform.id] ? ` · Last synced at ${lastSyncedTimes[activePlatform.id]}` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1040,6 +1395,47 @@ export function Screen6DigitalFootprints({
                 >
                   <X size={16} />
                 </button>
+              </div>
+
+              {/* Consent & Data Disclosure Card */}
+              <div
+                style={{
+                  background: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 14,
+                  padding: "16px 20px",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 16,
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <FileText size={15} color="#2563EB" />
+                    <span style={{ fontSize: 12.5, fontWeight: 750, color: "#1E293B" }}>
+                      What public data will be collected:
+                    </span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#475569", lineHeight: 1.5 }}>
+                    {activePlatform.dataCollected.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <ShieldCheck size={15} color="#059669" />
+                    <span style={{ fontSize: 12.5, fontWeight: 750, color: "#1E293B" }}>
+                      Strict Guarantees &amp; Privacy:
+                    </span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#475569", lineHeight: 1.5 }}>
+                    {activePlatform.strictGuarantees.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
               {/* Input Row or Upload Option */}
@@ -1123,19 +1519,17 @@ export function Screen6DigitalFootprints({
                     {isSyncing ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        <span>{activePlatform.id === "github" ? "Importing Repositories..." : "Syncing..."}</span>
+                        <span>Importing &amp; Syncing...</span>
                       </>
                     ) : (
                       <>
                         <Check size={16} strokeWidth={2.5} />
                         <span>
-                          {activePlatform.id === "github"
-                            ? profiles[activePrompt] && statuses[activePrompt] === "Public Data Imported"
-                              ? "Refresh Public Data"
-                              : "Import Public GitHub Data"
+                          {profiles[activePrompt] && statuses[activePrompt] === "Import Completed"
+                            ? "Refresh Data"
                             : uploadFile
                             ? "Import & Extract"
-                            : "Save & Connect"}
+                            : activePlatform.primaryActionLabel}
                         </span>
                       </>
                     )}
@@ -1161,7 +1555,7 @@ export function Screen6DigitalFootprints({
                       }}
                     >
                       <Trash2 size={15} />
-                      <span>Remove</span>
+                      <span>Disconnect</span>
                     </button>
                   )}
                 </div>
@@ -1177,9 +1571,13 @@ export function Screen6DigitalFootprints({
                     padding: "8px 14px",
                     borderRadius: 8,
                     fontWeight: 650,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                   }}
                 >
-                  {statusMessage}
+                  <CheckCircle2 size={15} />
+                  <span>{statusMessage}</span>
                 </div>
               )}
 

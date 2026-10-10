@@ -90,6 +90,7 @@ export type OnboardingEducationEntry = {
   percentage?: string;
   academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
   status?: "candidate" | "confirmed";
+  source?: string;
 };
 
 export type OnboardingExperienceEntry = {
@@ -102,6 +103,7 @@ export type OnboardingExperienceEntry = {
   highlights?: string[];
   technologies?: string[];
   status?: "candidate" | "confirmed";
+  source?: string;
 };
 
 export type OnboardingAchievementEntry = {
@@ -113,6 +115,7 @@ export type OnboardingAchievementEntry = {
   date?: string;
   description?: string;
   candidateId?: string;
+  source?: string;
 };
 
 export const initialDraft: OnboardingDraft = {
@@ -288,6 +291,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
               ? (e.academicLevel as OnboardingEducationEntry["academicLevel"])
               : undefined,
             status: e.status === "confirmed" ? "confirmed" : "candidate",
+            source: e.source ? str(e.source, 60) : undefined,
           }))
       : [],
     experiences: Array.isArray(raw.experiences)
@@ -306,6 +310,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
             highlights: Array.isArray(e.highlights) ? strings(e.highlights) : undefined,
             technologies: Array.isArray(e.technologies) ? strings(e.technologies) : undefined,
             status: e.status === "confirmed" ? "confirmed" : "candidate",
+            source: e.source ? str(e.source, 60) : undefined,
           }))
       : [],
     achievements: Array.isArray(raw.achievements)
@@ -325,6 +330,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
             date: a.date ? str(a.date, 40) : undefined,
             description: a.description ? str(a.description, 400) : undefined,
             candidateId: a.candidateId ? str(a.candidateId, 80) : undefined,
+            source: a.source ? str(a.source, 60) : undefined,
           }))
       : [],
     goal: str(raw.goal, 160),

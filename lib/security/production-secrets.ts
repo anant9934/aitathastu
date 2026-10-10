@@ -15,10 +15,11 @@ const REQUIRED_PRODUCTION_SECRETS = [
   "GITHUB_CLIENT_SECRET",
   "GITHUB_WEBHOOK_SECRET",
   "EXTERNAL_TOKEN_ENCRYPTION_KEY",
-  "STUDY_LPU_INTEGRATION_SECRET",
-  "PADHO_CODE_INTEGRATION_SECRET",
-  "ERIS_INTEGRATION_SECRET",
-  "MENTORMAZE_INTEGRATION_SECRET",
+  // Actual env var names used in .env / .env.local / Vercel:
+  "INTEGRATION_STUDY_LPU_SECRET",
+  "INTEGRATION_PADHO_CODE_SECRET",
+  "INTEGRATION_ERIS_SECRET",
+  "INTEGRATION_MENTORMAZE_SECRET",
   "CRON_SECRET",
   "DATABASE_URL",
 ];
@@ -42,19 +43,19 @@ const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
     "secret",
   ],
   EXTERNAL_TOKEN_ENCRYPTION_KEY: ["change-me", "secret", "replace-with-random-key"],
-  STUDY_LPU_INTEGRATION_SECRET: [
+  INTEGRATION_STUDY_LPU_SECRET: [
     "study_lpu_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  PADHO_CODE_INTEGRATION_SECRET: [
+  INTEGRATION_PADHO_CODE_SECRET: [
     "padho_code_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  ERIS_INTEGRATION_SECRET: [
+  INTEGRATION_ERIS_SECRET: [
     "eris_live_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  MENTORMAZE_INTEGRATION_SECRET: [
+  INTEGRATION_MENTORMAZE_SECRET: [
     "mentormaze_sec_key_tathastu_dev_2026",
     "dev_key",
   ],

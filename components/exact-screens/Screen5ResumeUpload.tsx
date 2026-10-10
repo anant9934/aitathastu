@@ -87,6 +87,18 @@ export function Screen5ResumeUpload({
     discoveredProfiles?: Partial<Record<string, string>>;
     extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
   }>({});
+  // null = probing, true = gate open, false = gate closed
+  const [ingestionReady, setIngestionReady] = useState<boolean | null>(null);
+
+  // Probe server gate status once on mount so UI reflects reality before any interaction
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/resume/preflight", { method: "GET", credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setIngestionReady(Boolean(data?.ready)); })
+      .catch(() => { if (!cancelled) setIngestionReady(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const isBusy =
     processingState === "UPLOADING" ||
@@ -94,8 +106,15 @@ export function Screen5ResumeUpload({
     processingState === "EXTRACTING" ||
     processingState === "SAVING";
 
+  // Upload is possible only when gate is confirmed open
+  const uploadBlocked = ingestionReady === false;
+
   const processFile = async (file?: File) => {
     if (!file) return;
+    if (uploadBlocked) {
+      setErrorMessage("Resume upload is temporarily unavailable. Use \"Skip for now\" to enter your details manually.");
+      return;
+    }
     if (!aiConsent) {
       setErrorMessage("Please consent to resume processing before upload.");
       return;
@@ -237,6 +256,8 @@ export function Screen5ResumeUpload({
 
   const advance = () => {
     if (isBusy) return;
+    // If ingestion is blocked and nothing was previously uploaded, force manual route via Skip
+    if (uploadBlocked && !isUploaded) return;
     if (candidates.length > 0 && !reviewSaved) {
       setErrorMessage("Save your reviewed CV suggestions before continuing, or choose Skip for now.");
       return;
@@ -396,26 +417,36 @@ export function Screen5ResumeUpload({
             }}
           >
             <div
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => { event.preventDefault(); void processFile(event.dataTransfer.files?.[0]); }}
-              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(event) => { if (!uploadBlocked) event.preventDefault(); }}
+              onDrop={(event) => { event.preventDefault(); if (!uploadBlocked) void processFile(event.dataTransfer.files?.[0]); }}
+              onClick={() => { if (!uploadBlocked) fileInputRef.current?.click(); }}
               role="button"
-              tabIndex={0}
+              aria-disabled={uploadBlocked || isBusy}
+              tabIndex={uploadBlocked ? -1 : 0}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+                if (!uploadBlocked && (e.key === "Enter" || e.key === " ")) {
                   fileInputRef.current?.click();
                 }
               }}
               style={{
-                border: isUploaded ? "2px solid #10B981" : "2px dashed #818CF8",
+                border: uploadBlocked
+                  ? "2px dashed #CBD5E1"
+                  : isUploaded
+                  ? "2px solid #10B981"
+                  : "2px dashed #818CF8",
                 borderRadius: 18,
                 padding: "48px 24px",
-                background: isUploaded ? "#F0FDF4" : "linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 100%)",
+                background: uploadBlocked
+                  ? "#F8FAFC"
+                  : isUploaded
+                  ? "#F0FDF4"
+                  : "linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 100%)",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: "pointer",
+                cursor: uploadBlocked ? "not-allowed" : "pointer",
+                opacity: uploadBlocked ? 0.65 : 1,
                 transition: "all 0.2s ease",
               }}
             >
@@ -459,26 +490,28 @@ export function Screen5ResumeUpload({
 
               <button
                 type="button"
-                disabled={isBusy}
+                disabled={uploadBlocked || isBusy}
                 onClick={(e) => {
                   e.stopPropagation();
-                  fileInputRef.current?.click();
+                  if (!uploadBlocked) fileInputRef.current?.click();
                 }}
                 style={{
                   padding: "11px 28px",
                   borderRadius: 9999,
-                  background: isBusy
+                  background: uploadBlocked || isBusy
                     ? "rgba(100, 116, 139, 0.4)"
                     : "linear-gradient(110deg, #02C5F5 0%, #4564FF 48%, #9335E8 100%)",
                   color: "#FFFFFF",
                   fontWeight: 750,
                   fontSize: 13.5,
                   border: "none",
-                  cursor: isBusy ? "not-allowed" : "pointer",
-                  boxShadow: isBusy ? "none" : "0 4px 16px rgba(69, 100, 255, 0.35)",
+                  cursor: uploadBlocked || isBusy ? "not-allowed" : "pointer",
+                  boxShadow: uploadBlocked || isBusy ? "none" : "0 4px 16px rgba(69, 100, 255, 0.35)",
                 }}
               >
-                {isBusy
+                {uploadBlocked
+                  ? "Upload Unavailable"
+                  : isBusy
                   ? processingState === "SAVING"
                     ? "Saving Claims..."
                     : "Reading & Extracting..."
@@ -486,6 +519,32 @@ export function Screen5ResumeUpload({
                   ? "Replace File"
                   : "Browse Computer"}
               </button>
+
+              {/* Honest blocked state — shown instead of fake-ready state */}
+              {uploadBlocked && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    marginTop: 14,
+                    padding: "10px 16px",
+                    borderRadius: 10,
+                    background: "#FEF2F2",
+                    border: "1px solid #FECACA",
+                    color: "#DC2626",
+                    fontSize: 12.5,
+                    maxWidth: 340,
+                    textAlign: "center",
+                  }}
+                >
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>
+                    Resume upload is temporarily unavailable. Use{" "}
+                    <strong>Skip for now</strong> to enter your details manually and upload a resume later.
+                  </span>
+                </div>
+              )}
 
               {isBusy && (
                 <div
@@ -552,9 +611,10 @@ export function Screen5ResumeUpload({
                 style={{
                   background: "none",
                   border: "none",
-                  color: isBusy ? "#94A3B8" : "#64748B",
+                  // Skip is ALWAYS available even when ingestion is blocked
+                  color: isBusy ? "#94A3B8" : uploadBlocked ? "#5642EF" : "#64748B",
                   fontSize: 13.5,
-                  fontWeight: 600,
+                  fontWeight: uploadBlocked ? 700 : 600,
                   cursor: isBusy ? "not-allowed" : "pointer",
                 }}
               >
@@ -616,7 +676,19 @@ export function Screen5ResumeUpload({
 
             <div style={{ paddingTop: 18, borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, color: "#64748B" }}>
               <span>Private upload &bull; review before saving</span>
-              <span style={{ fontWeight: 700, color: "#10B981" }}>Ready</span>
+              {ingestionReady === null && (
+                <span style={{ fontWeight: 600, color: "#94A3B8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Loader2 size={12} className="animate-spin" /> Checking...
+                </span>
+              )}
+              {ingestionReady === true && (
+                <span style={{ fontWeight: 700, color: "#10B981" }}>Ready</span>
+              )}
+              {ingestionReady === false && (
+                <span style={{ fontWeight: 700, color: "#DC2626", display: "flex", alignItems: "center", gap: 4 }}>
+                  <AlertCircle size={12} /> Unavailable
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -629,7 +701,7 @@ export function Screen5ResumeUpload({
           activeStep={stepNumber}
           totalSteps={totalSteps}
           nextLabel="Next"
-          isNextDisabled={isBusy}
+          isNextDisabled={isBusy || (uploadBlocked && !isUploaded)}
         />
       </main>
     </div>

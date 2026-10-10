@@ -16,6 +16,8 @@
     "test:core-v3-5": "node --env-file=.env --import tsx scripts/verify-v3-5-production-pilot.ts",
     "test:browser-v3-5": "node --env-file=.env --import tsx scripts/verify-v3-5-browser-journey.ts",
     "test:browser-eora-phase6": "node --env-file=.env --import tsx scripts/verify-eora-phase6-browser.ts",
+    "test:eora-phase6-2-pipeline": "node --env-file=.env --import tsx scripts/verify-eora-phase6-2-pipeline.ts",
+    "test:eora-phase6-1-resume": "node --import tsx scripts/verify-eora-phase6-1-resume.ts",
     "test:core-v3-4": "node --env-file=.env --import tsx scripts/verify-v3-4-production-certification.ts",
     "test:browser-v3-4": "node --env-file=.env --import tsx scripts/verify-v3-4-browser-journey.ts",
     "test:core-v3-3": "node --env-file=.env --import tsx scripts/verify-v3-3-certification.ts",

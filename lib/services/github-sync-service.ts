@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { encryptConnectionToken, decryptConnectionToken } from "../security/connection-token";
+import { encryptConnectionToken, decryptConnectionToken, decryptConnectionTokenWithMeta } from "../security/connection-token";
 import { coreIngestionReady } from "../security/core-ingestion-gate";
 import { fetchGitHubProjects } from "../connectors/github/client";
 import { hasRepoMeaningfullyChanged, DiscoveredGitHubProject } from "../connectors/github/mapper";
@@ -110,9 +110,34 @@ export async function syncGitHubConnection(
   }
 
   const metadata = (connection.metadata || {}) as Record<string, unknown>;
-  const storedToken = typeof metadata.encryptedAccessToken === "string"
-    ? decryptConnectionToken(metadata.encryptedAccessToken, personId)
-    : undefined;
+  let storedToken: string | undefined;
+  if (typeof metadata.encryptedAccessToken === "string") {
+    try {
+      const decrypted = decryptConnectionTokenWithMeta(metadata.encryptedAccessToken, personId);
+      storedToken = decrypted.token;
+      if (decrypted.keyUsed === "previous") {
+        // Transparently re-encrypt with current primary key
+        const reencrypted = encryptConnectionToken(decrypted.token, personId);
+        await saveExternalConnection({
+          personId,
+          provider: "github",
+          externalUsername: connection.externalUsername,
+          profileUrl: connection.profileUrl,
+          displayName: connection.displayName || undefined,
+          scopes: Array.isArray(connection.scopes) ? (connection.scopes as string[]) : undefined,
+          metadata: { ...metadata, encryptedAccessToken: reencrypted },
+        }).catch(() => {});
+      }
+    } catch {
+      return {
+        success: false,
+        recordsFetched: 0,
+        recordsChanged: 0,
+        projects: [],
+        error: "GitHub authorization has expired or was encrypted with a rotated key. Please reconnect GitHub.",
+      };
+    }
+  }
   const authorizedToken = token || storedToken;
   if (!authorizedToken) {
     return { success: false, recordsFetched: 0, recordsChanged: 0, projects: [], error: "Reconnect GitHub to authorize repository sync." };

@@ -9,13 +9,15 @@ type ResumeSnapshot = { version: 1; candidates: Candidate[] };
 
 import { ExtractionValidator } from "./extraction-validator";
 
-export function resumeCandidates(extracted: ResumeInterpretationOutput): Candidate[] {
+export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceText?: string): Candidate[] {
   const candidates: Candidate[] = [];
+  const normalizedSource = sourceText?.replace(/\s+/g, " ").trim().toLocaleLowerCase();
   const add = (category: Candidate["category"], rows: Array<{ value: string; sourceSpan: string }>) => {
     rows.forEach((row, index) => {
       const trimmedVal = row.value.trim();
       const trimmedSpan = row.sourceSpan.trim();
       if (!trimmedVal || !trimmedSpan) return;
+      if (normalizedSource && !normalizedSource.includes(trimmedSpan.replace(/\s+/g, " ").toLocaleLowerCase())) return;
 
       if (category === "skill") {
         const valRes = ExtractionValidator.validateSkillClaim(trimmedVal, trimmedSpan);
@@ -42,9 +44,9 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput): Candida
   return candidates;
 }
 
-export async function saveResumeCandidates(personId: string, documentId: string, extracted: ResumeInterpretationOutput): Promise<void> {
+export async function saveResumeCandidates(personId: string, documentId: string, extracted: ResumeInterpretationOutput, sourceText?: string): Promise<void> {
   const db = await getDb();
-  const snapshotData: ResumeSnapshot = { version: 1, candidates: resumeCandidates(extracted) };
+  const snapshotData: ResumeSnapshot = { version: 1, candidates: resumeCandidates(extracted, sourceText) };
   const id = `resume_${crypto.createHash("sha256").update(`${personId}:${documentId}:${JSON.stringify(snapshotData)}`).digest("hex")}`;
   await db.insert(sourceSnapshots).values({
     id, personId, source: "resume", sourceReference: `resume:sha256:${documentId}`,

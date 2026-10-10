@@ -37,7 +37,7 @@ interface Screen5ResumeUploadProps {
       extractedProfile?: ExtractedProfileData;
       discoveredProfiles?: Partial<Record<string, string>>;
     }
-  ) => void;
+  ) => Promise<boolean> | boolean;
   onNext: () => void;
   onExtractionReady?: () => void;
   onBack: () => void;
@@ -53,6 +53,7 @@ export function Screen5ResumeUpload({
   onJumpToStep,
 }: Screen5ResumeUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const completedDocumentsRef = useRef<Set<string>>(new Set());
   const [fileName, setFileName] = useState<string | null>(initialFileName || null);
   const [isUploaded, setIsUploaded] = useState<boolean>(Boolean(initialFileName));
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -94,6 +95,25 @@ export function Screen5ResumeUpload({
         return;
       }
 
+      const documentId = String(data.documentId || "");
+      const rows: ResumeCandidate[] = Array.isArray(data.reviewCandidates)
+        ? data.reviewCandidates.flatMap((raw: unknown) => {
+            if (!raw || typeof raw !== "object") return [];
+            const item = raw as Record<string, unknown>;
+            const category = item.category;
+            const candidateId = item.candidateId;
+            const value = item.value;
+            const sourceSpan = item.sourceSpan;
+            if (!documentId || !["education", "experience", "project", "skill", "certification"].includes(String(category)) ||
+              typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string") return [];
+            return [{ id: candidateId, candidateId, category: category as ReviewedResumeClaim["category"], value, sourceSpan, documentId, corrected: false, selected: false }];
+          })
+        : [];
+      if (data.extractionMeta?.success !== true || rows.length === 0) {
+        setErrorMessage("No reviewable claims were returned. Please retry or enter details manually.");
+        setIsProcessing(false);
+        return;
+      }
       setFileName(file.name);
       setIsUploaded(true);
       setIsProcessing(false);
@@ -102,46 +122,27 @@ export function Screen5ResumeUpload({
         extractedProfile: data.extractedProfile,
         discoveredProfiles: data.discoveredProfiles,
       });
-      const structured = data.structured || {};
-      const documentId = String(data.documentId || "");
-      const rows: ResumeCandidate[] = [];
-      const append = (category: ReviewedResumeClaim["category"], values: unknown[], getValue: (item: Record<string, unknown>) => string) => {
-        values.forEach((raw, index) => {
-          if (!raw || typeof raw !== "object") return;
-          const item = raw as Record<string, unknown>;
-          const value = getValue(item);
-          const sourceSpan = typeof item.sourceSpan === "string" ? item.sourceSpan.trim() : "";
-          if (value && sourceSpan && documentId) rows.push({ id: `${category}_${index}`, candidateId: `${category}_${index}`, category, value, sourceSpan, documentId, corrected: false, selected: false });
-        });
-      };
-      append("education", structured.education || [], (item) => [item.degree, item.fieldOfStudy, item.institution].filter(Boolean).join(" · "));
-      append("experience", structured.experience || [], (item) => [item.role, item.company].filter(Boolean).join(" · "));
-      append("project", structured.projects || [], (item) => String(item.title || ""));
-      append("skill", structured.skills || [], (item) => String(item.name || ""));
-      append("certification", structured.certifications || [], (item) => String(item.name || ""));
-
-      if (rows.length === 0 && documentId) {
-        if (data.suggestions?.education) {
-          rows.push({ id: `education_0`, candidateId: `education_0`, category: "education", value: String(data.suggestions.education), sourceSpan: String(data.suggestions.education), documentId, corrected: false, selected: false });
-        }
-        if (data.suggestions?.skills) {
-          const skl = String(data.suggestions.skills).split(/[,;]/);
-          skl.forEach((s: string, idx: number) => {
-            const trimmed = s.trim();
-            if (trimmed) rows.push({ id: `skill_${idx}`, candidateId: `skill_${idx}`, category: "skill", value: trimmed, sourceSpan: trimmed, documentId, corrected: false, selected: false });
-          });
-        }
-        if (data.discovery?.projects && Array.isArray(data.discovery.projects)) {
-          data.discovery.projects.forEach((p: string, idx: number) => {
-            if (p) rows.push({ id: `project_${idx}`, candidateId: `project_${idx}`, category: "project", value: p, sourceSpan: p, documentId, corrected: false, selected: false });
-          });
-        }
-      }
       setCandidates(rows);
-      onExtractionReady?.();
+      if (!completedDocumentsRef.current.has(documentId)) {
+        completedDocumentsRef.current.add(documentId);
+        onExtractionReady?.();
+      }
     } catch {
       setErrorMessage("Network error during file upload. You can continue manually.");
       setIsProcessing(false);
+    }
+  };
+
+  const saveReviewedClaims = async () => {
+    const selected = candidates.filter((candidate) => candidate.selected && candidate.value.trim()).map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({ candidateId, category, value: value.trim(), sourceSpan, documentId, corrected }));
+    try {
+      const saved = await onExtractSuccess?.(fileName || "resume", selected, extraData);
+      if (saved === false) throw new Error("Review save failed");
+      setReviewSaved(true);
+      setErrorMessage(null);
+    } catch {
+      setReviewSaved(false);
+      setErrorMessage("We could not save your review. Please retry before continuing.");
     }
   };
 
@@ -350,7 +351,7 @@ export function Screen5ResumeUpload({
                   <small style={{ color: "#64748B" }}>Source: “{candidate.sourceSpan}”</small>
                 </div>
               </div>)}
-              <button type="button" onClick={() => { onExtractSuccess?.(fileName || "resume", candidates.filter((candidate) => candidate.selected && candidate.value.trim()).map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({ candidateId, category, value: value.trim(), sourceSpan, documentId, corrected })), extraData); setReviewSaved(true); }} style={{ background: "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>Save selected claims</button>
+              <button type="button" onClick={saveReviewedClaims} style={{ background: "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>Save selected claims</button>
               {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12 }}>Review saved</span>}
             </div>}
 

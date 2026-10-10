@@ -10,7 +10,7 @@
  * The student reviews and confirms extracted items before anything becomes canonical.
  *
  * Security:
- * - Rate limited (5 req/min per IP)
+ * - Rate limited (5 req/min per authenticated student)
  * - File type + magic byte validation
  * - File size limit (5MB)
  * - Zero LLM API calls, zero prompts, zero model provider dependencies
@@ -19,11 +19,11 @@
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { checkRateLimit } from "@/lib/security/rate-limit";
+import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { extractResumeStructured } from "@/lib/services/resume-extraction-service";
-import { saveResumeCandidates } from "@/lib/services/resume-review-service";
+import { resumeCandidates, saveResumeCandidates } from "@/lib/services/resume-review-service";
 import { parseResumeDocument } from "@/lib/services/document-parser-service";
 import { resumeSuggestions, resumeDiscovery } from "@/lib/resume-suggestions";
 
@@ -31,14 +31,17 @@ export const runtime = "nodejs";
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
 function error(message: string, status: number, headers?: Record<string, string>) {
-  return NextResponse.json({ error: message }, { status, headers });
+  return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "private, no-store", ...headers } });
 }
 
 export async function POST(request: Request) {
   if (!coreIngestionReady()) return error("Resume import is unavailable until credential rotation is complete.", 503);
-  // Rate limiting (resume tier: 5 req/min per IP)
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "client";
-  const rl = checkRateLimit(ip, "resume");
+  const auth = await getServerAuthContext().catch(() => null);
+  if (!auth) return error("Sign in before uploading a resume.", 401);
+  const personId = auth.person.id;
+
+  // Tie upload cost to the authenticated account; client-supplied IP headers cannot reset its quota.
+  const rl = await checkRateLimitDistributed(personId, "resume");
   if (!rl.allowed) {
     return error(
       "Too many resume upload requests. Please wait a minute before uploading again.",
@@ -46,10 +49,6 @@ export async function POST(request: Request) {
       { "Retry-After": String(Math.ceil(rl.resetMs / 1000)) }
     );
   }
-
-  const auth = await getServerAuthContext().catch(() => null);
-  if (!auth) return error("Sign in before uploading a resume.", 401);
-  const personId = auth.person.id;
 
   // --- File reception ---
   let file: File;
@@ -100,9 +99,9 @@ export async function POST(request: Request) {
   }
 
   const rawText = parsedDoc.text;
-  if (rawText.replace(/\s/g, "").length < 40 && parsedDoc.requiresManualReview) {
+  if (rawText.replace(/\s/g, "").length < 40) {
     return error(
-      "We could not read enough text. Scanned or image-only files need manual entry.",
+      "We could not read enough text. Please use a readable document or enter details manually.",
       422
     );
   }
@@ -113,14 +112,19 @@ export async function POST(request: Request) {
 
   // --- Structured Deterministic Extraction (ZERO-LLM) ---
   const extraction = await extractResumeStructured(rawText, personId, parsedDoc.hyperlinks);
+  if (!extraction.success || !extraction.extracted) {
+    return error("We could not extract reviewable details. Please retry or enter details manually.", 422);
+  }
+  const reviewCandidates = resumeCandidates(extraction.extracted, rawText);
+  if (reviewCandidates.length === 0) {
+    return error("No supported claims were found for review. Please enter details manually.", 422);
+  }
 
   const documentId = crypto.createHash("sha256").update(bytes).digest("hex");
-  if (extraction.extracted) {
-    try {
-      await saveResumeCandidates(personId, documentId, extraction.extracted);
-    } catch {
-      return error("We could not save the extraction for review. Please retry or enter details manually.", 503);
-    }
+  try {
+    await saveResumeCandidates(personId, documentId, extraction.extracted, rawText);
+  } catch {
+    return error("We could not save the extraction for review. Please retry or enter details manually.", 503);
   }
 
   // --- Build response ---
@@ -132,6 +136,7 @@ export async function POST(request: Request) {
     discoveredProfiles: extraction.discoveredProfiles,
     discoveredRepositories: extraction.discoveredRepositories,
     candidates: extraction.candidates,
+    reviewCandidates,
     extractionMeta: {
       success: extraction.success,
       provider: extraction.provider,
@@ -149,8 +154,6 @@ export async function POST(request: Request) {
     suggestions: legacySuggestions,
     discovery: legacyDiscovery,
 
-    message: extraction.success
-      ? "Your resume was analysed deterministically without generative AI. Review every extracted item carefully — nothing is saved until you confirm it."
-      : "Basic information was extracted from your resume. Please review and complete manually.",
-  });
+    message: "Your resume was analysed deterministically without generative AI. Source-backed suggestions were saved for review; they remain unverified until independently checked.",
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }

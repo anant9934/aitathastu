@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const base = process.env.BASE_URL || "http://127.0.0.1:3000";
-const output = path.join(process.cwd(), "docs/screenshots/eora-phase6");
+const output = path.join(process.cwd(), process.env.EORA_SCREENSHOT_DIR || "docs/screenshots/eora-phase6-1");
 mkdirSync(output, { recursive: true });
 const results: Array<{ check: string; passed: boolean; detail: string }> = [];
 const consoleErrors: string[] = [];
@@ -158,18 +158,33 @@ async function main() {
 
     const consent = page.locator('input[type="checkbox"]').first();
     if (await consent.count() && !(await consent.isChecked())) await consent.check();
+    const extractionResponsePromise = page.waitForResponse((response) => response.url().endsWith("/api/resume/extract") && response.request().method() === "POST", { timeout: 30000 });
     await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles(path.join(process.cwd(), "scripts/fixtures/test_student_cv.pdf"));
-    const extraction = await Promise.race([
-      page.getByText("Review suggested claims").first().waitFor({ timeout: 15000 }).then(() => "ready" as const),
-      page.getByText("Resume import is unavailable").first().waitFor({ timeout: 15000 }).then(() => "blocked" as const),
-    ]);
-    if (extraction === "ready") {
+    const extractionResponse = await extractionResponsePromise;
+    if (extractionResponse.ok()) {
+      const payload = await extractionResponse.json();
+      const reviewable = payload.extractionMeta?.success === true && payload.extractionMeta?.llmUsed === false &&
+        typeof payload.documentId === "string" && Array.isArray(payload.reviewCandidates) && payload.reviewCandidates.length > 0;
+      await page.getByText("Review suggested claims").first().waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: /EORA — open help panel/ }).click();
+      const reaction = await page.getByText("Extraction complete. Please review the suggested claims below before saving.").isVisible();
+      await shot(page, "06-resume-extraction-complete");
+      await page.getByRole("button", { name: "Close help panel", exact: true }).click();
+      await page.getByRole("checkbox", { name: /^Select / }).first().check();
       await page.getByRole("button", { name: "Save selected claims" }).click();
+      await page.getByText("Review saved").waitFor({ timeout: 15000 });
       await shot(page, "06-resume-analysis-completion");
-      record("Resume extraction and review", await page.getByText("Review saved").isVisible());
+      const savedDraft = await page.evaluate(async () => {
+        const response = await fetch("/api/onboarding-v2", { cache: "no-store" });
+        return response.ok ? await response.json() : null;
+      });
+      const persisted = savedDraft?.draft?.resumeReviewed?.some((claim: { documentId?: string; sourceSpan?: string }) =>
+        claim.documentId === payload.documentId && Boolean(claim.sourceSpan));
+      record("Resume extraction and review", reviewable && reaction && Boolean(persisted), "grounded candidates extracted, EORA reaction confirmed, and claim persisted in authenticated draft");
     } else {
+      await page.getByText("Resume import is unavailable").first().waitFor({ timeout: 15000 }).catch(() => {});
       await shot(page, "06-resume-extraction-blocked");
-      record("Resume extraction and review", false, "HTTP 503: credential rotation required");
+      record("Resume extraction and review", false, `HTTP ${extractionResponse.status()}: extraction did not complete`);
     }
     await next(page);
 

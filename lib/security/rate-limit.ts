@@ -8,6 +8,7 @@
  */
 
 import { logger } from "../logger";
+import { randomUUID } from "node:crypto";
 
 export type RateLimitTier =
   | "auth"        // Login, signup, password attempts: 10 req/min
@@ -126,12 +127,12 @@ export class DistributedRedisRateLimiter implements RateLimiterBackend {
     const windowSeconds = Math.ceil(windowMs / 1000);
     const redisKey = `ratelimit:${key}`;
 
-    // Redis Pipeline using atomic commands via REST API:
-    // MULTI -> ZREMRANGEBYSCORE key 0 (now - windowMs) -> ZADD key now now -> ZCARD key -> EXPIRE key windowSeconds -> EXEC
+    // REST pipeline: prune old entries, add a unique request member, count, then expire.
+    // This pipeline is not a Redis transaction; capacity still needs deployed concurrency testing.
     const cutoff = now - windowMs;
     const commands = [
       ["ZREMRANGEBYSCORE", redisKey, "0", String(cutoff)],
-      ["ZADD", redisKey, String(now), String(now)],
+      ["ZADD", redisKey, String(now), `${now}:${randomUUID()}`],
       ["ZCARD", redisKey],
       ["EXPIRE", redisKey, String(windowSeconds)],
     ];

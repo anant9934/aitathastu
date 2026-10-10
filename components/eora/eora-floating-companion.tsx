@@ -93,15 +93,18 @@ export function EoraFloatingCompanion() {
       frame = requestAnimationFrame(() => {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        const size = width <= 480 ? 58 : 72;
-        const bottom = width <= 480 ? 76 : 24;
+        const trigger = containerRef.current?.querySelector<HTMLElement>(".eora-avatar-trigger")?.getBoundingClientRect();
+        const triggerWidth = trigger?.width || (width <= 480 ? 58 : 72);
+        const triggerHeight = trigger?.height || (width <= 480 ? 58 : 72);
+        const edge = width <= 340 ? 8 : width <= 480 ? 12 : width <= 768 ? 16 : 24;
+        const bottom = width <= 340 ? 68 : width <= 480 ? 72 : 24;
         const candidates: Placement[] = ["bottom-right", "bottom-left", "top-right", "top-left"];
         const controls = Array.from(document.querySelectorAll<HTMLElement>("button, input, textarea, select, a, [role='button']"))
           .filter((el) => !containerRef.current?.contains(el) && el.getClientRects().length > 0);
         const scored = candidates.map((candidate, index) => {
-          const left = candidate.endsWith("right") ? width - size - 16 : 16;
-          const top = candidate.startsWith("bottom") ? height - bottom - size : 82;
-          const box = { left: left - 6, top: top - 6, right: left + size + 6, bottom: top + size + 6 };
+          const left = candidate.endsWith("right") ? width - triggerWidth - edge : edge;
+          const top = candidate.startsWith("bottom") ? height - bottom - triggerHeight : 82;
+          const box = { left: left - 6, top: top - 6, right: left + triggerWidth + 6, bottom: top + triggerHeight + 6 };
           const collisions = controls.reduce((count, control) => {
             const r = control.getBoundingClientRect();
             return count + (r.left < box.right && r.right > box.left && r.top < box.bottom && r.bottom > box.top ? 1 : 0);
@@ -113,12 +116,19 @@ export function EoraFloatingCompanion() {
       });
     };
     update();
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some((mutation) => !containerRef.current?.contains(mutation.target))) update();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
+    document.addEventListener("load", update, true);
     return () => {
       cancelAnimationFrame(frame);
+      observer.disconnect();
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
+      document.removeEventListener("load", update, true);
     };
   }, [eora?.isVisible, eora?.isPanelOpen, eora?.onboardingStep, eora?.context.route]);
 

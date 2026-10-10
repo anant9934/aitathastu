@@ -168,9 +168,9 @@ export function ExactScreensContainer({
   // Persist draft to server
   const persistDraft = useCallback(
     async (patch: Record<string, unknown>) => {
-      if (isGalleryMode) return;
+      if (isGalleryMode) return true;
       try {
-        await fetch("/api/onboarding-v2", {
+        const response = await fetch("/api/onboarding-v2", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -196,8 +196,9 @@ export function ExactScreensContainer({
             primaryPriority: patch.primaryPriority ?? primaryPriority,
           }),
         });
+        return response.ok;
       } catch {
-        // Ignore background sync errors
+        return false;
       }
     },
     [
@@ -432,7 +433,24 @@ export function ExactScreensContainer({
             onExtractionReady={() => {
               eora?.signalSuccess("extraction_completed");
             }}
-            onExtractSuccess={(fileName, claims, extraData) => {
+            onExtractSuccess={async (fileName, claims, extraData) => {
+              const nextDiscoveredProfiles = {
+                ...discoveredResumeProfiles,
+                ...(extraData?.discoveredProfiles || {}),
+              };
+              const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
+              const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
+              const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => ({
+                id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value, description: "", technologies: [], sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
+              }));
+              const nextProjects = [...projects.filter((project) => !project.id.startsWith("resume_")), ...resumeProjects];
+              const saved = await persistDraft({
+                skills: nextSkills,
+                projects: nextProjects,
+                resumeReviewed: claims,
+                discoveredResumeProfiles: nextDiscoveredProfiles,
+              });
+              if (!saved) return false;
               setResumeFileName(fileName);
               setResumeReviewed(claims);
 
@@ -456,31 +474,16 @@ export function ExactScreensContainer({
               }
 
               // Auto-fill Discovered Footprints for Step 6
-              const nextDiscoveredProfiles = {
-                ...discoveredResumeProfiles,
-                ...(extraData?.discoveredProfiles || {}),
-              };
               setDiscoveredResumeProfiles(nextDiscoveredProfiles);
 
-              const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
-              const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
               setSkills(nextSkills);
-              const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => ({
-                id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value, description: "", technologies: [], sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
-              }));
-              const nextProjects = [...projects.filter((project) => !project.id.startsWith("resume_")), ...resumeProjects];
               setProjects(nextProjects);
-              persistDraft({
-                skills: nextSkills,
-                projects: nextProjects,
-                resumeReviewed: claims,
-                discoveredResumeProfiles: nextDiscoveredProfiles,
-              });
               // Signal confirmed backend extraction success to EORA (once per upload)
               if (!resumeSignalFiredRef.current) {
                 resumeSignalFiredRef.current = true;
                 eora?.signalSuccess("resume_uploaded");
               }
+              return true;
             }}
             onNext={() => setCurrentScreen(6)}
             onBack={() => setCurrentScreen(4)}

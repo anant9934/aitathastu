@@ -75,11 +75,22 @@ export async function extractResumeStructured(
     });
 
     const validated = ResumeInterpretationSchema.safeParse(result.structured);
-    const extractedData = validated.success ? validated.data : result.structured;
+    if (!validated.success) {
+      return {
+        success: false,
+        extracted: null,
+        provider: "deterministic-engine",
+        modelUsed: "v3.9-zero-llm",
+        fallbackUsed: false,
+        latencyMs: Date.now() - startTime,
+        truncated: false,
+        error: "Structured extraction did not pass validation.",
+      };
+    }
 
     return {
       success: true,
-      extracted: extractedData,
+      extracted: validated.data,
       provider: "deterministic-engine",
       modelUsed: "v3.9-zero-llm",
       fallbackUsed: false,
@@ -90,17 +101,16 @@ export async function extractResumeStructured(
       discoveredRepositories: result.discoveredRepositories,
       candidates: result.candidates,
     };
-  } catch (err) {
-    const fallback = buildDeterministicExtraction(resumeText, extraHyperlinks);
+  } catch {
     return {
-      success: true,
-      extracted: fallback,
-      provider: "deterministic-fallback",
+      success: false,
+      extracted: null,
+      provider: "deterministic-engine",
       modelUsed: "v3.9-zero-llm",
-      fallbackUsed: true,
+      fallbackUsed: false,
       latencyMs: Date.now() - startTime,
       truncated: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: "Structured extraction could not be completed.",
     };
   }
 }

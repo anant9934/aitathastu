@@ -72,6 +72,15 @@ const EXCLUDED_PORTFOLIO_HOSTS = new Set([
   "drive.google.com",
   "docs.google.com",
   "dropbox.com",
+  "ams.org",
+  "www.ams.org",
+  "sil.org",
+  "scripts.sil.org",
+  "adobe.com",
+  "tug.org",
+  "ctan.org",
+  "w3.org",
+  "apache.org",
 ]);
 
 /**
@@ -377,8 +386,7 @@ export function discoverDigitalFootprints(
   }
 
   // 2b. Discover labeled portfolio website (e.g. "Portfolio: anantkumar.site")
-  if (!discoveredProfiles.portfolio) {
-    const portfolioMatch = text.match(
+  const portfolioMatch = text.match(
       /(?:portfolio|website|web)\s*[:\-]\s*(?:https?:\/\/)?([a-zA-Z0-9.\-]+\.[a-z]{2,}(?:\/[^\s|]*)*)/i
     );
     if (portfolioMatch && portfolioMatch[1]) {
@@ -398,7 +406,6 @@ export function discoverDigitalFootprints(
         });
       }
     }
-  }
 
   // 3. Raw ORCID ID in text (e.g. "ORCID: 0000-0002-1825-0097")
   if (!discoveredProfiles.orcid) {

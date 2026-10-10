@@ -24,7 +24,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  serverExternalPackages: ["pdf-parse", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js"],
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js"],
   eslint: {
     ignoreDuringBuilds: true,
   },

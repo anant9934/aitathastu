@@ -21,6 +21,8 @@
 .DS_Store
 *.pem
 *.traineddata
+Anant-Kumar-Resume.pdf
+scripts/reproduce*
 
 # debug
 npm-debug.log*

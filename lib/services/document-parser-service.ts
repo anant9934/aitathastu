@@ -206,19 +206,122 @@ export async function parseResumeDocument(
     const annotations = extractPdfUriAnnotations(bytes);
     hyperlinks.push(...annotations);
 
-    // 2. Extract visible text stream using pdf-parse
+    // 2. Extract visible text stream using pdf-parse with page annotations
+    let pdfParseSuccess = false;
     try {
       const { PDFParse } = await import("pdf-parse");
       const parser = new PDFParse({ data: new Uint8Array(bytes) });
       try {
         const parsed = await parser.getText();
         rawText = parsed?.text || "";
+
+        // Extract clickable hyperlinks directly from page annotations
+        const underlyingDoc = (parser as any).doc;
+        if (underlyingDoc) {
+          const numPages = underlyingDoc._pdfInfo?.numPages || 1;
+          for (let p = 1; p <= numPages; p++) {
+            try {
+              const page = await underlyingDoc.getPage(p);
+              const annots = await page.getAnnotations();
+              for (const a of annots) {
+                const target = a?.url || a?.unsafeUrl;
+                if (typeof target === "string" && (target.startsWith("http://") || target.startsWith("https://"))) {
+                  const cleaned = target.trim().replace(/[.,;:)\]]+$/, "");
+                  if (cleaned && !hyperlinks.includes(cleaned)) hyperlinks.push(cleaned);
+                }
+              }
+            } catch {
+              // Page annotation lookup non-fatal
+            }
+          }
+        }
+        if (rawText.replace(/\s/g, "").length >= 40) {
+          pdfParseSuccess = true;
+        }
       } finally {
         await parser.destroy();
       }
     } catch {
-      // If pdf-parse encounters unreadable structure, consider scanned
-      isScanned = true;
+      pdfParseSuccess = false;
+    }
+
+    // 2b. High-res pure-JS fallback using pdfjs-dist legacy without canvas
+    if (!pdfParseSuccess || rawText.replace(/\s/g, "").length < 40) {
+      try {
+        const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+        const doc = await getDocument({ data: new Uint8Array(bytes), useSystemFonts: true }).promise;
+        const pageTexts: string[] = [];
+        for (let p = 1; p <= doc.numPages; p++) {
+          const page = await doc.getPage(p);
+          const content = await page.getTextContent();
+          const lines: string[] = [];
+          let currentLine: string[] = [];
+          let lastY: number | null = null;
+          for (const item of content.items as any[]) {
+            if (!item.str) continue;
+            const y = item.transform ? item.transform[5] : null;
+            if (lastY !== null && y !== null && Math.abs(y - lastY) > 3) {
+              if (currentLine.length) {
+                lines.push(currentLine.join(" "));
+                currentLine = [];
+              }
+            }
+            currentLine.push(item.str);
+            if (item.hasEOL) {
+              lines.push(currentLine.join(" "));
+              currentLine = [];
+              lastY = null;
+            } else {
+              lastY = y;
+            }
+          }
+          if (currentLine.length) lines.push(currentLine.join(" "));
+          pageTexts.push(lines.join("\n"));
+
+          // Harvest links from page annotations
+          try {
+            const annots = await page.getAnnotations();
+            for (const a of annots) {
+              const target = a?.url || a?.unsafeUrl;
+              if (typeof target === "string" && (target.startsWith("http://") || target.startsWith("https://"))) {
+                const cleaned = target.trim().replace(/[.,;:)\]]+$/, "");
+                if (cleaned && !hyperlinks.includes(cleaned)) hyperlinks.push(cleaned);
+              }
+            }
+          } catch {
+            // Ignore annotation error
+          }
+        }
+        const fallbackText = pageTexts.join("\n\n");
+        if (fallbackText.replace(/\s/g, "").length >= 40) {
+          rawText = fallbackText;
+        }
+      } catch {
+        // Fallback error non-fatal; proceed to cleanChars check
+      }
+    }
+
+    // 2c. Re-fuse lone bullet lines to normalize document reading order
+    if (rawText) {
+      const fused = rawText.split(/\r?\n/).reduce<string[]>((acc, line) => {
+        const trimmed = line.trim();
+        if (trimmed === "•" || trimmed === "*" || trimmed === "◦" || trimmed === "-") {
+          acc.push(trimmed);
+        } else if (
+          acc.length &&
+          (acc[acc.length - 1] === "•" ||
+            acc[acc.length - 1] === "*" ||
+            acc[acc.length - 1] === "◦" ||
+            acc[acc.length - 1] === "-")
+        ) {
+          const bullet = acc.pop()!;
+          acc.push(`${bullet} ${trimmed}`);
+        } else {
+          acc.push(line);
+        }
+        return acc;
+      }, []);
+      rawText = fused.join("\n");
     }
 
     // 3. Detect scanned / image-only documents (< 40 non-whitespace chars)

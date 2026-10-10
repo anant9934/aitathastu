@@ -87,7 +87,7 @@ export const SECTION_REGISTRY_V3_9: SectionDefinition[] = [
   {
     id: "summary",
     canonicalName: "Professional Summary",
-    pattern: /^(summary|professional summary|executive summary|about|about me|profile|biography|objective|career objective)$/i,
+    pattern: /^(summary|professional summary|executive summary|about|about me|profile|biography|objective|career objective|personal profile)$/i,
   },
   {
     id: "education",
@@ -97,17 +97,17 @@ export const SECTION_REGISTRY_V3_9: SectionDefinition[] = [
   {
     id: "skills",
     canonicalName: "Technical Skills",
-    pattern: /^(technical skills|skills|core competencies|key skills|skills\s*&\s*technologies|technical competencies|technical proficiencies|areas of expertise|technologies|tools\s*&\s*technologies)$/i,
+    pattern: /^(technical skills|skills|skills summary|skills\s*&\s*tools|core competencies|key skills|skills\s*&\s*technologies|technical competencies|technical proficiencies|areas of expertise|technologies|tools\s*&\s*technologies|technical summary)$/i,
   },
   {
     id: "projects",
     canonicalName: "Projects",
-    pattern: /^(projects|key projects|academic projects|personal projects|technical projects|selected projects|software projects)$/i,
+    pattern: /^(projects|key projects|academic projects|personal projects|technical projects|selected projects|selected projects\s*&\s*client work|projects\s*&\s*client work|client work|software projects)$/i,
   },
   {
     id: "experience",
     canonicalName: "Experience",
-    pattern: /^(experience|work experience|professional experience|employment|employment history|work history|relevant experience|internships|internship experience)$/i,
+    pattern: /^(experience|work experience|professional experience|experience\s*&\s*leadership|leadership\s*&\s*experience|leadership|employment|employment history|work history|relevant experience|internships|internship experience)$/i,
   },
   {
     id: "certifications",
@@ -122,7 +122,7 @@ export const SECTION_REGISTRY_V3_9: SectionDefinition[] = [
   {
     id: "research",
     canonicalName: "Research & Publications",
-    pattern: /^(research|publications|papers|research papers|patents|selected publications|research\s*&\s*publications)$/i,
+    pattern: /^(research|publications|papers|research papers|patents|selected publications|research\s*&\s*publications|research,\s*patents\s*&\s*books|research\s*&\s*patents|patents\s*&\s*books)$/i,
   },
   {
     id: "profiles",
@@ -132,10 +132,17 @@ export const SECTION_REGISTRY_V3_9: SectionDefinition[] = [
 ];
 
 function cleanLineForHeaderMatch(line: string): string {
-  return line
+  let cleaned = line
     .replace(/^[*_#:\-•—–\s]+|[*_#:\-•—–\s]+$/g, "")
     .replace(/[:|]+$/, "")
     .trim();
+
+  // Normalize track-spaced small caps: "S ELECTED P ROJECTS & C LIENT W ORK" -> "SELECTED PROJECTS & CLIENT WORK"
+  cleaned = cleaned.replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g, "$1$2");
+  // Normalize fully spaced letters: "E D U C A T I O N" -> "EDUCATION"
+  cleaned = cleaned.replace(/\b([A-Za-z]\s+){2,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ""));
+
+  return cleaned.trim();
 }
 
 function preprocessTwoColumnLines(lines: string[]): string[] {
@@ -252,11 +259,15 @@ export function extractPersonalDetails(
     }
   }
 
-  // 3. Name candidate: check top 5 lines of document before any section
+  // 3. Name candidate: check top 6 lines of document before any section
   let fullName = "";
   for (const line of headerLines.slice(0, 6)) {
-    const cleaned = line.replace(/[*_#:`]/g, "").trim();
-    if (!cleaned || cleaned.includes("@") || /\d/.test(cleaned)) continue;
+    // Support names sharing the line with contact details (e.g. "Anant Kumar Email: 720anant@gmail.com")
+    const beforeContact = line
+      .split(/\b(?:Email|Mail|Phone|Mobile|Tel|LinkedIn|Github|Portfolio)\b|[:|•–—\-]|\b[a-zA-Z0-9._%+-]+@/i)[0]
+      .trim();
+    const cleaned = (beforeContact || line).replace(/[*_#:`]/g, "").trim();
+    if (!cleaned || /\d/.test(cleaned)) continue;
     if (/curriculum|resume|vitae|contact|phone|email|profile|github|linkedin|portfolio/i.test(cleaned)) continue;
 
     const words = cleaned.split(/\s+/);
@@ -344,6 +355,14 @@ export function extractEducationEntries(lines: string[]): ExtractedAcademicInfo[
         const nextLine = lines[j];
         const nextHasDegree = DEGREE_PATTERNS.some((d) => d.regex.test(nextLine));
         const nextHasInst = INSTITUTION_KEYWORDS.some((inst) => new RegExp(`\\b${inst}\\b`, "i").test(nextLine));
+        // If current line only had institution and next line provides the degree, group them!
+        if (detectedInst && !detectedDegree && nextHasDegree && !nextHasInst) {
+          blockLines.push(nextLine);
+          const degMatch = DEGREE_PATTERNS.find((d) => d.regex.test(nextLine));
+          if (degMatch) detectedDegree = nextLine.match(degMatch.regex)?.[1] || degMatch.name;
+          i = j; // advance outer loop
+          break;
+        }
         if (nextHasDegree || nextHasInst) break;
         blockLines.push(nextLine);
       }
@@ -357,17 +376,21 @@ export function extractEducationEntries(lines: string[]): ExtractedAcademicInfo[
       const gradYearNum = gradYearStr && /^\d{4}$/.test(gradYearStr) ? parseInt(gradYearStr, 10) : undefined;
 
       // Look for GPA / CGPA
-      const gpaMatch = combinedBlock.match(/\b(?:CGPA|GPA|Score|Percentage)\s*[:=\-]?\s*([0-9.]+(?:\s*\/\s*[0-9.]+)?%?)/i) ||
-                       combinedBlock.match(/\b([0-9]\.[0-9]{1,2}\s*\/\s*(?:10|4(?:\.0)?))\b/);
+      const gpaMatch =
+        combinedBlock.match(/\b(?:CGPA|GPA|Score|Percentage)\s*[:=\-]?\s*([0-9.]+(?:\s*\/\s*[0-9.]+)?%?)/i) ||
+        combinedBlock.match(/\b([0-9]\.[0-9]{1,2}\s*\/\s*(?:10|4(?:\.0)?))\b/);
       const gpa = gpaMatch ? gpaMatch[1] : undefined;
 
       // Specialization
-      const specMatch = combinedBlock.match(/\b(?:in|major in|specialization in)\s+([A-Za-z\s&]{4,40})(?:[,–—\n]|$)/i);
+      const specMatch =
+        combinedBlock.match(/(?:B\.Tech|Degree|Engineering)\s*[,;]?\s*([A-Za-z\s&()]*?(?:Computer Science|AI|Machine Learning|Data Science|Information Technology)[A-Za-z\s&()]*?)(?:[;,\-–—]|\s+Aug|\s+20\d\d|$)/i) ||
+        combinedBlock.match(/\b(?:in|major in|specialization in)\s+([A-Za-z\s&()]{4,50})(?:[,–—;\n]|$)/i);
       const specialization = specMatch ? specMatch[1].trim() : undefined;
 
-      const institution = detectedInst
-        ? (line.split(/[,–—|]/).find((p) => new RegExp(detectedInst, "i").test(p))?.trim() || detectedInst)
-        : (line.split(/[,–—|]/)[0]?.trim() || "University");
+      const rawInst = detectedInst
+        ? (blockLines[0].split(/[,–—|]/).find((p) => new RegExp(detectedInst, "i").test(p))?.trim() || detectedInst)
+        : (blockLines[0].split(/[,–—|]/)[0]?.trim() || "University");
+      const institution = rawInst.replace(/^[•*–—\-]\s*/, "").trim();
 
       const degree = detectedDegree || "Bachelor's Degree";
 
@@ -486,8 +509,9 @@ export const TECH_TAXONOMY_V3_9: SkillTaxonomyEntry[] = [
   { name: "CI/CD", category: "tool", aliases: ["github actions"] },
 
   // AI/ML Core Concepts
+  { name: "Artificial Intelligence", category: "concept", aliases: ["ai"], requiresBoundary: true },
   { name: "Deep Learning", category: "concept" },
-  { name: "Machine Learning", category: "concept", aliases: ["ml"] },
+  { name: "Machine Learning", category: "concept", aliases: ["ml"], requiresBoundary: true },
   { name: "Computer Vision", category: "concept", aliases: ["cv"] },
   { name: "Natural Language Processing", category: "concept", aliases: ["nlp"] },
   { name: "Reinforcement Learning", category: "concept", aliases: ["rl"] },
@@ -574,12 +598,29 @@ export function extractProjects(
 
   for (const line of projectLines) {
     const isNumberedTitle = /^\d+[\.)]\s+[A-Za-z]/.test(line) && line.length <= 80 && !line.endsWith(".");
+    const bulletProjectMatch = line.match(/^[•\-*–—]\s*([^:(]+?)(?:\s*\(([^)]+)\))?\s*:\s*(.*)/);
     const isBullet = (/^[•\-*–—]\s*/.test(line) || /^\d+\.\s*/.test(line)) && !isNumberedTitle;
     const hasRepo = /github\.com\/[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+/i.test(line);
     const isUrl = /^https?:\/\//i.test(line) || /^github\.com\//i.test(line);
 
-    // If it is a bold/distinct short title line without bullets, and NOT a URL
-    if ((!isBullet || isNumberedTitle) && !isUrl && line.length <= 80 && !line.endsWith(".")) {
+    // Case 1: Bulleted project format: • Project Title (Domain): Description
+    if (bulletProjectMatch) {
+      if (currentBlock) blocks.push(currentBlock);
+      const titleClean = bulletProjectMatch[1].trim();
+      const domain = bulletProjectMatch[2]?.trim();
+      const descInit = bulletProjectMatch[3].trim();
+      currentBlock = {
+        title: titleClean,
+        description: domain ? `(${domain}) ${descInit}` : descInit,
+        lines: [line],
+      };
+      if (hasRepo) {
+        const repoMatch = line.match(/https?:\/\/github\.com\/[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+/i);
+        if (repoMatch) currentBlock.repoUrl = repoMatch[0];
+      }
+    }
+    // Case 2: Numbered title or short distinct header line
+    else if ((!isBullet || isNumberedTitle) && !isUrl && line.length <= 80 && !line.endsWith(".")) {
       if (currentBlock) blocks.push(currentBlock);
       const titleClean = line.replace(/^\d+[\.)]\s+/, "").replace(/^[*_#:\s]+|[*_#:\s]+$/g, "");
       currentBlock = {
@@ -598,7 +639,6 @@ export function extractProjects(
         currentBlock.description = (currentBlock.description + " " + cleanedLine).trim();
       }
     } else {
-      // First line if it starts directly
       currentBlock = {
         title: line.replace(/^[•\-*–—\d.]+\s*/, "").slice(0, 60),
         description: line,
@@ -655,15 +695,62 @@ export function extractExperience(lines: string[]): ResumeInterpretationOutput["
   const experiences: ResumeInterpretationOutput["experience"] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.length < 5 || /^[•\-*]/.test(line)) continue;
+    const line = lines[i]?.trim();
+    if (!line || line.length < 3) continue;
 
+    // Format A: Line starts with bullet and is a company header (e.g. "• Founders Verbinden Remote")
+    if (/^[•*–—\-]\s*[A-Za-z]/.test(line)) {
+      const companyClean = line
+        .replace(/^[•*–—\-]\s*/, "")
+        .replace(/\s+(?:Remote|Onsite|Hybrid|[A-Z][a-z]+,\s*[A-Z][a-z]+)$/i, "")
+        .trim();
+
+      let role = "";
+      let duration: string | undefined;
+      const highlights: string[] = [];
+      let sourceSpan = line;
+
+      // Check next line for Role and Dates
+      if (i + 1 < lines.length && !/^[•*]/.test(lines[i + 1])) {
+        const next = lines[i + 1].trim();
+        const dateMatch = next.match(
+          /\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?\d{4}\s*[-–—to]+\s*(?:Present|Current|\d{4})\b/i
+        );
+        if (dateMatch) {
+          duration = dateMatch[0];
+          role = next.replace(dateMatch[0], "").trim().replace(/[-–—,|;]$/, "").trim();
+        } else {
+          role = next;
+        }
+        sourceSpan += " " + next;
+        i++; // advance past next line
+      }
+
+      // Check subsequent lines for highlights (e.g. lines starting with ◦ or -)
+      while (i + 1 < lines.length && /^[◦\-]/.test(lines[i + 1].trim())) {
+        const hl = lines[i + 1].trim().replace(/^[◦\-:\s]+/, "").trim();
+        if (hl) highlights.push(hl);
+        i++;
+      }
+
+      if (companyClean) {
+        experiences.push({
+          company: companyClean.slice(0, 80),
+          role: (role || "Member").slice(0, 80),
+          duration,
+          highlights: highlights.slice(0, 3),
+          sourceSpan: sourceSpan.slice(0, 250),
+        });
+      }
+      if (experiences.length >= 6) break;
+      continue;
+    }
+
+    // Format B: Inline "Role at Company" or "Role, Company"
     const parts = line.split(/[—–|,]|\sat\s|\s-\s/i).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2) {
       const role = parts[0];
       const company = parts[1];
-
-      // Date in line or next line
       const dateMatch = line.match(/\b(?:20\d\d|present|current|intern|full[- ]time)\b/i);
 
       experiences.push({
@@ -674,7 +761,7 @@ export function extractExperience(lines: string[]): ResumeInterpretationOutput["
         sourceSpan: line.slice(0, 250),
       });
 
-      if (experiences.length >= 5) break;
+      if (experiences.length >= 6) break;
     }
   }
 

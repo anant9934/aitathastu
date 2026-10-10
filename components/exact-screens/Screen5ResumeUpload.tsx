@@ -324,8 +324,16 @@ export function Screen5ResumeUpload({
 
   const advance = () => {
     if (isBusy) return;
+    // If extraction failed or file unreadable, advance explicitly takes manual route
+    if (processingState === "FAILED" || !isUploaded) {
+      handleSkip();
+      return;
+    }
     // If ingestion is blocked and nothing was previously uploaded, force manual route via Skip
-    if (uploadBlocked && !isUploaded) return;
+    if (uploadBlocked && !isUploaded) {
+      handleSkip();
+      return;
+    }
     if (candidates.length > 0 && !reviewSaved) {
       setErrorMessage("Save your reviewed CV suggestions before continuing, or choose Skip for now.");
       return;
@@ -802,15 +810,17 @@ export function Screen5ResumeUpload({
               <span>Private upload &bull; review before saving</span>
               {ingestionReady === null && (
                 <span style={{ fontWeight: 600, color: "#94A3B8", display: "flex", alignItems: "center", gap: 4 }}>
-                  <Loader2 size={12} className="animate-spin" /> Checking...
+                  <Loader2 size={12} className="animate-spin" /> Checking service...
                 </span>
               )}
               {ingestionReady === true && (
-                <span style={{ fontWeight: 700, color: "#10B981" }}>Ready</span>
+                <span style={{ fontWeight: 700, color: "#10B981" }}>
+                  Upload Service: Ready
+                </span>
               )}
               {ingestionReady === false && (
                 <span style={{ fontWeight: 700, color: "#DC2626", display: "flex", alignItems: "center", gap: 4 }}>
-                  <AlertCircle size={12} /> Unavailable
+                  <AlertCircle size={12} /> Service Unavailable
                 </span>
               )}
             </div>
@@ -824,8 +834,8 @@ export function Screen5ResumeUpload({
           onStepClick={onJumpToStep}
           activeStep={stepNumber}
           totalSteps={totalSteps}
-          nextLabel="Next"
-          isNextDisabled={isBusy || (uploadBlocked && !isUploaded)}
+          nextLabel={processingState === "FAILED" ? "Continue Manually →" : "Next"}
+          isNextDisabled={isBusy}
         />
       </main>
     </div>

@@ -544,6 +544,90 @@ Projects: Inventory Manager using Java and MySQL
     `10 runs: min=${docxLatencies[0].toFixed(1)}ms, max=${docxLatencies[docxLatencies.length - 1].toFixed(1)}ms.`
   );
 
+  // ---------------------------------------------------------------------------
+  // [Test 31] Track-Spaced Small-Caps Heading Normalization
+  // ---------------------------------------------------------------------------
+  const trackSpacedCvText = `
+Anant Kumar Email: 720anant@gmail.com
+LinkedIn: linkedin.com/in/quantumanant01 Mobile: +91 7209536120
+Github: github.com/anant9934 Location: Gaya, Bihar, India
+Portfolio: anantkumar.site | Joint Portfolio: anantshivam.online
+P ROFILE
+• B.Tech CSE (AI & ML) student, founder and researcher.
+E DUCATION
+• Lovely Professional University Phagwara, Punjab
+B.Tech, Computer Science & Engineering (AI & ML); CGPA: 8.84 / 10 Aug. 2025 – Present
+S KILLS S UMMARY
+• Languages: Python, C, JavaScript, SQL, HTML, CSS
+• Technologies: React, FastAPI
+E XPERIENCE & L EADERSHIP
+• Founders Verbinden Remote
+President Aug. 2025 – Present
+◦ : Lead an entrepreneurship and technology ecosystem.
+S ELECTED P ROJECTS & C LIENT W ORK
+• GeoJeevan AI (AI / Environmental Intelligence): Developed an AI platform delivering risk information.
+• QuickDorm (Quick Commerce): Built a campus-focused quick-commerce platform.
+R ESEARCH , P ATENTS & B OOKS
+• Patent: DBMS Predictive Execution: Co-inventor on database patent.
+A CHIEVEMENTS
+• Reach: 300+ active students reached.
+`;
+  const trackExtracted = DeterministicResumeExtractionEngine.extract(trackSpacedCvText, {
+    extraHyperlinks: ["https://linkedin.com/in/quantumanant01", "https://github.com/anant9934", "https://anantkumar.site/"],
+  });
+  assert(
+    trackExtracted.extractedProfile.fullName === "Anant Kumar" &&
+      trackExtracted.structured.education.length >= 1 &&
+      trackExtracted.structured.skills.length >= 5 &&
+      trackExtracted.structured.projects.length >= 2 &&
+      trackExtracted.structured.experience.length >= 1,
+    "Track-Spaced Small-Caps Headings Normalized Deterministically",
+    `Name="${trackExtracted.extractedProfile.fullName}", Edu=${trackExtracted.structured.education.length}, Skills=${trackExtracted.structured.skills.length}, Projects=${trackExtracted.structured.projects.length}, Exp=${trackExtracted.structured.experience.length}.`
+  );
+
+  // ---------------------------------------------------------------------------
+  // [Test 32] Inline Header Contact Name Extraction
+  // ---------------------------------------------------------------------------
+  assert(
+    trackExtracted.extractedProfile.fullName === "Anant Kumar",
+    "Inline Contact Header Correctly Disambiguates Full Name",
+    `Extracted fullName: "${trackExtracted.extractedProfile.fullName}" from inline "Anant Kumar Email: ..."`
+  );
+
+  // ---------------------------------------------------------------------------
+  // [Test 33] Multi-Line Education Grouping with CGPA & Specialization
+  // ---------------------------------------------------------------------------
+  const firstEdu = trackExtracted.structured.education[0];
+  assert(
+    firstEdu?.institution.includes("Lovely Professional University") &&
+      firstEdu?.degree === "B.Tech" &&
+      trackExtracted.extractedProfile.gpa === "8.84 / 10",
+    "Multi-Line Education Grouping Resolves Institution, Degree & CGPA",
+    `Inst="${firstEdu?.institution}", Degree="${firstEdu?.degree}", GPA="${trackExtracted.extractedProfile.gpa}", Specialization="${trackExtracted.extractedProfile.specialization}".`
+  );
+
+  // ---------------------------------------------------------------------------
+  // [Test 34] Bulleted Project and Experience Block Extraction with Tech Attribution
+  // ---------------------------------------------------------------------------
+  const projectTitles = trackExtracted.structured.projects.map((p) => p.title);
+  const expCompanies = trackExtracted.structured.experience.map((e) => e.company);
+  assert(
+    projectTitles.includes("GeoJeevan AI") &&
+      projectTitles.includes("QuickDorm") &&
+      expCompanies.includes("Founders Verbinden"),
+    "Bulleted Project and Experience Blocks Grouped Accurately",
+    `Projects: [${projectTitles.join(", ")}], Experience: [${expCompanies.join(", ")}].`
+  );
+
+  // ---------------------------------------------------------------------------
+  // [Test 35] Portfolio URL Discovery from Domain and Text Label
+  // ---------------------------------------------------------------------------
+  assert(
+    Boolean(trackExtracted.discoveredProfiles.portfolio?.includes("anantkumar.site")),
+    "Portfolio Website Discovered from Label & Candidate Domain",
+    `Discovered portfolio: "${trackExtracted.discoveredProfiles.portfolio}".`
+  );
+
   // Cleanup test entities
   await db.delete(persons).where(eq(persons.id, testPersonId)).catch(() => null);
   await db.delete(persons).where(eq(persons.id, studentA)).catch(() => null);

@@ -376,6 +376,30 @@ export function discoverDigitalFootprints(
     }
   }
 
+  // 2b. Discover labeled portfolio website (e.g. "Portfolio: anantkumar.site")
+  if (!discoveredProfiles.portfolio) {
+    const portfolioMatch = text.match(
+      /(?:portfolio|website|web)\s*[:\-]\s*(?:https?:\/\/)?([a-zA-Z0-9.\-]+\.[a-z]{2,}(?:\/[^\s|]*)*)/i
+    );
+    if (portfolioMatch && portfolioMatch[1]) {
+      const rawP = portfolioMatch[1].trim().replace(/[.,;:)\]]+$/, "");
+      const host = rawP.split("/")[0].toLowerCase();
+      if (!EXCLUDED_PORTFOLIO_HOSTS.has(host) && !host.endsWith(".edu") && !host.endsWith(".ac.in")) {
+        const fullP = rawP.startsWith("http://") || rawP.startsWith("https://") ? rawP : `https://${rawP}`;
+        discoveredProfiles.portfolio = fullP;
+        discovered.push({
+          platformId: "portfolio",
+          platformName: "Portfolio / Website",
+          url: fullP,
+          username: host,
+          isProfile: true,
+          source: "label",
+          confidence: 0.95,
+        });
+      }
+    }
+  }
+
   // 3. Raw ORCID ID in text (e.g. "ORCID: 0000-0002-1825-0097")
   if (!discoveredProfiles.orcid) {
     const orcidMatch = text.match(/\b(0000-\d{4}-\d{4}-\d{3}[\dX])\b/i);

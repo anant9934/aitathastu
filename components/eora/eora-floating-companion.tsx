@@ -33,6 +33,7 @@ import { EoraSpeechBubble } from "./eora-speech-bubble";
 import { getEoraAsset } from "@/lib/eora/avatar-registry";
 import { EoraMotionAvatar } from "./eora-motion-avatar";
 import { getPageContract } from "@/lib/eora/page-registry";
+import { getPrimaryTaskForRoute } from "@/lib/eora/tasks";
 
 type Placement = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
@@ -220,6 +221,7 @@ export function EoraFloatingCompanion() {
   // ── Compute quick actions for current route ────────────────────────────────
   const route = eora.context.route;
   const pageContract = getPageContract(route);
+  const primaryTask = getPrimaryTaskForRoute(route);
   const isStudentArea = route.startsWith("student");
   const isOnboarding = route === "onboarding";
 
@@ -441,6 +443,134 @@ export function EoraFloatingCompanion() {
             </div>
           )}
 
+          {/* Active task guidance card (Phase 7.1) */}
+          {eora.activeTask && eora.activeTaskDef && (
+            <div
+              className="eora-task-card"
+              role="region"
+              aria-label="Active Task Guidance"
+              style={{
+                margin: "8px 12px",
+                padding: "10px 12px",
+                borderRadius: 10,
+                background: "linear-gradient(135deg, rgba(89, 66, 220, 0.15), rgba(2, 197, 245, 0.12))",
+                border: "1px solid rgba(89, 66, 220, 0.35)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "#38bdf8",
+                  }}
+                >
+                  Step {eora.activeTask.currentStepIndex + 1} of {eora.activeTaskDef.steps.length} — {eora.activeTaskDef.title}
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    background: "rgba(255, 255, 255, 0.1)",
+                    color: "#e2e8f0",
+                  }}
+                >
+                  {eora.activeTask.state}
+                </span>
+              </div>
+
+              {(() => {
+                const step = eora.activeTaskDef.steps[eora.activeTask.currentStepIndex];
+                if (!step) return null;
+                return (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>
+                      {step.title}
+                    </div>
+                    <div style={{ fontSize: 12, lineHeight: 1.45, color: "#e2e8f0" }}>
+                      {step.instruction}
+                    </div>
+                    {step.nonShamingTip && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          padding: "4px 8px",
+                          borderRadius: 6,
+                          background: "rgba(2, 197, 245, 0.1)",
+                          borderLeft: "3px solid #02c5f5",
+                          color: "#bae6fd",
+                        }}
+                      >
+                        💡 {step.nonShamingTip}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="eora-tour-btn"
+                        onClick={eora.rewindTask}
+                        disabled={eora.activeTask.currentStepIndex === 0}
+                        aria-label="Previous task step"
+                        style={{ fontSize: 11, padding: "4px 10px" }}
+                      >
+                        <ChevronLeft size={12} /> Back
+                      </button>
+                      <button
+                        type="button"
+                        className="eora-tour-btn eora-tour-btn--primary"
+                        onClick={eora.advanceTask}
+                        aria-label={
+                          eora.activeTask.currentStepIndex === eora.activeTaskDef.steps.length - 1
+                            ? (step.requiresUserConfirmation ? "Confirm & Finish" : "Complete task")
+                            : "Next task step"
+                        }
+                        style={{ fontSize: 11, padding: "4px 12px" }}
+                      >
+                        {eora.activeTask.currentStepIndex === eora.activeTaskDef.steps.length - 1
+                          ? (step.requiresUserConfirmation ? "Confirm & Finish" : "Finish")
+                          : "Next Step"}
+                        <ChevronRight size={12} />
+                      </button>
+                      {eora.activeTask.state === "PAUSED" ? (
+                        <button
+                          type="button"
+                          className="eora-tour-btn"
+                          onClick={eora.resumeTask}
+                          style={{ fontSize: 11, padding: "4px 8px" }}
+                        >
+                          Resume
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="eora-tour-btn"
+                          onClick={eora.pauseTask}
+                          style={{ fontSize: 11, padding: "4px 8px" }}
+                        >
+                          Pause
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="eora-tour-btn eora-tour-btn--exit"
+                        onClick={eora.cancelTask}
+                        style={{ fontSize: 11, padding: "4px 8px" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Active tour controls */}
           {eora.activeTour && (
             <div
@@ -499,6 +629,22 @@ export function EoraFloatingCompanion() {
 
           {/* Context-aware quick actions */}
           <div className="eora-quick-actions">
+            {primaryTask && !eora.activeTask && (
+              <button
+                type="button"
+                className="eora-quick-btn"
+                style={{
+                  background: "rgba(89, 66, 220, 0.25)",
+                  borderColor: "rgba(89, 66, 220, 0.5)",
+                  color: "#c4b5fd",
+                  fontWeight: 700,
+                }}
+                onClick={() => eora.startTask(primaryTask.taskId)}
+                data-eora-id="eora-start-task-btn"
+              >
+                ✨ Guide: {primaryTask.title}
+              </button>
+            )}
             <button
               type="button"
               className="eora-quick-btn"

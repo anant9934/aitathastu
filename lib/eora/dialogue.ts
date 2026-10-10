@@ -166,7 +166,7 @@ export function getIntentResponse(
   context: EoraContext,
   params?: Record<string, string>
 ): EoraMessage {
-  const name = context.student.displayName
+  const name = context?.student?.displayName
     ? context.student.displayName.split(" ")[0]
     : "there";
 
@@ -243,9 +243,39 @@ export function getIntentResponse(
         animationState: "REASSURING",
       };
 
+    case "EXPLAIN_WHY_NOT_SAVING":
+      return {
+        text: context.focusedField?.errorMessage
+          ? `Please check "${context.focusedField.label}": ${context.focusedField.errorMessage}`
+          : "The form cannot save until all required fields (such as Project Title) are completed and URLs are valid. Please check the highlighted inputs above.",
+        animationState: "REASSURING",
+      };
+
+    case "EXPLAIN_FIELD_REQUIREMENT":
+      return {
+        text: "Required fields ground your evidence in verifiable artifacts. For example, project titles and repository URLs enable faculty and recruiters to evaluate your actual code.",
+        animationState: "EXPLAINING",
+      };
+
+    case "WHERE_PUT_GITHUB_LINK":
+      return {
+        text: "You can attach your GitHub repository in Section B ('Project Links & Demo') under 'GitHub Repository URL'. Public repositories receive verified code badges.",
+        animationState: "POINTING",
+        actionUrl: "/student/projects",
+        actionLabel: "View project links",
+      };
+
+    case "HOW_DESCRIBE_CONTRIBUTION":
+      return {
+        text: "In Section D ('Personal Contribution'), describe what YOU personally implemented, trained, or tested. Specific contribution boundaries build recruiter trust.",
+        animationState: "EXPLAINING",
+        actionUrl: "/student/projects",
+        actionLabel: "View contribution note",
+      };
+
     case "EXPLAIN_RECOMMENDATION":
       return {
-        text: `This recommendation is based on your target goal (${context.student.targetRole || "AI/ML role"}) and your current confirmed evidence.`,
+        text: `This recommendation is based on your target goal (${context.student.targetRole || "AI/ML role"}) and your current confirmed evidence. Each milestone unlocks prerequisites for your target trajectory.`,
         animationState: "EXPLAINING",
         actionUrl: "/student/roadmap",
         actionLabel: "View roadmap",

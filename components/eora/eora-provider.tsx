@@ -66,6 +66,15 @@ import type { TourDefinition } from "@/lib/eora/tours";
 import { getTourById } from "@/lib/eora/tours";
 import type { EoraAnimationState } from "@/lib/eora/identity";
 import { getPoseForState } from "@/lib/eora/identity";
+import type { EoraActiveTaskSession, EoraTaskDefinition } from "@/lib/eora/tasks";
+import {
+  getTaskById,
+  getPrimaryTaskForRoute,
+  createInitialTaskSession,
+  advanceTaskStep,
+  rewindTaskStep,
+  canResumeTask,
+} from "@/lib/eora/tasks";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIVE STUDENT DATA — safe subset only (no tokens/passwords/secrets)
@@ -116,6 +125,9 @@ export interface EoraControllerState {
   showCelebration: boolean;
   /** Whether live student data has been loaded */
   hasLiveStudentData: boolean;
+  /** Guided multi-step task state (Phase 7.1) */
+  activeTask: EoraActiveTaskSession | null;
+  activeTaskDef: EoraTaskDefinition | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,6 +151,14 @@ export interface EoraController extends EoraControllerState {
   pauseTour: () => void;
   resumeTour: () => void;
   exitTour: () => void;
+  /** Phase 7.1 Guided Task State Machine */
+  startTask: (taskId: string) => void;
+  advanceTask: () => void;
+  rewindTask: () => void;
+  pauseTask: () => void;
+  resumeTask: () => void;
+  cancelTask: () => void;
+  notifyTaskEvent: (eventName: string, data?: unknown) => void;
   /** Called by ExactScreensContainer on each screen transition */
   setOnboardingStep: (step: OnboardingStep) => void;
   /** Called by WorkspaceProvider / student pages with real Person 360 data */
@@ -209,6 +229,9 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     createEmptyStudentContext()
   );
   const [hasLiveStudentData, setHasLiveStudentData] = useState(false);
+  // Guided multi-step task state (Phase 7.1)
+  const [activeTask, setActiveTask] = useState<EoraActiveTaskSession | null>(null);
+  const [activeTaskDef, setActiveTaskDef] = useState<EoraTaskDefinition | null>(null);
 
   // Session refs
   const sessionNudgeCount = useRef(0);
@@ -216,6 +239,10 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   const proactiveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasShownWelcomeBack = useRef(false);
   const managedTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const startTaskRef = useRef<(taskId: string) => void>(() => {});
+  const exitTourRef = useRef<() => void>(() => {});
+  const nextTourStepRef = useRef<() => void>(() => {});
+  const prevTourStepRef = useRef<() => void>(() => {});
 
   const schedule = useCallback((callback: () => void, delay: number) => {
     const timer = setTimeout(() => {
@@ -366,8 +393,13 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       });
 
     // Apply new spotlight + scroll into view
-    const target = Array.from(document.querySelectorAll<HTMLElement>("[data-eora-id]"))
-      .find((element) => element.dataset.eoraId === tourSpotlightTargetId && element.getClientRects().length > 0);
+    const target = Array.from(document.querySelectorAll<HTMLElement>("[data-eora-id], [id]"))
+      .find(
+        (element) =>
+          (element.dataset.eoraId === tourSpotlightTargetId ||
+            element.id === tourSpotlightTargetId) &&
+          element.getClientRects().length > 0
+      );
 
     if (target) {
       setTourTargetAvailable(true);
@@ -423,18 +455,35 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         setIsVisible(true);
         setIsMinimized(false);
       }
-      // Tour navigation via chat
       if (intentResult.intent === "STOP_TOUR" && activeTour) {
-        exitTour();
+        exitTourRef.current();
         return;
       }
       if (intentResult.intent === "NEXT_TOUR_STEP" && activeTour) {
-        nextTourStep();
+        nextTourStepRef.current();
         return;
       }
       if (intentResult.intent === "PREVIOUS_TOUR_STEP" && activeTour) {
-        prevTourStep();
+        prevTourStepRef.current();
         return;
+      }
+
+      // Phase 7.1 Deep Interactive Assistance Triggers
+      if (
+        (intentResult.intent === "HELP_WITH_PROJECT" ||
+          text.toLowerCase().includes("add project") ||
+          text.toLowerCase().includes("add my project")) &&
+        (pathname?.includes("project") || context.route === "student-projects")
+      ) {
+        startTaskRef.current("task-add-project");
+        return;
+      }
+
+      if (intentResult.intent === "WHERE_PUT_GITHUB_LINK") {
+        setTourSpotlightTargetId("eora-project-input-repo");
+      }
+      if (intentResult.intent === "HOW_DESCRIBE_CONTRIBUTION") {
+        setTourSpotlightTargetId("eora-project-input-contribution");
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -557,6 +606,170 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     setCurrentMessage({ text: step?.explanation ?? activeTour.description, animationState: "EXPLAINING" });
     setAnimationState("EXPLAINING");
   }, [activeTour, tourStepIndex]);
+
+  // ── Phase 7.1 Guided Task State Machine ──────────────────────────────────
+  const startTask = useCallback(
+    (taskId: string) => {
+      const taskDef = getTaskById(taskId);
+      if (!taskDef) return;
+      const session = createInitialTaskSession(taskDef, liveStudent.personId || undefined);
+      setActiveTask(session);
+      setActiveTaskDef(taskDef);
+      setIsPanelOpen(true);
+      const firstStep = taskDef.steps[0];
+      if (firstStep) {
+        setCurrentMessage({
+          text: firstStep.instruction,
+          animationState: firstStep.animationPose,
+        });
+        setAnimationState(firstStep.animationPose);
+        setTourSpotlightTargetId(firstStep.targetId || firstStep.fieldId || null);
+      }
+    },
+    [liveStudent.personId]
+  );
+
+  const advanceTask = useCallback(() => {
+    if (!activeTask || !activeTaskDef) return;
+    const nextSession = advanceTaskStep(activeTask, activeTaskDef);
+    setActiveTask(nextSession);
+    if (nextSession.state === "COMPLETED") {
+      const celebration = activeTaskDef.completionCelebration;
+      setCurrentMessage({
+        text: celebration.message,
+        animationState: celebration.animationPose,
+        actionUrl: celebration.nextRoute,
+        actionLabel: celebration.nextRecommendedAction,
+      });
+      setAnimationState(celebration.animationPose);
+      setTourSpotlightTargetId(null);
+      setShowCelebration(true);
+      if (celebration.nextRoute) {
+        setPendingNavUrl(celebration.nextRoute);
+        setPendingNavLabel(celebration.nextRecommendedAction);
+      }
+      return;
+    }
+    const step = activeTaskDef.steps[nextSession.currentStepIndex];
+    if (step) {
+      setCurrentMessage({
+        text: step.instruction,
+        animationState: step.animationPose,
+      });
+      setAnimationState(step.animationPose);
+      setTourSpotlightTargetId(step.targetId || step.fieldId || null);
+    }
+  }, [activeTask, activeTaskDef]);
+
+  const rewindTask = useCallback(() => {
+    if (!activeTask || !activeTaskDef) return;
+    const prevSession = rewindTaskStep(activeTask);
+    setActiveTask(prevSession);
+    const step = activeTaskDef.steps[prevSession.currentStepIndex];
+    if (step) {
+      setCurrentMessage({
+        text: step.instruction,
+        animationState: step.animationPose,
+      });
+      setAnimationState(step.animationPose);
+      setTourSpotlightTargetId(step.targetId || step.fieldId || null);
+    }
+  }, [activeTask, activeTaskDef]);
+
+  const pauseTask = useCallback(() => {
+    if (!activeTask) return;
+    setActiveTask((prev) =>
+      prev ? { ...prev, state: "PAUSED", lastUpdatedAt: Date.now() } : null
+    );
+    setTourSpotlightTargetId(null);
+    setCurrentMessage({
+      text: "Task paused. You can resume anytime from this page.",
+      animationState: "WAITING",
+    });
+    setAnimationState("WAITING");
+  }, [activeTask]);
+
+  const resumeTask = useCallback(() => {
+    if (!activeTask || !activeTaskDef) return;
+    setActiveTask((prev) =>
+      prev ? { ...prev, state: "WAITING_FOR_USER", lastUpdatedAt: Date.now() } : null
+    );
+    const step = activeTaskDef.steps[activeTask.currentStepIndex];
+    if (step) {
+      setCurrentMessage({
+        text: step.instruction,
+        animationState: step.animationPose,
+      });
+      setAnimationState(step.animationPose);
+      setTourSpotlightTargetId(step.targetId || step.fieldId || null);
+    }
+  }, [activeTask, activeTaskDef]);
+
+  const cancelTask = useCallback(() => {
+    if (!activeTask) return;
+    setActiveTask(null);
+    setActiveTaskDef(null);
+    setTourSpotlightTargetId(null);
+    setCurrentMessage({
+      text: "Task guidance ended. I'm here if you need help with anything else.",
+      animationState: "IDLE",
+    });
+    setAnimationState("IDLE");
+  }, [activeTask]);
+
+  const notifyTaskEvent = useCallback(
+    (eventName: string, data?: unknown) => {
+      if (!activeTask || !activeTaskDef) return;
+      const currentStep = activeTaskDef.steps[activeTask.currentStepIndex];
+      if (currentStep && currentStep.expectedEvent === eventName) {
+        advanceTask();
+      } else if (eventName === "project_saved" && activeTask.taskId === "task-add-project") {
+        setActiveTask((prev) =>
+          prev
+            ? {
+                ...prev,
+                state: "COMPLETED",
+                currentStepIndex: activeTaskDef.steps.length - 1,
+                lastUpdatedAt: Date.now(),
+              }
+            : null
+        );
+        const celebration = activeTaskDef.completionCelebration;
+        setCurrentMessage({
+          text: celebration.message,
+          animationState: celebration.animationPose,
+          actionUrl: celebration.nextRoute,
+          actionLabel: celebration.nextRecommendedAction,
+        });
+        setAnimationState(celebration.animationPose);
+        setTourSpotlightTargetId(null);
+        setShowCelebration(true);
+        if (celebration.nextRoute) {
+          setPendingNavUrl(celebration.nextRoute);
+          setPendingNavLabel(celebration.nextRecommendedAction);
+        }
+      }
+    },
+    [activeTask, activeTaskDef, advanceTask]
+  );
+
+  useEffect(() => {
+    if (!activeTask) return;
+    if (!canResumeTask(activeTask, pathname ?? "/")) {
+      if (activeTask.state !== "PAUSED" && activeTask.state !== "COMPLETED") {
+        setActiveTask((prev) =>
+          prev ? { ...prev, state: "PAUSED", lastUpdatedAt: Date.now() } : null
+        );
+      }
+    }
+  }, [pathname, activeTask]);
+
+  useEffect(() => {
+    startTaskRef.current = startTask;
+    exitTourRef.current = exitTour;
+    nextTourStepRef.current = nextTourStep;
+    prevTourStepRef.current = prevTourStep;
+  }, [startTask, exitTour, nextTourStep, prevTourStep]);
 
   // Onboarding targets live on separate screens. Following the student's own
   // navigation keeps the tour aligned without advancing or submitting a form.
@@ -692,10 +905,13 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         setAnimationState(msg.animationState);
       }
 
+      // Notify active task state machine of the backend success event
+      notifyTaskEvent(action, studentName);
+
       // Clear signal after animation cycle
       schedule(() => setLastSuccessfulAction(null), 5000);
     },
-    [liveStudent.displayName, schedule]
+    [liveStudent.displayName, schedule, notifyTaskEvent]
   );
 
   // ── Field validation signals ──────────────────────────────────────────────
@@ -790,6 +1006,8 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     tourPaused,
     tourTargetAvailable,
     tourSpotlightTargetId,
+    activeTask,
+    activeTaskDef,
     isMinimized,
     onboardingStep,
     preferences,
@@ -815,6 +1033,13 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     pauseTour,
     resumeTour,
     exitTour,
+    startTask,
+    advanceTask,
+    rewindTask,
+    pauseTask,
+    resumeTask,
+    cancelTask,
+    notifyTaskEvent,
     setOnboardingStep,
     updateLiveStudentContext,
     clearStudentContext,

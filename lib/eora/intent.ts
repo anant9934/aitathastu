@@ -45,6 +45,10 @@ export type EoraIntent =
   | "DISMISS"
   | "RESUME_ASSISTANT"
   | "RESUME"
+  | "WHERE_PUT_GITHUB_LINK"
+  | "HOW_DESCRIBE_CONTRIBUTION"
+  | "EXPLAIN_FIELD_REQUIREMENT"
+  | "EXPLAIN_WHY_NOT_SAVING"
   | "SWITCH_LANGUAGE"
   | "UNKNOWN_INTENT"
   | "UNKNOWN";
@@ -119,7 +123,6 @@ const INTENT_PATTERNS: Array<{
   // EXPLAIN_CURRENT_PAGE
   {
     intent: "EXPLAIN_CURRENT_PAGE",
-
     patterns: [
       /\bwhat is this page\b/,
       /\bwhat does this page do\b/,
@@ -132,6 +135,9 @@ const INTENT_PATTERNS: Array<{
       /\bhelp me\b/,
       /\bwhat is this\b/,
       /\btell me about this\b/,
+      /\b(ye|yeh|this) (kya|what) (karta|does|kar raha)\b/,
+      /\b(ye|yeh) (kya|what) hai\b/,
+      /\b(ye|yeh) screen (kya|what)\b/,
       /\byeh page kya\b/,
       /\byeh page what\b/,
       /\bthis page what\b/,
@@ -147,13 +153,27 @@ const INTENT_PATTERNS: Array<{
     patterns: [
       /\bwhat is this field\b/,
       /\bwhat does this mean\b/,
+      /\biska (meaning|matlab)\b/,
+      /\b(iska|is field ka) (meaning|matlab) (kya|what)\b/,
       /\bwhat should i enter\b/,
       /\bwhat to fill\b/,
       /\bwhat to type\b/,
       /\bexplain this field\b/,
       /\bwhat goes here\b/,
     ],
-    weight: 0.85,
+    weight: 0.88,
+  },
+  // EXPLAIN_FIELD_REQUIREMENT
+  {
+    intent: "EXPLAIN_FIELD_REQUIREMENT",
+    patterns: [
+      /\bwhy is this field required\b/,
+      /\bwhy (is it|is this|this) required\b/,
+      /\brequired kyu hai\b/,
+      /\brequired kyu\b/,
+      /\b(ye|yeh) required kyu\b/,
+    ],
+    weight: 0.94,
   },
   // START_FULL_TOUR
   {
@@ -177,6 +197,10 @@ const INTENT_PATTERNS: Array<{
       /\btour this page\b/,
       /\bguide me\b/,
       /\bshow me around\b/,
+      /\b(mujhe|me) start se (samjhao|explain)\b/,
+      /\bexplain (from|from the) start\b/,
+      /\bstart se batao\b/,
+      /\bbegin from start\b/,
       /\btour karao\b/,
       /\btour shuru\b/,
       /\bshuru karo tour\b/,
@@ -185,7 +209,7 @@ const INTENT_PATTERNS: Array<{
       /\bhow do i use this\b/,
       /\bhelp me navigate\b/,
     ],
-    weight: 0.88,
+    weight: 0.9,
   },
   // NEXT_TOUR_STEP
   {
@@ -257,6 +281,7 @@ const INTENT_PATTERNS: Array<{
   {
     intent: "EXPLAIN_EXISTING_ROADMAP",
     patterns: [
+      /\bexplain (my )?roadmap\b/,
       /\broadmap\b/,
       /\bmera roadmap\b/,
       /\bmy roadmap\b/,
@@ -264,7 +289,7 @@ const INTENT_PATTERNS: Array<{
       /\bmy learning path\b/,
       /\blearning roadmap\b/,
     ],
-    weight: 0.85,
+    weight: 0.95,
   },
   // EXPLAIN_PROFILE_STATUS
   {
@@ -327,12 +352,17 @@ const INTENT_PATTERNS: Array<{
       /\bwhats my next step\b/,
       /\bwhat s my next step\b/,
       /\bwhat is my next step\b/,
-      /\bwhat to do\b/,
+      /\b(mera|my) next step (kya|what)?\b/,
+      /\b(mera|my) next step\b/,
+      /\bhow can i complete this\b/,
+      /\bhow to complete this\b/,
+      /\bise kaise complete karu\b/,
+      /\bise complete kaise\b/,
       /\bnext action\b/,
       /\bwhat now\b/,
       /\bguide me next\b/,
     ],
-    weight: 0.92,  // Higher than NEXT_TOUR_STEP (0.75) to win on ambiguous "next" phrases
+    weight: 0.94,  // Higher than NEXT_TOUR_STEP (0.75) to win on ambiguous "next" phrases
   },
   // PAUSE_ASSISTANT
   {
@@ -460,6 +490,20 @@ const INTENT_PATTERNS: Array<{
     weight: 0.92,
   },
 
+  // EXPLAIN_WHY_NOT_SAVING
+  {
+    intent: "EXPLAIN_WHY_NOT_SAVING",
+    patterns: [
+      /\b(ye|yeh|this) save kyu (nahi|not) ho raha\b/,
+      /\bwhy is this not saving\b/,
+      /\bwhy (not|wont) save\b/,
+      /\bform save kyu (nahi|not)\b/,
+      /\bsave kyu (nahi|not)\b/,
+      /\bwhy can ?t i save\b/,
+    ],
+    weight: 0.96,
+  },
+
   // EXPLAIN_METRIC
   {
     intent: "EXPLAIN_METRIC",
@@ -493,27 +537,55 @@ const INTENT_PATTERNS: Array<{
   {
     intent: "EXPLAIN_RECOMMENDATION",
     patterns: [
+      /\bwhy am i seeing this result\b/,
       /\bwhy am i seeing this\b/,
       /\bwhy seeing this\b/,
+      /\bwhy is this milestone recommended\b/,
       /\bwhy this recommendation\b/,
       /\bwhy this milestone\b/,
       /\bwhy this step\b/,
       /\bwhy was this recommended\b/,
       /\bye kyu dikh raha\b/,
     ],
-    weight: 0.9,
+    weight: 0.93,
+  },
+  // WHERE_PUT_GITHUB_LINK
+  {
+    intent: "WHERE_PUT_GITHUB_LINK",
+    patterns: [
+      /\bwhere do i put (my )?github (link|repo|url)?\b/,
+      /\bwhere (to|can i) put (my )?github\b/,
+      /\bgithub link kahan\b/,
+      /\bgithub repo kahan\b/,
+      /\bgithub kahan\b/,
+    ],
+    weight: 0.96,
+  },
+  // HOW_DESCRIBE_CONTRIBUTION
+  {
+    intent: "HOW_DESCRIBE_CONTRIBUTION",
+    patterns: [
+      /\bhow do i describe (my )?contribution\b/,
+      /\bhow to describe (my )?contribution\b/,
+      /\bdescribe (my )?contribution\b/,
+      /\bcontribution kaise likhu\b/,
+      /\bcontribution kaise\b/,
+    ],
+    weight: 0.96,
   },
   // HELP_WITH_PROJECT
   {
     intent: "HELP_WITH_PROJECT",
     patterns: [
+      /\bhelp me add (my )?project\b/,
+      /\badd my project\b/,
       /\bhow to add project\b/,
       /\badd a project\b/,
       /\badd new project\b/,
       /\bproject add\b/,
       /\bhelp me add project\b/,
     ],
-    weight: 0.88,
+    weight: 0.96,
   },
   // HELP_WITH_SKILL
   {
@@ -524,7 +596,7 @@ const INTENT_PATTERNS: Array<{
       /\bverify skill\b/,
       /\bskill add\b/,
     ],
-    weight: 0.88,
+    weight: 0.96,
   },
   // OPEN_RELEVANT_SECTION (catch-all for navigation)
   {

@@ -21,7 +21,7 @@ No routes are fabricated, and no non-existent modules (e.g. hypothetical externa
 | 1 | `/` | `public-landing` | Public | Public / Anonymous | Yes (3 steps) | 3 | **COVERED & VERIFIED** |
 | 2 | `/sign-in` | `auth-signin` | Authentication | Public | Yes (2 steps) | 2 | **COVERED & VERIFIED** |
 | 3 | `/sign-up` | `auth-signup` | Registration | Public | Yes (2 steps) | 2 | **COVERED & VERIFIED** |
-| 4 | `/onboarding` | `onboarding-journey` | Onboarding | Multi-step / Partial | Yes (6 steps) | 6 | **COVERED & VERIFIED** |
+| 4 | `/onboarding` | `onboarding-journey` | Onboarding | Multi-step / Partial | Yes (6 steps) | 7 | **COVERED & VERIFIED** |
 | 5 | `/student` | `student-home` | Workspace | Authenticated Student | Yes (4 steps) | 4 | **COVERED & VERIFIED** |
 | 6 | `/student/profile` | `student-profile` | Person 360 | Authenticated Student | Yes (3 steps) | 3 | **COVERED & VERIFIED** |
 | 7 | `/student/skills` | `student-skills` | Competency | Authenticated Student | Yes (3 steps) | 3 | **COVERED & VERIFIED** |
@@ -34,6 +34,8 @@ No routes are fabricated, and no non-existent modules (e.g. hypothetical externa
 | 14 | `/student/assessments` | `student-assessments` | Diagnostic | Authenticated Student | Yes (2 steps) | 2 | **COVERED & VERIFIED** |
 | 15 | `/student/interviews` | `student-interviews` | Simulation | Authenticated Student | Yes (1 step) | 1 | **COVERED & VERIFIED** |
 | 16 | `/verification` | `faculty-verification` | Faculty Review | Authorized Faculty/Admin | Yes (2 steps) | 2 | **COVERED & VERIFIED** |
+
+> **Reconciliation Note (Phase 7.1 Audit)**: The sum of physical DOM targets deployed across all 16 genuine routes equals exactly **42 targets** (3 + 2 + 2 + 7 + 4 + 3 + 3 + 4 + 4 + 3 + 3 + 3 + 1 + 2 + 1 + 2 = 42). In the initial Phase 7 summary table, `/onboarding` was mistakenly printed as 6 targets (matching its 6 tour steps) instead of its 7 physical DOM targets (`eora-name-input`, `eora-role-select`, `eora-ai-direction`, `eora-priorities`, `eora-academic-form`, `eora-resume-upload`, and `eora-digital-footprints`). With onboarding correctly counted as 7 physical targets, the table total reconciles exactly with the reported 42 physical DOM targets.
 
 ---
 

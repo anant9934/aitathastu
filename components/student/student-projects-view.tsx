@@ -254,7 +254,8 @@ export function StudentProjectsView() {
     setModalMode("create");
     setEditingProjectId(null);
     setShowModal(true);
-  }, [resetForm]);
+    eora?.notifyTaskEvent("project_modal_opened");
+  }, [resetForm, eora]);
 
   const startEditProject = useCallback((proj: ProjectItem) => {
     resetForm();
@@ -663,6 +664,7 @@ export function StudentProjectsView() {
         </div>
 
         <button
+          id="eora-add-project-trigger"
           data-eora-id="eora-add-project-btn"
           type="button"
           onClick={startCreateProject}
@@ -750,6 +752,8 @@ export function StudentProjectsView() {
             No projects yet. Add your first project using manual entry, GitHub import, or resource links to establish evidence in your profile.
           </p>
           <button
+            id="eora-add-project-empty-trigger"
+            data-eora-id="eora-add-project-btn"
             type="button"
             onClick={startCreateProject}
             style={{
@@ -1353,6 +1357,8 @@ export function StudentProjectsView() {
                         Project Title *
                       </label>
                       <input
+                        id="eora-project-input-title"
+                        data-eora-id="eora-project-input-title"
                         type="text"
                         required
                         placeholder="AI-powered Research Assistant"
@@ -1367,6 +1373,8 @@ export function StudentProjectsView() {
                         Short Summary
                       </label>
                       <input
+                        id="eora-project-input-summary"
+                        data-eora-id="eora-project-input-summary"
                         type="text"
                         placeholder="A concise 1-2 sentence description of what the project accomplishes."
                         value={summary}
@@ -1484,6 +1492,8 @@ export function StudentProjectsView() {
                           GitHub Repository URL
                         </label>
                         <input
+                          id="eora-project-input-repo"
+                          data-eora-id="eora-project-input-repo"
                           type="url"
                           placeholder="https://github.com/..."
                           value={repositoryUrl}
@@ -1702,11 +1712,13 @@ export function StudentProjectsView() {
                       })}
                     </div>
 
-                    <div>
+                    <div data-eora-id="eora-contribution-note">
                       <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>
                         Describe Your Contribution (in your own words)
                       </label>
                       <textarea
+                        id="eora-project-input-contribution"
+                        data-eora-id="eora-project-input-contribution"
                         rows={2}
                         placeholder="e.g., I implemented the fine-tuning training loop in PyTorch and deployed the FastAPI container; a team member built the UI."
                         value={contributionNote}
@@ -2133,6 +2145,8 @@ export function StudentProjectsView() {
                   </button>
                 )}
                 <button
+                  id="eora-project-save-btn"
+                  data-eora-id="eora-project-save-btn"
                   type="button"
                   onClick={() => handleSubmit(false)}
                   disabled={isSubmitting}

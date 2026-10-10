@@ -8,21 +8,32 @@ export interface ProductionSecretAuditResult {
   warnings: string[];
 }
 
-const REQUIRED_PRODUCTION_SECRETS = [
+/**
+ * Secrets required for CV ingestion to operate securely.
+ * These are the ONLY secrets that can block resume upload.
+ */
+const CORE_INGESTION_SECRETS = [
   "SESSION_SECRET",
   "HANDOFF_SIGNING_SECRET",
   "GITHUB_CLIENT_ID",
   "GITHUB_CLIENT_SECRET",
   "GITHUB_WEBHOOK_SECRET",
   "EXTERNAL_TOKEN_ENCRYPTION_KEY",
-  // Actual env var names used in .env / .env.local / Vercel:
+  "CRON_SECRET",
+  "DATABASE_URL",
+] as const;
+
+/**
+ * Secrets for ecosystem integrations (LPU, PadhoCode, ERIS, MentorMaze).
+ * Validated separately — missing/insecure values here produce warnings,
+ * NOT errors, and cannot block CV upload or the ingestion gate.
+ */
+const ECOSYSTEM_INTEGRATION_SECRETS = [
   "INTEGRATION_STUDY_LPU_SECRET",
   "INTEGRATION_PADHO_CODE_SECRET",
   "INTEGRATION_ERIS_SECRET",
   "INTEGRATION_MENTORMAZE_SECRET",
-  "CRON_SECRET",
-  "DATABASE_URL",
-];
+] as const;
 
 const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
   CRON_SECRET: [
@@ -61,8 +72,10 @@ const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
   ],
 };
 
+
 /**
- * Validates that all required production secrets are configured and free of placeholder/dev defaults.
+ * Validates production secrets. Core ingestion secrets are mandatory;
+ * ecosystem integration secrets are advisory (warnings only).
  */
 export function auditProductionSecrets(
   env: Record<string, string | undefined> = process.env
@@ -76,7 +89,16 @@ export function auditProductionSecrets(
   const insecureDefaults: string[] = [];
   const warnings: string[] = [];
 
-  for (const secretKey of REQUIRED_PRODUCTION_SECRETS) {
+  const cryptoLengthKeys = new Set([
+    "SESSION_SECRET",
+    "HANDOFF_SIGNING_SECRET",
+    "GITHUB_WEBHOOK_SECRET",
+    "EXTERNAL_TOKEN_ENCRYPTION_KEY",
+    "CRON_SECRET",
+  ]);
+
+  // --- Core ingestion secrets (errors in production) ---
+  for (const secretKey of CORE_INGESTION_SECRETS) {
     const val = env[secretKey];
     if (!val || val.trim() === "") {
       if (isProd) {
@@ -86,31 +108,31 @@ export function auditProductionSecrets(
       }
       continue;
     }
-
-    // Check for known insecure default values
     const insecureList = KNOWN_INSECURE_DEFAULTS[secretKey] || [];
     if (insecureList.includes(val)) {
-      if (isProd) {
-        insecureDefaults.push(secretKey);
-      } else {
-        warnings.push(`${secretKey} is using a development default value.`);
-      }
+      if (isProd) insecureDefaults.push(secretKey);
+      else warnings.push(`${secretKey} is using a development default value.`);
     }
-
-    // Check minimum length for cryptographic secrets
-    if (
-      ["SESSION_SECRET", "HANDOFF_SIGNING_SECRET", "GITHUB_WEBHOOK_SECRET", "EXTERNAL_TOKEN_ENCRYPTION_KEY", "CRON_SECRET"].includes(secretKey) &&
-      val.length < 32
-    ) {
-      if (isProd) {
-        insecureDefaults.push(`${secretKey} (length < 32 chars)`);
-      } else {
-        warnings.push(`${secretKey} should be at least 32 characters in production.`);
-      }
+    if (cryptoLengthKeys.has(secretKey) && val.length < 32) {
+      if (isProd) insecureDefaults.push(`${secretKey} (length < 32 chars)`);
+      else warnings.push(`${secretKey} should be at least 32 characters in production.`);
     }
   }
 
-  // LLM Key check
+  // --- Ecosystem integration secrets (advisory warnings only — never block the gate) ---
+  for (const secretKey of ECOSYSTEM_INTEGRATION_SECRETS) {
+    const val = env[secretKey];
+    if (!val || val.trim() === "") {
+      warnings.push(`Ecosystem secret ${secretKey} not configured — its integration will be disabled.`);
+      continue;
+    }
+    const insecureList = KNOWN_INSECURE_DEFAULTS[secretKey] || [];
+    if (insecureList.includes(val)) {
+      warnings.push(`Ecosystem secret ${secretKey} is using a development placeholder value.`);
+    }
+  }
+
+  // LLM Key check — advisory only
   const hasLlmKey = Boolean(
     env.GEMINI_API_KEYS ||
     env.GROQ_API_KEYS ||
@@ -119,7 +141,6 @@ export function auditProductionSecrets(
     env.MISTRAL_API_KEYS ||
     env.SAMBANOVA_API_KEYS
   );
-
   if (!hasLlmKey) {
     warnings.push("No LLM provider keys configured; system operates in deterministic offline mode.");
   }
@@ -134,6 +155,7 @@ export function auditProductionSecrets(
     warnings,
   };
 }
+
 
 /**
  * Generates a high-entropy cryptographically secure token.

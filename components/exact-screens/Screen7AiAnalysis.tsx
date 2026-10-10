@@ -223,40 +223,48 @@ export function Screen7AiAnalysis({
                 </p>
               </div>
 
-              {/* Glowing Circular Progress Spinner */}
-              <div style={{ position: "relative", width: 52, height: 52, flexShrink: 0 }}>
-                <svg width="52" height="52" viewBox="0 0 52 52">
-                  <circle
-                    cx="26"
-                    cy="26"
-                    r="22"
-                    stroke="rgba(255, 255, 255, 0.12)"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <circle
-                    cx="26"
-                    cy="26"
-                    r="22"
-                    stroke="url(#spinnerGrad7)"
-                    strokeWidth="4"
-                    strokeDasharray={2 * Math.PI * 22}
-                    strokeDashoffset={2 * Math.PI * 22 * 0.35}
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                  <defs>
-                    <linearGradient id="spinnerGrad7" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#02C5F5" />
-                      <stop offset="100%" stopColor="#9335E8" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
+              {/* Glowing Circular Progress Indicator */}
+              {(() => {
+                const completedCount = completed.filter(Boolean).length;
+                const ratio = Math.max(0.2, Math.min(1, (completedCount + 1) / analysisSteps.length));
+                const circumference = 2 * Math.PI * 22;
+                const dashOffset = circumference * (1 - ratio);
+                return (
+                  <div style={{ position: "relative", width: 52, height: 52, flexShrink: 0 }}>
+                    <svg width="52" height="52" viewBox="0 0 52 52">
+                      <circle
+                        cx="26"
+                        cy="26"
+                        r="22"
+                        stroke="rgba(255, 255, 255, 0.12)"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <circle
+                        cx="26"
+                        cy="26"
+                        r="22"
+                        stroke="url(#spinnerGrad7)"
+                        strokeWidth="4"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={dashOffset}
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                      <defs>
+                        <linearGradient id="spinnerGrad7" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#02C5F5" />
+                          <stop offset="100%" stopColor="#9335E8" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Checklist with Green Checkmarks */}
-            <ProcessingActivity />
+            <ProcessingActivity hideWhenIdle={true} />
             <div data-eora-id="eora-ai-analysis" style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 36 }}>
               {analysisSteps.map((step, idx) => {
                 const isDone = Boolean(completed[idx]);

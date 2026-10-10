@@ -1171,7 +1171,7 @@ export function Screen6DigitalFootprints({
               )}
             </div>
           )}
-          <ProcessingActivity />
+          <ProcessingActivity hideWhenIdle={true} />
         </div>
 
         {/* Footer with Interactive Stepper */}

@@ -4,6 +4,7 @@ import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 import { ProcessingActivity } from "./ProcessingActivity";
 import { useEoraSafe } from "@/components/eora/eora-provider";
+import { parseSafeJsonResponse } from "@/lib/api/safe-api-response";
 
 export type ResumeProcessingState =
   | "IDLE"
@@ -71,6 +72,8 @@ export function Screen5ResumeUpload({
 }: Screen5ResumeUploadProps) {
   const eora = useEoraSafe();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedFileRef = useRef<File | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const completedDocumentsRef = useRef<Set<string>>(new Set());
   const [fileName, setFileName] = useState<string | null>(initialFileName || null);
   const [isUploaded, setIsUploaded] = useState<boolean>(Boolean(initialFileName));
@@ -97,7 +100,10 @@ export function Screen5ResumeUpload({
       .then((r) => r.json())
       .then((data) => { if (!cancelled) setIngestionReady(Boolean(data?.ready)); })
       .catch(() => { if (!cancelled) setIngestionReady(false); });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, []);
 
   const isBusy =
@@ -109,8 +115,22 @@ export function Screen5ResumeUpload({
   // Upload is possible only when gate is confirmed open
   const uploadBlocked = ingestionReady === false;
 
+  const notifyJobFailed = async (jobId: string, status: "failed" | "timed_out", message: string) => {
+    try {
+      await fetch("/api/student/processing-jobs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId, status, errorMessage: message }),
+      });
+    } catch {
+      // Safe non-blocking notification
+    }
+  };
+
   const processFile = async (file?: File) => {
     if (!file) return;
+    selectedFileRef.current = file;
+
     if (uploadBlocked) {
       setErrorMessage("Resume upload is temporarily unavailable. Use \"Skip for now\" to enter your details manually.");
       return;
@@ -125,48 +145,80 @@ export function Screen5ResumeUpload({
     setReviewSaved(false);
     setCandidates([]);
 
-    // Signal EORA extraction started
+    // Signal EORA extraction started (exact required copy)
     eora?.speak(
-      "Hey! I'm reading your CV and collecting your details.",
+      "I'm reading your resume and collecting the details we can use.",
       "WORKING"
     );
 
+    // Setup 45-second bounded client timeout to eliminate indefinite waiting
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const timeoutTimer = setTimeout(() => {
+      abortController.abort("CLIENT_TIMEOUT");
+    }, 45000);
+
+    let currentJobId: string | null = null;
+
     try {
+      // 1. Create or verify tracking job
       const jobResponse = await fetch("/api/student/processing-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sourceId: "resume" }),
+        signal: abortController.signal,
       });
-      const job = await jobResponse.json();
-      if (!jobResponse.ok || !job.jobId) {
-        throw new Error(job.error || "Could not start resume import.");
+
+      const safeJob = await parseSafeJsonResponse<{ ok: boolean; jobId?: string; error?: string }>(
+        jobResponse,
+        "Could not start resume import."
+      );
+
+      if (!safeJob.ok || !safeJob.data?.jobId) {
+        throw new Error(safeJob.error?.message || "Could not start resume import.");
       }
-      setActiveJobId(job.jobId);
+      currentJobId = safeJob.data.jobId;
+      setActiveJobId(currentJobId);
       setProcessingState("PARSING");
 
+      // 2. Perform zero-LLM structured extraction
       const formData = new FormData();
       formData.append("resume", file);
       formData.append("aiConsent", "true");
-      formData.append("jobId", job.jobId);
+      formData.append("jobId", currentJobId);
 
       setProcessingState("EXTRACTING");
       const res = await fetch("/api/resume/extract", {
         method: "POST",
         body: formData,
+        signal: abortController.signal,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMsg = data.error || "Could not read this file. Please enter details manually.";
+      clearTimeout(timeoutTimer);
+
+      const safeExtract = await parseSafeJsonResponse<any>(
+        res,
+        "Could not read this file. Please try again or enter details manually."
+      );
+
+      if (!safeExtract.ok || !safeExtract.data) {
+        const errorMsg = safeExtract.error?.message || "Could not read this file. Please enter details manually.";
+        if (currentJobId) {
+          void notifyJobFailed(currentJobId, "failed", errorMsg);
+        }
         setErrorMessage(errorMsg);
         setProcessingState("FAILED");
         eora?.speak(
-          "I couldn't finish reading this CV. You can try again or enter your details manually.",
+          "I couldn't finish reading this file. You can retry or continue manually.",
           "REASSURING"
         );
         return;
       }
 
+      const data = safeExtract.data;
       const documentId = String(data.documentId || "");
       const rows: ResumeCandidate[] = Array.isArray(data.reviewCandidates)
         ? data.reviewCandidates.flatMap((raw: unknown) => {
@@ -200,10 +252,12 @@ export function Screen5ResumeUpload({
         : [];
 
       if (data.extractionMeta?.success !== true || rows.length === 0) {
-        setErrorMessage("No reviewable claims were returned. Please retry or enter details manually.");
+        const err = "No reviewable claims were returned. Please retry or enter details manually.";
+        if (currentJobId) void notifyJobFailed(currentJobId, "failed", err);
+        setErrorMessage(err);
         setProcessingState("FAILED");
         eora?.speak(
-          "I couldn't finish reading this CV. You can try again or enter your details manually.",
+          "I couldn't finish reading this file. You can retry or continue manually.",
           "REASSURING"
         );
         return;
@@ -220,16 +274,16 @@ export function Screen5ResumeUpload({
       });
       setCandidates(rows);
 
-      // Contextual EORA guidance based on completeness
+      // Contextual EORA event guidance based on completeness
       const hasAcademic = Boolean(data.extractedProfile?.degree && data.extractedProfile?.institution);
       if (hasAcademic) {
         eora?.speak(
-          "I've found some information in your CV. Let's review it together.",
+          "I found some information! Let's review it together.",
           "HAPPY"
         );
       } else {
         eora?.speak(
-          "I found some details, but a few things are missing. Let's complete them.",
+          "I found some details, but we still need a little more information.",
           "EXPLAINING"
         );
       }
@@ -239,11 +293,25 @@ export function Screen5ResumeUpload({
         onExtractionReady?.();
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Network error during file upload. You can continue manually.";
-      setErrorMessage(msg);
+      clearTimeout(timeoutTimer);
+      const isTimeout =
+        (err instanceof Error && (err.name === "AbortError" || err.message === "CLIENT_TIMEOUT")) ||
+        abortController.signal.aborted;
+
+      const userMessage = isTimeout
+        ? "Resume extraction took longer than 45 seconds. You can retry or enter your details manually."
+        : err instanceof Error
+        ? err.message
+        : "Network error during resume extraction. You can continue manually.";
+
+      if (currentJobId) {
+        void notifyJobFailed(currentJobId, isTimeout ? "timed_out" : "failed", userMessage);
+      }
+
+      setErrorMessage(userMessage);
       setProcessingState("FAILED");
       eora?.speak(
-        "I couldn't finish reading this CV. You can try again or enter your details manually.",
+        "I couldn't finish reading this file. You can retry or continue manually.",
         "REASSURING"
       );
     }
@@ -299,7 +367,7 @@ export function Screen5ResumeUpload({
       setProcessingState("COMPLETED");
       setErrorMessage(null);
       eora?.speak(
-        "Your information is saved! You can continue to the next step.",
+        "Everything is saved. Let's continue to your digital profiles.",
         "HAPPY"
       );
     } catch {
@@ -576,8 +644,64 @@ export function Screen5ResumeUpload({
               )}
 
               {errorMessage && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#EF4444", fontSize: 13, marginTop: 12 }}>
-                  <AlertCircle size={15} /> {errorMessage}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#EF4444", fontSize: 13 }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} /> {errorMessage}
+                  </div>
+                  {processingState === "FAILED" && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                      {selectedFileRef.current && (
+                        <button
+                          type="button"
+                          onClick={() => processFile(selectedFileRef.current!)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            background: "#5642EF",
+                            color: "#FFFFFF",
+                            fontSize: 12,
+                            fontWeight: 650,
+                            border: "none",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Retry this file
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          background: "#F1F5F9",
+                          color: "#334155",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          border: "1px solid #CBD5E1",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Choose another file
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSkip}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          background: "#F8FAFC",
+                          color: "#475569",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          border: "1px solid #E2E8F0",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Enter details manually
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

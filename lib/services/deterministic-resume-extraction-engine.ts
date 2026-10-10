@@ -573,14 +573,15 @@ export function extractProjects(
   let currentBlock: RawProjectBlock | null = null;
 
   for (const line of projectLines) {
-    const isBullet = /^[•\-*–—]\s*/.test(line) || /^\d+\.\s*/.test(line);
+    const isNumberedTitle = /^\d+[\.)]\s+[A-Za-z]/.test(line) && line.length <= 80 && !line.endsWith(".");
+    const isBullet = (/^[•\-*–—]\s*/.test(line) || /^\d+\.\s*/.test(line)) && !isNumberedTitle;
     const hasRepo = /github\.com\/[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+/i.test(line);
     const isUrl = /^https?:\/\//i.test(line) || /^github\.com\//i.test(line);
 
     // If it is a bold/distinct short title line without bullets, and NOT a URL
-    if (!isBullet && !isUrl && line.length <= 80 && !line.endsWith(".")) {
+    if ((!isBullet || isNumberedTitle) && !isUrl && line.length <= 80 && !line.endsWith(".")) {
       if (currentBlock) blocks.push(currentBlock);
-      const titleClean = line.replace(/^[*_#:\s]+|[*_#:\s]+$/g, "");
+      const titleClean = line.replace(/^\d+[\.)]\s+/, "").replace(/^[*_#:\s]+|[*_#:\s]+$/g, "");
       currentBlock = {
         title: titleClean,
         description: "",

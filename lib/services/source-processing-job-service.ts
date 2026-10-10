@@ -28,7 +28,7 @@ export type ProcessingStage =
   | "interpret"
   | "plan";
 
-export type JobStatus = "queued" | "running" | "completed" | "failed" | "retry";
+export type JobStatus = "queued" | "running" | "completed" | "failed" | "retry" | "cancelled" | "timed_out";
 
 export interface CreateJobParams {
   personId: string;
@@ -51,6 +51,7 @@ export interface FailJobParams {
   errorCode: string;
   errorMessage: string;
   canRetry?: boolean;
+  status?: "failed" | "retry" | "timed_out" | "cancelled";
 }
 
 export class SourceProcessingJobService {
@@ -126,10 +127,11 @@ export class SourceProcessingJobService {
    */
   static async failJob(params: FailJobParams): Promise<void> {
     const db = await getDb();
+    const finalStatus = params.status ?? (params.canRetry ? "retry" : "failed");
     await db
       .update(sourceProcessingJobs)
       .set({
-        status: params.canRetry ? "retry" : "failed",
+        status: finalStatus,
         completedAt: new Date(),
         errorCode: params.errorCode,
         errorMessage: params.errorMessage.slice(0, 500),
@@ -140,6 +142,34 @@ export class SourceProcessingJobService {
           eq(sourceProcessingJobs.personId, params.personId)
         )
       );
+  }
+
+  /**
+   * Explicitly marks a job as timed out.
+   */
+  static async timeoutJob(params: { jobId: string; personId: string; errorMessage?: string }): Promise<void> {
+    return this.failJob({
+      jobId: params.jobId,
+      personId: params.personId,
+      errorCode: "TIMED_OUT",
+      errorMessage: params.errorMessage ?? "Processing job exceeded client timeout threshold.",
+      status: "timed_out",
+      canRetry: true,
+    });
+  }
+
+  /**
+   * Explicitly marks a job as cancelled by the user.
+   */
+  static async cancelJob(params: { jobId: string; personId: string; errorMessage?: string }): Promise<void> {
+    return this.failJob({
+      jobId: params.jobId,
+      personId: params.personId,
+      errorCode: "CANCELLED",
+      errorMessage: params.errorMessage ?? "Processing job cancelled by student.",
+      status: "cancelled",
+      canRetry: false,
+    });
   }
 
   /**

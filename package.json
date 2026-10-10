@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx scripts/test-core-v3.ts",
+    "test:core-v4-2": "node --env-file=.env --import tsx scripts/verify-v4-2-cv-intelligence.ts",
     "test:core-v4-1": "node --env-file=.env --import tsx scripts/verify-v4-1-coding-profiles.ts",
     "test:core-v4-0": "node --env-file=.env --import tsx scripts/verify-v4-0-digital-footprints.ts",
     "test:core-v3-9": "node --env-file=.env --import tsx scripts/verify-v3-9-zero-llm-extraction.ts",

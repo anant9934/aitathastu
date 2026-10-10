@@ -89,6 +89,7 @@ export default function RoadmapPage() {
     <div className="min-h-screen" style={{ background: "#F9F8F5", color: "#171626" }}>
       {/* Header */}
       <header
+        data-eora-id="eora-roadmap-header"
         style={{
           background: "#FFFFFF",
           borderBottom: "1px solid #E5E7EB",
@@ -180,17 +181,18 @@ export default function RoadmapPage() {
       {/* Main Content */}
       <main style={{ maxWidth: 1040, margin: "0 auto", padding: "32px 20px" }}>
         {loading ? (
-          <div style={{ padding: 48, textAlign: "center", color: "#6B7280", fontSize: 14 }}>
-            Generating personalized roadmap...
+          <div data-eora-id="eora-roadmap-milestones" style={{ padding: 48, textAlign: "center", color: "#6B7280", fontSize: 14 }}>
+            <div data-eora-id="eora-roadmap-next">Generating personalized roadmap...</div>
           </div>
         ) : !data?.roadmap ? (
-          <div style={{ padding: 48, textAlign: "center", color: "#6B7280", fontSize: 14 }}>
-            Roadmap not available.
+          <div data-eora-id="eora-roadmap-milestones" style={{ padding: 48, textAlign: "center", color: "#6B7280", fontSize: 14 }}>
+            <div data-eora-id="eora-roadmap-next">Roadmap not available.</div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* What Matters Now: Max 3 Primary Actions */}
             <section
+              data-eora-id="eora-roadmap-next"
               style={{
                 padding: 24,
                 borderRadius: 16,

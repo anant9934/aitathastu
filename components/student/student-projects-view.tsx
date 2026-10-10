@@ -637,7 +637,7 @@ export function StudentProjectsView() {
   return (
     <div style={{ maxWidth: 1040, marginInline: "auto", width: "100%", padding: "28px 20px 80px" }}>
       {/* Top Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, gap: 16 }}>
+      <div data-eora-id="eora-projects-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, gap: 16 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
             <div
@@ -663,6 +663,7 @@ export function StudentProjectsView() {
         </div>
 
         <button
+          data-eora-id="eora-add-project-btn"
           type="button"
           onClick={startCreateProject}
           style={{
@@ -715,6 +716,7 @@ export function StudentProjectsView() {
       {/* Empty State */}
       {!loading && !error && projects.length === 0 && (
         <div
+          data-eora-id="eora-projects-list"
           style={{
             padding: "56px 24px",
             textAlign: "center",
@@ -741,7 +743,10 @@ export function StudentProjectsView() {
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "#171626", marginBottom: 8 }}>
             No Projects Confirmed Yet
           </h2>
-          <p style={{ fontSize: 14, color: "#6B7280", maxWidth: 460, margin: "0 auto 24px", lineHeight: 1.5 }}>
+          <p
+            data-eora-id="eora-contribution-note"
+            style={{ fontSize: 14, color: "#6B7280", maxWidth: 460, margin: "0 auto 24px", lineHeight: 1.5 }}
+          >
             No projects yet. Add your first project using manual entry, GitHub import, or resource links to establish evidence in your profile.
           </p>
           <button

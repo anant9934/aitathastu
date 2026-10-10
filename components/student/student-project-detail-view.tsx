@@ -246,6 +246,7 @@ export function StudentProjectDetailView({ projectId }: { projectId: string }) {
 
       {/* Main Header Card */}
       <div
+        data-eora-id="eora-project-detail-hero"
         style={{
           background: "#FFFFFF",
           borderRadius: 20,
@@ -431,6 +432,7 @@ export function StudentProjectDetailView({ projectId }: { projectId: string }) {
 
           {/* Personal Contribution Record */}
           <div
+            data-eora-id="eora-project-detail-contribution"
             style={{
               background: "#FFFFFF",
               borderRadius: 16,
@@ -500,6 +502,7 @@ export function StudentProjectDetailView({ projectId }: { projectId: string }) {
           {/* AI/ML Details (Problem, Dataset, Architecture, Results) */}
           {(project.aiDetails?.problemStatement || project.aiDetails?.proposedSolution || project.aiDetails?.modelFamily || metrics.length > 0) && (
             <div
+              data-eora-id="eora-project-detail-architecture"
               style={{
                 background: "#FFFFFF",
                 borderRadius: 16,

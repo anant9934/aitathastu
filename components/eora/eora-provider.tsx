@@ -398,7 +398,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       setPendingNavUrl(null);
       setPendingNavLabel(null);
 
-      const intentResult = recognizeIntent(text);
+      const intentResult = recognizeIntent(text, pathname, context);
       const decision = processUserInput(text, intentResult, context);
 
       setCurrentMessage(decision.message);
@@ -413,17 +413,21 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         setPendingNavLabel(decision.navigationLabel ?? null);
       }
 
-      if (intentResult.intent === "DISMISS_ASSISTANT") {
+      if (intentResult.intent === "DISMISS_ASSISTANT" || intentResult.intent === "DISMISS") {
         schedule(() => setIsVisible(false), 800);
       }
-      if (intentResult.intent === "PAUSE_ASSISTANT") {
+      if (intentResult.intent === "PAUSE_ASSISTANT" || intentResult.intent === "QUIET_MODE") {
         setPreferences((p) => snoozeEora(p, 60));
       }
-      if (intentResult.intent === "RESUME_ASSISTANT") {
+      if (intentResult.intent === "RESUME_ASSISTANT" || intentResult.intent === "RESUME") {
         setIsVisible(true);
         setIsMinimized(false);
       }
       // Tour navigation via chat
+      if (intentResult.intent === "STOP_TOUR" && activeTour) {
+        exitTour();
+        return;
+      }
       if (intentResult.intent === "NEXT_TOUR_STEP" && activeTour) {
         nextTourStep();
         return;
@@ -434,7 +438,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [context, activeTour, schedule]
+    [context, activeTour, schedule, pathname]
   );
 
   const handleClarifyingChoice = useCallback(
@@ -530,7 +534,12 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (activeTour && pathname !== activeTour.validRoute) exitTour();
+    if (!activeTour) return;
+    const isValid =
+      activeTour.validRoute === "/"
+        ? pathname === "/" || pathname === ""
+        : pathname.startsWith(activeTour.validRoute);
+    if (!isValid) exitTour();
   }, [activeTour, pathname, exitTour]);
 
   const pauseTour = useCallback(() => {

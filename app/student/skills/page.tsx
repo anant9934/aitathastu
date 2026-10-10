@@ -208,42 +208,40 @@ export default function SkillsPage() {
       {/* Main Content */}
       <main data-eora-id="eora-skills-list" style={{ maxWidth: 1040, marginInline: "auto", padding: "28px 20px 80px" }}>
         {/* Metrics Row */}
-        {data?.stats && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
-            <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
-                Total Tracked Skills
-              </span>
-              <span style={{ fontSize: 26, fontWeight: 800, color: "#171626" }}>
-                {data.stats.totalSkills}
-              </span>
-            </div>
-            <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
-                Demonstrated Skills
-              </span>
-              <span style={{ fontSize: 26, fontWeight: 800, color: "#5942DC" }}>
-                {data.stats.demonstratedSkills}
-              </span>
-            </div>
-            <div data-eora-id="eora-skill-verification" style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
-                Verified Skills
-              </span>
-              <span style={{ fontSize: 26, fontWeight: 800, color: "#059669" }}>
-                {data.stats.verifiedSkills}
-              </span>
-            </div>
-            <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
-                Target Goal
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 800, color: "#171626", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
-                {data.activeGoal}
-              </span>
-            </div>
+        <div data-eora-id="eora-skills-overview" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 24 }}>
+          <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
+              Total Tracked Skills
+            </span>
+            <span style={{ fontSize: 26, fontWeight: 800, color: "#171626" }}>
+              {data?.stats?.totalSkills ?? 0}
+            </span>
           </div>
-        )}
+          <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
+              Demonstrated Skills
+            </span>
+            <span style={{ fontSize: 26, fontWeight: 800, color: "#5942DC" }}>
+              {data?.stats?.demonstratedSkills ?? 0}
+            </span>
+          </div>
+          <div data-eora-id="eora-skill-verification" style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
+              Verified Skills
+            </span>
+            <span style={{ fontSize: 26, fontWeight: 800, color: "#059669" }}>
+              {data?.stats?.verifiedSkills ?? 0}
+            </span>
+          </div>
+          <div style={{ padding: 18, borderRadius: 14, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 6px rgba(0,0,0,0.02)" }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", display: "block", marginBottom: 4 }}>
+              Target Goal
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: "#171626", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+              {data?.activeGoal || "AI/ML Track"}
+            </span>
+          </div>
+        </div>
 
         {/* Filter and Search Bar */}
         <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
@@ -270,7 +268,7 @@ export default function SkillsPage() {
             ))}
           </div>
 
-          <div style={{ position: "relative", minWidth: 240 }}>
+          <div data-eora-id="eora-skills-search" style={{ position: "relative", minWidth: 240 }}>
             <Search size={15} color="#9CA3AF" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
             <input
               type="text"

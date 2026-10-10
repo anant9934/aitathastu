@@ -201,6 +201,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
           SECTION A: HERO VIEWPORT
           ========================================================================= */}
       <section
+        data-eora-id="eora-landing-hero"
         style={{
           position: "relative",
           width: "100%",
@@ -570,7 +571,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
       </section>
 
       {/* 2. One Intelligent Ecosystem for 5 Stakeholders */}
-      <section id="ecosystem" style={{ position: "relative", zIndex: 10, padding: "90px 36px", maxWidth: 1280, margin: "0 auto", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
+      <section id="ecosystem" data-eora-id="eora-landing-features" style={{ position: "relative", zIndex: 10, padding: "90px 36px", maxWidth: 1280, margin: "0 auto", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
         <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto 52px" }}>
           <GlowingBadge color="violet">One Intelligent Ecosystem</GlowingBadge>
           <h2 style={{ fontSize: "clamp(28px, 3.5vw, 44px)", fontWeight: 800, color: "#FFFFFF", marginTop: 18, marginBottom: 16, letterSpacing: "-0.025em" }}>
@@ -758,7 +759,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
       </section>
 
       {/* 4. Final CTA & Footer */}
-      <section style={{ position: "relative", zIndex: 10, padding: "70px 36px 80px", maxWidth: 1280, margin: "0 auto", borderTop: "1px solid rgba(255, 255, 255, 0.08)", textAlign: "center" }}>
+      <section data-eora-id="eora-landing-cta" style={{ position: "relative", zIndex: 10, padding: "70px 36px 80px", maxWidth: 1280, margin: "0 auto", borderTop: "1px solid rgba(255, 255, 255, 0.08)", textAlign: "center" }}>
         <div
           style={{
             position: "relative",

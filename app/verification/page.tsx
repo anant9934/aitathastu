@@ -233,7 +233,7 @@ export default function VerificationPage() {
       </header>
 
       {/* Main Container */}
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 20px 60px" }}>
+      <main data-eora-id="eora-verification-queue" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 20px 60px" }}>
         {/* Banner */}
         <div
           style={{
@@ -360,7 +360,7 @@ export default function VerificationPage() {
               <Link href="/student" className="ws-btn ws-btn-secondary" style={{ fontSize: 13 }}>
                 Return to Student Workspace
               </Link>
-              <Link href="/sign-in" className="ws-btn ws-btn-primary" style={{ fontSize: 13 }}>
+              <Link data-eora-id="eora-verification-action" href="/sign-in" className="ws-btn ws-btn-primary" style={{ fontSize: 13 }}>
                 Sign In with Faculty Account
               </Link>
             </div>
@@ -372,6 +372,7 @@ export default function VerificationPage() {
           <>
             {/* Filter Tabs */}
             <div
+              data-eora-id="eora-verification-filters"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -434,7 +435,7 @@ export default function VerificationPage() {
                 <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px", color: "var(--ink)" }}>
                   No requests matching this view
                 </h3>
-                <p style={{ fontSize: 13.5, margin: 0 }}>
+                <p data-eora-id="eora-verification-action" style={{ fontSize: 13.5, margin: 0 }}>
                   {filter === "pending"
                     ? "All submitted evidence items have been reviewed."
                     : "No verification requests found in this filter category."}
@@ -569,6 +570,7 @@ export default function VerificationPage() {
                     {/* Action Button */}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
                       <button
+                        data-eora-id="eora-verification-action"
                         onClick={() => handleOpenReview(item)}
                         className="ws-btn ws-btn-primary"
                         style={{ fontSize: 13, minHeight: 36, padding: "6px 14px", gap: 6 }}

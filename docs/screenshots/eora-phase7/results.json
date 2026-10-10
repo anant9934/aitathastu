@@ -1,0 +1,267 @@
+[
+  {
+    "check": "Landing hero renders",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Hero large EORA illustration mounted",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "No trigger collision: Landing page desktop",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Sign-in page renders with floating companion",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Sign-in badge reflects contract",
+    "passed": true,
+    "detail": "Sign In | AI Tathastu"
+  },
+  {
+    "check": "Sign-in page explanation grounded",
+    "passed": true,
+    "detail": "Sign In | AI TathastuAuthenticate returning students and faculty using email/password or secure OAuth providers (Google, GitHub)."
+  },
+  {
+    "check": "Sign-up page renders with floating companion",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Sign-up badge reflects contract",
+    "passed": true,
+    "detail": "Sign Up | AI Tathastu"
+  },
+  {
+    "check": "Onboarding welcome screen renders",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Single floating companion on onboarding",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Onboarding tour highlights name input",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Role select step reached",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "AI Direction step reached",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Academic form step reached",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Resume upload step reached",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Authenticated student dashboard loaded",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Dashboard badge indicates student workspace",
+    "passed": true,
+    "detail": "Student Workspace | AI Tathastu"
+  },
+  {
+    "check": "Dashboard explanation grounded in student progress",
+    "passed": true,
+    "detail": "Student Workspace | AI TathastuCentral command center displaying active AI/ML go"
+  },
+  {
+    "check": "Dashboard tour: spotlight eora-active-goal",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Dashboard tour: spotlight eora-next-actions",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Dashboard tour: spotlight eora-evidence-panel",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Dashboard tour: spotlight eora-sidebar",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Skills badge indicates skill competency",
+    "passed": true,
+    "detail": "Skills Map | AI Tathastu"
+  },
+  {
+    "check": "Skills tour: spotlight eora-skills-list",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Skills tour: spotlight eora-skill-verification",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Skill detail badge indicates deep dive",
+    "passed": true,
+    "detail": "Skills Map | AI Tathastu"
+  },
+  {
+    "check": "Projects badge indicates portfolio evidence",
+    "passed": true,
+    "detail": "Projects Workspace | AI Tathastu"
+  },
+  {
+    "check": "Projects tour: spotlight eora-projects-list",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Projects tour: spotlight eora-contribution-note",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "New project created and persisted",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Roadmap badge indicates learning trajectory",
+    "passed": true,
+    "detail": "Career Learning Roadmap | AI Tathastu"
+  },
+  {
+    "check": "Roadmap tour: spotlight eora-roadmap-milestones",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Roadmap tour: spotlight eora-roadmap-next",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Connections badge indicates digital footprint",
+    "passed": true,
+    "detail": "Digital Footprints & Connections | AI Tathastu"
+  },
+  {
+    "check": "Connections tour: spotlight eora-connections-grid",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Connections tour: spotlight eora-connection-github",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Connections tour: spotlight eora-sync-history",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Verification badge indicates evidence audit",
+    "passed": true,
+    "detail": "Evidence Verification Queue | AI Tathastu"
+  },
+  {
+    "check": "Verification tour: spotlight eora-verification-queue",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "Verification tour: spotlight eora-verification-action",
+    "passed": true,
+    "detail": "spotlight active"
+  },
+  {
+    "check": "No trigger collision: 768px Student Workspace",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Panel responsive containment: 768px Panel",
+    "passed": true,
+    "detail": "{\"ok\":true,\"width\":252.19998168945312,\"left\":487.8999938964844,\"right\":740.0999755859375,\"innerWidth\":768}"
+  },
+  {
+    "check": "No trigger collision: 390px Student Workspace",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Panel responsive containment: 390px Panel",
+    "passed": true,
+    "detail": "{\"ok\":true,\"width\":291,\"left\":82.5,\"right\":373.5,\"innerWidth\":390}"
+  },
+  {
+    "check": "No trigger collision: 320px Student Workspace",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Panel responsive containment: 320px Panel",
+    "passed": true,
+    "detail": "{\"ok\":true,\"width\":276.45001220703125,\"left\":29.274993896484375,\"right\":305.7250061035156,\"innerWidth\":320}"
+  },
+  {
+    "check": "Hinglish toggle button responsive",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Quiet mode selectable",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Quiet mode pauses avatar motion",
+    "passed": true,
+    "detail": "none"
+  },
+  {
+    "check": "Escape key closes help panel",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Zero uncaught JavaScript console errors",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Zero 5xx server responses",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "check": "Zero routine LLM API requests across entire journey",
+    "passed": true,
+    "detail": "LLM Requests count: 0"
+  }
+]

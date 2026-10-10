@@ -91,11 +91,13 @@ export function processUserInput(
   // 3. Handle dismiss/pause immediately
   if (
     intentResult.intent === "DISMISS_ASSISTANT" ||
-    intentResult.intent === "PAUSE_ASSISTANT"
+    intentResult.intent === "DISMISS" ||
+    intentResult.intent === "PAUSE_ASSISTANT" ||
+    intentResult.intent === "QUIET_MODE"
   ) {
     return {
       type: "USER_INTENT_RESPONSE",
-      message: getIntentResponse(intentResult.intent, context),
+      message: getIntentResponse(intentResult.intent, context, intentResult.params),
       isProactive: false,
     };
   }
@@ -104,7 +106,7 @@ export function processUserInput(
   // User asked explicitly → always respond
 
   // 5. Generate intent-based response
-  const responseMessage = getIntentResponse(intentResult.intent, context);
+  const responseMessage = getIntentResponse(intentResult.intent, context, intentResult.params);
 
   // 6. Output safety check
   const outputSafety = checkOutputSafety(responseMessage.text);

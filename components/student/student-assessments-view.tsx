@@ -127,6 +127,7 @@ export function StudentAssessmentsView() {
       {/* Empty State */}
       {!loading && !error && assessments.length === 0 && (
         <div
+          data-eora-id="eora-assessments-list"
           style={{
             textAlign: "center",
             padding: "50px 24px",
@@ -160,7 +161,7 @@ export function StudentAssessmentsView() {
 
       {/* Assessment List */}
       {!loading && !error && assessments.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div data-eora-id="eora-assessments-list" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {assessments.map((att) => (
             <div
               key={att.id}
@@ -216,6 +217,7 @@ export function StudentAssessmentsView() {
 
                 {att.results && att.results.length > 0 && att.results[0].overallResult && (
                   <div
+                    data-eora-id="eora-assessments-scores"
                     style={{
                       background: "rgba(89, 66, 220, 0.08)",
                       border: "1px solid rgba(89, 66, 220, 0.2)",

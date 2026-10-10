@@ -118,7 +118,7 @@ export function StudentJourneyView() {
         </div>
       </div>
 
-      <div className="journey-timeline-card">
+      <div className="journey-timeline-card" data-eora-id="eora-journey-timeline">
         {sortedEvents.length === 0 ? (
           <div className="empty-timeline-state">
             <p>No events recorded matching this filter.</p>

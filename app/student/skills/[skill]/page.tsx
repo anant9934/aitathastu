@@ -223,7 +223,7 @@ export default function SkillDetailPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {/* Why Tathastu Thinks This */}
-            <section style={{ padding: 24, borderRadius: 16, background: "#FFFFFF", border: "1.5px solid #EDE9FE", boxShadow: "0 2px 8px rgba(89, 66, 220, 0.04)" }}>
+            <section data-eora-id="eora-skill-detail-card" style={{ padding: 24, borderRadius: 16, background: "#FFFFFF", border: "1.5px solid #EDE9FE", boxShadow: "0 2px 8px rgba(89, 66, 220, 0.04)" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
                 <Sparkles size={20} color="#5942DC" style={{ marginTop: 2, flexShrink: 0 }} />
                 <div>
@@ -326,7 +326,7 @@ export default function SkillDetailPage() {
 
             {/* Supporting Evidence Records */}
             {data.evidenceItems.length > 0 && (
-              <section style={{ padding: 24, borderRadius: 16, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+              <section data-eora-id="eora-skill-detail-evidence" style={{ padding: 24, borderRadius: 16, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
                 <h2 style={{ fontSize: 16, fontWeight: 800, color: "#171626", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                   <ShieldCheck size={18} color="#059669" />
                   Supporting Evidence Records ({data.evidenceItems.length})
@@ -384,7 +384,7 @@ export default function SkillDetailPage() {
             )}
 
             {/* Recommended Learning Path */}
-            <section style={{ padding: 24, borderRadius: 16, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+            <section data-eora-id="eora-skill-detail-learning" style={{ padding: 24, borderRadius: 16, background: "#FFFFFF", border: "1px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
               <h2 style={{ fontSize: 16, fontWeight: 800, color: "#171626", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                 <BookOpen size={18} color="#5942DC" /> Recommended Actions in Ecosystem
               </h2>

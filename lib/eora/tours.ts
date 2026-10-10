@@ -220,18 +220,39 @@ export const TOUR_REGISTRY: TourDefinition[] = [
   },
 ];
 
+import { getAllPageContracts } from "./page-registry";
+
 /**
- * Looks up a tour by ID.
+ * Returns all registered tours across the core system and Universal Page Intelligence.
+ */
+export function getAllTours(): TourDefinition[] {
+  const pageTours = getAllPageContracts().map((c) => c.guidedTour);
+  const combined = [...TOUR_REGISTRY];
+  for (const pt of pageTours) {
+    if (!combined.some((t) => t.tourId === pt.tourId)) {
+      combined.push(pt);
+    }
+  }
+  return combined;
+}
+
+/**
+ * Looks up a tour by ID across all registered tours.
  */
 export function getTourById(tourId: string): TourDefinition | null {
-  return TOUR_REGISTRY.find((t) => t.tourId === tourId) ?? null;
+  return getAllTours().find((t) => t.tourId === tourId) ?? null;
 }
 
 /**
  * Returns all tours valid for a given route.
  */
 export function getToursForRoute(route: string): TourDefinition[] {
-  return TOUR_REGISTRY.filter((t) => route.startsWith(t.validRoute));
+  return getAllTours().filter((t) => {
+    if (t.validRoute === "/") {
+      return route === "/" || route === "";
+    }
+    return route.startsWith(t.validRoute);
+  });
 }
 
 /**

@@ -12,6 +12,7 @@
 import type { EoraContext, OnboardingStep } from "./context";
 import type { EoraAnimationState } from "./identity";
 import type { EoraIntent } from "./intent";
+import { getPageContract } from "./page-registry";
 
 export interface EoraMessage {
   text: string;
@@ -162,7 +163,8 @@ export function getRouteWelcomeMessage(context: EoraContext): EoraMessage {
 
 export function getIntentResponse(
   intent: EoraIntent,
-  context: EoraContext
+  context: EoraContext,
+  params?: Record<string, string>
 ): EoraMessage {
   const name = context.student.displayName
     ? context.student.displayName.split(" ")[0]
@@ -170,9 +172,11 @@ export function getIntentResponse(
 
   switch (intent) {
     case "EXPLAIN_CURRENT_PAGE":
+    case "EXPLAIN_PAGE":
       return getRouteWelcomeMessage(context);
 
     case "EXPLAIN_CURRENT_FIELD":
+    case "EXPLAIN_COMPONENT":
       return {
         text: context.focusedField
           ? `This field is for "${context.focusedField.label}". ${
@@ -184,9 +188,16 @@ export function getIntentResponse(
 
     case "START_FULL_TOUR":
     case "START_PAGE_TOUR":
+    case "START_TOUR":
       return {
         text: "Starting your tour now! I'll highlight each section one by one. Press Next to continue.",
         animationState: "EXPLAINING",
+      };
+
+    case "STOP_TOUR":
+      return {
+        text: "Tour ended. You can explore freely or ask me questions anytime.",
+        animationState: "IDLE",
       };
 
     case "NEXT_TOUR_STEP":
@@ -205,6 +216,73 @@ export function getIntentResponse(
       return {
         text: "Here it is again. Take your time — no rush.",
         animationState: "EXPLAINING",
+      };
+
+    case "SIMPLIFY_EXPLANATION": {
+      const contract = getPageContract(context.route);
+      return {
+        text: `Simply put: ${contract.pagePurpose} Pick any action to get started!`,
+        animationState: "REASSURING",
+      };
+    }
+
+    case "HELP_WITH_FORM": {
+      const contract = getPageContract(context.route);
+      const fields = contract.importantFormFields.map((f) => f.label).join(", ");
+      return {
+        text: fields
+          ? `I can help you fill this form. Key fields: ${fields}. Click any field to see instructions.`
+          : "Fill in the required fields and I'll validate them step by step.",
+        animationState: "WORKING",
+      };
+    }
+
+    case "EXPLAIN_ERROR":
+      return {
+        text: "Something didn't go as expected. Check your inputs or connection, and try again. I'm here to help you recover.",
+        animationState: "REASSURING",
+      };
+
+    case "EXPLAIN_RECOMMENDATION":
+      return {
+        text: `This recommendation is based on your target goal (${context.student.targetRole || "AI/ML role"}) and your current confirmed evidence.`,
+        animationState: "EXPLAINING",
+        actionUrl: "/student/roadmap",
+        actionLabel: "View roadmap",
+      };
+
+    case "EXPLAIN_EVIDENCE":
+      return {
+        text: "Evidence proves your capabilities. Verified evidence has faculty confirmation; self-reported or repo links are starting points.",
+        animationState: "EXPLAINING",
+        actionUrl: "/verification",
+        actionLabel: "View verification",
+      };
+
+    case "HELP_WITH_PROJECT":
+      return {
+        text: "To add a project, include: project title, concise summary, problem solved, tech stack, and your personal contribution.",
+        animationState: "WORKING",
+        actionUrl: "/student/projects",
+        actionLabel: "Go to projects",
+      };
+
+    case "HELP_WITH_SKILL":
+      return {
+        text: "Add skills you have hands-on experience with, and attach project evidence to verify them.",
+        animationState: "EXPLAINING",
+        actionUrl: "/student/skills",
+        actionLabel: "Go to skills",
+      };
+
+    case "HELP_WITH_ROADMAP":
+      return {
+        text: context.student.targetRole
+          ? `Your roadmap guides you step-by-step toward ${context.student.targetRole}. Each milestone has verified evidence criteria.`
+          : "Set your target role to unlock a tailored roadmap.",
+        animationState: "POINTING",
+        actionUrl: "/student/roadmap",
+        actionLabel: "Open roadmap",
       };
 
     case "SHOW_ACTUAL_SKILLS":
@@ -255,6 +333,7 @@ export function getIntentResponse(
       };
 
     case "CONNECT_SOURCE_HELP":
+    case "EXPLAIN_CONNECTION":
       return {
         text: "You can connect GitHub and other developer profiles in your Profile page. Click 'Connect' next to the source you want to add.",
         animationState: "EXPLAINING",
@@ -281,36 +360,55 @@ export function getIntentResponse(
       };
 
     case "PAUSE_ASSISTANT":
+    case "QUIET_MODE":
       return {
         text: "Got it! I'll stay quiet. Click me anytime when you need help.",
         animationState: "QUIET",
       };
 
     case "DISMISS_ASSISTANT":
+    case "DISMISS":
       return {
         text: "Closing for now. You can bring me back from the toolbar anytime.",
         animationState: "EXITING",
       };
 
     case "RESUME_ASSISTANT":
+    case "RESUME":
       return {
         text: `Hey ${name}! I'm back. What can I help with?`,
         animationState: "WAVING",
       };
 
     case "SWITCH_LANGUAGE":
+      if (params?.targetLanguage === "hinglish") {
+        return {
+          text: "Haan bilkul! Main Hinglish me guide karne ke liye taiyaar hoon. Boliye, kis cheez me madad chahiye?",
+          animationState: "HAPPY",
+        };
+      }
       return {
         text: "I'll do my best in both English and Hinglish! Just talk to me naturally.",
         animationState: "HAPPY",
       };
 
+    case "NAVIGATE":
     case "OPEN_RELEVANT_SECTION":
+      if (params?.targetRoute) {
+        return {
+          text: `Heading over to ${params.targetRoute}. Let's go!`,
+          animationState: "POINTING",
+          actionUrl: params.targetRoute,
+          actionLabel: "Navigate",
+        };
+      }
       return {
         text: "I can navigate you there. Which section did you want to open?",
         animationState: "POINTING",
       };
 
     case "UNKNOWN_INTENT":
+    case "UNKNOWN":
     default:
       return {
         text: "I'm not sure I caught that. Try asking: 'Show my roadmap', 'Start a tour', or 'What should I do next?'",

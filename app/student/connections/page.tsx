@@ -396,6 +396,7 @@ export default function ConnectionsPage() {
             </div>
           ) : (
             <div
+              data-eora-id="eora-connections-grid"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
@@ -405,6 +406,7 @@ export default function ConnectionsPage() {
               {connectors.map((conn) => (
                 <div
                   key={conn.provider}
+                  data-eora-id={conn.provider === "github" ? "eora-connection-github" : undefined}
                   style={{
                     padding: 20,
                     borderRadius: 14,
@@ -692,30 +694,31 @@ export default function ConnectionsPage() {
         </section>
 
         {/* Recent Synchronization History */}
-        {syncRuns.length > 0 && (
-          <section
+        <section
+          data-eora-id="eora-sync-history"
+          style={{
+            padding: 24,
+            borderRadius: 16,
+            background: "#FFFFFF",
+            border: "1px solid #E5E7EB",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+          }}
+        >
+          <h2
             style={{
-              padding: 24,
-              borderRadius: 16,
-              background: "#FFFFFF",
-              border: "1px solid #E5E7EB",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+              fontSize: 16,
+              fontWeight: 700,
+              color: "#171626",
+              marginBottom: 16,
+              marginTop: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            <h2
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#171626",
-                marginBottom: 16,
-                marginTop: 0,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <RefreshCw className="w-4 h-4" style={{ color: "#5942DC" }} /> Recent Sync Runs
-            </h2>
+            <RefreshCw className="w-4 h-4" style={{ color: "#5942DC" }} /> Recent Sync Runs
+          </h2>
+          {syncRuns.length > 0 ? (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", textAlign: "left", fontSize: 13, borderCollapse: "collapse" }}>
                 <thead>
@@ -763,8 +766,12 @@ export default function ConnectionsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
-        )}
+          ) : (
+            <p style={{ fontSize: 13, color: "#6B7280", margin: 0 }}>
+              No sync records yet. Connect GitHub or add profile links to record activity.
+            </p>
+          )}
+        </section>
       </main>
 
       {/* Profile Reference Modal */}

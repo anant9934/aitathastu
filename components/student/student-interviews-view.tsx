@@ -127,6 +127,7 @@ export function StudentInterviewsView() {
       {/* Empty State */}
       {!loading && !error && interviews.length === 0 && (
         <div
+          data-eora-id="eora-interviews-list"
           style={{
             textAlign: "center",
             padding: "50px 24px",
@@ -160,7 +161,7 @@ export function StudentInterviewsView() {
 
       {/* Interview Sessions List */}
       {!loading && !error && interviews.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div data-eora-id="eora-interviews-list" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {interviews.map((ses) => (
             <div
               key={ses.id}

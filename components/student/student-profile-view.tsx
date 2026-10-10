@@ -104,7 +104,7 @@ export function StudentProfileView() {
   return (
     <div className="student-home-view" style={{ maxWidth: 980, margin: "0 auto", paddingBottom: 60 }}>
       {/* Profile Header Hero */}
-      <section className="ws-hero-card" style={{ padding: "32px 30px" }}>
+      <section data-eora-id="eora-profile-header" className="ws-hero-card" style={{ padding: "32px 30px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <div
@@ -260,7 +260,7 @@ export function StudentProfileView() {
         </div>
 
         {/* Pathway Direction Card */}
-        <div className="ws-content-card" style={{ padding: "24px 22px" }}>
+        <div data-eora-id="eora-profile-goals" className="ws-content-card" style={{ padding: "24px 22px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
             <Target size={18} color="#5942dc" />
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--ink)" }}>Active Direction</h2>
@@ -364,7 +364,7 @@ export function StudentProfileView() {
       </div>
 
       {/* Evidence Ledger Section */}
-      <section className="ws-content-card" style={{ marginTop: 22, padding: "26px 24px" }}>
+      <section data-eora-id="eora-profile-evidence" className="ws-content-card" style={{ marginTop: 22, padding: "26px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14, marginBottom: 20 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

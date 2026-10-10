@@ -51,7 +51,7 @@ function SignInContent() {
   };
 
   return (
-    <div className="auth-card">
+    <div className="auth-card" data-eora-id="eora-signin-card">
       <div className="auth-header">
         <div className="auth-eyebrow">
           <Sparkles size={14} />
@@ -140,6 +140,7 @@ function SignInContent() {
 
         <a
           href={`/api/auth/google/start?from=${encodeURIComponent(from)}`}
+          data-eora-id="eora-signin-oauth"
           className="auth-google-btn"
           style={{
             display: "flex",

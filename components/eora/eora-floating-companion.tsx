@@ -32,6 +32,7 @@ import { useEoraSafe } from "./eora-provider";
 import { EoraSpeechBubble } from "./eora-speech-bubble";
 import { getEoraAsset } from "@/lib/eora/avatar-registry";
 import { EoraMotionAvatar } from "./eora-motion-avatar";
+import { getPageContract } from "@/lib/eora/page-registry";
 
 type Placement = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
@@ -218,14 +219,11 @@ export function EoraFloatingCompanion() {
 
   // ── Compute quick actions for current route ────────────────────────────────
   const route = eora.context.route;
+  const pageContract = getPageContract(route);
   const isStudentArea = route.startsWith("student");
   const isOnboarding = route === "onboarding";
-  const tourAvailable = [
-    "student-home", "student-skills", "student-projects",
-    "student-roadmap", "onboarding",
-  ].includes(route);
 
-  // Tour ID mapping
+  // Tour ID mapping with page contract fallback
   const tourIdForRoute: Record<string, string> = {
     "student-home": "student-home",
     "student-skills": "student-skills",
@@ -233,6 +231,8 @@ export function EoraFloatingCompanion() {
     "student-roadmap": "student-roadmap",
     "onboarding": "onboarding-welcome",
   };
+  const activeTourId = pageContract?.guidedTour?.tourId || tourIdForRoute[route];
+  const tourAvailable = Boolean(activeTourId);
 
   // ── Full floating companion ────────────────────────────────────────────────
   return (
@@ -269,7 +269,13 @@ export function EoraFloatingCompanion() {
             <span className="eora-avatar-badge" aria-hidden="true">
               <Sparkles size={10} />
             </span>
+            {pageContract && (
+              <span className="eora-page-badge sr-only" data-page-id={pageContract.pageId}>
+                {pageContract.pageTitle}
+              </span>
+            )}
           </button>
+
 
           {/* Control row */}
           {eora.isPanelOpen && <div className="eora-ctrl-row" aria-label="EORA controls">
@@ -340,6 +346,25 @@ export function EoraFloatingCompanion() {
                   ? `Hi, ${eora.context.student.displayName?.split(" ")[0] ?? "there"}!`
                   : "Your AI Companion"}
               </span>
+              {pageContract && (
+                <span
+                  className="eora-page-badge eora-panel-page-badge"
+                  style={{
+
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                    background: "rgba(2, 197, 245, 0.12)",
+                    color: "#0284c7",
+                    border: "1px solid rgba(2, 197, 245, 0.25)",
+                    marginLeft: 6,
+                  }}
+                  title={pageContract.pagePurpose}
+                >
+                  {pageContract.pageTitle}
+                </span>
+              )}
             </div>
             <div className="eora-panel-header-actions">
               {tourAvailable && (
@@ -347,8 +372,7 @@ export function EoraFloatingCompanion() {
                   type="button"
                   className="eora-panel-btn"
                   onClick={() => {
-                    const tourId = tourIdForRoute[route];
-                    if (tourId) eora.startTour(tourId);
+                    if (activeTourId) eora.startTour(activeTourId);
                   }}
                   title="Start page tour"
                   aria-label="Start a guided tour of this page"
@@ -367,6 +391,30 @@ export function EoraFloatingCompanion() {
               </button>
             </div>
           </div>
+
+          {/* Universal Page Intelligence Summary */}
+          {pageContract && (
+            <div
+              className="eora-panel-explanation"
+              style={{
+                margin: "8px 12px",
+                padding: "8px 12px",
+                borderRadius: 8,
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                fontSize: 12,
+                lineHeight: 1.45,
+                color: "#e2e8f0",
+              }}
+            >
+              <div style={{ fontWeight: 700, color: "#38bdf8", marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
+                <Sparkles size={11} />
+                <span>{pageContract.pageTitle}</span>
+              </div>
+              <p style={{ margin: 0, opacity: 0.9 }}>{pageContract.pagePurpose}</p>
+            </div>
+          )}
+
 
           {eora.currentMessage.text && !eora.context.userIsFocused && (
             <EoraSpeechBubble
@@ -454,18 +502,50 @@ export function EoraFloatingCompanion() {
             <button
               type="button"
               className="eora-quick-btn"
+              onClick={() => eora.handleUserMessage("Explain this page")}
+            >
+              Explain page
+            </button>
+            <button
+              type="button"
+              className="eora-quick-btn"
               onClick={() => eora.handleUserMessage("What should I do next?")}
             >
               What&apos;s next?
             </button>
-            {isOnboarding && (
+            {pageContract?.suggestedNextActions && pageContract.suggestedNextActions.length > 0 && (
               <button
                 type="button"
                 className="eora-quick-btn"
-                onClick={() => eora.handleUserMessage("Explain this page")}
+                onClick={() => {
+                  const firstAction = pageContract.suggestedNextActions[0];
+                  if (firstAction.route) {
+                    window.location.assign(firstAction.route);
+                  } else {
+                    eora.handleUserMessage(firstAction.label);
+                  }
+                }}
               >
-                Explain step
+                {pageContract.suggestedNextActions[0].label}
               </button>
+            )}
+            {isOnboarding && (
+              <>
+                <button
+                  type="button"
+                  className="eora-quick-btn"
+                  onClick={() => eora.handleUserMessage("Explain this page")}
+                >
+                  Explain step
+                </button>
+                <button
+                  type="button"
+                  className="eora-quick-btn"
+                  onClick={() => eora.handleUserMessage("Explain this field")}
+                >
+                  Explain field
+                </button>
+              </>
             )}
             {isStudentArea && (
               <>
@@ -525,6 +605,14 @@ export function EoraFloatingCompanion() {
 
           {/* Settings row */}
           <div className="eora-panel-footer">
+            <button
+              type="button"
+              className="eora-footer-link"
+              onClick={() => eora.handleUserMessage("Explain in Hinglish")}
+              title="Switch language to Hinglish"
+            >
+              Hinglish
+            </button>
             <button
               type="button"
               className="eora-footer-link"

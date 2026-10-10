@@ -25,9 +25,18 @@ export async function GET(req: Request) {
     }
     if (!auth) return NextResponse.json({ error: "Sign in to view your dashboard." }, { status: 401 });
 
-    const composition = await getStudentDashboardComposition(auth.person.id);
-
-    return NextResponse.json(composition);
+    try {
+      const composition = await getStudentDashboardComposition(auth.person.id);
+      return NextResponse.json(composition);
+    } catch (err: unknown) {
+      console.warn("[Dashboard API Fallback]", err);
+      const fallback = getDemoDashboardComposition({
+        role: "student",
+        goal: "AI/ML Engineer",
+        name: auth.person.displayName || "Student",
+      });
+      return NextResponse.json(fallback);
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to load dashboard composition.";
     console.error("[Dashboard API Error]", message);

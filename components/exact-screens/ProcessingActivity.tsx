@@ -93,8 +93,15 @@ export function ProcessingActivity({
 
   if (visible.length === 0) return null;
 
-  // If hideWhenIdle is set and no visible jobs are running or relevant, omit
-  if (hideWhenIdle && visible.every((j) => j.status === "completed")) {
+  const hasActiveJobs = visible.some((j) => j.status === "queued" || j.status === "running");
+
+  // If no specific activeJobId is tracked, do not show historical terminal jobs when idle
+  if (!activeJobId && !hasActiveJobs) {
+    return null;
+  }
+
+  // If hideWhenIdle is set and no visible jobs are running or in progress, omit
+  if (hideWhenIdle && !hasActiveJobs) {
     return null;
   }
 

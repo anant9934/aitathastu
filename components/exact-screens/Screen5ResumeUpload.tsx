@@ -728,7 +728,9 @@ export function Screen5ResumeUpload({
               <button type="button" disabled={isBusy} onClick={saveReviewedClaims} style={{ background: isBusy ? "#94A3B8" : "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: isBusy ? "not-allowed" : "pointer" }}>Save selected claims</button>
               {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12 }}>Review saved</span>}
             </div>}
-            <ProcessingActivity source="resume" activeJobId={activeJobId} />
+            {Boolean(activeJobId) && processingState !== "IDLE" && (
+              <ProcessingActivity source="resume" activeJobId={activeJobId} />
+            )}
 
             <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, color: "#475569", fontSize: 12.5, lineHeight: 1.45 }}>
               <input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} />

@@ -304,7 +304,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       route === "sign-up"
     )
       return;
-    if (shouldEoraBeQuiet(context) || activeTour || !isVisible) return;
+    if (shouldEoraBeQuiet(context) || activeTour || !isVisible || isPanelOpen) return;
     if (isEoraSnoozed(preferences)) return;
 
     proactiveTimer.current = setTimeout(() => {
@@ -353,7 +353,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       if (proactiveTimer.current) clearTimeout(proactiveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, onboardingStep, lastSuccessfulAction, hasLiveStudentData, activeTour, isVisible]);
+  }, [pathname, onboardingStep, lastSuccessfulAction, hasLiveStudentData, activeTour, isVisible, isPanelOpen]);
 
   // ── Onboarding step change → EORA message ─────────────────────────────────
   useEffect(() => {
@@ -866,7 +866,10 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const expand = useCallback(() => setIsMinimized(false), []);
-  const openPanel = useCallback(() => setIsPanelOpen(true), []);
+  const openPanel = useCallback(() => {
+    if (proactiveTimer.current) clearTimeout(proactiveTimer.current);
+    setIsPanelOpen(true);
+  }, []);
   const closePanel = useCallback(() => setIsPanelOpen(false), []);
 
   const snoozeHandler = useCallback((minutes: number) => {

@@ -16,6 +16,33 @@ import {
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 
+export interface Screen8EducationEntry {
+  institution: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  graduationYear?: string;
+  gpa?: string;
+}
+
+export interface Screen8ProjectEntry {
+  title: string;
+  description: string;
+  technologies?: string[];
+  sources?: string[];
+  url?: string;
+  aiCategories?: string[];
+  status?: string;
+  contributionStatus?: string;
+}
+
+export interface Screen8TechCandidate {
+  name: string;
+  category?: string;
+  source: string;
+  provenance?: string;
+  sourceFile?: string;
+}
+
 export interface Screen8ProfileInsightsProps {
   studentName?: string;
   degree?: string;
@@ -25,8 +52,10 @@ export interface Screen8ProfileInsightsProps {
   location?: string;
   goal?: string;
   skills?: string[];
+  educationEntries?: Screen8EducationEntry[];
   projectsCount?: number;
-  projects?: Array<{ title: string; description: string }>;
+  projects?: Screen8ProjectEntry[];
+  technologyCandidates?: Screen8TechCandidate[];
   isGalleryMode?: boolean;
   onNext: () => void;
   onBack: () => void;
@@ -50,8 +79,10 @@ export function Screen8ProfileInsights({
   institution = "",
   year = "",
   skills = [],
+  educationEntries = [],
   projectsCount = 0,
   projects = [],
+  technologyCandidates = [],
   isGalleryMode = false,
   onNext,
   onBack,
@@ -387,37 +418,104 @@ export function Screen8ProfileInsights({
               {/* Tab 2: Education */}
               {activeTab === "education" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                      <div>
-                        <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>{[degree, specialization].filter(Boolean).join(" in ") || "Education not added"}</h4>
-                        <p style={{ fontSize: 13.5, color: "#64748B", margin: "2px 0 0" }}>{institution}</p>
+                  {educationEntries && educationEntries.length > 0 ? (
+                    educationEntries.map((edu, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: "16px 20px",
+                          borderRadius: 14,
+                          background: "#F8FAFC",
+                          border: "1px solid #E2E8F0",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            marginBottom: 4,
+                          }}
+                        >
+                          <div>
+                            <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                              {[edu.degree, edu.fieldOfStudy].filter(Boolean).join(" in ") || "Academic Qualification"}
+                            </h4>
+                            <p style={{ fontSize: 13.5, color: "#64748B", margin: "3px 0 0" }}>{edu.institution}</p>
+                          </div>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            {edu.gpa && (
+                              <span
+                                style={{
+                                  fontSize: 11.5,
+                                  fontWeight: 750,
+                                  color: "#059669",
+                                  background: "#ECFDF5",
+                                  border: "1px solid #A7F3D0",
+                                  padding: "3px 8px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                CGPA: {edu.gpa}
+                              </span>
+                            )}
+                            {edu.graduationYear && (
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: "#5642EF",
+                                  background: "#EDE9FE",
+                                  padding: "3px 10px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                {edu.graduationYear}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 10px", borderRadius: 6 }}>
-                        {year || "Year not added"}
-                      </span>
+                    ))
+                  ) : (
+                    <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                        <div>
+                          <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                            {[degree, specialization].filter(Boolean).join(" in ") || "Education not added"}
+                          </h4>
+                          <p style={{ fontSize: 13.5, color: "#64748B", margin: "2px 0 0" }}>{institution}</p>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 10px", borderRadius: 6 }}>
+                          {year || "Year not added"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
               {/* Tab 3: Experience */}
               {activeTab === "experience" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {isGalleryMode ? <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                      <div>
-                        <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>AI Research Contributor</h4>
-                        <p style={{ fontSize: 13, color: "#64748B", margin: "2px 0 0" }}>Applied ML Laboratory &bull; University Research Project</p>
+                  {isGalleryMode ? (
+                    <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                        <div>
+                          <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>AI Research Contributor</h4>
+                          <p style={{ fontSize: 13, color: "#64748B", margin: "2px 0 0" }}>Applied ML Laboratory &bull; University Research Project</p>
+                        </div>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>
+                          Verified
+                        </span>
                       </div>
-                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>
-                        Verified
-                      </span>
+                      <p style={{ fontSize: 13, color: "#475569", margin: "6px 0 0", lineHeight: 1.45 }}>
+                        Implemented deep learning models, benchmarked Transformer models vs CNN baselines, and contributed to research manuscript draft.
+                      </p>
                     </div>
-                    <p style={{ fontSize: 13, color: "#475569", margin: "6px 0 0", lineHeight: 1.45 }}>
-                      Implemented deep learning models, benchmarked Transformer models vs CNN baselines, and contributed to research manuscript draft.
-                    </p>
-                  </div> : <p style={{ color: "#64748B" }}>No experience has been confirmed yet.</p>}
+                  ) : (
+                    <p style={{ color: "#64748B" }}>No experience has been confirmed yet.</p>
+                  )}
                 </div>
               )}
 
@@ -436,28 +534,208 @@ export function Screen8ProfileInsights({
                         </span>
                       </div>
                     ))}
+                    {technologyCandidates &&
+                      technologyCandidates
+                        .filter((tc) => !displayedSkills.some((s) => s.toLowerCase() === tc.name.toLowerCase()))
+                        .map((tc) => (
+                          <div
+                            key={tc.name}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 14px",
+                              borderRadius: 10,
+                              background: "#F0FDF4",
+                              border: "1px solid #BBF7D0",
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontSize: 13.5, fontWeight: 750, color: "#166534" }}>{tc.name}</span>
+                              <span style={{ display: "block", fontSize: 10.5, color: "#15803D" }}>
+                                Observed in GitHub {tc.sourceFile ? `(${tc.sourceFile})` : ""}
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: "#16A34A",
+                                background: "#DCFCE7",
+                                padding: "2px 7px",
+                                borderRadius: 6,
+                              }}
+                            >
+                              Observed
+                            </span>
+                          </div>
+                        ))}
                   </div>
                 </div>
               )}
 
               {/* Tab 5: Projects */}
               {activeTab === "projects" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {isGalleryMode ? <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1E1B4B" }}>CoRXGB Classification</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>CNN + Bi-LSTM + XGBoost Ensemble</div>
-                    </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 8px", borderRadius: 6 }}>AI Impact 94</span>
-                  </div> : null}
-                  {isGalleryMode ? <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1E1B4B" }}>Medical Image Segmentation</div>
-                      <div style={{ fontSize: 12, color: "#64748B" }}>Vision Transformers &amp; OpenCV</div>
-                    </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 8px", borderRadius: 6 }}>AI Impact 88</span>
-                  </div> : null}
-                  {!isGalleryMode && (projects.length ? projects.map((project) => <div key={project.title} style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0" }}><strong>{project.title}</strong><div style={{ color: "#64748B" }}>{project.description}</div></div>) : <p style={{ color: "#64748B" }}>No projects confirmed yet.</p>)}
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {isGalleryMode ? (
+                    <>
+                      <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1E1B4B" }}>CoRXGB Classification</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>CNN + Bi-LSTM + XGBoost Ensemble</div>
+                        </div>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 8px", borderRadius: 6 }}>AI Impact 94</span>
+                      </div>
+                      <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 14.5, fontWeight: 800, color: "#1E1B4B" }}>Medical Image Segmentation</div>
+                          <div style={{ fontSize: 12, color: "#64748B" }}>Vision Transformers &amp; OpenCV</div>
+                        </div>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 8px", borderRadius: 6 }}>AI Impact 88</span>
+                      </div>
+                    </>
+                  ) : null}
+                  {!isGalleryMode && projects.length > 0 ? (
+                    projects.map((project, idx) => (
+                      <div
+                        key={project.title + idx}
+                        style={{
+                          padding: "16px 20px",
+                          borderRadius: 14,
+                          background: "#F8FAFC",
+                          border: "1px solid #E2E8F0",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            marginBottom: 6,
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                                {project.title}
+                              </h4>
+                              {project.sources && project.sources.includes("github") && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#1E293B",
+                                    background: "#E2E8F0",
+                                    padding: "2px 7px",
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  GitHub
+                                </span>
+                              )}
+                              {project.sources && project.sources.includes("resume") && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#1E40AF",
+                                    background: "#DBEAFE",
+                                    padding: "2px 7px",
+                                    borderRadius: 9999,
+                                  }}
+                                >
+                                  Resume
+                                </span>
+                              )}
+                              {project.aiCategories &&
+                                project.aiCategories.slice(0, 2).map((cat) => (
+                                  <span
+                                    key={cat}
+                                    style={{
+                                      fontSize: 10.5,
+                                      fontWeight: 700,
+                                      color: "#6D28D9",
+                                      background: "#F5F3FF",
+                                      border: "1px solid #DDD6FE",
+                                      padding: "1px 6px",
+                                      borderRadius: 6,
+                                    }}
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
+                            </div>
+                            <p style={{ fontSize: 13, color: "#475569", margin: "6px 0 10px", lineHeight: 1.45 }}>
+                              {project.description}
+                            </p>
+                          </div>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: project.status === "confirmed" ? "#059669" : "#4338CA",
+                              background: project.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                              border: `1px solid ${project.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                              padding: "3px 9px",
+                              borderRadius: 6,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {project.status === "confirmed" ? "Confirmed" : "Candidate"}
+                          </span>
+                        </div>
+
+                        {/* Tech pills & Repo link */}
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: 6,
+                            alignItems: "center",
+                            marginTop: 8,
+                          }}
+                        >
+                          {project.technologies?.map((tech) => (
+                            <span
+                              key={tech}
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: 650,
+                                color: "#4338CA",
+                                background: "#EEF2FF",
+                                border: "1px solid #C7D2FE",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                              }}
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                          {project.url && (
+                            <a
+                              href={project.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontSize: 11.5,
+                                color: "#2563EB",
+                                textDecoration: "none",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                marginLeft: "auto",
+                                fontWeight: 600,
+                              }}
+                            >
+                              <span>Repository</span> &rarr;
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    !isGalleryMode && <p style={{ color: "#64748B" }}>No projects confirmed yet.</p>
+                  )}
                 </div>
               )}
 

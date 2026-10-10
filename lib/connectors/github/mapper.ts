@@ -25,16 +25,27 @@ export type DiscoveredGitHubProject = {
   title: string;
   description: string;
   repositoryUrl: string;
+  homepageUrl?: string | null;
+  primaryLanguage?: string | null;
+  languages?: string[];
   technologies: string[];
+  technologyFindings?: import("./tech-detector").TechnologyFinding[];
+  aiMlCategories?: import("./tech-detector").AiMlProjectCategory[];
   stars: number;
+  forks?: number;
   isFork: boolean;
+  isArchived?: boolean;
   isPrivate: boolean;
   sources: string[];
   status: "candidate";
   provenance: string;
   checksum: string;
   detectedManifests: string[];
-  analysisStage: "metadata" | "manifest_verified" | "deep_inspected";
+  observedFiles?: string[];
+  studentContributionStatus?: "UNVERIFIED" | "STUDENT_CONFIRMED" | "GITHUB_ATTRIBUTED";
+  lastGitHubSyncAt?: string;
+  lastGitHubPushAt?: string;
+  analysisStage?: "metadata" | "manifest_verified" | "deep_inspected";
 };
 
 export type TechnologyConfig = {

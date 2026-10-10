@@ -133,6 +133,12 @@ export async function POST(req: Request) {
             sources: ["github"],
             status: "candidate",
             projectType: "software",
+            aiDetails: {
+              proposedSolution: proj.description || undefined,
+              categories: proj.aiMlCategories || [],
+              observedFiles: proj.observedFiles || [],
+              primaryLanguage: proj.primaryLanguage || null,
+            },
           });
 
           await createEvidenceRecord(personId, {

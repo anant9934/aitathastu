@@ -182,6 +182,9 @@ export interface AiMlDetailsRecord {
   results?: StructuredMetricResult[];
   limitations?: string;
   futureImprovements?: string;
+  categories?: string[];
+  observedFiles?: string[];
+  primaryLanguage?: string | null;
 }
 
 export interface HardwareDetailsRecord {

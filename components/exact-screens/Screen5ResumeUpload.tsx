@@ -50,6 +50,7 @@ interface Screen5ResumeUploadProps {
       extractedProfile?: ExtractedProfileData;
       discoveredProfiles?: Partial<Record<string, string>>;
       extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
+      extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; gpa?: string }>;
     }
   ) => Promise<boolean> | boolean;
   onNext: () => void;
@@ -89,6 +90,7 @@ export function Screen5ResumeUpload({
     extractedProfile?: ExtractedProfileData;
     discoveredProfiles?: Partial<Record<string, string>>;
     extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
+    extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; gpa?: string }>;
   }>({});
   // null = probing, true = gate open, false = gate closed
   const [ingestionReady, setIngestionReady] = useState<boolean | null>(null);
@@ -271,6 +273,7 @@ export function Screen5ResumeUpload({
         extractedProfile: data.extractedProfile,
         discoveredProfiles: data.discoveredProfiles,
         extractedProjects: Array.isArray(data.structured?.projects) ? data.structured.projects : [],
+        extractedEducation: Array.isArray(data.structured?.education) ? data.structured.education : [],
       });
       setCandidates(rows);
 

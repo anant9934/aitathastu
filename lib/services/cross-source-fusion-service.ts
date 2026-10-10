@@ -181,4 +181,69 @@ export class CrossSourceFusionService {
 
     return latest[0]?.versionNumber ?? 1;
   }
+
+  /**
+   * Cross-source deduplication and fusion for Project candidates.
+   * Matches Resume projects with GitHub projects while preserving both sources and claims.
+   */
+  static fuseProjectCandidates(
+    resumeProjects: CandidateProjectMatch[],
+    githubProjects: CandidateProjectMatch[]
+  ): Array<{
+    project: CandidateProjectMatch;
+    isFused: boolean;
+    matchResult?: FusionMatchResult;
+  }> {
+    const fusedList: Array<{
+      project: CandidateProjectMatch;
+      isFused: boolean;
+      matchResult?: FusionMatchResult;
+    }> = [];
+
+    const matchedGithubIndices = new Set<number>();
+
+    for (const resProj of resumeProjects) {
+      let matched = false;
+      for (let gIdx = 0; gIdx < githubProjects.length; gIdx++) {
+        if (matchedGithubIndices.has(gIdx)) continue;
+        const ghProj = githubProjects[gIdx];
+        const matchRes = this.matchProjects(resProj, ghProj);
+        if (matchRes.isMatch) {
+          matchedGithubIndices.add(gIdx);
+          matched = true;
+          fusedList.push({
+            project: {
+              title: matchRes.suggestedTitle,
+              source: "resume+github",
+              repositoryUrl: ghProj.repositoryUrl || resProj.repositoryUrl,
+              technologies: matchRes.combinedTechnologies,
+              description: resProj.description || ghProj.description,
+            },
+            isFused: true,
+            matchResult: matchRes,
+          });
+          break;
+        }
+      }
+
+      if (!matched) {
+        fusedList.push({
+          project: resProj,
+          isFused: false,
+        });
+      }
+    }
+
+    // Add remaining distinct GitHub projects
+    for (let gIdx = 0; gIdx < githubProjects.length; gIdx++) {
+      if (!matchedGithubIndices.has(gIdx)) {
+        fusedList.push({
+          project: githubProjects[gIdx],
+          isFused: false,
+        });
+      }
+    }
+
+    return fusedList;
+  }
 }

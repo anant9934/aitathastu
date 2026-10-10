@@ -204,18 +204,52 @@ export async function syncGitHubConnection(
         );
       }
       await saveProject(personId, {
-        title: project.title, summary: project.description || "GitHub repository candidate",
-        description: project.description || "", technologies: project.technologies || [],
-        sources: ["github"], repositoryUrl: project.repositoryUrl, status: "candidate",
+        title: project.title,
+        summary: project.description || "GitHub repository candidate",
+        description: project.description || "",
+        technologies: project.technologies || [],
+        sources: ["github"],
+        repositoryUrl: project.repositoryUrl,
+        demoUrl: project.homepageUrl || undefined,
+        status: "candidate",
+        aiDetails: {
+          categories: project.aiMlCategories || [],
+          observedFiles: project.observedFiles || [],
+          primaryLanguage: project.primaryLanguage || null,
+        },
       });
-      for (const skill of project.technologies || []) {
-        await createEvidenceRecord(personId, {
-          category: "skill", subject: skill, value: skill, source: "imported", verificationStatus: "unverified",
-          sourceReference: project.repositoryUrl,
-          interpretation: `Detected in the public repository ${project.title}; personal use and proficiency require review.`,
-          whyItMatters: "Repository technology metadata can point to a skill for student review.",
-          importKey: `github_skill_${project.id}_${skill.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-        });
+
+      if (project.technologyFindings && project.technologyFindings.length > 0) {
+        for (const finding of project.technologyFindings) {
+          const sourceRef = finding.sourceFile
+            ? `${project.repositoryUrl}#${finding.sourceFile}`
+            : project.repositoryUrl;
+          await createEvidenceRecord(personId, {
+            category: "skill",
+            subject: finding.name,
+            value: finding.name,
+            source: "imported",
+            verificationStatus: "unverified",
+            sourceReference: sourceRef,
+            interpretation: `Observed in ${project.title} (${finding.provenance.toLowerCase().replace(/_/g, " ")}${finding.sourceFile ? ` in ${finding.sourceFile}` : ""}). Evidence confidence: ${finding.confidence}. Personal proficiency requires review.`,
+            whyItMatters: "Repository technology metadata can point to a skill for student review.",
+            importKey: `github_skill_${project.id}_${finding.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          });
+        }
+      } else {
+        for (const skill of project.technologies || []) {
+          await createEvidenceRecord(personId, {
+            category: "skill",
+            subject: skill,
+            value: skill,
+            source: "imported",
+            verificationStatus: "unverified",
+            sourceReference: project.repositoryUrl,
+            interpretation: `Detected in public repository ${project.title}; personal use requires review.`,
+            whyItMatters: "Repository technology metadata can point to a skill for student review.",
+            importKey: `github_skill_${project.id}_${skill.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          });
+        }
       }
     }
 

@@ -11,7 +11,22 @@ interface Screen6DigitalFootprintsProps {
   discoveredResumeProfiles?: Partial<Record<string, string>>;
   onProfilesChange?: (profiles: Partial<Record<string, string>>) => void;
   onGitHubProjectsDiscovered?: (
-    projects: Array<{ id: string; title: string; description?: string; technologies?: string[]; url?: string }>
+    projects: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      technologies?: string[];
+      url?: string;
+      primaryLanguage?: string | null;
+      aiMlCategories?: string[];
+      technologyFindings?: Array<{
+        name: string;
+        category?: string;
+        sourceFile?: string;
+        confidence?: string;
+      }>;
+    }>,
+    technologies?: string[]
   ) => void;
   onNext: () => void;
   onBack: () => void;
@@ -22,6 +37,7 @@ export type FootprintHonestStatus =
   | "Not Connected"
   | "Profile Linked"
   | "Connected"
+  | "Public Data Imported"
   | "Importing"
   | "Import Completed"
   | "Review Required"
@@ -327,7 +343,11 @@ export function Screen6DigitalFootprints({
 
   const handleOpenPrompt = (platformId: string) => {
     setActivePrompt(platformId);
-    setInputVal(profiles[platformId] || "");
+    setInputVal(
+      profiles[platformId] ||
+        (!ignoredResumeCandidates.has(platformId) ? discoveredResumeProfiles?.[platformId] : "") ||
+        ""
+    );
     setStatusMessage(null);
     setErrorMessage(null);
     setUploadFile(null);
@@ -416,10 +436,15 @@ export function Screen6DigitalFootprints({
         });
         const data = await res.json();
         if (res.ok && Array.isArray(data.projects)) {
-          onGitHubProjectsDiscovered?.(data.projects);
-          setStatuses((prev) => ({ ...prev, [platformId]: "Connected" }));
-          setStatusMessage(`GitHub connected. Found ${data.projects.length} repository candidates for review.`);
+          onGitHubProjectsDiscovered?.(data.projects, data.technologies);
+          setStatuses((prev) => ({ ...prev, [platformId]: "Public Data Imported" }));
+          setStatusMessage(
+            `GitHub public data imported. Found ${data.projects.length} repository candidates and ${
+              data.technologies?.length || 0
+            } technologies.`
+          );
         } else {
+          setStatuses((prev) => ({ ...prev, [platformId]: "Import Failed" }));
           throw new Error(data.error || "GitHub import failed.");
         }
         const next = { ...profiles, [platformId]: `https://github.com/${cleanVal}` };
@@ -482,9 +507,9 @@ export function Screen6DigitalFootprints({
   };
 
   const connectedCount = Object.keys(profiles).filter((k) => Boolean(profiles[k])).length;
-  const connectedAccounts = Object.entries(statuses).filter(([_, s]) => s === "Connected").length;
-  const importedSources = Object.entries(statuses).filter(([_, s]) => s === "Import Completed" || s === "Review Required").length;
-  const linkedProfiles = Object.entries(statuses).filter(([k, s]) => Boolean(profiles[k]) && s !== "Connected" && s !== "Import Completed" && s !== "Review Required").length;
+  const connectedAccounts = Object.entries(statuses).filter(([_, s]) => s === "Connected" || s === "Public Data Imported").length;
+  const importedSources = Object.entries(statuses).filter(([_, s]) => s === "Import Completed" || s === "Review Required" || s === "Public Data Imported").length;
+  const linkedProfiles = Object.entries(statuses).filter(([k, s]) => Boolean(profiles[k]) && s !== "Connected" && s !== "Public Data Imported" && s !== "Import Completed" && s !== "Review Required").length;
   const activePlatform = platforms.find((p) => p.id === activePrompt);
 
   return (
@@ -990,7 +1015,7 @@ export function Screen6DigitalFootprints({
                       {activePlatform.id === "linkedin"
                         ? "Connect via profile link or import student-authorized export archive (Positions.csv / export.json)."
                         : activePlatform.id === "github"
-                        ? "Connect authorized GitHub profile to inspect public repositories, READMEs, and tech stack."
+                        ? "Inspect public repositories, READMEs, manifests (package.json, requirements.txt, pyproject.toml, etc.) and AI/ML project architecture. No private code accessed or executed."
                         : activePlatform.id === "portfolio"
                         ? "SSRF-protected public metadata and project links extraction."
                         : "Permitted public data acquisition. Unverified signals will be recorded for your review."}
@@ -1098,12 +1123,20 @@ export function Screen6DigitalFootprints({
                     {isSyncing ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        <span>Syncing...</span>
+                        <span>{activePlatform.id === "github" ? "Importing Repositories..." : "Syncing..."}</span>
                       </>
                     ) : (
                       <>
                         <Check size={16} strokeWidth={2.5} />
-                        <span>{uploadFile ? "Import & Extract" : "Save & Connect"}</span>
+                        <span>
+                          {activePlatform.id === "github"
+                            ? profiles[activePrompt] && statuses[activePrompt] === "Public Data Imported"
+                              ? "Refresh Public Data"
+                              : "Import Public GitHub Data"
+                            : uploadFile
+                            ? "Import & Extract"
+                            : "Save & Connect"}
+                        </span>
                       </>
                     )}
                   </button>

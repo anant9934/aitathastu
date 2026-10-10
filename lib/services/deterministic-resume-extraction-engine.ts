@@ -23,10 +23,14 @@ export interface ExtractedAcademicInfo {
   institution: string;
   degree: string;
   specialization?: string;
+  startDate?: string;
+  endDate?: string;
   currentYear?: string;
   expectedGraduationYear?: number;
   graduationYear?: string;
   gpa?: string;
+  percentage?: string;
+  academicLevel?: "undergraduate" | "postgraduate" | "doctorate" | "diploma" | "high_school" | "other";
   sourceSpan: string;
 }
 
@@ -122,7 +126,7 @@ export const SECTION_REGISTRY_V3_9: SectionDefinition[] = [
   {
     id: "research",
     canonicalName: "Research & Publications",
-    pattern: /^(research|publications|papers|research papers|patents|selected publications|research\s*&\s*publications|research,\s*patents\s*&\s*books|research\s*&\s*patents|patents\s*&\s*books)$/i,
+    pattern: /^(research|publications|papers|research papers|patents|selected publications|research\s*&\s*publications|research\s*,\s*patents\s*&\s*books|research\s*&\s*patents|patents\s*&\s*books)$/i,
   },
   {
     id: "profiles",
@@ -141,6 +145,9 @@ function cleanLineForHeaderMatch(line: string): string {
   cleaned = cleaned.replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g, "$1$2");
   // Normalize fully spaced letters: "E D U C A T I O N" -> "EDUCATION"
   cleaned = cleaned.replace(/\b([A-Za-z]\s+){2,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ""));
+  // Normalize punctuation spacing
+  cleaned = cleaned.replace(/\s*,\s*/g, ", ");
+  cleaned = cleaned.replace(/\s*&\s*/g, " & ");
 
   return cleaned.trim();
 }
@@ -291,16 +298,22 @@ export function extractPersonalDetails(
 // 3. EDUCATION EXTRACTOR
 // ============================================================================
 
-const DEGREE_PATTERNS = [
-  { regex: /\b(B\.?\s*Tech(?:\.|nology)?(?:\s+in\s+[^,–—\n]+)?)\b/i, name: "B.Tech" },
-  { regex: /\b(B\.?\s*E\.?(?:\s+in\s+[^,–—\n]+)?)\b/i, name: "B.E." },
-  { regex: /\b(M\.?\s*Tech(?:\.|nology)?(?:\s+in\s+[^,–—\n]+)?)\b/i, name: "M.Tech" },
-  { regex: /\b(Bachelor\s+of\s+(?:Technology|Science|Engineering|Computer\s+Applications))(?:\s+in\s+[^,–—\n]+)?\b/i, name: "Bachelor's" },
-  { regex: /\b(Master\s+of\s+(?:Technology|Science|Engineering|Computer\s+Applications))(?:\s+in\s+[^,–—\n]+)?\b/i, name: "Master's" },
-  { regex: /\b(B\.?S\.?c?|B\.?C\.?A\.?)\b/i, name: "B.Sc" },
-  { regex: /\b(M\.?S\.?c?|M\.?C\.?A\.?)\b/i, name: "M.Sc" },
-  { regex: /\b(Ph\.?\s*D\.?|Doctor\s+of\s+Philosophy)\b/i, name: "Ph.D." },
-  { regex: /\b(High\s+School|Senior\s+Secondary|Intermediate|CBSE|ICSE)\b/i, name: "High School" },
+const DEGREE_PATTERNS: Array<{
+  regex: RegExp;
+  name: string;
+  level: "undergraduate" | "postgraduate" | "doctorate" | "diploma" | "high_school" | "other";
+}> = [
+  { regex: /\b(Ph\.?\s*D\.?|Doctor\s+of\s+Philosophy)\b/i, name: "Ph.D.", level: "doctorate" },
+  { regex: /\b(M\.?\s*Tech(?:\.|nology)?(?:\s+in\s+[^,–—\n]+)?)\b/i, name: "M.Tech", level: "postgraduate" },
+  { regex: /\b(Master\s+of\s+(?:Technology|Science|Engineering|Computer\s+Applications|Business\s+Administration))(?:\s+in\s+[^,–—\n]+)?\b/i, name: "Master's", level: "postgraduate" },
+  { regex: /\b(M\.?S\.?c?|M\.?C\.?A\.?|M\.?B\.?A\.?)\b/i, name: "M.Sc", level: "postgraduate" },
+  { regex: /\b(B\.?\s*Tech(?:\.|nology)?(?:\s+in\s+[^,–—\n]+)?)\b/i, name: "B.Tech", level: "undergraduate" },
+  { regex: /\b(B\.?\s*E\.?(?:\s+in\s+[^,–—\n]+)?)\b/i, name: "B.E.", level: "undergraduate" },
+  { regex: /\b(Bachelor\s+of\s+(?:Technology|Science|Engineering|Computer\s+Applications))(?:\s+in\s+[^,–—\n]+)?\b/i, name: "Bachelor's", level: "undergraduate" },
+  { regex: /\b(B\.?S\.?c?|B\.?C\.?A\.?|B\.?B\.?A\.?|B\.?Com)\b/i, name: "B.Sc", level: "undergraduate" },
+  { regex: /\b(Diploma(?:\s+in\s+[^,–—\n]+)?|Polytechnic)\b/i, name: "Diploma", level: "diploma" },
+  { regex: /\b(Senior\s+Secondary(?:\s*\([^)]+\))?|Class\s*(?:XII|12(?:th)?)|Intermediate|CBSE\s*\(?Class\s*XII\)?|ICSE\s*\(?Class\s*XII\)?|Higher\s+Secondary|12th\s+Grade)\b/i, name: "Senior Secondary (Class XII)", level: "high_school" },
+  { regex: /\b(Secondary\s+School(?:\s*\([^)]+\))?|Class\s*(?:X|10(?:th)?)|Matriculation|CBSE\s*\(?Class\s*X\)?|ICSE\s*\(?Class\s*X\)?|High\s+School\s+Diploma|10th\s+Grade)\b/i, name: "Secondary (Class X)", level: "high_school" },
 ];
 
 const INSTITUTION_KEYWORDS = [
@@ -320,21 +333,31 @@ const INSTITUTION_KEYWORDS = [
   "Berkeley",
   "Carnegie Mellon",
   "Polytechnic",
+  "Public School",
+  "Vidya Mandir",
+  "Central School",
+  "Kendriya Vidyalaya",
+  "Junior College",
+  "Inter College",
+  "DPS",
+  "DAV",
 ];
 
 export function extractEducationEntries(lines: string[]): ExtractedAcademicInfo[] {
   const entries: ExtractedAcademicInfo[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.length < 5) continue;
+    const line = lines[i]?.trim();
+    if (!line || line.length < 5) continue;
 
     // Look for degree match
     let detectedDegree = "";
+    let detectedLevel: ExtractedAcademicInfo["academicLevel"] = undefined;
     for (const deg of DEGREE_PATTERNS) {
       const match = line.match(deg.regex);
       if (match) {
         detectedDegree = match[1] || deg.name;
+        detectedLevel = deg.level;
         break;
       }
     }
@@ -342,7 +365,7 @@ export function extractEducationEntries(lines: string[]): ExtractedAcademicInfo[
     // Look for institution match
     let detectedInst = "";
     for (const inst of INSTITUTION_KEYWORDS) {
-      if (new RegExp(`\\b${inst}\\b`, "i").test(line)) {
+      if (new RegExp(`\\b${escapeRegex(inst)}\\b`, "i").test(line)) {
         detectedInst = inst;
         break;
       }
@@ -351,53 +374,81 @@ export function extractEducationEntries(lines: string[]): ExtractedAcademicInfo[
     // If degree or institution found, build entry with lookahead
     if (detectedDegree || detectedInst) {
       const blockLines = [line];
-      for (let j = i + 1; j < Math.min(lines.length, i + 3); j++) {
-        const nextLine = lines[j];
+      for (let j = i + 1; j < Math.min(lines.length, i + 4); j++) {
+        const nextLine = lines[j]?.trim();
+        if (!nextLine || nextLine.length < 3) continue;
+
+        const isNewBullet = /^[•*–—\-]\s*[A-Za-z]/.test(nextLine);
         const nextHasDegree = DEGREE_PATTERNS.some((d) => d.regex.test(nextLine));
-        const nextHasInst = INSTITUTION_KEYWORDS.some((inst) => new RegExp(`\\b${inst}\\b`, "i").test(nextLine));
+        // Strip degree terms so that phrases like "Secondary School" or "High School Diploma" are not mistaken for an institution name
+        const lineWithoutDegree = nextLine.replace(/\b(?:Secondary\s+School|Senior\s+Secondary(?:\s+School)?|High\s+School\s+Diploma|Bachelor|Master|Doctor)\b/gi, "");
+        const nextHasInst = INSTITUTION_KEYWORDS.some((inst) => new RegExp(`\\b${escapeRegex(inst)}\\b`, "i").test(lineWithoutDegree));
+
+        // If next line introduces a brand new distinct bullet entry or both degree + institution, stop grouping
+        if (isNewBullet && (nextHasInst || nextHasDegree)) break;
+        if (nextHasDegree && nextHasInst) break;
+
         // If current line only had institution and next line provides the degree, group them!
-        if (detectedInst && !detectedDegree && nextHasDegree && !nextHasInst) {
+        if (detectedInst && !detectedDegree && nextHasDegree) {
           blockLines.push(nextLine);
           const degMatch = DEGREE_PATTERNS.find((d) => d.regex.test(nextLine));
-          if (degMatch) detectedDegree = nextLine.match(degMatch.regex)?.[1] || degMatch.name;
+          if (degMatch) {
+            detectedDegree = nextLine.match(degMatch.regex)?.[1] || degMatch.name;
+            detectedLevel = degMatch.level;
+          }
           i = j; // advance outer loop
-          break;
+          continue;
         }
-        if (nextHasDegree || nextHasInst) break;
-        blockLines.push(nextLine);
+
+        // If next line has neither a new degree nor a new institution, it is metadata (dates/GPA/spec)
+        if (!nextHasDegree && !nextHasInst) {
+          blockLines.push(nextLine);
+          i = j;
+          continue;
+        }
+
+        break;
       }
 
       const combinedBlock = blockLines.join(", ");
 
       // Look for dates
-      const yearRange = combinedBlock.match(/\b(20\d\d)\s*[-–—to]+\s*(20\d\d|present|expected|current)\b/i);
+      const yearRange = combinedBlock.match(
+        /\b((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?20\d\d)\s*[-–—to]+\s*((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:20\d\d|present|expected|current))\b/i
+      );
       const singleYear = combinedBlock.match(/\b(20\d\d)\b/);
-      const gradYearStr = yearRange ? yearRange[2] : singleYear ? singleYear[1] : undefined;
+      const startDate = yearRange ? yearRange[1].trim() : undefined;
+      const endDate = yearRange ? yearRange[2].trim() : undefined;
+      const gradYearStr = endDate || (singleYear ? singleYear[1] : undefined);
       const gradYearNum = gradYearStr && /^\d{4}$/.test(gradYearStr) ? parseInt(gradYearStr, 10) : undefined;
 
       // Look for GPA / CGPA
       const gpaMatch =
-        combinedBlock.match(/\b(?:CGPA|GPA|Score|Percentage)\s*[:=\-]?\s*([0-9.]+(?:\s*\/\s*[0-9.]+)?%?)/i) ||
+        combinedBlock.match(/\b(?:CGPA|GPA|Score)\s*[:=\-]?\s*([0-9.]+(?:\s*\/\s*[0-9.]+)?)/i) ||
         combinedBlock.match(/\b([0-9]\.[0-9]{1,2}\s*\/\s*(?:10|4(?:\.0)?))\b/);
       const gpa = gpaMatch ? gpaMatch[1] : undefined;
 
+      // Look for Percentage
+      const pctMatch = combinedBlock.match(/\b(?:Percentage|Score)?\s*[:=\-]?\s*([0-9]{1,2}(?:\.[0-9]{1,2})?%)(?:\s|$|[,;|])/i);
+      const percentage = pctMatch ? pctMatch[1] : undefined;
+
       // Specialization
       const specMatch =
-        combinedBlock.match(/(?:B\.Tech|Degree|Engineering)\s*[,;]?\s*([A-Za-z\s&()]*?(?:Computer Science|AI|Machine Learning|Data Science|Information Technology)[A-Za-z\s&()]*?)(?:[;,\-–—]|\s+Aug|\s+20\d\d|$)/i) ||
+        combinedBlock.match(/(?:B\.Tech|Degree|Engineering|Secondary|Senior\s+Secondary)\s*[,;\-–—]?\s*([A-Za-z\s&()]*?(?:Computer Science|AI|Machine Learning|Data Science|Information Technology|Science|PCM|Commerce|Arts)[A-Za-z\s&()]*?)(?:[;,\-–—]|\s+Aug|\s+20\d\d|$)/i) ||
         combinedBlock.match(/\b(?:in|major in|specialization in)\s+([A-Za-z\s&()]{4,50})(?:[,–—;\n]|$)/i);
       const specialization = specMatch ? specMatch[1].trim() : undefined;
 
       const rawInst = detectedInst
-        ? (blockLines[0].split(/[,–—|]/).find((p) => new RegExp(detectedInst, "i").test(p))?.trim() || detectedInst)
+        ? (blockLines[0].split(/[,–—|]/).find((p) => new RegExp(escapeRegex(detectedInst), "i").test(p))?.trim() || detectedInst)
         : (blockLines[0].split(/[,–—|]/)[0]?.trim() || "University");
       const institution = rawInst.replace(/^[•*–—\-]\s*/, "").trim();
 
-      const degree = detectedDegree || "Bachelor's Degree";
+      const degree = detectedDegree || (detectedLevel === "high_school" ? "High School" : "Bachelor's Degree");
 
-      // Current Year inference
+      // Current Year inference (for ongoing college)
       let currentYear = "";
       if (yearRange && /present|current/i.test(yearRange[2])) {
-        const startYear = parseInt(yearRange[1], 10);
+        const startYear = parseInt(yearRange[1].slice(-4), 10);
         const currentYearNum = new Date().getFullYear();
         const diff = currentYearNum - startYear + 1;
         if (diff === 1) currentYear = "1st Year";
@@ -410,14 +461,18 @@ export function extractEducationEntries(lines: string[]): ExtractedAcademicInfo[
         institution: institution.slice(0, 100),
         degree: degree.slice(0, 100),
         specialization: specialization?.slice(0, 80),
+        startDate,
+        endDate,
         currentYear,
         expectedGraduationYear: gradYearNum,
         graduationYear: gradYearStr,
         gpa,
+        percentage,
+        academicLevel: detectedLevel,
         sourceSpan: combinedBlock.slice(0, 250),
       });
 
-      if (entries.length >= 4) break;
+      if (entries.length >= 6) break;
     }
   }
 
@@ -691,77 +746,201 @@ export function extractProjects(
 // 6. EXPERIENCE EXTRACTOR
 // ============================================================================
 
-export function extractExperience(lines: string[]): ResumeInterpretationOutput["experience"] {
+// ============================================================================
+// 6. EXPERIENCE EXTRACTOR
+// ============================================================================
+
+function detectExperienceTechs(text: string): string[] {
+  const techs: string[] = [];
+  for (const t of TECH_TAXONOMY_V3_9) {
+    const candidates = [t.name, ...(t.aliases || [])];
+    for (const cand of candidates) {
+      if (cand.length <= 2 && !t.requiresBoundary) continue;
+      if (new RegExp(`(?<![a-zA-Z0-9])${escapeRegex(cand)}(?![a-zA-Z0-9])`, "i").test(text)) {
+        techs.push(t.name);
+        break;
+      }
+    }
+  }
+  return techs;
+}
+
+function classifyExperienceRoleType(roleStr: string, descStr: string): "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other" {
+  const rLower = roleStr.toLowerCase();
+  if (/\b(?:intern|internship|trainee|apprentice)\b/i.test(rLower)) return "internship";
+  if (/\b(?:co-founder|founder|founding|co-founding|ceo|cto|coo)\b/i.test(rLower)) return "founder";
+  if (/\b(?:freelance|contractor|consultant)\b/i.test(rLower)) return "freelance";
+  if (/\b(?:volunteer|volunteering|community\s+organizer|ngo|mentor)\b/i.test(rLower)) return "volunteering";
+  if (/\b(?:president|vice\s+president|director|chair|head\s+of)\b/i.test(rLower)) return "leadership";
+  if (/\b(?:engineer|developer|scientist|analyst|architect|manager|specialist|officer|associate|member|programmer|designer)\b/i.test(rLower)) return "employment";
+
+  const combined = (roleStr + " " + descStr).toLowerCase();
+  if (/\b(?:intern|internship|trainee|apprentice)\b/i.test(combined)) return "internship";
+  if (/\b(?:co-founder|founder|founding|co-founding)\b/i.test(combined)) return "founder";
+  if (/\b(?:freelance|contractor|consultant)\b/i.test(combined)) return "freelance";
+  if (/\b(?:volunteer|volunteering|community\s+organizer|ngo|mentor)\b/i.test(combined)) return "volunteering";
+  if (/\b(?:president|vice\s+president|director|chair|head\s+of)\b/i.test(combined)) return "leadership";
+  return "employment";
+}
+
+export function extractExperience(
+  lines: string[],
+  projectTitles: string[] = []
+): ResumeInterpretationOutput["experience"] {
   const experiences: ResumeInterpretationOutput["experience"] = [];
+  const lowerProjectTitles = new Set(projectTitles.map((p) => p.toLowerCase().trim()));
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]?.trim();
     if (!line || line.length < 3) continue;
 
-    // Format A: Line starts with bullet and is a company header (e.g. "• Founders Verbinden Remote")
-    if (/^[•*–—\-]\s*[A-Za-z]/.test(line)) {
-      const companyClean = line
-        .replace(/^[•*–—\-]\s*/, "")
-        .replace(/\s+(?:Remote|Onsite|Hybrid|[A-Z][a-z]+,\s*[A-Z][a-z]+)$/i, "")
-        .trim();
+    // Check if line is a section header (e.g., "WORK EXPERIENCE", "EXPERIENCE")
+    if (ExtractionValidator.isHeadingOrNonProject(line)) continue;
 
-      let role = "";
+    // Ignore lines that match a known project title
+    const lineWithoutBullet = line.replace(/^[•*–—\-◦\d.]+\s*/, "").trim();
+    if (lowerProjectTitles.has(lineWithoutBullet.toLowerCase())) continue;
+
+    // Format A: Line starts with bullet and is a company header (e.g. "• Founders Verbinden Remote President Aug. 2025 – Present" or "• Tathastu AI Labs")
+    if (/^[•*–—\-]\s*[A-Za-z]/.test(line)) {
+      let lineText = line.replace(/^[•*–—\-]\s*/, "").trim();
       let duration: string | undefined;
+      let startDate: string | undefined;
+      let endDate: string | undefined;
+      let company = "";
+      let role = "";
       const highlights: string[] = [];
       let sourceSpan = line;
 
-      // Check next line for Role and Dates
-      if (i + 1 < lines.length && !/^[•*]/.test(lines[i + 1])) {
-        const next = lines[i + 1].trim();
-        const dateMatch = next.match(
-          /\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?\d{4}\s*[-–—to]+\s*(?:Present|Current|\d{4})\b/i
-        );
-        if (dateMatch) {
-          duration = dateMatch[0];
-          role = next.replace(dateMatch[0], "").trim().replace(/[-–—,|;]$/, "").trim();
-        } else {
-          role = next;
-        }
-        sourceSpan += " " + next;
-        i++; // advance past next line
+      // Check for inline date in this line
+      const inlineDateMatch = lineText.match(
+        /\b((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?\d{4})\s*[-–—to]+\s*((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:\d{4}|Present|Current))\b/i
+      );
+      if (inlineDateMatch) {
+        duration = inlineDateMatch[0];
+        startDate = inlineDateMatch[1].trim();
+        endDate = inlineDateMatch[2].trim();
+        lineText = lineText.replace(inlineDateMatch[0], "").trim();
       }
 
-      // Check subsequent lines for highlights (e.g. lines starting with ◦ or -)
-      while (i + 1 < lines.length && /^[◦\-]/.test(lines[i + 1].trim())) {
-        const hl = lines[i + 1].trim().replace(/^[◦\-:\s]+/, "").trim();
-        if (hl) highlights.push(hl);
+      // Strip location tokens (Remote, Onsite, Hybrid, city/state)
+      lineText = lineText.replace(/\s+(?:Remote|Onsite|Hybrid|[A-Z][a-z]+,\s*[A-Z][a-z]+)\b/i, " ").trim();
+
+      // Check if role keyword is inside lineText
+      const roleKeywordsRegex = /\b(?:(?:Senior|Junior|Principal|Staff|Lead|Associate)\s+)?(?:President|Vice\s+President|Co-Founder|Founder(?:\s*(?:&|\/)\s*(?:CEO|Builder))?|CEO|CTO|COO|Chief\s+[A-Za-z]+|Software\s+Engineer(?:\s+Intern)?|ML\s+Engineer|AI\s+Engineer|Data\s+Scientist|Research\s+(?:Scientist|Intern)|Resident|Intern|Lead|Developer|Consultant|Freelancer|Builder|Mentor|Teacher)\b/i;
+      const roleMatches = [...lineText.matchAll(new RegExp(roleKeywordsRegex.source, "gi"))];
+      // Pick the last matching role token (roles typically follow the organization name in inline headers)
+      const bestRoleMatch = roleMatches.length > 0 ? roleMatches[roleMatches.length - 1] : null;
+
+      if (bestRoleMatch && bestRoleMatch.index !== undefined) {
+        company = lineText.slice(0, bestRoleMatch.index).replace(/[,|–—\-]+$/, "").trim();
+        role = lineText.slice(bestRoleMatch.index).replace(/^[,|–—\-]+/, "").trim();
+      } else {
+        company = lineText;
+      }
+
+      // Check next line for Role and Dates if not found inline
+      if (!role && i + 1 < lines.length && !/^[•*]/.test(lines[i + 1].trim())) {
+        const next = lines[i + 1].trim();
+        if (!ExtractionValidator.isHeadingOrNonProject(next) && !next.startsWith(":") && !next.startsWith("\u000e")) {
+          const nextDateMatch = next.match(
+            /\b((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?\d{4})\s*[-–—to]+\s*((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:\d{4}|Present|Current))\b/i
+          );
+          if (nextDateMatch) {
+            duration = nextDateMatch[0];
+            startDate = nextDateMatch[1].trim();
+            endDate = nextDateMatch[2].trim();
+            role = next.replace(nextDateMatch[0], "").trim().replace(/[-–—,|;]$/, "").trim();
+          } else {
+            role = next;
+          }
+          sourceSpan += " " + next;
+          i++; // advance past next line
+        }
+      }
+
+      // Check subsequent lines for highlights (e.g. lines starting with ◦ or - or : or indented)
+      while (
+        i + 1 < lines.length &&
+        !/^[•*–—\-]\s*[A-Z]/.test(lines[i + 1].trim()) &&
+        !ExtractionValidator.isHeadingOrNonProject(lines[i + 1].trim())
+      ) {
+        const nextSubLine = lines[i + 1].trim();
+        const cleanedHl = nextSubLine.replace(/^[\u000e:◦\-*•\s]+/, "").trim();
+        if (cleanedHl.length > 5 && !lowerProjectTitles.has(cleanedHl.toLowerCase())) {
+          highlights.push(cleanedHl);
+        }
         i++;
       }
 
-      if (companyClean) {
+      if (company && !lowerProjectTitles.has(company.toLowerCase())) {
+        const combinedText = `${role} ${company} ${highlights.join(" ")}`;
+        const roleType = classifyExperienceRoleType(role, combinedText);
+        const techs = detectExperienceTechs(combinedText);
+
         experiences.push({
-          company: companyClean.slice(0, 80),
+          company: company.slice(0, 80),
           role: (role || "Member").slice(0, 80),
+          type: roleType,
           duration,
-          highlights: highlights.slice(0, 3),
+          startDate,
+          endDate,
+          highlights: highlights.slice(0, 5),
+          technologies: techs,
           sourceSpan: sourceSpan.slice(0, 250),
         });
       }
-      if (experiences.length >= 6) break;
+      if (experiences.length >= 8) break;
       continue;
     }
 
-    // Format B: Inline "Role at Company" or "Role, Company"
-    const parts = line.split(/[—–|,]|\sat\s|\s-\s/i).map((p) => p.trim()).filter(Boolean);
+    // Format B: Inline "Role at Company" or "Role, Company" or "Company | Role | Dates"
+    const dateMatch = line.match(
+      /\b((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?\d{4})\s*[-–—to]+\s*((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:\d{4}|Present|Current))\b/i
+    );
+    const lineWithoutDates = dateMatch ? line.replace(dateMatch[0], "").trim() : line;
+    const parts = lineWithoutDates.split(/[—–|,]|\sat\s|\s-\s/i).map((p) => p.trim()).filter(Boolean);
+
     if (parts.length >= 2) {
-      const role = parts[0];
-      const company = parts[1];
-      const dateMatch = line.match(/\b(?:20\d\d|present|current|intern|full[- ]time)\b/i);
+      let role = parts[0];
+      let company = parts[1];
+
+      // Disambiguate if first part looks like company and second part looks like role
+      if (/\b(?:Labs|Inc|Corp|LLC|Technologies|Solutions|AI|Startup|Verbinden|University|Studio)\b/i.test(parts[0]) &&
+          /\b(?:Intern|Engineer|Developer|Lead|Founder|Manager|Analyst)\b/i.test(parts[1])) {
+        company = parts[0];
+        role = parts[1];
+      }
+
+      if (lowerProjectTitles.has(company.toLowerCase())) continue;
+
+      const highlights: string[] = [];
+      // Look ahead for bulleted highlights
+      let lookahead = i + 1;
+      while (lookahead < lines.length && /^[◦\-•*]/.test(lines[lookahead].trim())) {
+        const hl = lines[lookahead].trim().replace(/^[◦\-•*:\s]+/, "").trim();
+        if (hl) highlights.push(hl);
+        lookahead++;
+      }
+      if (lookahead > i + 1) i = lookahead - 1;
+
+      const combinedText = `${role} ${company} ${highlights.join(" ")}`;
+      const roleType = classifyExperienceRoleType(role, combinedText);
+      const techs = detectExperienceTechs(combinedText);
 
       experiences.push({
         role: role.slice(0, 80),
         company: company.slice(0, 80),
+        type: roleType,
         duration: dateMatch ? dateMatch[0] : undefined,
-        highlights: [],
+        startDate: dateMatch ? dateMatch[1].trim() : undefined,
+        endDate: dateMatch ? dateMatch[2].trim() : undefined,
+        highlights: highlights.slice(0, 5),
+        technologies: techs,
         sourceSpan: line.slice(0, 250),
       });
 
-      if (experiences.length >= 6) break;
+      if (experiences.length >= 8) break;
     }
   }
 
@@ -791,7 +970,7 @@ export function extractCertifications(lines: string[]): ResumeInterpretationOutp
       sourceSpan: line.slice(0, 250),
     });
 
-    if (certs.length >= 6) break;
+    if (certs.length >= 8) break;
   }
 
   return certs;
@@ -812,38 +991,97 @@ export function extractAchievements(
   for (const line of combined) {
     if (!line || line.trim().length < 4) continue;
     const cleaned = line.replace(/^[•\-*–—\d.]+\s*/, "").trim();
-    const isSectionHeader = /^(research|patents?|books?|publications?|papers?|awards?|honors?|certifications?|achievements?|education|experience|technical\s*skills|skills|projects|selected\s*projects|work\s*experience|academic\s*projects)$/i.test(cleaned) ||
-      /^(research,\s*patents\s*&\s*books|research\s*&\s*publications|patents\s*&\s*books|honors\s*&\s*awards|awards\s*&\s*achievements)$/i.test(cleaned);
-    if (isSectionHeader) continue;
+    if (ExtractionValidator.isSectionHeading(cleaned)) continue;
 
     let category: "patent" | "publication" | "book" | "award" | "hackathon" | "honor" = "award";
-    if (/\b(patent|patent\s*application|patent\s*granted|indian\s*patent|us\s*patent)\b/i.test(cleaned)) {
+    let subType: string = "award";
+    let status: string = "awarded";
+
+    // 1. Patents (distinguish application vs granted)
+    if (/\b(?:patent|patent\s*application|patent\s*granted|indian\s*patent|us\s*patent|appl\.?\s*no|application\s*no)\b/i.test(cleaned)) {
       category = "patent";
-    } else if (/\b(book|book\s*chapter|isbn|monograph|co-authored\s*book)\b/i.test(cleaned)) {
+      if (/\b(?:granted|grant|issued|patent\s*no)\b/i.test(cleaned)) {
+        subType = "patent_granted";
+        status = "granted";
+      } else {
+        subType = "patent_application";
+        status = "application";
+      }
+    }
+    // 2. Books (distinguish co-author vs author)
+    else if (/\b(?:book|book\s*chapter|isbn|monograph|co-authored\s*book|author)\b/i.test(cleaned)) {
       category = "book";
-    } else if (/\b(publication|research\s*paper|published\s*in|conference|journal|ieee|springer|acm|arxiv|doi)\b/i.test(cleaned)) {
+      if (/\b(?:co-author|co-authored|contributing\s*author)\b/i.test(cleaned)) {
+        subType = "book_coauthor";
+      } else {
+        subType = "book";
+      }
+      status = "published";
+    }
+    // 3. Publications / Research Papers (distinguish published vs manuscript/under review)
+    else if (/\b(?:publication|research\s*paper|published\s*in|conference|journal|ieee|springer|acm|arxiv|doi|proceedings|manuscript|under\s*review)\b/i.test(cleaned)) {
       category = "publication";
-    } else if (/\b(hackathon|smart\s*india|finalist|contest|competition|codechef|leetcode)\b/i.test(cleaned)) {
+      if (/\b(?:manuscript|under\s*review|submitted|preprint|working\s*paper|draft)\b/i.test(cleaned)) {
+        subType = "manuscript";
+        status = "under_review";
+      } else {
+        subType = "published_paper";
+        status = "published";
+      }
+    }
+    // 4. Hackathons & Competitions
+    else if (/\b(?:hackathon|smart\s*india|finalist|contest|competition|codechef|leetcode|kaggle|winner|runner-up)\b/i.test(cleaned)) {
       category = "hackathon";
-    } else if (/\b(honor|award|scholarship|gold\s*medalist|distinction|rank\s*\d)\b/i.test(cleaned)) {
+      subType = "hackathon";
+      status = "awarded";
+    }
+    // 5. Honors & Awards
+    else if (/\b(?:honor|award|scholarship|gold\s*medalist|distinction|rank\s*\d|dean's\s*list)\b/i.test(cleaned)) {
       category = "honor";
+      subType = "award";
+      status = "awarded";
     }
 
     const dateMatch = cleaned.match(/\b(20\d\d)\b/);
-    const parts = cleaned.split(/[:|—–-]\s*/);
-    const hasLabelPrefix = parts.length > 1 && /^(patent|book|paper|publication|award|honor|hackathon)$/i.test(parts[0]);
-    const title = (hasLabelPrefix ? parts.slice(1).join(" — ") : parts[0] && parts[0].length >= 4 ? parts[0] : cleaned).slice(0, 150).trim();
-    const description = parts.length > 1 ? parts.slice(hasLabelPrefix ? 2 : 1).join(" — ").slice(0, 350).trim() || cleaned.slice(0, 350) : cleaned.slice(0, 350);
+
+    // Clean title by stripping leading tags like "Patent:", "Book:", "Paper:"
+    const titleClean = cleaned
+      .replace(/^(?:patent|book|paper|publication|honor|award|hackathon|competition|research\s*paper)\s*[:—–\-|]\s*/i, "")
+      .replace(/\s*[:|—–.\-]?\s*\b(?:Co[- ]?inventor|Co[- ]?author|Author|Applicant|Application\s+no|Published|Accepted|ISBN).*$/i, "")
+      .trim()
+      .replace(/[:.\s—–\-]+$/, "")
+      .slice(0, 150);
+
+    // Reject standalone names like "Book" or "Patent"
+    if (/^(?:book|books|patent|patents|publication|publications|paper|papers)$/i.test(titleClean)) {
+      continue;
+    }
+
+    // Issuer extraction
+    let issuer: string | undefined;
+    if (category === "patent") {
+      if (/indian\s*patent/i.test(cleaned)) issuer = "Indian Patent Office";
+      else if (/us\s*patent|uspto/i.test(cleaned)) issuer = "United States Patent and Trademark Office (USPTO)";
+      else issuer = "Patent Office";
+    } else if (category === "publication") {
+      if (/ieee/i.test(cleaned)) issuer = "IEEE";
+      else if (/springer/i.test(cleaned)) issuer = "Springer";
+      else if (/acm/i.test(cleaned)) issuer = "ACM";
+      else if (/arxiv/i.test(cleaned)) issuer = "arXiv";
+    }
 
     achievements.push({
-      title,
+      title: titleClean || cleaned.slice(0, 150),
       category,
+      subType,
+      status,
+      issuer,
       date: dateMatch ? dateMatch[1] : undefined,
-      description,
+      description: cleaned.slice(0, 350),
       sourceSpan: line.slice(0, 250),
     });
 
-    if (achievements.length >= 10) break;
+    if (achievements.length >= 12) break;
   }
 
   // Fallback: If no achievements found yet, scan rawText for explicit patents or papers
@@ -852,9 +1090,13 @@ export function extractAchievements(
     let match: RegExpExecArray | null;
     while ((match = patentRegex.exec(rawText)) !== null) {
       if (match[1] && match[1].trim().length > 4) {
+        const isGranted = /granted/i.test(match[0]);
         achievements.push({
           title: match[1].trim().slice(0, 150),
           category: "patent",
+          subType: isGranted ? "patent_granted" : "patent_application",
+          status: isGranted ? "granted" : "application",
+          issuer: /indian/i.test(match[0]) ? "Indian Patent Office" : undefined,
           description: match[0].trim().slice(0, 350),
           sourceSpan: match[0].trim().slice(0, 250),
         });
@@ -897,11 +1139,11 @@ export class DeterministicResumeExtractionEngine {
     const educationEntries = extractEducationEntries(sectionMap.education || []);
     const skills = extractSkills(sectionMap.skills || [], rawText);
     const projects = extractProjects(sectionMap.projects || [], footprints.repositories);
-    const experience = extractExperience(sectionMap.experience || []);
+    const experience = extractExperience(sectionMap.experience || [], projects.map((p) => p.title));
     const certifications = extractCertifications(sectionMap.certifications || []);
     const achievements = extractAchievements(sectionMap.achievements || [], sectionMap.research || [], rawText);
 
-    // Step 4: Pick best academic profile
+    // Step 4: Pick best primary academic profile
     const primaryEdu = educationEntries[0];
 
     // Step 5: Build structured output
@@ -910,7 +1152,12 @@ export class DeterministicResumeExtractionEngine {
         institution: e.institution,
         degree: e.degree,
         fieldOfStudy: e.specialization,
+        startDate: e.startDate,
+        endDate: e.endDate,
         graduationYear: e.graduationYear,
+        gpa: e.gpa,
+        percentage: e.percentage,
+        academicLevel: e.academicLevel,
         sourceSpan: e.sourceSpan,
       })),
       skills,
@@ -945,8 +1192,8 @@ export class DeterministicResumeExtractionEngine {
     if (personal.fullName) {
       addCandidate("profile", personal.fullName, personal.fullName, "name_positional_v3_9", 1.0);
     }
-    if (primaryEdu) {
-      addCandidate("education", `${primaryEdu.degree} · ${primaryEdu.institution}`, primaryEdu.sourceSpan, "edu_dictionary_v3_9", 1.0);
+    for (const edu of educationEntries) {
+      addCandidate("education", `${edu.degree} · ${edu.institution}`, edu.sourceSpan, "edu_dictionary_v3_9", 1.0);
     }
     for (const s of skills) {
       addCandidate("skill", s.name, s.sourceSpan, "skill_taxonomy_v3_9", 1.0);

@@ -50,9 +50,37 @@ interface Screen5ResumeUploadProps {
       extractedProfile?: ExtractedProfileData;
       discoveredProfiles?: Partial<Record<string, string>>;
       extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
-      extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; gpa?: string }>;
-      extractedExperience?: Array<{ company: string; role: string; duration?: string; highlights?: string[]; sourceSpan: string }>;
-      extractedAchievements?: Array<{ title: string; category?: string; issuer?: string; date?: string; description?: string; sourceSpan: string }>;
+      extractedEducation?: Array<{
+        institution: string;
+        degree: string;
+        fieldOfStudy?: string;
+        graduationYear?: string;
+        startDate?: string;
+        endDate?: string;
+        gpa?: string;
+        percentage?: string;
+        academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
+      }>;
+      extractedExperience?: Array<{
+        company: string;
+        role: string;
+        type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
+        duration?: string;
+        startDate?: string;
+        endDate?: string;
+        highlights?: string[];
+        technologies?: string[];
+        sourceSpan: string;
+      }>;
+      extractedAchievements?: Array<{
+        title: string;
+        category?: string;
+        subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
+        issuer?: string;
+        date?: string;
+        description?: string;
+        sourceSpan: string;
+      }>;
     }
   ) => Promise<boolean> | boolean;
   onNext: () => void;
@@ -92,9 +120,37 @@ export function Screen5ResumeUpload({
     extractedProfile?: ExtractedProfileData;
     discoveredProfiles?: Partial<Record<string, string>>;
     extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
-    extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; gpa?: string }>;
-    extractedExperience?: Array<{ company: string; role: string; duration?: string; highlights?: string[]; sourceSpan: string }>;
-    extractedAchievements?: Array<{ title: string; category?: string; issuer?: string; date?: string; description?: string; sourceSpan: string }>;
+    extractedEducation?: Array<{
+      institution: string;
+      degree: string;
+      fieldOfStudy?: string;
+      graduationYear?: string;
+      startDate?: string;
+      endDate?: string;
+      gpa?: string;
+      percentage?: string;
+      academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
+    }>;
+    extractedExperience?: Array<{
+      company: string;
+      role: string;
+      type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
+      duration?: string;
+      startDate?: string;
+      endDate?: string;
+      highlights?: string[];
+      technologies?: string[];
+      sourceSpan: string;
+    }>;
+    extractedAchievements?: Array<{
+      title: string;
+      category?: string;
+      subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
+      issuer?: string;
+      date?: string;
+      description?: string;
+      sourceSpan: string;
+    }>;
   }>({});
   // null = probing, true = gate open, false = gate closed
   const [ingestionReady, setIngestionReady] = useState<boolean | null>(null);

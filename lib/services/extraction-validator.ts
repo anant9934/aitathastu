@@ -159,26 +159,56 @@ export class ExtractionValidator {
     };
   }
 
-  static isHeadingOrNonProject(title: string): boolean {
+  static isSectionHeading(title: string): boolean {
     const cleaned = title
       .replace(/^[*_#:\-•—–\s]+|[*_#:\-•—–\s]+$/g, "")
       .replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g, "$1$2")
       .replace(/\b([A-Za-z]\s+){2,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ""))
+      .replace(/\s*,\s*/g, ", ")
+      .replace(/\s*&\s*/g, " & ")
       .toLowerCase()
       .trim();
 
-    if (/^(research|patents?|books?|publications?|papers?|awards?|honors?|certifications?|achievements?|education|experience|technical\s*skills|skills|projects|selected\s*projects|work\s*experience|academic\s*projects)$/i.test(cleaned)) {
+    // 1. Standard resume section headers
+    if (/^(research|patents?|books?|publications?|papers?|awards?|honors?|certifications?|achievements?|education|experience|technical\s*skills|skills|projects|selected\s*projects|work\s*experience|academic\s*projects|leadership|extracurricular)$/i.test(cleaned)) {
       return true;
     }
-    if (/^(research,\s*patents\s*&\s*books|research\s*&\s*publications|patents\s*&\s*books|honors\s*&\s*awards|awards\s*&\s*achievements)$/i.test(cleaned)) {
+
+    // 2. Multi-topic headings
+    if (/^(research\s*,\s*patents\s*&\s*books|research\s*&\s*publications|patents\s*&\s*books|honors\s*&\s*awards|awards\s*&\s*honors|awards\s*&\s*achievements|achievements\s*&\s*awards|experience\s*&\s*leadership|leadership\s*&\s*experience|internships\s*&\s*projects|selected\s*projects\s*&\s*client\s*work)$/i.test(cleaned)) {
       return true;
     }
-    if (/^(patent|book|paper|publication|honor|award)\s*:/i.test(cleaned)) {
+
+    return false;
+  }
+
+  static isHeadingOrNonProject(title: string): boolean {
+    if (this.isSectionHeading(title)) return true;
+
+    const cleaned = title
+      .replace(/^[*_#:\-•—–\s]+|[*_#:\-•—–\s]+$/g, "")
+      .replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g, "$1$2")
+      .replace(/\b([A-Za-z]\s+){2,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ""))
+      .replace(/\s*,\s*/g, ", ")
+      .replace(/\s*&\s*/g, " & ")
+      .toLowerCase()
+      .trim();
+
+    // 3. Output prefix tags (e.g. "Patent: ...", "Book - ...", "Paper | ...")
+    if (/^(patent|book|paper|publication|honor|award|manuscript|research\s*paper|patent\s*application)\s*[:—–\-|]/i.test(cleaned)) {
       return true;
     }
-    if (/\b(?:patent\s+(?:application|no|grant|granted)|published\s+in|accepted\s+at\s+ieee|springer|packt\s+publishing|isbn\b)/i.test(cleaned)) {
+
+    // 4. Standalone academic output terms (never standalone projects)
+    if (/^(patent\s+application|research\s+paper|book\s+chapter|conference\s+paper|journal\s+article)$/i.test(cleaned)) {
       return true;
     }
+
+    // 5. In-line publication or patent metadata
+    if (/\b(?:patent\s+(?:application|no|grant|granted)|published\s+in|accepted\s+at\s+ieee|springer|packt\s+publishing|isbn\b|application\s+no\b)/i.test(cleaned)) {
+      return true;
+    }
+
     return false;
   }
 

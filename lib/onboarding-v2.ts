@@ -69,11 +69,50 @@ export type OnboardingDraft = {
   skills: string[];
   certifications: string[];
   projects: Project[];
+  education?: OnboardingEducationEntry[];
+  experiences?: OnboardingExperienceEntry[];
+  achievements?: OnboardingAchievementEntry[];
   goal: string;
   priorities?: string[];
   primaryPriority?: string;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
   completed: boolean;
+};
+
+export type OnboardingEducationEntry = {
+  institution: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  graduationYear?: string;
+  startDate?: string;
+  endDate?: string;
+  gpa?: string;
+  percentage?: string;
+  academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
+  status?: "candidate" | "confirmed";
+};
+
+export type OnboardingExperienceEntry = {
+  company: string;
+  role: string;
+  type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
+  duration?: string;
+  startDate?: string;
+  endDate?: string;
+  highlights?: string[];
+  technologies?: string[];
+  status?: "candidate" | "confirmed";
+};
+
+export type OnboardingAchievementEntry = {
+  title: string;
+  category: "award" | "certification" | "competition" | "publication" | "patent" | "academic";
+  subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
+  status?: string;
+  issuer?: string;
+  date?: string;
+  description?: string;
+  candidateId?: string;
 };
 
 export const initialDraft: OnboardingDraft = {
@@ -101,6 +140,9 @@ export const initialDraft: OnboardingDraft = {
   skills: [],
   certifications: [],
   projects: [],
+  education: [],
+  experiences: [],
+  achievements: [],
   goal: "",
   priorities: [],
   primaryPriority: undefined,
@@ -227,6 +269,62 @@ export function safeDraft(value: unknown): OnboardingDraft {
             url: str(p.url, 500),
             aiPurpose: str(p.aiPurpose, 1000),
             uncertaintyNotes: strings(p.uncertaintyNotes),
+          }))
+      : [],
+    education: Array.isArray(raw.education)
+      ? raw.education
+          .slice(0, 10)
+          .filter((e) => e && typeof e.institution === "string")
+          .map((e) => ({
+            institution: str(e.institution, 180),
+            degree: e.degree ? str(e.degree, 120) : undefined,
+            fieldOfStudy: e.fieldOfStudy ? str(e.fieldOfStudy, 120) : undefined,
+            graduationYear: e.graduationYear ? str(e.graduationYear, 20) : undefined,
+            startDate: e.startDate ? str(e.startDate, 30) : undefined,
+            endDate: e.endDate ? str(e.endDate, 30) : undefined,
+            gpa: e.gpa ? str(e.gpa, 20) : undefined,
+            percentage: e.percentage ? str(e.percentage, 20) : undefined,
+            academicLevel: ["undergraduate", "postgraduate", "high_school", "diploma", "doctorate"].includes(e.academicLevel || "")
+              ? (e.academicLevel as OnboardingEducationEntry["academicLevel"])
+              : undefined,
+            status: e.status === "confirmed" ? "confirmed" : "candidate",
+          }))
+      : [],
+    experiences: Array.isArray(raw.experiences)
+      ? raw.experiences
+          .slice(0, 20)
+          .filter((e) => e && typeof e.company === "string")
+          .map((e) => ({
+            company: str(e.company, 150),
+            role: str(e.role, 120),
+            type: ["employment", "internship", "freelance", "founder", "leadership", "volunteering", "other"].includes(e.type || "")
+              ? (e.type as OnboardingExperienceEntry["type"])
+              : undefined,
+            duration: e.duration ? str(e.duration, 60) : undefined,
+            startDate: e.startDate ? str(e.startDate, 30) : undefined,
+            endDate: e.endDate ? str(e.endDate, 30) : undefined,
+            highlights: Array.isArray(e.highlights) ? strings(e.highlights) : undefined,
+            technologies: Array.isArray(e.technologies) ? strings(e.technologies) : undefined,
+            status: e.status === "confirmed" ? "confirmed" : "candidate",
+          }))
+      : [],
+    achievements: Array.isArray(raw.achievements)
+      ? raw.achievements
+          .slice(0, 30)
+          .filter((a) => a && typeof a.title === "string")
+          .map((a) => ({
+            title: str(a.title, 200),
+            category: ["award", "certification", "competition", "publication", "patent", "academic"].includes(a.category)
+              ? a.category
+              : "academic",
+            subType: ["patent_application", "patent_granted", "published_paper", "manuscript", "book", "book_coauthor", "hackathon", "honor", "other"].includes(a.subType || "")
+              ? (a.subType as OnboardingAchievementEntry["subType"])
+              : undefined,
+            status: a.status ? str(a.status, 60) : undefined,
+            issuer: a.issuer ? str(a.issuer, 120) : undefined,
+            date: a.date ? str(a.date, 40) : undefined,
+            description: a.description ? str(a.description, 400) : undefined,
+            candidateId: a.candidateId ? str(a.candidateId, 80) : undefined,
           }))
       : [],
     goal: str(raw.goal, 160),

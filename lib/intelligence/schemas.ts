@@ -16,8 +16,12 @@ export const ResumeInterpretationSchema = z.object({
       institution: z.string().min(1).max(200),
       degree: z.string().min(1).max(100),
       fieldOfStudy: z.string().max(100).optional(),
+      startDate: z.string().max(30).optional(),
+      endDate: z.string().max(30).optional(),
       graduationYear: z.string().max(20).optional(),
       gpa: z.string().max(20).optional(),
+      percentage: z.string().max(20).optional(),
+      academicLevel: z.enum(["undergraduate", "postgraduate", "doctorate", "diploma", "high_school", "other"]).optional(),
       sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
@@ -25,8 +29,12 @@ export const ResumeInterpretationSchema = z.object({
     z.object({
       company: z.string().min(1).max(150),
       role: z.string().min(1).max(150),
+      type: z.enum(["employment", "internship", "freelance", "founder", "leadership", "volunteering", "other"]).default("employment").optional(),
       duration: z.string().max(100).optional(),
-      highlights: z.array(z.string().max(500)).default([]),
+      startDate: z.string().max(30).optional(),
+      endDate: z.string().max(30).optional(),
+      highlights: z.array(z.string().max(500)).default([]).optional(),
+      technologies: z.array(z.string().max(50)).default([]).optional(),
       sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
@@ -59,6 +67,8 @@ export const ResumeInterpretationSchema = z.object({
     z.object({
       title: z.string().min(1).max(250),
       category: z.enum(["patent", "publication", "book", "award", "hackathon", "honor"]).default("award"),
+      subType: z.string().max(50).optional(),
+      status: z.string().max(50).optional(),
       issuer: z.string().max(150).optional(),
       date: z.string().max(30).optional(),
       description: z.string().max(500).default(""),

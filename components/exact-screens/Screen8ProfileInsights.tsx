@@ -11,7 +11,9 @@ import {
   Edit3,
   CheckCircle2,
   ShieldCheck,
-  FileCheck
+  FileCheck,
+  Trash2,
+  ExternalLink
 } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
@@ -20,8 +22,14 @@ export interface Screen8EducationEntry {
   institution: string;
   degree?: string;
   fieldOfStudy?: string;
+  startDate?: string;
+  endDate?: string;
   graduationYear?: string;
   gpa?: string;
+  percentage?: string;
+  academicLevel?: string;
+  source?: string;
+  status?: "candidate" | "confirmed";
 }
 
 export interface Screen8ProjectEntry {
@@ -46,17 +54,24 @@ export interface Screen8TechCandidate {
 export interface Screen8ExperienceEntry {
   company: string;
   role: string;
+  type?: string;
   duration?: string;
+  startDate?: string;
+  endDate?: string;
   highlights?: string[];
+  technologies?: string[];
+  source?: string;
   status?: "candidate" | "confirmed";
 }
 
 export interface Screen8AchievementEntry {
   title: string;
   category?: string;
+  subType?: string;
   issuer?: string;
   date?: string;
   description?: string;
+  source?: string;
   status?: "candidate" | "confirmed";
 }
 
@@ -80,9 +95,18 @@ export interface Screen8ProfileInsightsProps {
   onBack: () => void;
   onEdit?: () => void;
   onJumpToStep?: (step: number) => void;
+  onToggleConfirmEducation?: (institution: string, degree?: string) => void;
+  onRemoveEducation?: (institution: string, degree?: string) => void;
+  onConfirmAllEducation?: () => void;
   onToggleConfirmProject?: (title: string) => void;
+  onRemoveProject?: (title: string) => void;
+  onConfirmAllProjects?: () => void;
   onToggleConfirmExperience?: (company: string, role: string) => void;
+  onRemoveExperience?: (company: string, role: string) => void;
+  onConfirmAllExperience?: () => void;
   onToggleConfirmAchievement?: (title: string) => void;
+  onRemoveAchievement?: (title: string) => void;
+  onConfirmAllAchievements?: () => void;
 }
 
 const navSections = [
@@ -112,9 +136,18 @@ export function Screen8ProfileInsights({
   onBack,
   onEdit,
   onJumpToStep,
+  onToggleConfirmEducation,
+  onRemoveEducation,
+  onConfirmAllEducation,
   onToggleConfirmProject,
+  onRemoveProject,
+  onConfirmAllProjects,
   onToggleConfirmExperience,
+  onRemoveExperience,
+  onConfirmAllExperience,
   onToggleConfirmAchievement,
+  onRemoveAchievement,
+  onConfirmAllAchievements,
 }: Screen8ProfileInsightsProps) {
   const [activeTab, setActiveTab] = useState("personal");
   const firstName = studentName.trim().split(" ")[0] || "Student";
@@ -444,11 +477,36 @@ export function Screen8ProfileInsights({
 
               {/* Tab 2: Education */}
               {activeTab === "education" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>Educational Background</h4>
+                      <p style={{ fontSize: 12.5, color: "#64748B", margin: "2px 0 0" }}>Qualifications extracted from your CV & academic history</p>
+                    </div>
+                    {educationEntries && educationEntries.some((e) => e.status !== "confirmed") && (
+                      <button
+                        type="button"
+                        onClick={onConfirmAllEducation}
+                        style={{
+                          background: "rgba(86, 66, 239, 0.08)",
+                          border: "1px solid rgba(86, 66, 239, 0.25)",
+                          color: "#5642EF",
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Confirm All Education
+                      </button>
+                    )}
+                  </div>
+
                   {educationEntries && educationEntries.length > 0 ? (
                     educationEntries.map((edu, idx) => (
                       <div
-                        key={idx}
+                        key={edu.institution + idx}
                         style={{
                           padding: "16px 20px",
                           borderRadius: 14,
@@ -461,46 +519,130 @@ export function Screen8ProfileInsights({
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "flex-start",
-                            marginBottom: 4,
+                            marginBottom: 8,
                           }}
                         >
                           <div>
-                            <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
-                              {[edu.degree, edu.fieldOfStudy].filter(Boolean).join(" in ") || "Academic Qualification"}
-                            </h4>
-                            <p style={{ fontSize: 13.5, color: "#64748B", margin: "3px 0 0" }}>{edu.institution}</p>
-                          </div>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            {edu.gpa && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                                {[edu.degree, edu.fieldOfStudy].filter(Boolean).join(" in ") || "Academic Qualification"}
+                              </h4>
+                              {edu.academicLevel && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#4338CA",
+                                    background: "#EEF2FF",
+                                    padding: "2px 7px",
+                                    borderRadius: 6,
+                                    textTransform: "capitalize",
+                                  }}
+                                >
+                                  {edu.academicLevel.replace("_", " ")}
+                                </span>
+                              )}
                               <span
                                 style={{
-                                  fontSize: 11.5,
-                                  fontWeight: 750,
-                                  color: "#059669",
-                                  background: "#ECFDF5",
-                                  border: "1px solid #A7F3D0",
-                                  padding: "3px 8px",
-                                  borderRadius: 6,
-                                }}
-                              >
-                                CGPA: {edu.gpa}
-                              </span>
-                            )}
-                            {edu.graduationYear && (
-                              <span
-                                style={{
-                                  fontSize: 12,
+                                  fontSize: 10.5,
                                   fontWeight: 700,
-                                  color: "#5642EF",
-                                  background: "#EDE9FE",
-                                  padding: "3px 10px",
+                                  color: "#0369A1",
+                                  background: "#E0F2FE",
+                                  padding: "2px 7px",
                                   borderRadius: 6,
                                 }}
                               >
-                                {edu.graduationYear}
+                                Source: CV
                               </span>
+                            </div>
+                            <p style={{ fontSize: 13.5, color: "#64748B", margin: "4px 0 0", fontWeight: 550 }}>
+                              {edu.institution}
+                            </p>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              onClick={() => onToggleConfirmEducation?.(edu.institution, edu.degree)}
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: edu.status === "confirmed" ? "#059669" : "#4338CA",
+                                background: edu.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                                border: `1px solid ${edu.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {edu.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                            </span>
+                            {onRemoveEducation && (
+                              <button
+                                type="button"
+                                onClick={() => onRemoveEducation(edu.institution, edu.degree)}
+                                title="Remove education entry"
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#94A3B8",
+                                  cursor: "pointer",
+                                  padding: "4px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             )}
                           </div>
+                        </div>
+
+                        {/* Dates & Score Badges */}
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
+                          {(edu.startDate || edu.endDate || edu.graduationYear) && (
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#5642EF",
+                                background: "#EDE9FE",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                              }}
+                            >
+                              {[edu.startDate, edu.endDate || edu.graduationYear].filter(Boolean).join(" – ")}
+                            </span>
+                          )}
+                          {edu.gpa && (
+                            <span
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: 750,
+                                color: "#059669",
+                                background: "#ECFDF5",
+                                border: "1px solid #A7F3D0",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                              }}
+                            >
+                              CGPA: {edu.gpa}
+                            </span>
+                          )}
+                          {edu.percentage && (
+                            <span
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: 750,
+                                color: "#0D9488",
+                                background: "#F0FDFA",
+                                border: "1px solid #99F6E4",
+                                padding: "2px 8px",
+                                borderRadius: 6,
+                              }}
+                            >
+                              Score: {edu.percentage}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))
@@ -511,7 +653,7 @@ export function Screen8ProfileInsights({
                           <h4 style={{ fontSize: 16, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
                             {[degree, specialization].filter(Boolean).join(" in ") || "Education not added"}
                           </h4>
-                          <p style={{ fontSize: 13.5, color: "#64748B", margin: "2px 0 0" }}>{institution}</p>
+                          <p style={{ fontSize: 13.5, color: "#64748B", margin: "2px 0 0" }}>{institution || "Institution not provided"}</p>
                         </div>
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#5642EF", background: "#EDE9FE", padding: "3px 10px", borderRadius: 6 }}>
                           {year || "Year not added"}
@@ -525,6 +667,31 @@ export function Screen8ProfileInsights({
               {/* Tab 3: Experience */}
               {activeTab === "experience" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>Experience & Internships</h4>
+                      <p style={{ fontSize: 12.5, color: "#64748B", margin: "2px 0 0" }}>Roles, employment & leadership extracted from your CV</p>
+                    </div>
+                    {experiences && experiences.some((e) => e.status !== "confirmed") && (
+                      <button
+                        type="button"
+                        onClick={onConfirmAllExperience}
+                        style={{
+                          background: "rgba(86, 66, 239, 0.08)",
+                          border: "1px solid rgba(86, 66, 239, 0.25)",
+                          color: "#5642EF",
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Confirm All Experience
+                      </button>
+                    )}
+                  </div>
+
                   {isGalleryMode ? (
                     <div style={{ padding: "16px", borderRadius: 14, background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
@@ -533,7 +700,7 @@ export function Screen8ProfileInsights({
                           <p style={{ fontSize: 13, color: "#64748B", margin: "2px 0 0" }}>Applied ML Laboratory &bull; University Research Project</p>
                         </div>
                         <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>
-                          Verified
+                          Confirmed
                         </span>
                       </div>
                       <p style={{ fontSize: 13, color: "#475569", margin: "6px 0 0", lineHeight: 1.45 }}>
@@ -554,31 +721,103 @@ export function Screen8ProfileInsights({
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                           <div>
-                            <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
-                              {exp.role}
-                            </h4>
-                            <p style={{ fontSize: 13, color: "#64748B", margin: "3px 0 0" }}>
-                              {exp.company} {exp.duration ? `• ${exp.duration}` : ""}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>
+                                {exp.role}
+                              </h4>
+                              {exp.type && exp.type !== "employment" && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: "#4338CA",
+                                    background: "#EEF2FF",
+                                    padding: "2px 7px",
+                                    borderRadius: 6,
+                                    textTransform: "capitalize",
+                                  }}
+                                >
+                                  {exp.type}
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  color: "#0369A1",
+                                  background: "#E0F2FE",
+                                  padding: "2px 7px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                Source: CV
+                              </span>
+                            </div>
+                            <p style={{ fontSize: 13, color: "#64748B", margin: "3px 0 0", fontWeight: 550 }}>
+                              {exp.company} {exp.startDate || exp.endDate ? `• ${[exp.startDate, exp.endDate].filter(Boolean).join(" – ")}` : (exp.duration ? `• ${exp.duration}` : "")}
                             </p>
                           </div>
-                          <span
-                            onClick={() => onToggleConfirmExperience?.(exp.company, exp.role)}
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: exp.status === "confirmed" ? "#059669" : "#4338CA",
-                              background: exp.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
-                              border: `1px solid ${exp.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
-                              padding: "3px 9px",
-                              borderRadius: 6,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {exp.status === "confirmed" ? "Confirmed" : "Candidate (Click to Confirm)"}
-                          </span>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              onClick={() => onToggleConfirmExperience?.(exp.company, exp.role)}
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: exp.status === "confirmed" ? "#059669" : "#4338CA",
+                                background: exp.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                                border: `1px solid ${exp.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {exp.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                            </span>
+                            {onRemoveExperience && (
+                              <button
+                                type="button"
+                                onClick={() => onRemoveExperience(exp.company, exp.role)}
+                                title="Remove experience entry"
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#94A3B8",
+                                  cursor: "pointer",
+                                  padding: "4px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Tech tags */}
+                        {exp.technologies && exp.technologies.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 6 }}>
+                            {exp.technologies.map((tech) => (
+                              <span
+                                key={tech}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 650,
+                                  color: "#3730A3",
+                                  background: "#EEF2FF",
+                                  padding: "1px 7px",
+                                  borderRadius: 5,
+                                }}
+                              >
+                                {tech}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         {exp.highlights && exp.highlights.length > 0 && (
-                          <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, color: "#475569", lineHeight: 1.45 }}>
+                          <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13, color: "#475569", lineHeight: 1.45 }}>
                             {exp.highlights.map((h, i) => (
                               <li key={i}>{h}</li>
                             ))}
@@ -650,6 +889,31 @@ export function Screen8ProfileInsights({
               {/* Tab 5: Projects */}
               {activeTab === "projects" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>Technical Projects</h4>
+                      <p style={{ fontSize: 12.5, color: "#64748B", margin: "2px 0 0" }}>Evidence-backed projects discovered from CV & GitHub</p>
+                    </div>
+                    {projects && projects.some((p) => p.status !== "confirmed") && (
+                      <button
+                        type="button"
+                        onClick={onConfirmAllProjects}
+                        style={{
+                          background: "rgba(86, 66, 239, 0.08)",
+                          border: "1px solid rgba(86, 66, 239, 0.25)",
+                          color: "#5642EF",
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Confirm All Projects
+                      </button>
+                    )}
+                  </div>
+
                   {isGalleryMode ? (
                     <>
                       <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -717,7 +981,7 @@ export function Screen8ProfileInsights({
                                     borderRadius: 9999,
                                   }}
                                 >
-                                  Resume
+                                  Source: CV
                                 </span>
                               )}
                               {project.aiCategories &&
@@ -742,20 +1006,43 @@ export function Screen8ProfileInsights({
                               {project.description}
                             </p>
                           </div>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              color: project.status === "confirmed" ? "#059669" : "#4338CA",
-                              background: project.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
-                              border: `1px solid ${project.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
-                              padding: "3px 9px",
-                              borderRadius: 6,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {project.status === "confirmed" ? "Confirmed" : "Candidate"}
-                          </span>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              onClick={() => onToggleConfirmProject?.(project.title)}
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: project.status === "confirmed" ? "#059669" : "#4338CA",
+                                background: project.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                                border: `1px solid ${project.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                flexShrink: 0,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {project.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                            </span>
+                            {onRemoveProject && (
+                              <button
+                                type="button"
+                                onClick={() => onRemoveProject(project.title)}
+                                title="Remove project"
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "#94A3B8",
+                                  cursor: "pointer",
+                                  padding: "4px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Tech pills & Repo link */}
@@ -815,6 +1102,31 @@ export function Screen8ProfileInsights({
               {/* Tab 6: Achievements */}
               {activeTab === "achievements" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <div>
+                      <h4 style={{ fontSize: 15.5, fontWeight: 800, color: "#1E1B4B", margin: 0 }}>Achievements, Research & Patents</h4>
+                      <p style={{ fontSize: 12.5, color: "#64748B", margin: "2px 0 0" }}>Intellectual output, papers, patents & honors from your CV</p>
+                    </div>
+                    {achievements && achievements.some((a) => a.status !== "confirmed") && (
+                      <button
+                        type="button"
+                        onClick={onConfirmAllAchievements}
+                        style={{
+                          background: "rgba(86, 66, 239, 0.08)",
+                          border: "1px solid rgba(86, 66, 239, 0.25)",
+                          color: "#5642EF",
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Confirm All Achievements
+                      </button>
+                    )}
+                  </div>
+
                   {isGalleryMode ? (
                     <div style={{ padding: "14px 16px", borderRadius: 12, background: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -824,7 +1136,7 @@ export function Screen8ProfileInsights({
                           <div style={{ fontSize: 12, color: "#64748B" }}>Ministry of Education Innovation Cell &bull; 2024</div>
                         </div>
                       </div>
-                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>Verified</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "#10B981", background: "#DEF7EC", padding: "3px 8px", borderRadius: 6 }}>Confirmed</span>
                     </div>
                   ) : null}
                   {!isGalleryMode && achievements && achievements.length > 0 ? (
@@ -861,36 +1173,68 @@ export function Screen8ProfileInsights({
                                     textTransform: "capitalize",
                                   }}
                                 >
-                                  {ach.category}
+                                  {ach.subType ? ach.subType.replace("_", " ") : ach.category}
                                 </span>
                               )}
+                              <span
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 700,
+                                  color: "#0369A1",
+                                  background: "#E0F2FE",
+                                  padding: "2px 7px",
+                                  borderRadius: 6,
+                                }}
+                              >
+                                Source: CV
+                              </span>
                             </div>
                             <p style={{ fontSize: 13, color: "#475569", margin: "4px 0 0", lineHeight: 1.45 }}>
                               {ach.description}
                             </p>
-                            {ach.date && (
+                            {(ach.issuer || ach.date) && (
                               <span style={{ fontSize: 12, color: "#64748B", display: "block", marginTop: 4 }}>
-                                {ach.date}
+                                {[ach.issuer, ach.date].filter(Boolean).join(" • ")}
                               </span>
                             )}
                           </div>
                         </div>
-                        <span
-                          onClick={() => onToggleConfirmAchievement?.(ach.title)}
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: ach.status === "confirmed" ? "#059669" : "#4338CA",
-                            background: ach.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
-                            border: `1px solid ${ach.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
-                            padding: "3px 9px",
-                            borderRadius: 6,
-                            flexShrink: 0,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {ach.status === "confirmed" ? "Confirmed" : "Candidate (Click to Confirm)"}
-                        </span>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <span
+                            onClick={() => onToggleConfirmAchievement?.(ach.title)}
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: ach.status === "confirmed" ? "#059669" : "#4338CA",
+                              background: ach.status === "confirmed" ? "#ECFDF5" : "#EEF2FF",
+                              border: `1px solid ${ach.status === "confirmed" ? "#A7F3D0" : "#C7D2FE"}`,
+                              padding: "4px 10px",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {ach.status === "confirmed" ? "Confirmed" : "Suggested from your CV"}
+                          </span>
+                          {onRemoveAchievement && (
+                            <button
+                              type="button"
+                              onClick={() => onRemoveAchievement(ach.title)}
+                              title="Remove achievement"
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "#94A3B8",
+                                cursor: "pointer",
+                                padding: "4px",
+                                display: "flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))
                   ) : !isGalleryMode ? (

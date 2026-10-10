@@ -194,39 +194,79 @@ export async function completeOnboarding(personId: string, input: unknown) {
     );
   }
 
+  // Record all confirmed education qualifications
+  const inputEducation = Array.isArray(rawInput.education) && rawInput.education.length > 0
+    ? rawInput.education
+    : (draft.education || []);
+  for (const edu of inputEducation) {
+    if (edu && typeof edu === "object") {
+      const inst = String((edu as any).institution || "").trim();
+      const deg = String((edu as any).degree || "").trim();
+      const field = String((edu as any).fieldOfStudy || (edu as any).specialization || "").trim();
+      const grad = (edu as any).graduationYear ? String((edu as any).graduationYear).trim() : "";
+      const dates = [(edu as any).startDate, (edu as any).endDate].filter(Boolean).join(" - ");
+      const score = (edu as any).gpa ? `GPA: ${(edu as any).gpa}` : (edu as any).percentage ? `${(edu as any).percentage}%` : "";
+      const level = (edu as any).academicLevel ? `[${(edu as any).academicLevel}]` : "";
+      const details = [deg, inst, field, dates || grad, score, level].filter(Boolean).join(" · ");
+      if (details) {
+        await add(
+          "education",
+          inst || deg || "Academic Record",
+          details,
+          "self_reported",
+          `edu_${(inst || deg).toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          "Academic qualification confirmed during onboarding."
+        );
+      }
+    }
+  }
+
   // Record confirmed student experiences
-  const inputExperiences = Array.isArray(rawInput.experiences) ? rawInput.experiences : [];
+  const inputExperiences = Array.isArray(rawInput.experiences) && rawInput.experiences.length > 0
+    ? rawInput.experiences
+    : (draft.experiences || []);
   for (const exp of inputExperiences) {
     if (exp && typeof exp === "object") {
       const company = String((exp as any).company || (exp as any).organization || "").trim();
       const role = String((exp as any).role || "").trim();
+      const type = (exp as any).type ? ` [${(exp as any).type}]` : "";
+      const dates = [(exp as any).startDate, (exp as any).endDate].filter(Boolean).join(" - ") || (exp as any).duration || "";
+      const techs = Array.isArray((exp as any).technologies) && (exp as any).technologies.length > 0
+        ? ` · Tech: ${(exp as any).technologies.join(", ")}`
+        : "";
       if (company || role) {
-        const title = `${role ? role + " at " : ""}${company}`;
+        const title = `${role ? role + " at " : ""}${company}${type}`;
         await add(
           "experience",
           title,
-          `${title}${(exp as any).duration ? " (" + (exp as any).duration + ")" : ""}`,
+          `${title}${dates ? " (" + dates + ")" : ""}${techs}`,
           "self_reported",
           `exp_${company.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${role.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-          "Experience entry confirmed by student during onboarding."
+          Array.isArray((exp as any).highlights) && (exp as any).highlights.length > 0
+            ? (exp as any).highlights.join("; ")
+            : "Experience entry confirmed by student during onboarding."
         );
       }
     }
   }
 
   // Record confirmed student achievements (patents, publications, awards, books)
-  const inputAchievements = Array.isArray(rawInput.achievements) ? rawInput.achievements : [];
+  const inputAchievements = Array.isArray(rawInput.achievements) && rawInput.achievements.length > 0
+    ? rawInput.achievements
+    : (draft.achievements || []);
   for (const ach of inputAchievements) {
     if (ach && typeof ach === "object") {
       const title = String((ach as any).title || "").trim();
+      const subType = (ach as any).subType ? ` [${(ach as any).subType}]` : "";
+      const status = (ach as any).status ? ` (${(ach as any).status})` : "";
       if (title) {
         await add(
           "other",
           title,
-          `${title}${(ach as any).issuer ? " · " + (ach as any).issuer : ""}${(ach as any).date ? " (" + (ach as any).date + ")" : ""}`,
+          `${title}${subType}${status}${(ach as any).issuer ? " · " + (ach as any).issuer : ""}${(ach as any).date ? " (" + (ach as any).date + ")" : ""}`,
           "self_reported",
           `ach_${title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-          (ach as any).description || "Achievement or honor confirmed by student during onboarding."
+          (ach as any).description || "Achievement or academic output confirmed by student during onboarding."
         );
       }
     }

@@ -13,7 +13,7 @@ import { Screen4AcademicDetails, type AcademicDetailsData } from "./Screen4Acade
 import { Screen5ResumeUpload, type ReviewedResumeClaim } from "./Screen5ResumeUpload";
 import { Screen6DigitalFootprints } from "./Screen6DigitalFootprints";
 import { Screen7AiAnalysis } from "./Screen7AiAnalysis";
-import { Screen8ProfileInsights, type Screen8ExperienceEntry, type Screen8AchievementEntry } from "./Screen8ProfileInsights";
+import { Screen8ProfileInsights, type Screen8EducationEntry, type Screen8ExperienceEntry, type Screen8AchievementEntry } from "./Screen8ProfileInsights";
 import { Screen9SkillsMap } from "./Screen9SkillsMap";
 import { Screen10GitHubProjects, type ProjectEntry } from "./Screen10GitHubProjects";
 import { Screen11OnboardingComplete } from "./Screen11OnboardingComplete";
@@ -81,15 +81,7 @@ export function ExactScreensContainer({
   const [priorities, setPriorities] = useState<string[]>([]);
   const [primaryPriority, setPrimaryPriority] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [educationEntries, setEducationEntries] = useState<
-    Array<{
-      institution: string;
-      degree: string;
-      fieldOfStudy?: string;
-      graduationYear?: string;
-      gpa?: string;
-    }>
-  >(
+  const [educationEntries, setEducationEntries] = useState<Screen8EducationEntry[]>(
     isGalleryMode
       ? [
           {
@@ -98,6 +90,8 @@ export function ExactScreensContainer({
             fieldOfStudy: "Computer Science",
             graduationYear: "2026",
             gpa: "8.8 CGPA",
+            academicLevel: "undergraduate",
+            status: "confirmed",
           },
         ]
       : []
@@ -373,7 +367,7 @@ export function ExactScreensContainer({
           projects: projects.filter((p) => p.status === "confirmed"),
           experiences: experienceEntries.filter((e) => e.status === "confirmed"),
           achievements: achievementEntries.filter((a) => a.status === "confirmed"),
-          education: educationEntries,
+          education: educationEntries.filter((e) => e.status === "confirmed" || (!e.status && educationEntries.length === 1)),
           profiles,
           goal,
           priorities,
@@ -553,8 +547,12 @@ export function ExactScreensContainer({
               const nextExperiences: Screen8ExperienceEntry[] = (extraData?.extractedExperience || []).map((exp) => ({
                 company: exp.company || "Organization",
                 role: exp.role || "Role",
+                type: exp.type,
                 duration: exp.duration,
+                startDate: exp.startDate,
+                endDate: exp.endDate,
                 highlights: exp.highlights,
+                technologies: exp.technologies,
                 status: "candidate" as const,
               }));
               setExperienceEntries(nextExperiences);
@@ -562,7 +560,8 @@ export function ExactScreensContainer({
               // Map resume-extracted achievements (patents, books, publications, awards) as candidates
               const nextAchievements: Screen8AchievementEntry[] = (extraData?.extractedAchievements || []).map((ach) => ({
                 title: ach.title,
-                category: ach.category || "honor",
+                category: ach.category || "academic",
+                subType: ach.subType,
                 issuer: ach.issuer,
                 date: ach.date,
                 description: ach.description,
@@ -576,8 +575,19 @@ export function ExactScreensContainer({
                 extraData?.extractedEducation?.[0]?.institution ||
                 "";
 
-              const nextEducation = Array.isArray(extraData?.extractedEducation) && extraData.extractedEducation.length > 0
-                ? extraData.extractedEducation
+              const nextEducation: Screen8EducationEntry[] = Array.isArray(extraData?.extractedEducation) && extraData.extractedEducation.length > 0
+                ? extraData.extractedEducation.map((edu) => ({
+                    institution: edu.institution,
+                    degree: edu.degree,
+                    fieldOfStudy: edu.fieldOfStudy,
+                    graduationYear: edu.graduationYear,
+                    startDate: edu.startDate,
+                    endDate: edu.endDate,
+                    gpa: edu.gpa,
+                    percentage: edu.percentage,
+                    academicLevel: edu.academicLevel,
+                    status: "candidate" as const,
+                  }))
                 : resolvedInstitution || academic.degree
                 ? [
                     {
@@ -585,6 +595,8 @@ export function ExactScreensContainer({
                       degree: academic.degree || extraData?.extractedProfile?.degree || "",
                       fieldOfStudy: academic.department || extraData?.extractedProfile?.specialization,
                       graduationYear: (academic.expectedGraduationYear || extraData?.extractedProfile?.expectedGraduationYear)?.toString(),
+                      academicLevel: "undergraduate" as const,
+                      status: "candidate" as const,
                     },
                   ]
                 : [];
@@ -758,34 +770,115 @@ export function ExactScreensContainer({
             goal={goal}
             skills={skills}
             educationEntries={educationEntries.length > 0 ? educationEntries : undefined}
-            experiences={experienceEntries}
-            achievements={achievementEntries}
-            onToggleConfirmExperience={(company, role) => {
-              setExperienceEntries((prev) =>
-                prev.map((e) =>
-                  e.company === company && e.role === role
-                    ? { ...e, status: e.status === "confirmed" ? "candidate" : "confirmed" }
+            onToggleConfirmEducation={(institution, degree) => {
+              setEducationEntries((prev) => {
+                const next = prev.map((e) =>
+                  e.institution === institution && (!degree || e.degree === degree)
+                    ? { ...e, status: e.status === "confirmed" ? ("candidate" as const) : ("confirmed" as const) }
                     : e
-                )
-              );
+                );
+                persistDraft({ education: next });
+                return next;
+              });
             }}
+            onRemoveEducation={(institution, degree) => {
+              setEducationEntries((prev) => {
+                const next = prev.filter((e) => !(e.institution === institution && (!degree || e.degree === degree)));
+                persistDraft({ education: next });
+                return next;
+              });
+            }}
+            onConfirmAllEducation={() => {
+              setEducationEntries((prev) => {
+                const next = prev.map((e) => ({ ...e, status: "confirmed" as const }));
+                persistDraft({ education: next });
+                return next;
+              });
+            }}
+            experiences={experienceEntries}
+            onToggleConfirmExperience={(company, role) => {
+              setExperienceEntries((prev) => {
+                const next = prev.map((e) =>
+                  e.company === company && e.role === role
+                    ? { ...e, status: e.status === "confirmed" ? ("candidate" as const) : ("confirmed" as const) }
+                    : e
+                );
+                persistDraft({ experiences: next });
+                return next;
+              });
+            }}
+            onRemoveExperience={(company, role) => {
+              setExperienceEntries((prev) => {
+                const next = prev.filter((e) => !(e.company === company && e.role === role));
+                persistDraft({ experiences: next });
+                return next;
+              });
+            }}
+            onConfirmAllExperience={() => {
+              setExperienceEntries((prev) => {
+                const next = prev.map((e) => ({ ...e, status: "confirmed" as const }));
+                persistDraft({ experiences: next });
+                return next;
+              });
+            }}
+            achievements={achievementEntries}
             onToggleConfirmAchievement={(title) => {
-              setAchievementEntries((prev) =>
-                prev.map((a) =>
+              setAchievementEntries((prev) => {
+                const next = prev.map((a) =>
                   a.title === title
-                    ? { ...a, status: a.status === "confirmed" ? "candidate" : "confirmed" }
+                    ? { ...a, status: a.status === "confirmed" ? ("candidate" as const) : ("confirmed" as const) }
                     : a
-                )
-              );
+                );
+                persistDraft({ achievements: next });
+                return next;
+              });
+            }}
+            onRemoveAchievement={(title) => {
+              setAchievementEntries((prev) => {
+                const next = prev.filter((a) => a.title !== title);
+                persistDraft({ achievements: next });
+                return next;
+              });
+            }}
+            onConfirmAllAchievements={() => {
+              setAchievementEntries((prev) => {
+                const next = prev.map((a) => ({ ...a, status: "confirmed" as const }));
+                persistDraft({ achievements: next });
+                return next;
+              });
             }}
             onToggleConfirmProject={(title) => {
-              setProjects((prev) =>
-                prev.map((p) =>
+              setProjects((prev) => {
+                const next = prev.map((p) =>
                   p.title === title
-                    ? { ...p, status: p.status === "confirmed" ? "candidate" : "confirmed" }
+                    ? { ...p, status: p.status === "confirmed" ? ("candidate" as const) : ("confirmed" as const) }
                     : p
-                )
-              );
+                );
+                persistDraft({ projects: next });
+                return next;
+              });
+            }}
+            onRemoveProject={(title) => {
+              setProjects((prev) => {
+                const next = prev.map((p) =>
+                  p.title === title
+                    ? { ...p, status: "removed" as const }
+                    : p
+                );
+                persistDraft({ projects: next });
+                return next;
+              });
+            }}
+            onConfirmAllProjects={() => {
+              setProjects((prev) => {
+                const next = prev.map((p) =>
+                  p.status !== "removed"
+                    ? { ...p, status: "confirmed" as const }
+                    : p
+                );
+                persistDraft({ projects: next });
+                return next;
+              });
             }}
             projectsCount={projects.filter((p) => p.status !== "removed").length}
             projects={projects

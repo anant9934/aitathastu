@@ -52,13 +52,13 @@ import {
   fetchOrcidRecord,
   fetchDevToArticles,
   fetchStackOverflowProfile,
-  fetchKaggleProfile,
   fetchKaggleApiData,
   validateGoogleScholarProfile,
 } from "@/lib/connectors/research-and-dev/client";
 import { CodingProfileIntelligenceService } from "@/lib/services/coding-profile-intelligence-service";
 
 export async function POST(req: Request) {
+  let activeJob: { jobId: string; personId: string } | null = null;
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { provider, identifier, exportFilename, exportContent, consent, manualMetrics } = body;
+    const { provider, identifier, exportFilename, exportContent, consent, manualMetrics, jobId: requestedJobId } = body;
 
     if (!provider || typeof provider !== "string") {
       return NextResponse.json({ error: "Provider is required." }, { status: 400 });
@@ -83,12 +83,18 @@ export async function POST(req: Request) {
     const cleanId = typeof identifier === "string" ? identifier.trim() : "";
 
     // 1. Audit Job Start
-    const jobId = await SourceProcessingJobService.startJob({
-      personId,
-      sourceId: provider,
-      stage: "acquire",
-      metadata: { inputIdentifier: cleanId ? cleanId.slice(0, 100) : "export_upload" },
-    });
+    let jobId: string;
+    if (typeof requestedJobId === "string") {
+      const existing = await SourceProcessingJobService.getJobForPerson(requestedJobId, personId);
+      if (!existing || existing.sourceId !== provider || existing.status !== "running") {
+        return NextResponse.json({ error: "Invalid processing job." }, { status: 400 });
+      }
+      jobId = existing.id;
+    } else {
+      jobId = await SourceProcessingJobService.startJob({ personId, sourceId: provider, stage: "acquire" });
+    }
+    activeJob = { jobId, personId };
+    await SourceProcessingJobService.updateStage(jobId, personId, "parse");
 
     let recordsCreated = 0;
     let acquisitionStatus = "PROFILE_LINK_ONLY";
@@ -931,11 +937,13 @@ export async function POST(req: Request) {
     }
 
     // 3. Persist Source Snapshot in Neon Database
+    await SourceProcessingJobService.updateStage(jobId, personId, "validate");
     const snapshotChecksum = crypto
       .createHash("sha256")
       .update(JSON.stringify(extractedDetails))
       .digest("hex");
 
+    await SourceProcessingJobService.updateStage(jobId, personId, "persist");
     await saveSourceSnapshot(
       personId,
       provider,
@@ -944,15 +952,7 @@ export async function POST(req: Request) {
       snapshotChecksum
     );
 
-    // 4. Finalize Job
-    await SourceProcessingJobService.completeJob({
-      jobId,
-      personId,
-      resultReference: `records_${recordsCreated}`,
-      metadata: { acquisitionStatus, recordsCreated },
-    });
-
-    // 5. Record Profile Version & Journey Event for Downstream Dashboard & EORA Refresh
+    // 4. Record Profile Version & Journey Event for Downstream Dashboard & EORA Refresh
     await CrossSourceFusionService.recordProfileVersion(
       personId,
       "evidence_added",
@@ -967,8 +967,16 @@ export async function POST(req: Request) {
       metadata: { provider, acquisitionStatus, recordsCreated },
     });
 
+    await SourceProcessingJobService.completeJob({
+      jobId,
+      personId,
+      resultReference: `records_${recordsCreated}`,
+      metadata: { acquisitionStatus, recordsCreated },
+    });
+
     return NextResponse.json({
       success: true,
+      jobId,
       provider,
       acquisitionStatus,
       recordsCreated,
@@ -977,6 +985,7 @@ export async function POST(req: Request) {
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Footprint synchronization failed.";
+    if (activeJob) await SourceProcessingJobService.failJob({ ...activeJob, errorCode: "SYNC_FAILED", errorMessage: errorMsg }).catch(() => null);
     console.error("[Footprint Sync Error]", errorMsg);
     return NextResponse.json({ error: errorMsg }, { status: 500 });
   }

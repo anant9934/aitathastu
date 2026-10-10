@@ -123,23 +123,28 @@ export function discoverDigitalFootprints(
           const owner = pathParts[0];
           const repo = pathParts[1].replace(/\.git$/, "");
           const repoUrl = `https://github.com/${owner}/${repo}`;
-          repositories.push({ url: repoUrl, owner, repo });
-          discovered.push({
-            platformId: "github",
-            platformName: "GitHub Repository",
-            url: repoUrl,
-            username: owner,
-            isProfile: false,
-            isRepository: true,
-            source: extraHyperlinks.includes(rawUrl) ? "hyperlink" : "text",
-            confidence: 1.0,
-          });
+          if (!repositories.some((r) => r.url.toLowerCase() === repoUrl.toLowerCase())) {
+            repositories.push({ url: repoUrl, owner, repo });
+          }
+          if (!discovered.some((d) => d.url.toLowerCase() === repoUrl.toLowerCase())) {
+            discovered.push({
+              platformId: "github",
+              platformName: "GitHub Repository",
+              url: repoUrl,
+              username: owner,
+              isProfile: false,
+              isRepository: true,
+              source: extraHyperlinks.includes(rawUrl) ? "hyperlink" : "text",
+              confidence: 1.0,
+            });
+          }
           // Also record owner as profile if no profile set yet
           if (!discoveredProfiles.github) {
             discoveredProfiles.github = `https://github.com/${owner}`;
           }
         }
       }
+
 
       // LinkedIn
       else if (host === "linkedin.com") {

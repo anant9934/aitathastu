@@ -38,6 +38,7 @@ type SkillsData = {
 export default function SkillsPage() {
   const [data, setData] = useState<SkillsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -48,17 +49,23 @@ export default function SkillsPage() {
         if (res.ok) {
           const resData = await res.json();
           setData(resData);
+          setError(null);
+        } else {
+          const result = await res.json().catch(() => ({}));
+          setError(result.error || "Could not load skills.");
         }
       } catch {
-        // Non-fatal
+        setError("Could not load skills. Please refresh and try again.");
       } finally {
         setLoading(false);
       }
     }
     loadSkills();
+    window.addEventListener("focus", loadSkills);
+    return () => window.removeEventListener("focus", loadSkills);
   }, []);
 
-  const categories = ["All", "AI & ML", "GenAI", "Data", "Backend", "Tools", "Cloud"];
+  const categories = ["All", "AI & ML", "GenAI", "Data", "Backend", "Tools", "Cloud", "Other"];
 
   const filteredSkills = (data?.skills || []).filter((s) => {
     const matchesCategory = selectedCategory === "All" || s.category === selectedCategory;
@@ -192,7 +199,7 @@ export default function SkillsPage() {
                 Skills & Competency Ledger
               </h1>
               <p style={{ fontSize: 12, color: "#6B7280", margin: 0 }}>
-                Ground-truth skills derived strictly from confirmed projects, source snapshots, and verified assessments
+                Reviewed CV skills and source-backed platform signals, with evidence and verification status
               </p>
             </div>
           </div>
@@ -286,6 +293,8 @@ export default function SkillsPage() {
           <div style={{ padding: 48, textAlign: "center", color: "#6B7280", fontSize: 14 }}>
             Loading skills ledger...
           </div>
+        ) : error ? (
+          <div role="alert" style={{ padding: 24, borderRadius: 12, background: "#FEF2F2", color: "#991B1B" }}>{error}</div>
         ) : filteredSkills.length === 0 ? (
           <div
             style={{

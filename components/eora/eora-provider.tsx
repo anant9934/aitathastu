@@ -178,6 +178,8 @@ export interface EoraController extends EoraControllerState {
   focusField: (fieldId: string, label: string) => void;
   updatePreferences: (patch: Partial<EoraPreferences>) => void;
   resetAllPreferences: () => void;
+  /** Direct dialogue speech method */
+  speak: (text: string, state?: EoraAnimationState) => void;
   /** Language toggling */
   setLanguage: (lang: "english" | "hinglish") => void;
   toggleLanguage: () => void;
@@ -187,6 +189,7 @@ export interface EoraController extends EoraControllerState {
   updateStudentContext: (patch: Partial<EoraPreferences>) => void;
   context: EoraContext;
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REACT CONTEXT
@@ -416,15 +419,43 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, onboardingStep, lastSuccessfulAction, hasLiveStudentData, activeTour, isVisible, isPanelOpen]);
 
-  // ── Onboarding step change → EORA message ─────────────────────────────────
+  // ── Onboarding step change → EORA message & dynamic spatial guidance ───────
   useEffect(() => {
     if (onboardingStep === "none" || activeTour || preferences.assistanceMode === "quiet") return;
     const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
     const msg = getOnboardingStepMessage(onboardingStep, isHinglish);
     if (msg.text) {
       setCurrentMessage(msg);
-      setAnimationState(msg.animationState);
+      setAnimationState(msg.animationState || "POINTING");
       setClarifyingOptions(null);
+    }
+
+    const stepTargets: Record<string, string> = {
+      welcome: "eora-name-input",
+      "role-select": "eora-role-student",
+      "ai-direction": "eora-ai-direction",
+      priorities: "eora-priorities",
+      academic: "eora-academic-form",
+      resume: "eora-resume-upload",
+      "digital-footprints": "eora-digital-footprints",
+      "ai-analysis": "eora-ai-analysis",
+      "profile-insights": "eora-profile-insights",
+      "skills-map": "eora-skills-map",
+      "github-projects": "eora-github-projects",
+      complete: "eora-onboarding-finish",
+    };
+
+    const target = stepTargets[onboardingStep];
+    if (target) {
+      // Prioritize invalid field if any exists on the screen
+      const errField = document.querySelector<HTMLElement>(
+        "[style*='solid #EF4444'], input:invalid, .field-error"
+      );
+      if (errField && (errField.id || errField.getAttribute("data-eora-id"))) {
+        setTourSpotlightTargetId(errField.id || errField.getAttribute("data-eora-id") || target);
+      } else {
+        setTourSpotlightTargetId(target);
+      }
     }
   }, [onboardingStep, activeTour, preferences.assistanceMode, preferences.language]);
 
@@ -455,20 +486,52 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       });
 
     // Apply new spotlight + scroll into view
-    const target = Array.from(document.querySelectorAll<HTMLElement>("[data-eora-id], [id]"))
-      .find(
+    const applySpotlight = () => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>("[data-eora-id], [id]")).find(
         (element) =>
           (element.dataset.eoraId === tourSpotlightTargetId ||
             element.id === tourSpotlightTargetId) &&
           element.getClientRects().length > 0
       );
 
-    if (target) {
-      setTourTargetAvailable(true);
-      target.setAttribute("data-eora-spotlight", "true");
-      target.scrollIntoView({ behavior: preferences.reducedMotion ? "instant" : "smooth", block: "nearest" });
-    } else {
+      if (target) {
+        let effectiveTarget = target;
+        if (
+          target.id === "eora-academic-form" ||
+          target.dataset.eoraId === "eora-academic-form" ||
+          target.clientWidth > 550
+        ) {
+          const errorInput = target.querySelector<HTMLElement>(
+            "[style*='solid #EF4444'], [style*='rgb(239, 68, 68)'], input:invalid, .field-error, [aria-invalid='true']"
+          );
+          const focusedInput = target.querySelector<HTMLElement>(
+            "input:focus, textarea:focus, select:focus"
+          );
+          const defaultInput = target.querySelector<HTMLElement>(
+            "#field-email, #field-fullname, input, select"
+          );
+          if (errorInput) effectiveTarget = errorInput;
+          else if (focusedInput) effectiveTarget = focusedInput;
+          else if (defaultInput && (target.id === "eora-academic-form" || target.dataset.eoraId === "eora-academic-form")) {
+            effectiveTarget = defaultInput;
+          }
+        }
+
+        setTourTargetAvailable(true);
+        effectiveTarget.setAttribute("data-eora-spotlight", "true");
+        effectiveTarget.scrollIntoView({
+          behavior: preferences.reducedMotion ? "instant" : "smooth",
+          block: "nearest",
+        });
+        return true;
+      }
       setTourTargetAvailable(false);
+      return false;
+    };
+
+    if (!applySpotlight()) {
+      const timer = setTimeout(applySpotlight, 120);
+      return () => clearTimeout(timer);
     }
 
     return () => {
@@ -1183,6 +1246,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   // ── Field validation signals ──────────────────────────────────────────────
   const signalFieldError = useCallback(
     (fieldId: string, label: string, error: string) => {
+      const isHinglish = preferences.language === "hinglish" || preferences.language === "hi";
       setFocusedField({
         fieldId,
         label,
@@ -1190,30 +1254,57 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
         isEmpty: false,
         errorMessage: error,
       });
+
+      // Target the exact DOM element of the invalid field so EORA glides right beside it
+      const baseClean = fieldId.toLowerCase().replace(/^field-/, "");
+      const domId = fieldId.startsWith("field-")
+        ? fieldId
+        : document.getElementById(`field-${baseClean}`)
+        ? `field-${baseClean}`
+        : document.getElementById(`field-${fieldId}`)
+        ? `field-${fieldId}`
+        : fieldId;
+      setTourSpotlightTargetId(domId);
+
       // Show EORA reassurance message for the field
       setCurrentMessage({
-        text: `Please check "${label}": ${error}`,
+        text: isHinglish
+          ? `Kripya "${label}" check karein: ${error}`
+          : `Please check "${label}": ${error}`,
         animationState: "POINTING",
       });
       setAnimationState("POINTING");
     },
-    []
+    [preferences.language]
   );
 
-  const clearFieldError = useCallback((fieldId?: string) => {
-    setFocusedField((prev) => {
-      if (!fieldId || prev?.fieldId === fieldId) return null;
-      return prev;
-    });
-    // Return to idle only if the current message belongs to field validation.
-    setCurrentMessage((prev) => {
-      if (prev.text.startsWith("Please check \"")) {
-        return { text: "", animationState: "IDLE" };
+  const clearFieldError = useCallback(
+    (fieldId?: string) => {
+      setFocusedField((prev) => {
+        if (!fieldId || prev?.fieldId === fieldId) return null;
+        return prev;
+      });
+      if (onboardingStep !== "none") {
+        const stepTargets: Record<string, string> = {
+          welcome: "eora-name-input",
+          "role-select": "eora-role-student",
+          "ai-direction": "eora-ai-direction",
+          priorities: "eora-priorities",
+          academic: "eora-academic-form",
+          resume: "eora-resume-upload",
+          "digital-footprints": "eora-digital-footprints",
+          "ai-analysis": "eora-ai-analysis",
+          "profile-insights": "eora-profile-insights",
+          "skills-map": "eora-skills-map",
+          "github-projects": "eora-github-projects",
+          complete: "eora-onboarding-finish",
+        };
+        const baseTarget = stepTargets[onboardingStep];
+        if (baseTarget) setTourSpotlightTargetId(baseTarget);
       }
-      return prev;
-    });
-    setAnimationState((prev) => (prev === "POINTING" ? "IDLE" : prev));
-  }, []);
+    },
+    [onboardingStep]
+  );
 
   const setUserFocused = useCallback((focused: boolean) => {
     setUserIsFocused(focused);
@@ -1221,6 +1312,17 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
 
   const focusField = useCallback((fieldId: string, label: string) => {
     setFocusedField({ fieldId, label, isValid: true, isEmpty: false });
+    const baseClean = fieldId.toLowerCase().replace(/^field-/, "");
+    const domId = fieldId.startsWith("field-")
+      ? fieldId
+      : document.getElementById(`field-${baseClean}`)
+      ? `field-${baseClean}`
+      : document.getElementById(`field-${fieldId}`)
+      ? `field-${fieldId}`
+      : fieldId;
+    if (document.getElementById(domId) || document.querySelector(`[data-eora-id="${domId}"]`)) {
+      setTourSpotlightTargetId(domId);
+    }
   }, []);
 
   // ── Preferences ────────────────────────────────────────────────────────────
@@ -1254,6 +1356,12 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     }
     setPreferences(defaults);
   }, [liveStudent.personId]);
+
+  const speak = useCallback((text: string, state: EoraAnimationState = "EXPLAINING") => {
+    setCurrentMessage({ text, animationState: state });
+    setAnimationState(state);
+  }, []);
+
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const isQuiet = shouldEoraBeQuiet(context);
@@ -1317,6 +1425,8 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
     updateStudentContext,
     updatePreferences,
     resetAllPreferences,
+    speak,
+
     setLanguage,
     toggleLanguage,
     boop,

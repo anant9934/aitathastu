@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 export interface ScreenFooterProps {
   onBack?: () => void;
@@ -39,7 +39,6 @@ export function ScreenFooter({
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
 
   const handleStepSelect = onStepClick || onJumpToStep;
-  const progressPercent = Math.round((activeStep / totalSteps) * 100);
 
   return (
     <footer
@@ -130,7 +129,7 @@ export function ScreenFooter({
           >
             {hoveredStep !== null && stepLabels[hoveredStep - 1]
               ? `Step ${hoveredStep}: ${stepLabels[hoveredStep - 1]}`
-              : `Step ${activeStep} of ${totalSteps} · ${progressPercent}% Complete`}
+              : `Step ${activeStep} of ${totalSteps} · Onboarding journey`}
           </span>
         </div>
 
@@ -225,9 +224,7 @@ export function ScreenFooter({
                   padding: 0,
                 }}
               >
-                {isCompleted ? (
-                  <Check size={11} strokeWidth={3} />
-                ) : isCurrent ? (
+                {isCurrent ? (
                   <span style={{ fontSize: 11, fontWeight: 800 }}>{stepNum}</span>
                 ) : (
                   <span style={{ fontSize: 10, fontWeight: 600 }}>{stepNum}</span>

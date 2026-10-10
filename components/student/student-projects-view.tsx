@@ -105,6 +105,7 @@ export function StudentProjectsView() {
   const [visibility, setVisibility] = useState("private");
   const [projectType, setProjectType] = useState("software");
   const [status, setStatus] = useState("in_progress");
+  const [confirmImported, setConfirmImported] = useState(false);
 
   // Section B: Links
   const [repositoryUrl, setRepositoryUrl] = useState("");
@@ -204,6 +205,7 @@ export function StudentProjectsView() {
     setVisibility("private");
     setProjectType("software");
     setStatus("in_progress");
+    setConfirmImported(false);
     setRepositoryUrl("");
     setDemoUrl("");
     setLinks([]);
@@ -269,6 +271,7 @@ export function StudentProjectsView() {
     setVisibility(proj.visibility || "private");
     setProjectType(proj.projectType || "software");
     setStatus(proj.status || "in_progress");
+    setConfirmImported(false);
     setRepositoryUrl(proj.repositoryUrl || "");
     setDemoUrl(proj.demoUrl || "");
     setLinks(proj.links || []);
@@ -538,7 +541,7 @@ export function StudentProjectsView() {
       projectType,
       status: asDraft ? "planning" : status,
       technologies: selectedTechs,
-      sources: ["manual"],
+      sources: modalMode === "edit" ? (projects.find((p) => p.id === editingProjectId)?.sources || ["manual"]) : ["manual"],
       repositoryUrl: repositoryUrl.trim() || undefined,
       demoUrl: demoUrl.trim() || undefined,
       links: links.filter((l) => l.url.trim().length > 0),
@@ -602,6 +605,19 @@ export function StudentProjectsView() {
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.error || "Failed to update project.");
+        }
+        if (confirmImported) {
+          const confirmResponse = await fetch("/api/student/projects/confirm", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "confirm", project: {
+              title: title.trim(), repositoryUrl: repositoryUrl.trim() || undefined,
+              description: description.trim(), contributionRoles: selectedRoles, contributionNote: contributionNote.trim(),
+            } }),
+          });
+          if (!confirmResponse.ok) {
+            const result = await confirmResponse.json();
+            throw new Error(result.error || "Could not confirm this imported project.");
+          }
         }
       } else {
         const res = await fetch("/api/student/projects", {
@@ -842,6 +858,7 @@ export function StudentProjectsView() {
                       >
                         {project.category || "AI/ML Project"}
                       </span>
+                      {project.status === "candidate" && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: "#FEF3C7", color: "#92400E" }}>Needs review</span>}
                       <span
                         style={{
                           fontSize: 11,
@@ -1364,6 +1381,10 @@ export function StudentProjectsView() {
 
                 {openSections.basic && (
                   <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                    {modalMode === "edit" && status === "candidate" && <label style={{ display: "flex", alignItems: "center", gap: 8, color: "#334155", fontSize: 13 }}>
+                      <input type="checkbox" checked={confirmImported} onChange={(event) => setConfirmImported(event.target.checked)} />
+                      Confirm this imported project after reviewing its details and my personal contribution
+                    </label>}
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 700, color: "#374151", display: "block", marginBottom: 4 }}>
                         Project Title *

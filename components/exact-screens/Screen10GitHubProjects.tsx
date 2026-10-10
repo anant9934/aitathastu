@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Github,
@@ -199,9 +199,16 @@ export function Screen10GitHubProjects({
   const [projects, setProjects] = useState<ProjectEntry[]>(
     isGalleryMode ? defaultRichProjects : discoveredProjects
   );
+  useEffect(() => {
+    if (isGalleryMode) return;
+    setProjects((current) => [...current, ...discoveredProjects.filter((incoming) => !current.some((existing) => existing.id === incoming.id || (incoming.url && existing.url === incoming.url)))]);
+  }, [discoveredProjects, isGalleryMode]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     isGalleryMode ? defaultRichProjects[0].id : (discoveredProjects[0]?.id || "")
   );
+  useEffect(() => {
+    if (projects.length && !projects.some((project) => project.id === selectedProjectId)) setSelectedProjectId(projects[0].id);
+  }, [projects, selectedProjectId]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -397,7 +404,7 @@ export function Screen10GitHubProjects({
         </div>
 
         {/* Two Columns: Left Projects Grid (6 cards) + Right Active Project Detail Showcase */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 24, alignItems: "start", marginBottom: 28 }}>
+        <div data-eora-id="eora-github-projects" style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 24, alignItems: "start", marginBottom: 28 }}>
           
           {/* Left Grid: 2 Columns of Project Cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>

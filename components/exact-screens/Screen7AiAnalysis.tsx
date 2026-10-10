@@ -4,11 +4,13 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Check, Lightbulb, ArrowRight, ArrowLeft } from "lucide-react";
+import { ProcessingActivity } from "./ProcessingActivity";
 
 interface Screen7AiAnalysisProps {
   onComplete: () => void;
   onBack?: () => void;
   studentName?: string;
+  completed?: boolean[];
 }
 
 const analysisSteps = [
@@ -23,8 +25,8 @@ const analysisSteps = [
 export function Screen7AiAnalysis({
   onComplete,
   onBack,
+  completed = [],
 }: Screen7AiAnalysisProps) {
-  const completedSteps = 0;
 
   return (
     <div
@@ -254,9 +256,10 @@ export function Screen7AiAnalysis({
             </div>
 
             {/* Checklist with Green Checkmarks */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 36 }}>
+            <ProcessingActivity />
+            <div data-eora-id="eora-ai-analysis" style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 36 }}>
               {analysisSteps.map((step, idx) => {
-                const isDone = idx < completedSteps;
+                const isDone = Boolean(completed[idx]);
                 return (
                   <div key={step} style={{ display: "flex", alignItems: "center", gap: 16 }}>
                     <div

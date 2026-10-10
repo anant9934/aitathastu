@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { encryptConnectionToken, decryptConnectionToken, decryptConnectionTokenWithMeta } from "../security/connection-token";
 import { coreIngestionReady } from "../security/core-ingestion-gate";
 import { fetchGitHubProjects } from "../connectors/github/client";
+import { saveProject } from "../repositories/project-repository";
+import { createEvidenceRecord } from "../repositories/evidence-repository";
 import { hasRepoMeaningfullyChanged, DiscoveredGitHubProject } from "../connectors/github/mapper";
 import {
   saveExternalConnection,
@@ -200,6 +202,20 @@ export async function syncGitHubConnection(
           },
           project.checksum
         );
+      }
+      await saveProject(personId, {
+        title: project.title, summary: project.description || "GitHub repository candidate",
+        description: project.description || "", technologies: project.technologies || [],
+        sources: ["github"], repositoryUrl: project.repositoryUrl, status: "candidate",
+      });
+      for (const skill of project.technologies || []) {
+        await createEvidenceRecord(personId, {
+          category: "skill", subject: skill, value: skill, source: "imported", verificationStatus: "unverified",
+          sourceReference: project.repositoryUrl,
+          interpretation: `Detected in the public repository ${project.title}; personal use and proficiency require review.`,
+          whyItMatters: "Repository technology metadata can point to a skill for student review.",
+          importKey: `github_skill_${project.id}_${skill.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+        });
       }
     }
 

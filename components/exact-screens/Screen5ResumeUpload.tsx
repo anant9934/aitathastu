@@ -1,9 +1,19 @@
-"use client";
-
-import React, { useRef, useState } from "react";
-import { FileText, CheckCircle2, FileUp, Sparkles, AlertCircle, ShieldCheck, Layers, BookOpen } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import { FileText, CheckCircle2, FileUp, Sparkles, AlertCircle, ShieldCheck, Layers, BookOpen, Loader2, Hourglass } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
+import { ProcessingActivity } from "./ProcessingActivity";
+import { useEoraSafe } from "@/components/eora/eora-provider";
+
+export type ResumeProcessingState =
+  | "IDLE"
+  | "UPLOADING"
+  | "PARSING"
+  | "EXTRACTING"
+  | "REVIEW_REQUIRED"
+  | "SAVING"
+  | "COMPLETED"
+  | "FAILED";
 
 export type ReviewedResumeClaim = {
   candidateId?: string;
@@ -30,15 +40,19 @@ type ResumeCandidate = ReviewedResumeClaim & { id: string; selected: boolean };
 
 interface Screen5ResumeUploadProps {
   initialFileName?: string | null;
+  stepNumber?: number;
+  totalSteps?: number;
   onExtractSuccess?: (
     fileName: string,
     claims: ReviewedResumeClaim[],
     extraData?: {
       extractedProfile?: ExtractedProfileData;
       discoveredProfiles?: Partial<Record<string, string>>;
+      extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
     }
   ) => Promise<boolean> | boolean;
   onNext: () => void;
+  onSkip?: () => void;
   onExtractionReady?: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
@@ -46,43 +60,77 @@ interface Screen5ResumeUploadProps {
 
 export function Screen5ResumeUpload({
   initialFileName,
+  stepNumber = 4,
+  totalSteps = 10,
   onExtractSuccess,
   onNext,
+  onSkip,
   onExtractionReady,
   onBack,
   onJumpToStep,
 }: Screen5ResumeUploadProps) {
+  const eora = useEoraSafe();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const completedDocumentsRef = useRef<Set<string>>(new Set());
   const [fileName, setFileName] = useState<string | null>(initialFileName || null);
   const [isUploaded, setIsUploaded] = useState<boolean>(Boolean(initialFileName));
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [processingState, setProcessingState] = useState<ResumeProcessingState>(
+    initialFileName ? "COMPLETED" : "IDLE"
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [aiConsent, setAiConsent] = useState(false);
   const [candidates, setCandidates] = useState<ResumeCandidate[]>([]);
   const [reviewSaved, setReviewSaved] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [extraData, setExtraData] = useState<{
     extractedProfile?: ExtractedProfileData;
     discoveredProfiles?: Partial<Record<string, string>>;
+    extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
   }>({});
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const isBusy =
+    processingState === "UPLOADING" ||
+    processingState === "PARSING" ||
+    processingState === "EXTRACTING" ||
+    processingState === "SAVING";
+
+  const processFile = async (file?: File) => {
     if (!file) return;
     if (!aiConsent) {
       setErrorMessage("Please consent to resume processing before upload.");
-      e.target.value = "";
       return;
     }
 
     setErrorMessage(null);
-    setIsProcessing(true);
+    setProcessingState("UPLOADING");
+    setReviewSaved(false);
+    setCandidates([]);
+
+    // Signal EORA extraction started
+    eora?.speak(
+      "Hey! I'm reading your CV and collecting your details.",
+      "WORKING"
+    );
 
     try {
+      const jobResponse = await fetch("/api/student/processing-jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceId: "resume" }),
+      });
+      const job = await jobResponse.json();
+      if (!jobResponse.ok || !job.jobId) {
+        throw new Error(job.error || "Could not start resume import.");
+      }
+      setActiveJobId(job.jobId);
+      setProcessingState("PARSING");
+
       const formData = new FormData();
       formData.append("resume", file);
       formData.append("aiConsent", "true");
+      formData.append("jobId", job.jobId);
 
+      setProcessingState("EXTRACTING");
       const res = await fetch("/api/resume/extract", {
         method: "POST",
         body: formData,
@@ -90,8 +138,13 @@ export function Screen5ResumeUpload({
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMessage(data.error || "Could not read this file. Please enter details manually.");
-        setIsProcessing(false);
+        const errorMsg = data.error || "Could not read this file. Please enter details manually.";
+        setErrorMessage(errorMsg);
+        setProcessingState("FAILED");
+        eora?.speak(
+          "I couldn't finish reading this CV. You can try again or enter your details manually.",
+          "REASSURING"
+        );
         return;
       }
 
@@ -104,47 +157,138 @@ export function Screen5ResumeUpload({
             const candidateId = item.candidateId;
             const value = item.value;
             const sourceSpan = item.sourceSpan;
-            if (!documentId || !["education", "experience", "project", "skill", "certification"].includes(String(category)) ||
-              typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string") return [];
-            return [{ id: candidateId, candidateId, category: category as ReviewedResumeClaim["category"], value, sourceSpan, documentId, corrected: false, selected: false }];
+            if (
+              !documentId ||
+              !["education", "experience", "project", "skill", "certification"].includes(String(category)) ||
+              typeof candidateId !== "string" ||
+              typeof value !== "string" ||
+              typeof sourceSpan !== "string"
+            )
+              return [];
+            return [
+              {
+                id: candidateId,
+                candidateId,
+                category: category as ReviewedResumeClaim["category"],
+                value,
+                sourceSpan,
+                documentId,
+                corrected: false,
+                selected: true,
+              },
+            ];
           })
         : [];
+
       if (data.extractionMeta?.success !== true || rows.length === 0) {
         setErrorMessage("No reviewable claims were returned. Please retry or enter details manually.");
-        setIsProcessing(false);
+        setProcessingState("FAILED");
+        eora?.speak(
+          "I couldn't finish reading this CV. You can try again or enter your details manually.",
+          "REASSURING"
+        );
         return;
       }
+
       setFileName(file.name);
       setIsUploaded(true);
-      setIsProcessing(false);
+      setProcessingState("REVIEW_REQUIRED");
       setReviewSaved(false);
       setExtraData({
         extractedProfile: data.extractedProfile,
         discoveredProfiles: data.discoveredProfiles,
+        extractedProjects: Array.isArray(data.structured?.projects) ? data.structured.projects : [],
       });
       setCandidates(rows);
+
+      // Contextual EORA guidance based on completeness
+      const hasAcademic = Boolean(data.extractedProfile?.degree && data.extractedProfile?.institution);
+      if (hasAcademic) {
+        eora?.speak(
+          "I've found some information in your CV. Let's review it together.",
+          "HAPPY"
+        );
+      } else {
+        eora?.speak(
+          "I found some details, but a few things are missing. Let's complete them.",
+          "EXPLAINING"
+        );
+      }
+
       if (!completedDocumentsRef.current.has(documentId)) {
         completedDocumentsRef.current.add(documentId);
         onExtractionReady?.();
       }
-    } catch {
-      setErrorMessage("Network error during file upload. You can continue manually.");
-      setIsProcessing(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error during file upload. You can continue manually.";
+      setErrorMessage(msg);
+      setProcessingState("FAILED");
+      eora?.speak(
+        "I couldn't finish reading this CV. You can try again or enter your details manually.",
+        "REASSURING"
+      );
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    void processFile(e.target.files?.[0]);
+    e.target.value = "";
+  };
+
+  const advance = () => {
+    if (isBusy) return;
+    if (candidates.length > 0 && !reviewSaved) {
+      setErrorMessage("Save your reviewed CV suggestions before continuing, or choose Skip for now.");
+      return;
+    }
+    onNext();
+  };
+
+  const handleSkip = () => {
+    if (isBusy) return;
+    if (onSkip) {
+      onSkip();
+    } else {
+      onNext();
     }
   };
 
   const saveReviewedClaims = async () => {
-    const selected = candidates.filter((candidate) => candidate.selected && candidate.value.trim()).map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({ candidateId, category, value: value.trim(), sourceSpan, documentId, corrected }));
+    const selected = candidates
+      .filter((candidate) => candidate.selected && candidate.value.trim())
+      .map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({
+        candidateId,
+        category,
+        value: value.trim(),
+        sourceSpan,
+        documentId,
+        corrected,
+      }));
+
+    if (selected.length === 0) {
+      setErrorMessage("Select at least one accurate CV detail to save, or use Skip for now.");
+      return;
+    }
+
+    setProcessingState("SAVING");
     try {
       const saved = await onExtractSuccess?.(fileName || "resume", selected, extraData);
       if (saved === false) throw new Error("Review save failed");
       setReviewSaved(true);
+      setProcessingState("COMPLETED");
       setErrorMessage(null);
+      eora?.speak(
+        "Your information is saved! You can continue to the next step.",
+        "HAPPY"
+      );
     } catch {
       setReviewSaved(false);
+      setProcessingState("REVIEW_REQUIRED");
       setErrorMessage("We could not save your review. Please retry before continuing.");
     }
   };
+
+
 
   return (
     <div
@@ -189,7 +333,7 @@ export function Screen5ResumeUpload({
       <ScreenHeader
         onBack={onBack}
         showBack={true}
-        rightLabel="Step 5 of 10"
+        rightLabel={`Step ${stepNumber} of ${totalSteps}`}
       />
 
       <main
@@ -225,7 +369,7 @@ export function Screen5ResumeUpload({
             }}
           >
             <Sparkles size={13} color="#02C5F5" />
-            <span>Step 5 · Document &amp; Experience Ingestion</span>
+            <span>Step {stepNumber} · Document &amp; Experience Ingestion</span>
           </span>
           <h1 style={{ fontSize: "clamp(28px, 3.2vw, 40px)", fontWeight: 850, color: "#171626", letterSpacing: "-0.03em", margin: "0 0 8px" }}>
             Upload your Resume or Academic CV
@@ -252,6 +396,8 @@ export function Screen5ResumeUpload({
             }}
           >
             <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => { event.preventDefault(); void processFile(event.dataTransfer.files?.[0]); }}
               onClick={() => fileInputRef.current?.click()}
               role="button"
               tabIndex={0}
@@ -313,7 +459,7 @@ export function Screen5ResumeUpload({
 
               <button
                 type="button"
-                disabled={isProcessing}
+                disabled={isBusy}
                 onClick={(e) => {
                   e.stopPropagation();
                   fileInputRef.current?.click();
@@ -321,17 +467,54 @@ export function Screen5ResumeUpload({
                 style={{
                   padding: "11px 28px",
                   borderRadius: 9999,
-                  background: "linear-gradient(110deg, #02C5F5 0%, #4564FF 48%, #9335E8 100%)",
+                  background: isBusy
+                    ? "rgba(100, 116, 139, 0.4)"
+                    : "linear-gradient(110deg, #02C5F5 0%, #4564FF 48%, #9335E8 100%)",
                   color: "#FFFFFF",
                   fontWeight: 750,
                   fontSize: 13.5,
                   border: "none",
-                  cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(69, 100, 255, 0.35)",
+                  cursor: isBusy ? "not-allowed" : "pointer",
+                  boxShadow: isBusy ? "none" : "0 4px 16px rgba(69, 100, 255, 0.35)",
                 }}
               >
-                {isProcessing ? "Extracting Details..." : isUploaded ? "Replace File" : "Browse Computer"}
+                {isBusy
+                  ? processingState === "SAVING"
+                    ? "Saving Claims..."
+                    : "Reading & Extracting..."
+                  : isUploaded
+                  ? "Replace File"
+                  : "Browse Computer"}
               </button>
+
+              {isBusy && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "14px 20px",
+                    marginTop: 14,
+                    borderRadius: 14,
+                    background: "linear-gradient(135deg, rgba(86, 66, 239, 0.05) 0%, rgba(2, 197, 245, 0.08) 100%)",
+                    border: "1px solid rgba(86, 66, 239, 0.2)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5642EF", fontWeight: 700, fontSize: 13.5 }}>
+                    <Hourglass size={18} className="animate-spin" style={{ animationDuration: "3s" }} />
+                    <span>
+                      {processingState === "UPLOADING" && "Uploading document securely..."}
+                      {processingState === "PARSING" && "Parsing document structure & text..."}
+                      {processingState === "EXTRACTING" && "Extracting skills, academics & projects (Zero-LLM)..."}
+                      {processingState === "SAVING" && "Saving reviewed claims to Tathastu Core..."}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "#64748B" }}>
+                    Deterministic in-process analysis &bull; Zero generative LLMs
+                  </span>
+                </div>
+              )}
 
               {errorMessage && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#EF4444", fontSize: 13, marginTop: 12 }}>
@@ -344,16 +527,17 @@ export function Screen5ResumeUpload({
               <strong style={{ color: "#1E1B4B", fontSize: 13 }}>Review suggested claims</strong>
               <p style={{ color: "#64748B", fontSize: 12, margin: "6px 0 10px" }}>Select only accurate items. You can correct the text before saving. These are not independently verified.</p>
               {candidates.map((candidate, index) => <div key={candidate.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
-                <input aria-label={`Select ${candidate.category} ${candidate.value}`} type="checkbox" checked={candidate.selected} onChange={(event) => setCandidates((current) => current.map((item, i) => i === index ? { ...item, selected: event.target.checked } : item))} />
+                <input aria-label={`Select ${candidate.category} ${candidate.value}`} type="checkbox" checked={candidate.selected} onChange={(event) => { setReviewSaved(false); setCandidates((current) => current.map((item, i) => i === index ? { ...item, selected: event.target.checked } : item)); }} />
                 <div style={{ flex: 1 }}>
                   <span style={{ color: "#5642EF", fontWeight: 750, fontSize: 11, textTransform: "uppercase" }}>{candidate.category}</span>
-                  <input aria-label={`Edit ${candidate.category}`} value={candidate.value} onChange={(event) => setCandidates((current) => current.map((item, i) => i === index ? { ...item, value: event.target.value, corrected: true } : item))} style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12 }} />
+                  <input aria-label={`Edit ${candidate.category}`} value={candidate.value} onChange={(event) => { setReviewSaved(false); setCandidates((current) => current.map((item, i) => i === index ? { ...item, value: event.target.value, corrected: true } : item)); }} style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12 }} />
                   <small style={{ color: "#64748B" }}>Source: “{candidate.sourceSpan}”</small>
                 </div>
               </div>)}
-              <button type="button" onClick={saveReviewedClaims} style={{ background: "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: "pointer" }}>Save selected claims</button>
+              <button type="button" disabled={isBusy} onClick={saveReviewedClaims} style={{ background: isBusy ? "#94A3B8" : "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: isBusy ? "not-allowed" : "pointer" }}>Save selected claims</button>
               {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12 }}>Review saved</span>}
             </div>}
+            <ProcessingActivity source="resume" activeJobId={activeJobId} />
 
             <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, color: "#475569", fontSize: 12.5, lineHeight: 1.45 }}>
               <input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} />
@@ -363,14 +547,15 @@ export function Screen5ResumeUpload({
             <div style={{ textAlign: "center", marginTop: 16 }}>
               <button
                 type="button"
-                onClick={onNext}
+                onClick={handleSkip}
+                disabled={isBusy}
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#64748B",
+                  color: isBusy ? "#94A3B8" : "#64748B",
                   fontSize: 13.5,
                   fontWeight: 600,
-                  cursor: "pointer",
+                  cursor: isBusy ? "not-allowed" : "pointer",
                 }}
               >
                 Skip for now →
@@ -439,13 +624,15 @@ export function Screen5ResumeUpload({
         {/* Footer */}
         <ScreenFooter
           onBack={onBack}
-          onNext={onNext}
+          onNext={advance}
           onStepClick={onJumpToStep}
-          activeStep={5}
-          totalSteps={10}
+          activeStep={stepNumber}
+          totalSteps={totalSteps}
           nextLabel="Next"
+          isNextDisabled={isBusy}
         />
       </main>
     </div>
   );
 }
+

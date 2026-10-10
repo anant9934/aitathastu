@@ -167,6 +167,7 @@ export function Screen8ProfileInsights({
 
         {/* Broad Two-Column Layout */}
         <div
+          data-eora-id="eora-profile-insights"
           style={{
             display: "grid",
             gridTemplateColumns: "260px 1fr",

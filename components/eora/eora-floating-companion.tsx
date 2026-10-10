@@ -133,10 +133,24 @@ export function EoraFloatingCompanion() {
         const trigger = containerRef.current
           ?.querySelector<HTMLElement>(".eora-avatar-trigger")
           ?.getBoundingClientRect();
-        const triggerWidth = trigger?.width || (width <= 480 ? 58 : 72);
-        const triggerHeight = trigger?.height || (width <= 480 ? 58 : 72);
+        const isGuiding = Boolean(
+          eora.currentMessage.text ||
+          eora.activeTour ||
+          eora.activeTask ||
+          (eora.onboardingStep && eora.onboardingStep !== "none")
+        );
+        const triggerWidth = isGuiding
+          ? width <= 480
+            ? 300
+            : 380
+          : trigger?.width || (width <= 480 ? 58 : 72);
+        const triggerHeight = isGuiding
+          ? width <= 480
+            ? 220
+            : 250
+          : trigger?.height || (width <= 480 ? 58 : 72);
         const edge = width <= 340 ? 8 : width <= 480 ? 12 : width <= 768 ? 16 : 24;
-        const bottom = width <= 340 ? 68 : width <= 480 ? 72 : 24;
+        const bottom = width <= 340 ? 76 : width <= 480 ? 84 : 96;
         const candidates: Placement[] = [
           "bottom-right",
           "bottom-left",
@@ -150,6 +164,14 @@ export function EoraFloatingCompanion() {
         ).filter(
           (el) => !containerRef.current?.contains(el) && el.getClientRects().length > 0
         );
+        const nextBtn =
+          document.getElementById("eora-onboarding-next-btn") ||
+          document.querySelector<HTMLElement>(".btn-purple-next");
+        const nextRect =
+          nextBtn && nextBtn.getClientRects().length > 0
+            ? nextBtn.getBoundingClientRect()
+            : null;
+
         const scored = candidates.map((candidate, index) => {
           const left = candidate.endsWith("right") ? width - triggerWidth - edge : edge;
           const top = candidate.startsWith("bottom") ? height - bottom - triggerHeight : 82;
@@ -159,7 +181,7 @@ export function EoraFloatingCompanion() {
             right: left + triggerWidth + 6,
             bottom: top + triggerHeight + 6,
           };
-          const collisions = controls.reduce((count, control) => {
+          let collisions = controls.reduce((count, control) => {
             const r = control.getBoundingClientRect();
             return (
               count +
@@ -171,6 +193,18 @@ export function EoraFloatingCompanion() {
                 : 0)
             );
           }, 0);
+
+          // Extra penalty if candidate would overlap the Next button or footer
+          if (
+            nextRect &&
+            box.left < nextRect.right + 20 &&
+            box.right > nextRect.left - 20 &&
+            box.top < nextRect.bottom + 20 &&
+            box.bottom > nextRect.top - 20
+          ) {
+            collisions += 10;
+          }
+
           return { candidate, score: collisions * 100 + index };
         });
         scored.sort((a, b) => a.score - b.score);
@@ -195,7 +229,7 @@ export function EoraFloatingCompanion() {
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [eora?.isVisible, eora?.isPanelOpen, eora?.onboardingStep, eora?.context.route]);
+  }, [eora?.isVisible, eora?.isPanelOpen, eora?.onboardingStep, eora?.context.route, eora?.currentMessage.text]);
 
   // ── SPATIAL MOVEMENT ENGINE — CLASH OF CLANS CHARACTER GUIDANCE ───────────
   useEffect(() => {
@@ -224,48 +258,122 @@ export function EoraFloatingCompanion() {
           return;
         }
 
-        const rect = el.getBoundingClientRect();
+        // Child element resolution for containers or large forms
+        let targetEl: HTMLElement = el;
+        const innerError = el.querySelector<HTMLElement>(
+          "[style*='solid #EF4444'], [style*='rgb(239, 68, 68)'], input:invalid, .field-error, [aria-invalid='true']"
+        );
+        const innerFocused = el.querySelector<HTMLElement>(
+          "input:focus, textarea:focus, select:focus"
+        );
+        const innerInput = el.querySelector<HTMLElement>(
+          "#field-email, #field-fullname, input, select"
+        );
+        if (innerError) {
+          targetEl = innerError;
+        } else if (innerFocused) {
+          targetEl = innerFocused;
+        } else if (innerInput && el.clientWidth > 550) {
+          targetEl = innerInput;
+        }
+
+        const rect = targetEl.getBoundingClientRect();
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const isMobile = vw <= 768;
-        const companionW = isMobile ? 310 : 380;
+        const companionW = isMobile ? Math.min(310, vw - 24) : 380;
         const companionH = isMobile ? 220 : 260;
 
+        // Footer & Next button anti-obstruction detector
+        const nextBtn =
+          document.getElementById("eora-onboarding-next-btn") ||
+          document.querySelector<HTMLElement>(".btn-purple-next");
+        const footerBar = document.querySelector<HTMLElement>(".screen-stepper-footer");
+        const avoidRect =
+          nextBtn && nextBtn.getClientRects().length > 0
+            ? nextBtn.getBoundingClientRect()
+            : footerBar && footerBar.getClientRects().length > 0
+            ? footerBar.getBoundingClientRect()
+            : null;
+
+        let bestX = 0;
+        let bestY = 0;
+        let bestTail: "left" | "right" | "top" | "bottom" = "left";
+
         if (!isMobile) {
-          // Desktop: prefer placing to the right, fallback to left or top/bottom
-          if (rect.right + companionW + 24 <= vw) {
-            const x = rect.right + 18;
-            const y = Math.max(76, Math.min(vh - companionH - 24, rect.top - 20));
-            setSpatialCoords({ x, y, tail: "left", active: true });
-          } else if (rect.left - companionW - 24 >= 0) {
-            const x = rect.left - companionW - 18;
-            const y = Math.max(76, Math.min(vh - companionH - 24, rect.top - 20));
-            setSpatialCoords({ x, y, tail: "right", active: true });
-          } else if (rect.bottom + companionH + 20 <= vh) {
-            const x = Math.max(16, Math.min(vw - companionW - 16, rect.left));
-            const y = rect.bottom + 14;
-            setSpatialCoords({ x, y, tail: "top", active: true });
+          const isWide = rect.width > 550;
+          if (isWide) {
+            // Anchor adjacent to top-right of wide card
+            bestX = Math.max(16, Math.min(vw - companionW - 24, rect.right - companionW - 12));
+            bestY = Math.max(
+              76,
+              rect.top - companionH - 12 >= 76
+                ? rect.top - companionH - 12
+                : rect.top + 16
+            );
+            bestTail = rect.top - companionH - 12 >= 76 ? "bottom" : "left";
           } else {
-            const x = Math.max(16, Math.min(vw - companionW - 16, rect.left));
-            const y = Math.max(76, rect.top - companionH - 14);
-            setSpatialCoords({ x, y, tail: "bottom", active: true });
+            // Standard element: evaluate candidates
+            if (rect.right + companionW + 24 <= vw) {
+              bestX = rect.right + 18;
+              bestY = Math.max(76, Math.min(vh - companionH - 24, rect.top - 20));
+              bestTail = "left";
+            } else if (rect.left - companionW - 24 >= 0) {
+              bestX = rect.left - companionW - 18;
+              bestY = Math.max(76, Math.min(vh - companionH - 24, rect.top - 20));
+              bestTail = "right";
+            } else if (
+              rect.bottom + companionH + 20 <=
+              (avoidRect ? avoidRect.top - 12 : vh - 20)
+            ) {
+              bestX = Math.max(16, Math.min(vw - companionW - 16, rect.left));
+              bestY = rect.bottom + 14;
+              bestTail = "top";
+            } else {
+              bestX = Math.max(16, Math.min(vw - companionW - 16, rect.left));
+              bestY = Math.max(76, rect.top - companionH - 14);
+              bestTail = "bottom";
+            }
+          }
+
+          // Anti-collision check against Next button & footer
+          if (avoidRect) {
+            const collides =
+              bestX < avoidRect.right + 20 &&
+              bestX + companionW > avoidRect.left - 20 &&
+              bestY < avoidRect.bottom + 20 &&
+              bestY + companionH > avoidRect.top - 20;
+
+            if (collides) {
+              if (avoidRect.top - companionH - 24 >= 76) {
+                bestY = avoidRect.top - companionH - 24;
+              } else {
+                bestX = Math.max(16, avoidRect.left - companionW - 24);
+              }
+            }
           }
         } else {
-          // Mobile: prefer placing below or above so the target element is NEVER obscured
-          if (rect.bottom + companionH + 30 <= vh) {
-            const x = Math.max(12, Math.min(vw - companionW - 12, rect.left - 10));
-            const y = rect.bottom + 12;
-            setSpatialCoords({ x, y, tail: "top", active: true });
+          // Mobile placement
+          const maxBottom = avoidRect ? avoidRect.top - 12 : vh - 20;
+          if (rect.bottom + companionH + 16 <= maxBottom) {
+            bestX = Math.max(12, Math.min(vw - companionW - 12, rect.left - 6));
+            bestY = rect.bottom + 12;
+            bestTail = "top";
           } else if (rect.top - companionH - 14 >= 64) {
-            const x = Math.max(12, Math.min(vw - companionW - 12, rect.left - 10));
-            const y = Math.max(68, rect.top - companionH - 12);
-            setSpatialCoords({ x, y, tail: "bottom", active: true });
+            bestX = Math.max(12, Math.min(vw - companionW - 12, rect.left - 6));
+            bestY = Math.max(68, rect.top - companionH - 12);
+            bestTail = "bottom";
           } else {
-            const x = Math.max(12, vw - companionW - 12);
-            const y = Math.max(68, vh - companionH - 72);
-            setSpatialCoords({ x, y, tail: "bottom", active: true });
+            bestX = Math.max(12, vw - companionW - 12);
+            bestY = Math.max(
+              68,
+              (avoidRect ? avoidRect.top : vh) - companionH - 20
+            );
+            bestTail = "bottom";
           }
         }
+
+        setSpatialCoords({ x: bestX, y: bestY, tail: bestTail, active: true });
       });
     };
 
@@ -429,7 +537,26 @@ export function EoraFloatingCompanion() {
       }
     : {};
 
-  // Progress metadata for active tour or task
+  // Onboarding step dictionary for Clash of Clans progress badges
+  const onboardingStepMap: Record<
+    string,
+    { num: number; total: number; title: string; hinglishTitle: string }
+  > = {
+    welcome: { num: 1, total: 10, title: "Welcome & Name", hinglishTitle: "Swagat aur Naam" },
+    "role-select": { num: 2, total: 10, title: "Choose Your Path", hinglishTitle: "Apna Path Chunein" },
+    "ai-direction": { num: 3, total: 10, title: "AI/ML Direction", hinglishTitle: "AI/ML Target Direction" },
+    priorities: { num: 3, total: 10, title: "Top Priorities", hinglishTitle: "Pehli Priorities" },
+    academic: { num: 4, total: 10, title: "Personal Profile & Account", hinglishTitle: "Profile aur Account" },
+    resume: { num: 5, total: 10, title: "Resume Upload & Claims", hinglishTitle: "Resume Upload aur Proof" },
+    "digital-footprints": { num: 6, total: 10, title: "Digital Footprints", hinglishTitle: "Digital Profiles aur Coding" },
+    "ai-analysis": { num: 7, total: 10, title: "Synthesizing AI Profile", hinglishTitle: "AI Profile Taiyar Ho Rahi Hai" },
+    "profile-insights": { num: 8, total: 10, title: "Profile & Skills Review", hinglishTitle: "Profile aur Skills Review" },
+    "skills-map": { num: 9, total: 10, title: "Skills Constellation", hinglishTitle: "Skills Graph Constellation" },
+    "github-projects": { num: 10, total: 10, title: "Project Evidence Ledger", hinglishTitle: "Projects aur Evidence" },
+    complete: { num: 10, total: 10, title: "Workspace Initialized", hinglishTitle: "Workspace Taiyar Hai" },
+  };
+
+  // Progress metadata for active tour or task or onboarding
   const progressData = eora.activeTour
     ? {
         current: eora.tourStepIndex + 1,
@@ -445,6 +572,13 @@ export function EoraFloatingCompanion() {
         total: eora.activeTaskDef.steps.length,
         title: eora.activeTaskDef.title,
         hinglishTitle: eora.activeTaskDef.title,
+      }
+    : eora.onboardingStep && eora.onboardingStep !== "none" && onboardingStepMap[eora.onboardingStep]
+    ? {
+        current: onboardingStepMap[eora.onboardingStep].num,
+        total: onboardingStepMap[eora.onboardingStep].total,
+        title: onboardingStepMap[eora.onboardingStep].title,
+        hinglishTitle: onboardingStepMap[eora.onboardingStep].hinglishTitle,
       }
     : null;
 
@@ -578,6 +712,13 @@ export function EoraFloatingCompanion() {
                   : eora.nextTourStep
                 : eora.activeTask
                 ? eora.advanceTask
+                : eora.onboardingStep !== "none" && eora.onboardingStep !== "complete"
+                ? () => {
+                    const btn =
+                      document.getElementById("eora-onboarding-next-btn") ||
+                      document.querySelector<HTMLElement>(".btn-purple-next");
+                    if (btn) (btn as HTMLButtonElement).click();
+                  }
                 : undefined
             }
             onPrev={
@@ -585,6 +726,13 @@ export function EoraFloatingCompanion() {
                 ? eora.prevTourStep
                 : eora.activeTask
                 ? eora.rewindTask
+                : eora.onboardingStep !== "none" && eora.onboardingStep !== "welcome"
+                ? () => {
+                    const btn =
+                      document.getElementById("eora-onboarding-back-btn") ||
+                      document.querySelector<HTMLElement>(".stepper-circle-btn");
+                    if (btn) (btn as HTMLButtonElement).click();
+                  }
                 : undefined
             }
             onRepeat={() => eora.handleUserMessage("repeat")}
@@ -620,14 +768,14 @@ export function EoraFloatingCompanion() {
                 ? eora.tourStepIndex < eora.activeTour.steps.length - 1
                 : eora.activeTask && eora.activeTaskDef
                 ? eora.activeTask.currentStepIndex < eora.activeTaskDef.steps.length - 1
-                : false
+                : eora.onboardingStep !== "none" && eora.onboardingStep !== "complete"
             }
             hasPrev={
               eora.activeTour
                 ? eora.tourStepIndex > 0
                 : eora.activeTask
                 ? eora.activeTask.currentStepIndex > 0
-                : false
+                : eora.onboardingStep !== "none" && eora.onboardingStep !== "welcome"
             }
             canSkip={Boolean(eora.activeTour || eora.activeTask)}
             actionLabel={eora.currentMessage.actionLabel}

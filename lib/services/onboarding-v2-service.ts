@@ -135,7 +135,9 @@ export async function completeOnboarding(personId: string, input: unknown) {
     );
   }
 
+  const reviewedResumeSkills = new Set(draft.resumeReviewed.filter((claim) => claim.category === "skill").map((claim) => claim.value.toLowerCase()));
   for (const skill of [...new Set(draft.skills)]) {
+    if (reviewedResumeSkills.has(skill.toLowerCase())) continue;
     await add(
       "skill",
       skill,

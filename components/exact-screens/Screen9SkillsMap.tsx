@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CheckCircle2, Sparkles, Zap, ShieldCheck, Layers, ArrowUpRight, Cpu } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 
 interface Screen9SkillsMapProps {
   skills?: string[];
+  suggestedSkills?: string[];
   isGalleryMode?: boolean;
   goal?: string;
   onNext: () => void;
@@ -167,23 +168,37 @@ const skillNodes: SkillNode[] = [
   },
 ];
 
-export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, onBack, onJumpToStep }: Screen9SkillsMapProps) {
-  const displayNodes: SkillNode[] = isGalleryMode ? skillNodes : skills.slice(0, 8).map((skill, index) => ({
-    ...skillNodes[index],
+function classifyReviewSkill(skill: string): SkillNode["category"] {
+  if (/math|statistic|probability|linear algebra|calculus/i.test(skill)) return "Theoretical";
+  if (/python|typescript|javascript|sql|git|docker|kubernetes|aws|azure|gcp|linux|pytorch|tensorflow|scikit|pandas|numpy|fastapi/i.test(skill)) return "Tooling";
+  if (/nlp|language model|llm|genai|generative|rag|vision|transformer|agent|deep learning/i.test(skill)) return "Specialized";
+  return "Core";
+}
+
+export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryMode = false, onNext, onBack, onJumpToStep }: Screen9SkillsMapProps) {
+  const confirmed = new Set(skills.map((skill) => skill.toLowerCase()));
+  const allSkills = [...skills, ...suggestedSkills.filter((skill) => !confirmed.has(skill.toLowerCase()))];
+  const allNodes: SkillNode[] = isGalleryMode ? skillNodes : allSkills.map((skill, index) => ({
+    ...skillNodes[index % skillNodes.length],
     id: `recorded_${index}`,
     label: skill,
+    category: classifyReviewSkill(skill),
     level: "Emerging",
     confidence: 0,
-    evidence: ["Student confirmed during onboarding; independent verification pending"],
+    evidence: [confirmed.has(skill.toLowerCase()) ? "Reviewed CV or student-confirmed skill; verification pending" : "Detected in linked project metadata; personal use needs review"],
     techs: [],
-    description: `${skill} is recorded in your profile. Add project or document evidence to show how you used it.`,
+    description: confirmed.has(skill.toLowerCase()) ? `${skill} is recorded in your profile. Add project evidence to show how you used it.` : `${skill} was detected in an imported project. Review your contribution before claiming proficiency.`,
     metrics: { githubCommits: 0, benchmarkPercentile: 0, courseCredentials: 0 },
   }));
-  const [selectedNode, setSelectedNode] = useState<SkillNode>(displayNodes[0] || {
+  const displayNodes = allNodes.slice(0, 8);
+  const [selectedNode, setSelectedNode] = useState<SkillNode>(allNodes[0] || {
     ...skillNodes[0], id: "empty", label: "No skills recorded", confidence: 0,
     evidence: [], techs: [], description: "Add or confirm a skill to begin your map.",
     metrics: { githubCommits: 0, benchmarkPercentile: 0, courseCredentials: 0 },
   });
+  useEffect(() => {
+    if (allNodes.length && !allNodes.some((node) => node.label === selectedNode.label)) setSelectedNode(allNodes[0]);
+  }, [allNodes, selectedNode.label]);
   const [activeFilter, setActiveFilter] = useState<string>("All");
 
   const categories = ["All", "Core", "Specialized", "Tooling", "Theoretical"];
@@ -191,6 +206,7 @@ export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, o
   const filteredNodes = activeFilter === "All"
     ? displayNodes
     : displayNodes.filter((n) => n.category === activeFilter);
+  const filteredList = activeFilter === "All" ? allNodes : allNodes.filter((n) => n.category === activeFilter);
 
   return (
     <div
@@ -263,7 +279,7 @@ export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, o
               Your Skills & Evidence Network
             </h1>
             <p style={{ fontSize: 14.5, color: "#64748B", margin: 0 }}>
-              {isGalleryMode ? "Interactive knowledge constellation for design preview." : "Skills you confirmed during onboarding. Evidence and proficiency need separate review."}
+              {isGalleryMode ? "Interactive knowledge constellation for design preview." : "Reviewed CV skills and skills suggested by linked projects. Evidence and proficiency need separate review."}
             </p>
           </div>
 
@@ -301,6 +317,7 @@ export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, o
           
           {/* Left Region: Spacious, Modern Constellation Canvas */}
           <div
+            data-eora-id="eora-skills-map"
             style={{
               position: "relative",
               minHeight: 540,
@@ -527,7 +544,7 @@ export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, o
                       borderRadius: 6,
                     }}
                   >
-                    {isGalleryMode ? `${selectedNode.level} Level` : "Recorded skill"}
+                    {isGalleryMode ? `${selectedNode.level} Level` : confirmed.has(selectedNode.label.toLowerCase()) ? "Reviewed skill" : "Suggested skill"}
                   </span>
                   <span
                     style={{
@@ -634,6 +651,13 @@ export function Screen9SkillsMap({ skills = [], isGalleryMode = false, onNext, o
             </div>
           </div>
         </div>
+
+        {!isGalleryMode && filteredList.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }} aria-label="All extracted and suggested skills">
+          {filteredList.map((node) => <button key={node.id} type="button" onClick={() => setSelectedNode(node)}
+            style={{ border: selectedNode.id === node.id ? "1px solid #5642EF" : "1px solid #CBD5E1", borderRadius: 999, padding: "6px 11px", background: selectedNode.id === node.id ? "#EDE9FE" : "#FFFFFF", color: "#334155", cursor: "pointer", fontSize: 12 }}>
+            {node.label}{confirmed.has(node.label.toLowerCase()) ? " · reviewed" : " · suggested"}
+          </button>)}
+        </div>}
 
         {/* Footer Navigation */}
         <ScreenFooter

@@ -28,20 +28,25 @@ export interface ParsedDocumentResult {
  */
 export function extractPdfUriAnnotations(bytes: Buffer): string[] {
   const links: string[] = [];
+  const cleanUrl = (url: string) => url.trim().replace(/[.,;:)\]]+$/, "");
   try {
     const raw = bytes.toString("latin1");
     // Standard PDF URI action regex
     const matches = raw.matchAll(/\/URI\s*\((https?:\/\/[^)]+)\)/g);
     for (const m of matches) {
       if (m[1]) {
-        links.push(m[1].trim());
+        const cleaned = cleanUrl(m[1]);
+        if (cleaned && !links.includes(cleaned)) links.push(cleaned);
       }
     }
     // Also look for /URI <hex> format or unparenthesized http links in objects
-    const directMatches = raw.matchAll(/(https?:\/\/[a-zA-Z0-9.\-_~:/?#[\]@!$&'()*+,;=]+)/g);
+    const directMatches = raw.matchAll(/(https?:\/\/[a-zA-Z0-9.\-_~:/?#[\]@!$&'*+,;=]+)/g);
     for (const dm of directMatches) {
-      if (dm[1] && !links.includes(dm[1])) {
-        links.push(dm[1].trim());
+      if (dm[1]) {
+        const cleaned = cleanUrl(dm[1]);
+        if (cleaned && !links.includes(cleaned)) {
+          links.push(cleaned);
+        }
       }
     }
   } catch {
@@ -49,6 +54,7 @@ export function extractPdfUriAnnotations(bytes: Buffer): string[] {
   }
   return Array.from(new Set(links));
 }
+
 
 /**
  * Performs local OCR on an image or scanned document buffer using Tesseract.js.

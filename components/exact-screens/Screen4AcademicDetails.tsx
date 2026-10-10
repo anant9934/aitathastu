@@ -22,6 +22,10 @@ export interface AcademicDetailsData {
 interface Screen4AcademicDetailsProps {
   initialData?: Partial<AcademicDetailsData>;
   isAuthenticated?: boolean;
+  isConditionalReview?: boolean;
+  extractedFields?: string[];
+  stepNumber?: number;
+  totalSteps?: number;
   onSave?: (data: AcademicDetailsData) => void | Promise<void>;
   onNext: () => void;
   onBack: () => void;
@@ -30,6 +34,11 @@ interface Screen4AcademicDetailsProps {
 
 export function Screen4AcademicDetails({
   initialData,
+  isAuthenticated = false,
+  isConditionalReview = false,
+  extractedFields = [],
+  stepNumber = 4,
+  totalSteps = 10,
   onSave,
   onNext,
   onBack,
@@ -41,11 +50,11 @@ export function Screen4AcademicDetails({
     email: initialData?.email || "",
     mobile: initialData?.mobile || "",
     role: initialData?.role || "Student",
-    institution: initialData?.institution || "Lovely Professional University (LPU)",
-    department: initialData?.department || "Computer Science and Engineering",
-    degree: initialData?.degree || "B.Tech",
-    currentYear: initialData?.currentYear || "3rd Year",
-    expectedGraduationYear: initialData?.expectedGraduationYear || 2026,
+    institution: initialData?.institution || "",
+    department: initialData?.department || "",
+    degree: initialData?.degree || "",
+    currentYear: initialData?.currentYear || "",
+    expectedGraduationYear: initialData?.expectedGraduationYear || undefined,
     password: initialData?.password || "",
   });
 
@@ -78,10 +87,16 @@ export function Screen4AcademicDetails({
       newErrors.email = "Please enter a valid email address (e.g. name@university.edu)";
     }
 
-    if (!formData.password) {
-      newErrors.password = "Password is required to secure your account";
-    } else if (formData.password.length < 6) {
+    if (!isAuthenticated && (!formData.password || formData.password.length < 6)) {
       newErrors.password = "Password must be at least 6 characters long";
+    }
+
+    if (!formData.institution.trim()) {
+      newErrors.institution = "Institution / University is required";
+    }
+
+    if (!formData.degree?.trim()) {
+      newErrors.degree = "Degree is required (e.g. B.Tech, B.S., M.S.)";
     }
 
     setErrors(newErrors);
@@ -92,6 +107,8 @@ export function Screen4AcademicDetails({
         fullName: "Full Name",
         email: "Email Address",
         password: "Password",
+        institution: "Institution",
+        degree: "Degree",
       };
       eora?.signalFieldError(
         firstKey,
@@ -111,6 +128,10 @@ export function Screen4AcademicDetails({
     onNext();
   };
 
+  const isFieldFromResume = (field: string) => {
+    return extractedFields.includes(field) || (Boolean(initialData?.[field as keyof AcademicDetailsData]) && isConditionalReview);
+  };
+
   return (
     <div
       className="exact-screen-wrapper relative overflow-hidden"
@@ -128,7 +149,7 @@ export function Screen4AcademicDetails({
       <ScreenHeader
         onBack={onBack}
         showBack={true}
-        rightLabel="Step 4 of 10"
+        rightLabel={`Step ${stepNumber} of ${totalSteps}`}
       />
 
       <main
@@ -162,13 +183,15 @@ export function Screen4AcademicDetails({
               marginBottom: 12,
             }}
           >
-            <span>Step 4 · Personal Profile & Account</span>
+            <span>{isConditionalReview ? "Profile Completion · Missing Details" : `Step ${stepNumber} · Personal Profile & Account`}</span>
           </span>
           <h1 style={{ fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 850, color: "#171626", letterSpacing: "-0.03em", margin: "0 0 10px" }}>
-            Tell us a bit about yourself
+            {isConditionalReview ? "Complete your profile details" : "Tell us a bit about yourself"}
           </h1>
           <p style={{ fontSize: 16, color: "#64748B", margin: 0, maxWidth: 640, marginInline: "auto", lineHeight: 1.55 }}>
-            Set up your credentials and academic background to personalize your AI roadmap and project matches.
+            {isConditionalReview
+              ? "We found some details in your CV. Please verify them and complete the missing academic information."
+              : "Set up your credentials and academic background to personalize your AI roadmap and project matches."}
           </p>
         </div>
 
@@ -193,10 +216,17 @@ export function Screen4AcademicDetails({
             <div>
               <label
                 htmlFor="field-fullname"
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
               >
-                <User size={15} className="text-[#5942DC]" />
-                <span>Full Name <span style={{ color: "#EF4444" }}>*</span></span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <User size={15} className="text-[#5942DC]" />
+                  <span>Full Name <span style={{ color: "#EF4444" }}>*</span></span>
+                </span>
+                {isFieldFromResume("fullName") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
               </label>
               <input
                 id="field-fullname"
@@ -230,10 +260,17 @@ export function Screen4AcademicDetails({
             <div>
               <label
                 htmlFor="field-email"
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
               >
-                <Mail size={15} className="text-[#5942DC]" />
-                <span>Email Address <span style={{ color: "#EF4444" }}>* (Mandatory)</span></span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Mail size={15} className="text-[#5942DC]" />
+                  <span>Email Address <span style={{ color: "#EF4444" }}>*</span></span>
+                </span>
+                {isFieldFromResume("email") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
               </label>
               <input
                 id="field-email"
@@ -263,71 +300,80 @@ export function Screen4AcademicDetails({
               )}
             </div>
 
-            {/* Field 3: Password (Required) */}
-            <div>
-              <label
-                htmlFor="field-password"
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
-              >
-                <Lock size={15} className="text-[#5942DC]" />
-                <span>Password <span style={{ color: "#EF4444" }}>* (Mandatory)</span></span>
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  id="field-password"
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password || ""}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                  placeholder="Create a secure password (min 6 characters)"
-                  style={{
-                    width: "100%",
-                    height: 48,
-                    padding: "0 44px 0 16px",
-                    borderRadius: 12,
-                    border: errors.password ? "1.5px solid #EF4444" : "1.5px solid #E5E7EB",
-                    fontSize: 14,
-                    color: "#171626",
-                    outline: "none",
-                    background: "#FAFAFD",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#5942DC")}
-                  onBlur={(e) => (e.target.style.borderColor = errors.password ? "#EF4444" : "#E5E7EB")}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: "absolute",
-                    right: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "none",
-                    border: "none",
-                    color: "#696778",
-                    cursor: "pointer",
-                    padding: 4,
-                  }}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+            {/* Field 3: Password (Required if not authenticated) */}
+            {!isAuthenticated && (
+              <div>
+                <label
+                  htmlFor="field-password"
+                  style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.password && (
-                <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#EF4444", fontSize: 12, marginTop: 5 }}>
-                  <AlertCircle size={13} /> {errors.password}
+                  <Lock size={15} className="text-[#5942DC]" />
+                  <span>Password <span style={{ color: "#EF4444" }}>* (Mandatory)</span></span>
+                </label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    id="field-password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password || ""}
+                    onChange={(e) => handleChange("password", e.target.value)}
+                    placeholder="Create a secure password (min 6 characters)"
+                    style={{
+                      width: "100%",
+                      height: 48,
+                      padding: "0 44px 0 16px",
+                      borderRadius: 12,
+                      border: errors.password ? "1.5px solid #EF4444" : "1.5px solid #E5E7EB",
+                      fontSize: 14,
+                      color: "#171626",
+                      outline: "none",
+                      background: "#FAFAFD",
+                      transition: "border-color 0.2s, box-shadow 0.2s",
+                    }}
+                    onFocus={(e) => (e.target.style.borderColor = "#5942DC")}
+                    onBlur={(e) => (e.target.style.borderColor = errors.password ? "#EF4444" : "#E5E7EB")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      color: "#696778",
+                      cursor: "pointer",
+                      padding: 4,
+                    }}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-              )}
-            </div>
+                {errors.password && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#EF4444", fontSize: 12, marginTop: 5 }}>
+                    <AlertCircle size={13} /> {errors.password}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Field 4: Mobile Number */}
             <div>
               <label
                 htmlFor="field-mobile"
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
               >
-                <Phone size={15} className="text-[#5942DC]" />
-                <span>Mobile Number</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Phone size={15} className="text-[#5942DC]" />
+                  <span>Mobile Number</span>
+                </span>
+                {isFieldFromResume("mobile") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
               </label>
               <input
                 id="field-mobile"
@@ -388,14 +434,64 @@ export function Screen4AcademicDetails({
               </select>
             </div>
 
-            {/* Field 6: Department / Domain */}
+            {/* Field 6: Degree */}
+            <div>
+              <label
+                htmlFor="field-degree"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <BookOpen size={15} className="text-[#5942DC]" />
+                  <span>Degree <span style={{ color: "#EF4444" }}>*</span></span>
+                </span>
+                {isFieldFromResume("degree") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
+              </label>
+              <input
+                id="field-degree"
+                type="text"
+                value={formData.degree || ""}
+                onChange={(e) => handleChange("degree", e.target.value)}
+                placeholder="e.g. B.Tech, B.S., M.S., BCA"
+                style={{
+                  width: "100%",
+                  height: 48,
+                  padding: "0 16px",
+                  borderRadius: 12,
+                  border: errors.degree ? "1.5px solid #EF4444" : "1.5px solid #E5E7EB",
+                  fontSize: 14,
+                  color: "#171626",
+                  outline: "none",
+                  background: "#FAFAFD",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#5942DC")}
+                onBlur={(e) => (e.target.style.borderColor = errors.degree ? "#EF4444" : "#E5E7EB")}
+              />
+              {errors.degree && (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#EF4444", fontSize: 12, marginTop: 5 }}>
+                  <AlertCircle size={13} /> {errors.degree}
+                </div>
+              )}
+            </div>
+
+            {/* Field 7: Department / Domain */}
             <div>
               <label
                 htmlFor="field-department"
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
               >
-                <BookOpen size={15} className="text-[#5942DC]" />
-                <span>Department / Domain</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <BookOpen size={15} className="text-[#5942DC]" />
+                  <span>Department / Domain</span>
+                </span>
+                {isFieldFromResume("department") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
               </label>
               <input
                 id="field-department"
@@ -419,21 +515,28 @@ export function Screen4AcademicDetails({
               />
             </div>
 
-            {/* Field 7: Institution (Spans Full Width on grid) */}
-            <div style={{ gridColumn: "1 / -1" }}>
+            {/* Field 8: Expected Graduation Year */}
+            <div>
               <label
-                htmlFor="field-institution"
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+                htmlFor="field-gradyear"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
               >
-                <Building2 size={15} className="text-[#5942DC]" />
-                <span>Institution / University</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <BookOpen size={15} className="text-[#5942DC]" />
+                  <span>Graduation Year</span>
+                </span>
+                {isFieldFromResume("expectedGraduationYear") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
               </label>
               <input
-                id="field-institution"
-                type="text"
-                value={formData.institution}
-                onChange={(e) => handleChange("institution", e.target.value)}
-                placeholder="e.g. Lovely Professional University (LPU)"
+                id="field-gradyear"
+                type="number"
+                value={formData.expectedGraduationYear || ""}
+                onChange={(e) => handleChange("expectedGraduationYear", e.target.value ? parseInt(e.target.value, 10) : "")}
+                placeholder="e.g. 2026"
                 style={{
                   width: "100%",
                   height: 48,
@@ -449,6 +552,49 @@ export function Screen4AcademicDetails({
                 onBlur={(e) => (e.target.style.borderColor = "#E5E7EB")}
               />
             </div>
+
+            {/* Field 9: Institution (Spans Full Width on grid) */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label
+                htmlFor="field-institution"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: "#171626", marginBottom: 8 }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Building2 size={15} className="text-[#5942DC]" />
+                  <span>Institution / University <span style={{ color: "#EF4444" }}>*</span></span>
+                </span>
+                {isFieldFromResume("institution") && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#059669", background: "rgba(5, 150, 105, 0.08)", padding: "2px 8px", borderRadius: 9999 }}>
+                    Found in your resume
+                  </span>
+                )}
+              </label>
+              <input
+                id="field-institution"
+                type="text"
+                value={formData.institution}
+                onChange={(e) => handleChange("institution", e.target.value)}
+                placeholder="e.g. Indian Institute of Technology, Stanford University"
+                style={{
+                  width: "100%",
+                  height: 48,
+                  padding: "0 16px",
+                  borderRadius: 12,
+                  border: errors.institution ? "1.5px solid #EF4444" : "1.5px solid #E5E7EB",
+                  fontSize: 14,
+                  color: "#171626",
+                  outline: "none",
+                  background: "#FAFAFD",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#5942DC")}
+                onBlur={(e) => (e.target.style.borderColor = errors.institution ? "#EF4444" : "#E5E7EB")}
+              />
+              {errors.institution && (
+                <div style={{ display: "flex", alignItems: "center", gap: 4, color: "#EF4444", fontSize: 12, marginTop: 5 }}>
+                  <AlertCircle size={13} /> {errors.institution}
+                </div>
+              )}
+            </div>
           </form>
         </div>
 
@@ -457,8 +603,8 @@ export function Screen4AcademicDetails({
           onBack={onBack}
           onNext={handleSubmit}
           onStepClick={onJumpToStep}
-          activeStep={4}
-          totalSteps={10}
+          activeStep={stepNumber}
+          totalSteps={totalSteps}
           nextLabel="Next"
         />
       </main>

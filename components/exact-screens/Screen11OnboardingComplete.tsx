@@ -205,6 +205,8 @@ export function Screen11OnboardingComplete({
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <button
                 type="button"
+                id="eora-onboarding-finish"
+                data-eora-id="eora-onboarding-finish"
                 onClick={onGoToDashboard}
                 style={{
                   display: "inline-flex",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServerAuthContext } from "@/lib/auth/server-session";
+import { getServerAuthContext, getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
 import { completeOnboarding, readOnboardingDraft, writeOnboardingDraft } from "@/lib/services/onboarding-v2-service";
-import { createUser, findUserByEmail } from "@/lib/repositories/user-repository";
+import { createUser, findUserByEmail, updateUserCredentials } from "@/lib/repositories/user-repository";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/auth/session";
 
@@ -17,41 +17,60 @@ export async function PUT(request: Request) {
   let sessionToken: string | null = null;
   let sessionExpires: Date | null = null;
 
-  // Seamless auto-auth if credentials are provided in draft
-  if (!auth && body.email && typeof body.email === "string" && body.password && typeof body.password === "string") {
-    const existing = await findUserByEmail(body.email);
-    if (existing) {
-      const valid = await verifyPassword(body.password, existing.passwordHash);
-      if (valid) {
-        const sess = await createSession(existing.id);
-        sessionToken = sess.token;
-        sessionExpires = sess.expiresAt;
-        auth = {
-          user: { id: existing.id, email: existing.email },
-          person: { id: existing.personId || existing.id, displayName: existing.displayName || "Student" },
-          session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-        };
-      }
-    } else if (body.password.length >= 6) {
-      const passwordHash = await hashPassword(body.password);
-      const created = await createUser({
-        email: body.email,
-        passwordHash,
-        displayName: body.name || "Student",
-      });
-      const sess = await createSession(created.userId);
-      sessionToken = sess.token;
-      sessionExpires = sess.expiresAt;
-      auth = {
-        user: { id: created.userId, email: created.email },
-        person: { id: created.personId, displayName: created.displayName },
-        session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-      };
+  // Ensure an auth context exists for the onboarding visitor
+  if (!auth) {
+    const guestCtx = await getOrCreateOnboardingAuthContext();
+    auth = guestCtx.auth;
+    if (guestCtx.sessionCookieToSet) {
+      sessionToken = guestCtx.sessionCookieToSet.value;
+      sessionExpires = guestCtx.sessionCookieToSet.options.expires as Date;
     }
   }
 
-  if (!auth) {
-    return NextResponse.json({ error: "Sign in to save your journey across devices." }, { status: 401 });
+  // Seamless account linking / upgrade if credentials are provided in draft
+  if (body.email && typeof body.email === "string" && body.password && typeof body.password === "string" && body.password.length >= 6) {
+    const normalizedEmail = body.email.trim().toLowerCase();
+    const existing = await findUserByEmail(normalizedEmail);
+    if (existing) {
+      if (existing.id !== auth.user.id) {
+        const valid = await verifyPassword(body.password, existing.passwordHash);
+        if (valid) {
+          const sess = await createSession(existing.id);
+          sessionToken = sess.token;
+          sessionExpires = sess.expiresAt;
+          auth = {
+            user: { id: existing.id, email: existing.email },
+            person: { id: existing.personId || existing.id, displayName: existing.displayName || "Student" },
+            session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
+          };
+        }
+      }
+    } else {
+      if (auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
+        const passwordHash = await hashPassword(body.password);
+        await updateUserCredentials(auth.user.id, {
+          email: normalizedEmail,
+          passwordHash,
+          displayName: body.name || "Student",
+        });
+        auth.user.email = normalizedEmail;
+      } else {
+        const passwordHash = await hashPassword(body.password);
+        const created = await createUser({
+          email: normalizedEmail,
+          passwordHash,
+          displayName: body.name || "Student",
+        });
+        const sess = await createSession(created.userId);
+        sessionToken = sess.token;
+        sessionExpires = sess.expiresAt;
+        auth = {
+          user: { id: created.userId, email: created.email },
+          person: { id: created.personId, displayName: created.displayName },
+          session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
+        };
+      }
+    }
   }
 
   try {
@@ -81,40 +100,61 @@ export async function POST(request: Request) {
   let sessionToken: string | null = null;
   let sessionExpires: Date | null = null;
 
-  // Auto-login / Auto-signup during final onboarding launch if email & password are provided
-  if (!auth && body.email && typeof body.email === "string" && body.password && typeof body.password === "string") {
-    const existing = await findUserByEmail(body.email);
-    if (existing) {
-      const valid = await verifyPassword(body.password, existing.passwordHash);
-      if (valid) {
-        const sess = await createSession(existing.id);
-        sessionToken = sess.token;
-        sessionExpires = sess.expiresAt;
-        auth = {
-          user: { id: existing.id, email: existing.email },
-          person: { id: existing.personId || existing.id, displayName: existing.displayName || "Student" },
-          session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-        };
-      }
-    } else if (body.password.length >= 6) {
-      const passwordHash = await hashPassword(body.password);
-      const created = await createUser({
-        email: body.email,
-        passwordHash,
-        displayName: body.name || "Student",
-      });
-      const sess = await createSession(created.userId);
-      sessionToken = sess.token;
-      sessionExpires = sess.expiresAt;
-      auth = {
-        user: { id: created.userId, email: created.email },
-        person: { id: created.personId, displayName: created.displayName },
-        session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-      };
+  // Ensure an auth context exists
+  if (!auth) {
+    const guestCtx = await getOrCreateOnboardingAuthContext();
+    auth = guestCtx.auth;
+    if (guestCtx.sessionCookieToSet) {
+      sessionToken = guestCtx.sessionCookieToSet.value;
+      sessionExpires = guestCtx.sessionCookieToSet.options.expires as Date;
     }
   }
 
-  if (!auth) return NextResponse.json({ error: "Sign in before completing onboarding." }, { status: 401 });
+  // Auto-login / Auto-upgrade during final onboarding launch if email & password are provided
+  if (body.email && typeof body.email === "string" && body.password && typeof body.password === "string" && body.password.length >= 6) {
+    const normalizedEmail = body.email.trim().toLowerCase();
+    const existing = await findUserByEmail(normalizedEmail);
+    if (existing) {
+      if (existing.id !== auth.user.id) {
+        const valid = await verifyPassword(body.password, existing.passwordHash);
+        if (valid) {
+          const sess = await createSession(existing.id);
+          sessionToken = sess.token;
+          sessionExpires = sess.expiresAt;
+          auth = {
+            user: { id: existing.id, email: existing.email },
+            person: { id: existing.personId || existing.id, displayName: existing.displayName || "Student" },
+            session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
+          };
+        }
+      }
+    } else {
+      if (auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
+        const passwordHash = await hashPassword(body.password);
+        await updateUserCredentials(auth.user.id, {
+          email: normalizedEmail,
+          passwordHash,
+          displayName: body.name || "Student",
+        });
+        auth.user.email = normalizedEmail;
+      } else {
+        const passwordHash = await hashPassword(body.password);
+        const created = await createUser({
+          email: normalizedEmail,
+          passwordHash,
+          displayName: body.name || "Student",
+        });
+        const sess = await createSession(created.userId);
+        sessionToken = sess.token;
+        sessionExpires = sess.expiresAt;
+        auth = {
+          user: { id: created.userId, email: created.email },
+          person: { id: created.personId, displayName: created.displayName },
+          session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
+        };
+      }
+    }
+  }
 
   try {
     const result = await completeOnboarding(auth.person.id, body);

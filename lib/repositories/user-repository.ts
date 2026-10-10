@@ -150,3 +150,23 @@ export async function findUserById(id: string) {
 
   return rows.length > 0 ? rows[0] : null;
 }
+
+export async function updateUserCredentials(
+  userId: string,
+  params: { email?: string; passwordHash?: string; displayName?: string }
+): Promise<void> {
+  const db = await getDb();
+  if (params.email || params.passwordHash) {
+    const userUpdates: Record<string, unknown> = { updatedAt: new Date() };
+    if (params.email) userUpdates.email = params.email.trim().toLowerCase();
+    if (params.passwordHash) userUpdates.passwordHash = params.passwordHash;
+    await db.update(users).set(userUpdates).where(eq(users.id, userId));
+  }
+  if (params.displayName) {
+    await db
+      .update(persons)
+      .set({ displayName: params.displayName.trim(), updatedAt: new Date() })
+      .where(eq(persons.primaryUserId, userId));
+  }
+}
+

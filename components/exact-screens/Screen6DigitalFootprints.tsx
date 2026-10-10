@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
-import { Check, Loader2, Sparkles, Plus, Globe, Trash2, X, Upload, ExternalLink, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Check, Loader2, Sparkles, Plus, Globe, Trash2, X, Upload, AlertCircle } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
+import { ProcessingActivity } from "./ProcessingActivity";
 
 interface Screen6DigitalFootprintsProps {
   initialProfiles?: Partial<Record<string, string>>;
@@ -256,6 +257,16 @@ const platforms: PlatformConfig[] = [
     bg: "#F3F4F6",
     supportedCapability: "Enter Details",
   },
+  {
+    id: "stackoverflow", name: "Stack Overflow", placeholder: "Stack Overflow profile URL or user ID",
+    prefix: "stackoverflow.com/users/", renderIcon: Globe, color: "#F48024", bg: "#FFF7ED",
+    supportedCapability: "Add Profile URL",
+  },
+  {
+    id: "google_scholar", name: "Google Scholar", placeholder: "Google Scholar profile URL or user ID",
+    prefix: "scholar.google.com/", renderIcon: Globe, color: "#4285F4", bg: "#EFF6FF",
+    supportedCapability: "Add Profile URL",
+  },
 ];
 
 export function Screen6DigitalFootprints({
@@ -276,6 +287,25 @@ export function Screen6DigitalFootprints({
     return init;
   });
   const [ignoredResumeCandidates, setIgnoredResumeCandidates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/student/connections", { cache: "no-store" }).then((res) => res.ok ? res.json() : null).then((data) => {
+      if (cancelled || !Array.isArray(data?.connectors)) return;
+      const found: Record<string, string> = {};
+      const nextStatuses: Partial<Record<string, FootprintHonestStatus>> = {};
+      for (const connection of data.connectors) {
+        if (connection.status === "not_connected" || !connection.profileUrl || !platforms.some((p) => p.id === connection.provider)) continue;
+        found[connection.provider] = connection.profileUrl;
+        nextStatuses[connection.provider] = connection.lastSyncedAt ? "Connected" : "Profile Linked";
+      }
+      if (Object.keys(found).length) {
+        setProfiles((prev) => ({ ...found, ...prev }));
+        setStatuses((prev) => ({ ...nextStatuses, ...prev }));
+      }
+    }).catch(() => null);
+    return () => { cancelled = true; };
+  }, []);
 
   const handleConfirmResumeCandidate = (platformId: string, url: string) => {
     const nextProfiles = { ...profiles, [platformId]: url };
@@ -357,12 +387,13 @@ export function Screen6DigitalFootprints({
     }
   };
 
-  const handleSavePlatform = async (platformId: string) => {
+  const handleSavePlatform = async (platformId: string, suppliedValue?: string) => {
     setErrorMessage(null);
     setStatusMessage(null);
-    const rawVal = inputVal.trim();
+    const rawVal = (suppliedValue ?? inputVal).trim();
 
-    if (!rawVal && !uploadFile) {
+    const selectedUpload = suppliedValue === undefined ? uploadFile : null;
+    if (!rawVal && !selectedUpload) {
       handleDisconnectPlatform(platformId);
       return;
     }
@@ -372,24 +403,26 @@ export function Screen6DigitalFootprints({
     setStatusMessage(`Verifying and syncing ${platformId}...`);
 
     try {
+      const jobResponse = await fetch("/api/student/processing-jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceId: platformId }) });
+      const job = await jobResponse.json();
+      if (!jobResponse.ok || !job.jobId) throw new Error(job.error || "Could not start import.");
       if (platformId === "github") {
         // GitHub specialized discovery
-        const cleanVal = rawVal.replace(/^https?:\/\/github\.com\//i, "").replace(/\/$/, "");
+        const cleanVal = rawVal.replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, "").split("/")[0];
         const res = await fetch("/api/onboarding-v2/github", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: cleanVal, consent: true }),
+          body: JSON.stringify({ username: cleanVal, consent: true, jobId: job.jobId }),
         });
         const data = await res.json();
-        if (res.ok && data.projects) {
+        if (res.ok && Array.isArray(data.projects)) {
           onGitHubProjectsDiscovered?.(data.projects);
           setStatuses((prev) => ({ ...prev, [platformId]: "Connected" }));
           setStatusMessage(`GitHub connected. Found ${data.projects.length} repository candidates for review.`);
         } else {
-          setStatuses((prev) => ({ ...prev, [platformId]: "Profile Linked" }));
-          setStatusMessage(data.error || "GitHub profile linked.");
+          throw new Error(data.error || "GitHub import failed.");
         }
-        const next = { ...profiles, [platformId]: cleanVal };
+        const next = { ...profiles, [platformId]: `https://github.com/${cleanVal}` };
         setProfiles(next);
         onProfilesChange?.(next);
       } else {
@@ -399,9 +432,10 @@ export function Screen6DigitalFootprints({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             provider: platformId,
+            jobId: job.jobId,
             identifier: rawVal,
-            exportFilename: uploadFile?.name,
-            exportContent: uploadFile?.content,
+            exportFilename: selectedUpload?.name,
+            exportContent: selectedUpload?.content,
             consent: true,
           }),
         });
@@ -412,7 +446,7 @@ export function Screen6DigitalFootprints({
         }
 
         const isLive = data.acquisitionStatus === "LIVE_VERIFIED" || data.acquisitionStatus === "API_PUBLIC_UNVERIFIED_OWNERSHIP";
-        const isArchive = data.acquisitionStatus === "MANUAL_ARCHIVE_VERIFIED" || Boolean(uploadFile);
+        const isArchive = data.acquisitionStatus === "MANUAL_ARCHIVE_VERIFIED" || Boolean(selectedUpload);
         const newStatus: FootprintHonestStatus = isArchive
           ? "Review Required"
           : isLive
@@ -422,14 +456,14 @@ export function Screen6DigitalFootprints({
         setStatuses((prev) => ({ ...prev, [platformId]: newStatus }));
         setStatusMessage(data.summary || `Successfully synced ${platformId}.`);
 
-        const nextVal = uploadFile ? `Archive: ${uploadFile.name}` : rawVal;
+        const nextVal = selectedUpload ? `Archive: ${selectedUpload.name}` : rawVal;
         const next = { ...profiles, [platformId]: nextVal };
         setProfiles(next);
         onProfilesChange?.(next);
       }
 
       setTimeout(() => {
-        handleClosePrompt();
+        if (activePrompt) handleClosePrompt();
       }, 1500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sync failed.";
@@ -437,6 +471,13 @@ export function Screen6DigitalFootprints({
       setStatuses((prev) => ({ ...prev, [platformId]: "Import Failed" }));
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const syncLinkedProfiles = async () => {
+    for (const [provider, value] of Object.entries(profiles)) {
+      if (!value || value.startsWith("Archive:") || !platforms.some((p) => p.id === provider)) continue;
+      await handleSavePlatform(provider, value);
     }
   };
 
@@ -614,6 +655,11 @@ export function Screen6DigitalFootprints({
               </div>
             )}
           </div>
+
+          {connectedCount > 0 && <button type="button" disabled={isSyncing} onClick={() => void syncLinkedProfiles()}
+            style={{ marginBottom: 18, padding: "10px 16px", borderRadius: 10, border: "1px solid #C7D2FE", background: "#EEF2FF", color: "#4338CA", fontWeight: 700, cursor: "pointer" }}>
+            {isSyncing ? "Syncing sources…" : "Extract from all linked profiles"}
+          </button>}
 
           <div
             style={{
@@ -1125,6 +1171,7 @@ export function Screen6DigitalFootprints({
               )}
             </div>
           )}
+          <ProcessingActivity />
         </div>
 
         {/* Footer with Interactive Stepper */}

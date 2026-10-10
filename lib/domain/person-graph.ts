@@ -144,7 +144,7 @@ export function generateWhyTathastuThinksThis(
 
   const githubEvidence = evidenceItems.filter((e) => e.source === "imported" || e.source === "github");
   if (githubEvidence.length > 0) {
-    reasons.push(`Detected in public code from your connected GitHub account (${githubEvidence.length} observations).`);
+    reasons.push(`Detected from a connected source (${githubEvidence.length} observations); review your personal contribution.`);
   }
 
   if (relatedProjects.length > 0) {
@@ -289,16 +289,15 @@ export async function buildPersonGraph(personId: string): Promise<PersonGraphSum
     let finalState: SkillEvidenceState = "Claimed";
 
     const hasVerified = node.evidenceItems.some((e) => e.verificationStatus === "verified");
-    const hasImportedOrProject =
-      node.relatedProjects.length > 0 ||
-      node.evidenceItems.some((e) => e.source === "imported" || e.source === "github");
+    const hasConfirmedProject = node.relatedProjects.length > 0;
+    const hasImported = node.evidenceItems.some((e) => e.source === "imported" || e.source === "github");
     const evidenceCount = node.evidenceItems.length;
 
     if (hasVerified) {
       finalState = "Verified";
-    } else if (hasImportedOrProject) {
+    } else if (hasConfirmedProject) {
       finalState = "Demonstrated";
-    } else if (evidenceCount >= 2) {
+    } else if (hasImported || evidenceCount >= 2) {
       finalState = "Evidence available";
     } else if (evidenceCount === 1) {
       finalState = "Claimed";

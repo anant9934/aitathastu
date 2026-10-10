@@ -155,6 +155,14 @@ export class SourceProcessingJobService {
       .limit(limit);
   }
 
+  static async getJobForPerson(jobId: string, personId: string) {
+    const db = await getDb();
+    const [job] = await db.select().from(sourceProcessingJobs).where(and(
+      eq(sourceProcessingJobs.id, jobId), eq(sourceProcessingJobs.personId, personId)
+    )).limit(1);
+    return job || null;
+  }
+
   /**
    * Recovers stuck processing jobs that have exceeded threshold runtime.
    */

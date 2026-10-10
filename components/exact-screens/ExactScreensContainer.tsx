@@ -72,6 +72,8 @@ export function ExactScreensContainer({
     isGalleryMode ? "Rahul_Sharma_Resume.pdf" : null
   );
   const [resumeReviewed, setResumeReviewed] = useState<ReviewedResumeClaim[]>([]);
+  const [extractedResumeFields, setExtractedResumeFields] = useState<string[]>([]);
+  const [visitedAcademicScreen, setVisitedAcademicScreen] = useState<boolean>(false);
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>({});
   const [discoveredResumeProfiles, setDiscoveredResumeProfiles] = useState<Partial<Record<string, string>>>({});
   const [skills, setSkills] = useState<string[]>(isGalleryMode ? ["Python", "Machine Learning", "Data Analysis", "DSA"] : []);
@@ -181,10 +183,11 @@ export function ExactScreensContainer({
             targetRoleId: patch.targetRoleId ?? targetRoleId,
             targetTimeline: patch.targetTimeline ?? targetTimeline,
             customGoalText: patch.customGoalText ?? customGoalText,
-            degree: academic.degree,
-            specialization: academic.department,
-            institution: academic.institution,
-            year: academic.currentYear,
+            degree: patch.degree ?? academic.degree,
+            specialization: patch.specialization ?? academic.department,
+            institution: patch.institution ?? academic.institution,
+            year: patch.year ?? academic.currentYear,
+            expectedGraduationYear: patch.expectedGraduationYear ?? academic.expectedGraduationYear,
             semester: "",
             skills: patch.skills ?? skills,
             resumeReviewed: patch.resumeReviewed ?? resumeReviewed,
@@ -224,7 +227,7 @@ export function ExactScreensContainer({
   const handleAcademicSave = async (data: AcademicDetailsData) => {
     setAcademic(data);
     setName(data.fullName);
-    persistDraft({ name: data.fullName });
+    persistDraft({ name: data.fullName, degree: data.degree, specialization: data.department, institution: data.institution, year: data.currentYear, expectedGraduationYear: data.expectedGraduationYear });
 
     if (!isAuthenticated && data.email && data.password && data.password.length >= 6) {
       try {
@@ -257,6 +260,34 @@ export function ExactScreensContainer({
         // Background non-fatal attempt
       }
     }
+  };
+
+  const isProfileComplete = useCallback(() => {
+    const hasName = Boolean((name || academic.fullName)?.trim());
+    const hasInstitution = Boolean(academic.institution?.trim());
+    const hasDegree = Boolean(academic.degree?.trim());
+    return hasName && hasInstitution && hasDegree;
+  }, [name, academic]);
+
+  const handleResumeNext = () => {
+    if (resumeFileName && isProfileComplete()) {
+      // Case A: Complete CV, skip Screen 4
+      setVisitedAcademicScreen(false);
+      setCurrentScreen(6);
+    } else if (resumeFileName && !isProfileComplete()) {
+      // Case C: Incomplete CV, show Screen 4 for missing fields
+      setVisitedAcademicScreen(true);
+      setCurrentScreen(4);
+    } else {
+      // Case B: No CV / skipped, show Screen 4
+      setVisitedAcademicScreen(true);
+      setCurrentScreen(4);
+    }
+  };
+
+  const handleResumeSkip = () => {
+    setVisitedAcademicScreen(true);
+    setCurrentScreen(4);
   };
 
   const handleFinishOnboarding = async () => {
@@ -307,8 +338,8 @@ export function ExactScreensContainer({
       1: 3,
       2: 3.2,
       3: 3.5,
-      4: 4,
-      5: 5,
+      4: 5, // Step 4 in CV-first flow is Resume Upload (Screen 5)
+      5: visitedAcademicScreen ? 4 : 6,
       6: 6,
       7: 7,
       8: 8,
@@ -408,28 +439,37 @@ export function ExactScreensContainer({
               setPrimaryPriority(primary);
               persistDraft({ priorities: selected, primaryPriority: primary });
             }}
-            onNext={() => setCurrentScreen(4)}
+            onNext={() => setCurrentScreen(5)}
             onBack={() => setCurrentScreen(3.2)}
             onJumpToStep={handleJumpToStep}
           />
         )}
 
-        {/* STEP 4: Academic Details */}
+        {/* STEP 4/5: Academic Details (Conditional Missing Details or Manual Profile) */}
         {currentScreen === 4 && (
           <Screen4AcademicDetails
             initialData={academic}
             isAuthenticated={isAuthenticated}
+            isConditionalReview={Boolean(resumeFileName)}
+            extractedFields={extractedResumeFields}
+            stepNumber={visitedAcademicScreen ? 5 : 4}
+            totalSteps={10}
             onSave={handleAcademicSave}
-            onNext={() => setCurrentScreen(5)}
-            onBack={() => setCurrentScreen(3.5)}
+            onNext={() => {
+              setVisitedAcademicScreen(true);
+              setCurrentScreen(6);
+            }}
+            onBack={() => setCurrentScreen(5)}
             onJumpToStep={handleJumpToStep}
           />
         )}
 
-        {/* STEP 5: Resume Upload */}
+        {/* STEP 4: Resume Upload */}
         {currentScreen === 5 && (
           <Screen5ResumeUpload
             initialFileName={resumeFileName}
+            stepNumber={4}
+            totalSteps={10}
             onExtractionReady={() => {
               eora?.signalSuccess("extraction_completed");
             }}
@@ -440,15 +480,29 @@ export function ExactScreensContainer({
               };
               const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
               const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
-              const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => ({
-                id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value, description: "", technologies: [], sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
-              }));
+              const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => {
+                const extracted = extraData?.extractedProjects?.find((project) => project.sourceSpan === claim.sourceSpan);
+                return {
+                  id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value,
+                  description: extracted?.description || "", technologies: extracted?.technologies || [],
+                  sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
+                  url: extracted?.repositoryUrl,
+                };
+              });
               const nextProjects = [...projects.filter((project) => !project.id.startsWith("resume_")), ...resumeProjects];
               const saved = await persistDraft({
                 skills: nextSkills,
                 projects: nextProjects,
                 resumeReviewed: claims,
                 discoveredResumeProfiles: nextDiscoveredProfiles,
+                ...(extraData?.extractedProfile ? {
+                  name: name || extraData.extractedProfile.fullName || academic.fullName,
+                  degree: academic.degree || extraData.extractedProfile.degree || "",
+                  specialization: academic.department || extraData.extractedProfile.specialization || "",
+                  institution: academic.institution || extraData.extractedProfile.institution || "",
+                  year: academic.currentYear || extraData.extractedProfile.currentYear || "",
+                  expectedGraduationYear: academic.expectedGraduationYear || extraData.extractedProfile.expectedGraduationYear,
+                } : {}),
               });
               if (!saved) return false;
               setResumeFileName(fileName);
@@ -457,9 +511,19 @@ export function ExactScreensContainer({
               // Auto-fill Name & Academic if not already entered by student
               if (extraData?.extractedProfile) {
                 const ep = extraData.extractedProfile;
-                if (ep.fullName && !name) {
-                  setName(ep.fullName);
+                const found: string[] = [];
+                if (ep.fullName) {
+                  found.push("fullName");
+                  if (!name) setName(ep.fullName);
                 }
+                if (ep.email) found.push("email");
+                if (ep.mobile) found.push("mobile");
+                if (ep.degree) found.push("degree");
+                if (ep.institution) found.push("institution");
+                if (ep.specialization) found.push("department");
+                if (ep.expectedGraduationYear) found.push("expectedGraduationYear");
+                setExtractedResumeFields(found);
+
                 setAcademic((prev) => ({
                   ...prev,
                   fullName: prev.fullName || ep.fullName || "",
@@ -485,8 +549,9 @@ export function ExactScreensContainer({
               }
               return true;
             }}
-            onNext={() => setCurrentScreen(6)}
-            onBack={() => setCurrentScreen(4)}
+            onNext={handleResumeNext}
+            onSkip={handleResumeSkip}
+            onBack={() => setCurrentScreen(3.5)}
             onJumpToStep={handleJumpToStep}
           />
         )}
@@ -512,7 +577,10 @@ export function ExactScreensContainer({
                 contributionNote: "",
                 url: p.url,
               }));
-              const nextProjects = [...projects, ...mapped];
+              const nextProjects = [
+                ...projects,
+                ...mapped.filter((incoming) => !projects.some((existing) => incoming.id === existing.id || (incoming.url && incoming.url === existing.url))),
+              ];
               setProjects(nextProjects);
               persistDraft({ projects: nextProjects });
               // Signal GitHub projects discovered to EORA (once per session)
@@ -522,7 +590,13 @@ export function ExactScreensContainer({
               }
             }}
             onNext={() => setCurrentScreen(7)}
-            onBack={() => setCurrentScreen(5)}
+            onBack={() => {
+              if (visitedAcademicScreen) {
+                setCurrentScreen(4);
+              } else {
+                setCurrentScreen(5);
+              }
+            }}
             onJumpToStep={handleJumpToStep}
           />
         )}
@@ -530,6 +604,14 @@ export function ExactScreensContainer({
         {/* STEP 7: AI Analysis */}
         {currentScreen === 7 && (
           <Screen7AiAnalysis
+            completed={[
+              Boolean(academic.degree || academic.institution),
+              resumeReviewed.length > 0,
+              Object.values(profiles).some(Boolean),
+              projects.some((project) => project.status !== "removed"),
+              projects.some((project) => Boolean(project.contributionNote || project.contribution.length)),
+              false,
+            ]}
             onComplete={() => setCurrentScreen(8)}
             onBack={() => setCurrentScreen(6)}
           />
@@ -557,6 +639,7 @@ export function ExactScreensContainer({
         {currentScreen === 9 && (
           <Screen9SkillsMap
             skills={skills}
+            suggestedSkills={Array.from(new Set(projects.filter((project) => project.sources.includes("github")).flatMap((project) => project.technologies)))}
             isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(10)}
             onBack={() => setCurrentScreen(8)}

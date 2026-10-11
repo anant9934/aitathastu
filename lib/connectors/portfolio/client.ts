@@ -10,6 +10,9 @@
  */
 
 import { URL } from "node:url";
+import { lookup } from "node:dns/promises";
+import https from "node:https";
+import { isIP } from "node:net";
 
 export interface PortfolioDiscoveredProject {
   title: string;
@@ -34,57 +37,97 @@ export interface PortfolioMetadata {
   extractedAt: string;
 }
 
-const PRIVATE_IP_REGEX = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|169\.254\.|0\.|::1|fe80:|fc00:)/i;
-const FORBIDDEN_HOSTNAMES = new RegExp(
-  "^(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|metadata\\.google\\.internal|169\\.254\\.169\\.254)$",
-  "i"
-);
+const MAX_HTML_BYTES = 150_000;
+
+function isPublicIpv4(address: string): boolean {
+  if (isIP(address) !== 4) return false;
+  const [a, b, c] = address.split(".").map(Number);
+  return !(
+    a === 0 || a === 10 || a === 127 || a >= 224 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && (b === 168 || (b === 0 && c === 0) || (b === 0 && c === 2))) ||
+    (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+    (a === 203 && b === 0 && c === 113)
+  );
+}
 
 export function isSafePublicUrl(rawUrl: string): { safe: boolean; reason?: string; parsed?: URL } {
   try {
     const parsed = new URL(rawUrl);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      return { safe: false, reason: "Only HTTP/HTTPS URLs are supported." };
+    if (parsed.protocol !== "https:") {
+      return { safe: false, reason: "Only HTTPS portfolio URLs are supported." };
     }
     const hostname = parsed.hostname.toLowerCase();
-    if (FORBIDDEN_HOSTNAMES.test(hostname) || PRIVATE_IP_REGEX.test(hostname)) {
+    const hostWithoutBrackets = hostname.replace(/^\[/, "").replace(/\]$/, "");
+    if (isIP(hostWithoutBrackets) || hostname === "localhost" || hostname.endsWith(".localhost") ||
+        hostname === "localhost.localdomain" || hostname.endsWith(".localdomain") ||
+        hostname.endsWith(".local") || hostname.endsWith(".internal") ||
+        hostname === "metadata.google.internal") {
       return { safe: false, reason: "Private, internal, or loopback network addresses are strictly forbidden." };
     }
-    if (parsed.port && !["80", "443"].includes(parsed.port)) {
+    if (parsed.port && parsed.port !== "443") {
       return { safe: false, reason: "Non-standard network ports are forbidden." };
     }
+    if (parsed.username || parsed.password) return { safe: false, reason: "Portfolio URLs cannot contain credentials." };
     return { safe: true, parsed };
   } catch {
     return { safe: false, reason: "Malformed URL provided." };
   }
 }
 
-export async function fetchPortfolioMetadata(rawUrl: string): Promise<PortfolioMetadata> {
+async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Promise<{ url: string; html: string }> {
   const check = isSafePublicUrl(rawUrl);
   if (!check.safe || !check.parsed) {
     throw new Error(check.reason || "Invalid portfolio URL");
   }
-
-  const res = await fetch(check.parsed.toString(), {
-    headers: {
-      "User-Agent": "AI-Tathastu-PortfolioAuditor/1.0",
-      Accept: "text/html,application/xhtml+xml",
-    },
-    signal: AbortSignal.timeout(5000),
-    redirect: "follow",
+  const addresses = await lookup(check.parsed.hostname, { all: true, family: 4 });
+  const address = addresses.find((entry) => isPublicIpv4(entry.address));
+  if (!address || addresses.some((entry) => !isPublicIpv4(entry.address))) {
+    throw new Error("Portfolio host did not resolve exclusively to public IPv4 addresses.");
+  }
+  const response = await new Promise<{ status: number; contentType: string; location?: string; html: string }>((resolve, reject) => {
+    const request = https.get(check.parsed!, {
+      headers: { "User-Agent": "AI-Tathastu-PortfolioAuditor/1.0", Accept: "text/html,application/xhtml+xml" },
+      timeout: 5000,
+      lookup: (_host, _options, callback) => callback(null, address.address, 4),
+    }, (res) => {
+      const status = res.statusCode || 0;
+      const contentType = String(res.headers["content-type"] || "");
+      const location = typeof res.headers.location === "string" ? res.headers.location : undefined;
+      if (status >= 300 && status < 400) {
+        res.resume();
+        resolve({ status, contentType, location, html: "" });
+        return;
+      }
+      let size = 0;
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_HTML_BYTES) {
+          res.destroy(new Error("Portfolio HTML exceeded the 150 KB limit."));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      res.on("end", () => resolve({ status, contentType, html: Buffer.concat(chunks).toString("utf8") }));
+      res.on("error", reject);
+    });
+    request.on("timeout", () => request.destroy(new Error("Portfolio request timed out.")));
+    request.on("error", reject);
   });
-
-  if (!res.ok) {
-    throw new Error(`Portfolio site returned HTTP status ${res.status}`);
+  if (response.status >= 300 && response.status < 400) {
+    if (!response.location || redirectsRemaining === 0) throw new Error("Portfolio redirect could not be followed safely.");
+    return fetchSafeHtml(new URL(response.location, check.parsed).toString(), redirectsRemaining - 1);
   }
+  if (response.status < 200 || response.status >= 300) throw new Error(`Portfolio site returned HTTP status ${response.status}`);
+  if (!/text\/html|application\/xhtml\+xml/i.test(response.contentType)) throw new Error("Portfolio URL did not return HTML content.");
+  return { url: check.parsed.toString(), html: response.html };
+}
 
-  const contentType = res.headers.get("content-type") || "";
-  if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
-    throw new Error("Portfolio URL did not return HTML content.");
-  }
-
-  const html = await res.text();
-  const truncatedHtml = html.slice(0, 150_000);
+export async function fetchPortfolioMetadata(rawUrl: string): Promise<PortfolioMetadata> {
+  const { url, html: truncatedHtml } = await fetchSafeHtml(rawUrl);
 
   // Extract <title>
   const titleMatch = truncatedHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
@@ -169,7 +212,7 @@ export async function fetchPortfolioMetadata(rawUrl: string): Promise<PortfolioM
   }
 
   return {
-    url: check.parsed.toString(),
+    url,
     title: openGraph.title || title,
     description: openGraph.description || description,
     author,

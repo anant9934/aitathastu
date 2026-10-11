@@ -161,7 +161,12 @@ export async function fetchGitHubUserProfile(
       return { success: false, error: `GitHub user "${clean}" does not exist.` };
     }
     if (res.status === 403 || res.status === 429) {
-      return { success: false, error: "GitHub API rate limit reached. You can continue manually.", rateLimited: true };
+      const rateLimited = res.status === 429 || res.headers.get("x-ratelimit-remaining") === "0";
+      return {
+        success: false,
+        error: rateLimited ? "GitHub API rate limit reached. You can continue manually." : "GitHub denied the profile request (HTTP 403). You can continue manually.",
+        rateLimited,
+      };
     }
     if (!res.ok) {
       return { success: false, error: `GitHub API error (${res.status}).` };
@@ -210,9 +215,7 @@ export async function fetchGitHubUserRepos(
 
   try {
     while (repos.length < maxRepos) {
-      const endpoint = token
-        ? `${GITHUB_API_BASE}/user/repos?sort=updated&per_page=${perPage}&page=${page}&affiliation=owner,collaborator`
-        : `${GITHUB_API_BASE}/users/${encodeURIComponent(clean)}/repos?sort=updated&per_page=${perPage}&page=${page}`;
+      const endpoint = `${GITHUB_API_BASE}/users/${encodeURIComponent(clean)}/repos?sort=updated&per_page=${perPage}&page=${page}`;
 
       const res = await fetch(endpoint, {
         headers: buildHeaders(token),
@@ -222,7 +225,8 @@ export async function fetchGitHubUserRepos(
 
       if (res.status === 404) return { success: false, repos: [], error: `GitHub user "${clean}" not found.` };
       if (res.status === 403 || res.status === 429) {
-        return { success: false, repos, error: "GitHub API rate limit reached.", rateLimited: true };
+        const rateLimited = res.status === 429 || res.headers.get("x-ratelimit-remaining") === "0";
+        return { success: false, repos, error: rateLimited ? "GitHub API rate limit reached." : "GitHub denied the repository request (HTTP 403).", rateLimited };
       }
       if (!res.ok) return { success: false, repos, error: `GitHub API error (${res.status}).` };
 
@@ -408,84 +412,6 @@ export async function fetchGitHubIntelligence(
   // Step 1: User Profile Acquisition
   const profileRes = await fetchGitHubUserProfile(clean, token);
   if (!profileRes.success || !profileRes.profile) {
-    if (profileRes.rateLimited) {
-      // Graceful rate-limit recovery
-      const fallbackProfile: GitHubUserProfile = {
-        id: Math.abs(clean.split("").reduce((acc, c) => (acc * 31 + c.charCodeAt(0)) | 0, 100000)),
-        login: clean,
-        name: clean,
-        bio: `Developer on GitHub (${clean})`,
-        blog: null,
-        location: null,
-        company: null,
-        html_url: `https://github.com/${clean}`,
-        avatar_url: `https://avatars.githubusercontent.com/u/${Math.abs(clean.length * 12345)}?v=4`,
-        public_repos: 2,
-        created_at: "2022-01-01T00:00:00Z",
-        followers: 10,
-        following: 5,
-      };
-
-      const fallbackProjects: DiscoveredGitHubProject[] = [
-        {
-          id: `gh_${fallbackProfile.id}_1`,
-          externalRepoId: fallbackProfile.id * 10 + 1,
-          title: `${clean}-core-engine`,
-          description: `Core software development project by ${clean}`,
-          repositoryUrl: `https://github.com/${clean}/${clean}-core-engine`,
-          homepageUrl: null,
-          primaryLanguage: "TypeScript",
-          languages: ["TypeScript", "Python"],
-          technologies: ["TypeScript", "Node.js", "Python"],
-          technologyFindings: [
-            {
-              name: "TypeScript",
-              category: "Languages",
-              confidence: 0.95,
-              provenance: "MANIFEST_DECLARED",
-              sourceFile: "package.json",
-            },
-            {
-              name: "Python",
-              category: "Languages",
-              confidence: 0.90,
-              provenance: "MANIFEST_DECLARED",
-              sourceFile: "repository",
-            },
-          ],
-          aiMlCategories: ["Full-Stack Web & Applications"],
-          stars: 5,
-          forks: 1,
-          isFork: false,
-          isArchived: false,
-          isPrivate: false,
-          sources: ["github"],
-          status: "candidate",
-          provenance: `Discovered from GitHub public profile (rate-limited resilient fallback).`,
-          checksum: `cs_${clean}_1`,
-          detectedManifests: ["package.json"],
-          observedFiles: ["package.json", "README.md"],
-          studentContributionStatus: "UNVERIFIED",
-          lastGitHubSyncAt: new Date().toISOString(),
-          lastGitHubPushAt: new Date().toISOString(),
-        },
-      ];
-
-      return {
-        success: true,
-        connectionState: "PUBLIC_DATA_IMPORTED",
-        username: clean,
-        profile: fallbackProfile,
-        totalPublicRepos: 2,
-        fetchedReposCount: 1,
-        analyzedReposCount: 1,
-        isComplete: true,
-        projects: fallbackProjects,
-        allDetectedTechnologies: fallbackProjects[0].technologyFindings,
-        source: "fallback",
-      };
-    }
-
     return {
       success: false,
       connectionState: "PUBLIC_PROFILE_CONFIRMED",
@@ -510,62 +436,7 @@ export async function fetchGitHubIntelligence(
     maxRepos: options.maxReposToDiscover ?? 60,
   });
 
-  if (!reposRes.success && reposRes.repos.length === 0) {
-    if (reposRes.rateLimited) {
-      // Graceful rate-limit recovery for repos
-      const fallbackProjects: DiscoveredGitHubProject[] = [
-        {
-          id: `gh_${profile.id}_1`,
-          externalRepoId: profile.id * 10 + 1,
-          title: `${clean}-core-engine`,
-          description: `Core software development project by ${clean}`,
-          repositoryUrl: `https://github.com/${clean}/${clean}-core-engine`,
-          homepageUrl: null,
-          primaryLanguage: "TypeScript",
-          languages: ["TypeScript", "Python"],
-          technologies: ["TypeScript", "Node.js", "Python"],
-          technologyFindings: [
-            {
-              name: "TypeScript",
-              category: "Languages",
-              confidence: 0.95,
-              provenance: "MANIFEST_DECLARED",
-              sourceFile: "package.json",
-            },
-          ],
-          aiMlCategories: ["Full-Stack Web & Applications"],
-          stars: 5,
-          forks: 1,
-          isFork: false,
-          isArchived: false,
-          isPrivate: false,
-          sources: ["github"],
-          status: "candidate",
-          provenance: `Discovered from GitHub public profile (rate-limited resilient fallback).`,
-          checksum: `cs_${clean}_1`,
-          detectedManifests: ["package.json"],
-          observedFiles: ["package.json", "README.md"],
-          studentContributionStatus: "UNVERIFIED",
-          lastGitHubSyncAt: new Date().toISOString(),
-          lastGitHubPushAt: new Date().toISOString(),
-        },
-      ];
-
-      return {
-        success: true,
-        connectionState: "PUBLIC_DATA_IMPORTED",
-        username: clean,
-        profile,
-        totalPublicRepos: profile.public_repos,
-        fetchedReposCount: 1,
-        analyzedReposCount: 1,
-        isComplete: true,
-        projects: fallbackProjects,
-        allDetectedTechnologies: fallbackProjects[0].technologyFindings,
-        source: "fallback",
-      };
-    }
-
+  if (!reposRes.success) {
     return {
       success: false,
       connectionState: "PUBLIC_PROFILE_CONFIRMED",
@@ -629,7 +500,7 @@ export async function fetchGitHubIntelligence(
     profile,
     totalPublicRepos: profile.public_repos,
     fetchedReposCount: allRepos.length,
-    analyzedReposCount: projects.length,
+    analyzedReposCount: reposToInspect.length,
     isComplete,
     projects,
     allDetectedTechnologies: Array.from(allFindingsMap.values()),

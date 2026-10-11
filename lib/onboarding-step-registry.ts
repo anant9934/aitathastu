@@ -15,6 +15,8 @@ export interface OnboardingStepDefinition {
   screenIndex: number;
 }
 
+// Screen 2 is the welcome prelude. Screen 9 is an unnumbered skills-map view
+// between Steps 8 and 9; neither should shift the ten numbered steps.
 export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
   {
     stepNumber: 1,
@@ -32,7 +34,7 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "AI/ML Direction",
     description: "Choose your target AI/ML role, specific goal, and timeline.",
     section: "Direction",
-    screenIndex: 4,
+    screenIndex: 3.2,
   },
   {
     stepNumber: 3,
@@ -41,25 +43,25 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "Priorities",
     description: "Select what you want to focus on first in Tathastu.",
     section: "Direction",
-    screenIndex: 5,
+    screenIndex: 3.5,
   },
   {
     stepNumber: 4,
-    id: "academic_details",
-    title: "Basic Academic Details",
-    shortLabel: "Academic Details",
-    description: "Confirm your degree, university, department, and graduation year.",
-    section: "Profile",
-    screenIndex: 6,
-  },
-  {
-    stepNumber: 5,
     id: "resume_upload",
     title: "Resume / CV Upload",
     shortLabel: "Resume & CV",
-    description: "Upload your resume for local parsing (optional).",
+    description: "Upload a PDF or DOCX resume for extraction and review (optional).",
     section: "Profile",
-    screenIndex: 7,
+    screenIndex: 5,
+  },
+  {
+    stepNumber: 5,
+    id: "academic_details",
+    title: "Basic Academic Details",
+    shortLabel: "Academic Details",
+    description: "Confirm your degree, university, department, and graduation year when needed.",
+    section: "Profile",
+    screenIndex: 4,
   },
   {
     stepNumber: 6,
@@ -68,7 +70,7 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "Digital Profiles",
     description: "Link your GitHub, LinkedIn, or coding platform profiles.",
     section: "Footprints",
-    screenIndex: 8,
+    screenIndex: 6,
   },
   {
     stepNumber: 7,
@@ -77,7 +79,7 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "AI Analysis",
     description: "EORA analyzes your starting picture and synthesizes insights.",
     section: "Review",
-    screenIndex: 9,
+    screenIndex: 7,
   },
   {
     stepNumber: 8,
@@ -86,7 +88,7 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "Profile & Skills",
     description: "Verify your confirmed skills and profile highlights.",
     section: "Review",
-    screenIndex: 10,
+    screenIndex: 8,
   },
   {
     stepNumber: 9,
@@ -95,7 +97,7 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "Projects",
     description: "Confirm your self-reported projects and personal contributions.",
     section: "Review",
-    screenIndex: 11,
+    screenIndex: 10,
   },
   {
     stepNumber: 10,
@@ -104,7 +106,7 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
     shortLabel: "Launch",
     description: "Complete your onboarding and transition to your live student workspace.",
     section: "Launch",
-    screenIndex: 12,
+    screenIndex: 11,
   },
 ];
 

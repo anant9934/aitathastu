@@ -26,7 +26,7 @@ interface Screen4AcademicDetailsProps {
   extractedFields?: string[];
   stepNumber?: number;
   totalSteps?: number;
-  onSave?: (data: AcademicDetailsData) => void | Promise<void>;
+  onSave?: (data: AcademicDetailsData) => boolean | Promise<boolean>;
   onNext: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
@@ -124,7 +124,11 @@ export function Screen4AcademicDetails({
     if (!validate()) {
       return;
     }
-    await onSave?.(formData);
+    const saved = await onSave?.(formData);
+    if (saved === false) {
+      setErrors({ email: "We could not save these details. If this email already has an account, sign in first." });
+      return;
+    }
     onNext();
   };
 

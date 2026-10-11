@@ -283,7 +283,7 @@ export function extractPersonalDetails(
 
   let fullName = "";
   for (const line of headerLines.slice(0, 6)) {
-    // Support names sharing the line with contact details (e.g. "Anant Kumar Email: 720anant@gmail.com")
+    // Support names sharing the line with contact details (e.g. "Alex Morgan Email: alex@example.test")
     const beforeContact = line
       .split(/\b(?:Email|Mail|Phone|Mobile|Tel|LinkedIn|Github|Portfolio)\b|[:|•–—\-]|\b[a-zA-Z0-9._%+-]+@/i)[0]
       .trim();
@@ -661,7 +661,7 @@ export function extractDomainSkills(
         results.push({
           name: found,
           category,
-          proficiencyHint: "intermediate",
+          proficiencyHint: "unknown",
           sourceSpan: found,
         });
       }
@@ -682,7 +682,7 @@ export function extractDomainSkills(
         results.push({
           name: tok,
           category: "other",
-          proficiencyHint: "intermediate",
+          proficiencyHint: "unknown",
           sourceSpan: tok,
         });
         if (results.length >= 20) break;
@@ -738,7 +738,7 @@ export function extractSkills(
       results.push({
         name: entry.name,
         category: entry.category,
-        proficiencyHint: "intermediate",
+        proficiencyHint: "unknown",
         sourceSpan: matchedSpan,
       });
     }
@@ -778,6 +778,7 @@ export function extractProjects(
     const isNumberedTitle = /^\d+[\.)]\s+[A-Za-z]/.test(line) && line.length <= 80 && !line.endsWith(".");
     const bulletProjectMatch = line.match(/^[•\-*–—]\s*([^:(]+?)(?:\s*\(([^)]+)\))?\s*:\s*(.*)/);
     const isBullet = (/^[•\-*–—]\s*/.test(line) || /^\d+\.\s*/.test(line)) && !isNumberedTitle;
+    const isBareBulletTitle = isBullet && !bulletProjectMatch && line.length <= 80 && !line.endsWith(".");
     const hasRepo = /github\.com\/[a-zA-Z0-9_.\-]+\/[a-zA-Z0-9_.\-]+/i.test(line);
     const isUrl = /^https?:\/\//i.test(line) || /^github\.com\//i.test(line);
 
@@ -798,9 +799,9 @@ export function extractProjects(
       }
     }
     // Case 2: Numbered title or short distinct header line
-    else if ((!isBullet || isNumberedTitle) && !isUrl && line.length <= 80 && !line.endsWith(".") && !currentBlock) {
+    else if ((isBareBulletTitle || isNumberedTitle || (!isBullet && !currentBlock)) && !isUrl && line.length <= 80 && !line.endsWith(".")) {
       if (currentBlock) blocks.push(currentBlock);
-      const titleClean = line.replace(/^\d+[\.)]\s+/, "").replace(/^[*_#:\s]+|[*_#:\s]+$/g, "");
+      const titleClean = line.replace(/^(?:\d+[\.)]|[•\-*–—])\s+/, "").replace(/^[*_#:\s]+|[*_#:\s]+$/g, "");
       currentBlock = {
         title: titleClean,
         description: "",
@@ -1124,7 +1125,7 @@ export function extractExperience(
       lineText = lineText.replace(/\s+(?:Remote|Onsite|Hybrid|[A-Z][a-z]+,\s*[A-Z]{2})\b/g, " ").trim();
 
       // Check if role keyword is inside lineText
-      const roleKeywordsRegex = /\b(?:(?:Senior|Junior|Principal|Staff|Lead|Associate)\s+)?(?:President|Vice\s+President|Co-Founder|Founder(?:\s*(?:&|\/)\s*(?:CEO|Builder))?|CEO|CTO|COO|Chief\s+[A-Za-z]+|(?:Backend|Frontend|Full[- ]?Stack|Software|ML|AI|Cloud|DevOps|Systems|Platform)\s+Engineer(?:\s+Intern)?|ML\s+Engineer|AI\s+Engineer|Data\s+Scientist|Research\s+(?:Scientist|Intern)|Resident|Intern|Lead|Developer|Consultant|Freelancer|Builder|Mentor|Teacher)\b/i;
+      const roleKeywordsRegex = /\b(?:(?:Senior|Junior|Principal|Staff|Lead|Associate)\s+)?(?:President|Vice\s+President|Co-Founder|Founder(?:\s*(?:&|\/)\s*(?:CEO|Builder))?|CEO|CTO|COO|Chief\s+[A-Za-z]+|(?:Backend|Frontend|Full[- ]?Stack|Software|ML|AI|Data|Cloud|DevOps|Systems|Platform)\s+Engineer(?:\s+Intern)?|Data\s+Scientist|Research\s+(?:Scientist|Intern)|Resident|Intern|Lead|Developer|Consultant|Freelancer|Builder|Mentor|Teacher)\b/i;
       const roleMatches = [...lineText.matchAll(new RegExp(roleKeywordsRegex.source, "gi"))];
       // Pick the last matching role token (roles typically follow the organization name in inline headers)
       const bestRoleMatch = roleMatches.length > 0 ? roleMatches[roleMatches.length - 1] : null;
@@ -1301,10 +1302,14 @@ export function extractAchievements(
     let subType: string = "award";
     let status: string = "awarded";
 
-    // 1. Patents (distinguish application vs granted)
-    // 1. Honors & Awards (checked early so 'Best Paper Award' or 'Award' is an honor even if paper/conference mentioned)
-    if (/\b(?:honor|best\s*paper|paper\s*award|award|scholarship|gold\s*medalist|distinction|rank\s*\d|dean's\s*list|fellowship)\b/i.test(cleaned)) {
+    // Classify named distinctions as honors; ordinary awards retain the award category.
+    if (/\b(?:honor|best\s*paper|paper\s*award|scholarship|gold\s*medalist|distinction|rank\s*\d|dean's\s*list|fellowship)\b/i.test(cleaned)) {
       category = "honor";
+      subType = "award";
+      status = "awarded";
+    }
+    else if (/\baward\b/i.test(cleaned)) {
+      category = "award";
       subType = "award";
       status = "awarded";
     }

@@ -8,7 +8,7 @@
 
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
+import { getOrCreateOnboardingAuthContext, getServerAuthContext } from "@/lib/auth/server-session";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 
@@ -28,32 +28,17 @@ function jsonResponse(body: Record<string, unknown>, status = 200, headers?: Rec
 export async function GET(request: Request) {
   const requestId = crypto.randomUUID();
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
-      return jsonResponse({
-        ok: false,
-        code: "UNAUTHORIZED",
-        message: "Sign in to view import progress.",
-        retryable: true,
-        requestId,
-      }, 401);
-    }
-    const auth = authRes.auth;
+    // A read-only poll must not mint a new guest cookie. It can otherwise race
+    // the academic save and make the browser switch owners mid-onboarding.
+    const auth = await getServerAuthContext();
+    if (!auth) return jsonResponse({ ok: true, jobs: [], requestId });
 
     const jobId = new URL(request.url).searchParams.get("jobId");
     const jobs = jobId
       ? [await SourceProcessingJobService.getJobForPerson(jobId, auth.person.id)].filter(Boolean)
       : await SourceProcessingJobService.getJobsForPerson(auth.person.id, 30);
 
-    const res = jsonResponse({ ok: true, jobs, requestId });
-    if (authRes.sessionCookieToSet) {
-      res.cookies.set(
-        authRes.sessionCookieToSet.name,
-        authRes.sessionCookieToSet.value,
-        authRes.sessionCookieToSet.options as Parameters<typeof res.cookies.set>[2]
-      );
-    }
-    return res;
+    return jsonResponse({ ok: true, jobs, requestId });
   } catch {
     return jsonResponse({
       ok: false,

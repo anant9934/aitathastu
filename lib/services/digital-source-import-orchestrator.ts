@@ -26,8 +26,6 @@ import {
   disconnectConnection,
   getExternalConnectionByProvider,
 } from "@/lib/repositories/connection-repository";
-import { saveProject } from "@/lib/repositories/project-repository";
-import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
 import { PROVIDER_CAPABILITIES_V4 } from "@/lib/connectors/registry";
 import type { ProviderCapabilities, AcquisitionMode } from "@/lib/connectors/types";
@@ -121,6 +119,7 @@ export interface ImportExecutionResult {
   externalUsername: string;
   profileUrl: string;
   recordsCreated: number;
+  candidateCount: number;
   projectsCount: number;
   skillsCount: number;
   evidenceCount: number;
@@ -591,7 +590,6 @@ export class DigitalSourceImportOrchestrator {
       achievements: [],
     };
 
-    let recordsCreated = 0;
     let summary = "";
     let acquisitionMode: AcquisitionMode = "PERMITTED_PUBLIC_METADATA";
     let externalUsername = identifier.trim();
@@ -616,7 +614,7 @@ export class DigitalSourceImportOrchestrator {
             throw new Error(ghResult.error || `Could not fetch GitHub account '${externalUsername}'.`);
           }
 
-          acquisitionMode = "OFFICIAL_OAUTH_API";
+          acquisitionMode = "OFFICIAL_PUBLIC_API";
 
           // Save external connection
           await saveExternalConnection({
@@ -630,6 +628,7 @@ export class DigitalSourceImportOrchestrator {
             metadata: {
               connectionState: "PUBLIC_DATA_IMPORTED",
               totalPublicRepos: ghResult.totalPublicRepos,
+              fetchedReposCount: ghResult.fetchedReposCount,
               analyzedReposCount: ghResult.analyzedReposCount,
               avatarUrl: ghResult.profile?.avatar_url,
               bio: ghResult.profile?.bio,
@@ -639,23 +638,6 @@ export class DigitalSourceImportOrchestrator {
 
           // Ingest candidate projects & technology findings
           for (const p of ghResult.projects) {
-            await saveProject(personId, {
-              title: p.title,
-              summary: p.description || `Repository by ${ghResult.username}`,
-              description: p.description || "",
-              technologies: p.technologies || [],
-              sources: ["github"],
-              repositoryUrl: p.repositoryUrl,
-              demoUrl: p.homepageUrl || undefined,
-              status: "candidate",
-              projectType: "software",
-              aiDetails: {
-                categories: p.aiMlCategories,
-                observedFiles: p.observedFiles,
-                primaryLanguage: p.primaryLanguage,
-              },
-            });
-
             candidates.projects.push({
               title: p.title,
               description: p.description || "",
@@ -666,33 +648,19 @@ export class DigitalSourceImportOrchestrator {
               primaryLanguage: p.primaryLanguage,
               aiMlCategories: p.aiMlCategories,
             });
-            recordsCreated++;
 
             for (const finding of p.technologyFindings) {
               const sourceRef = finding.sourceFile ? `${p.repositoryUrl}#${finding.sourceFile}` : p.repositoryUrl;
-              await createEvidenceRecord(personId, {
-                category: "skill",
-                subject: finding.name,
-                value: finding.name,
-                source: "imported",
-                verificationStatus: "unverified",
-                sourceReference: sourceRef,
-                interpretation: `Observed in ${p.title} (${finding.provenance.toLowerCase().replace(/_/g, " ")}). Evidence confidence: ${finding.confidence}.`,
-                whyItMatters: "Direct repository manifest observation.",
-                importKey: `github_skill_${p.id}_${finding.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-              });
-
               candidates.skills.push({
                 name: finding.name,
                 sourceReference: sourceRef,
                 confidence: finding.confidence ? String(finding.confidence) : undefined,
               });
-              recordsCreated++;
-            }
+              }
           }
 
           rawSnapshotPayload = ghResult as unknown as Record<string, unknown>;
-          summary = `Imported GitHub profile '${ghResult.username}' with ${ghResult.projects.length} repository project candidates.`;
+          summary = `Discovered ${ghResult.projects.length} GitHub repository candidates for '${ghResult.username}', pending your review.`;
           break;
         }
 
@@ -726,26 +694,6 @@ export class DigitalSourceImportOrchestrator {
 
           for (const m of artifacts.models) {
             const mUrl = `https://huggingface.co/${m.id}`;
-            await saveProject(personId, {
-              title: `HF Model: ${m.id}`,
-              summary: `Model on Hugging Face Hub (${m.pipelineTag || "AI/ML"}). ${m.downloads} downloads, ${m.likes} likes.`,
-              demoUrl: mUrl,
-              technologies: m.tags || [],
-              sources: ["huggingface"],
-              status: "candidate",
-              projectType: "software",
-            });
-
-            await createEvidenceRecord(personId, {
-              category: "project",
-              subject: `HF Model: ${m.id}`,
-              value: `${m.downloads} downloads, ${m.likes} likes. Task: ${m.pipelineTag || "AI/ML"}`,
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: mUrl,
-              interpretation: `Public AI/ML model published to Hugging Face registry.`,
-              whyItMatters: "Demonstrates practical model deployment, fine-tuning, or open weight sharing.",
-            });
 
             candidates.projects.push({
               title: `HF Model: ${m.id}`,
@@ -755,7 +703,6 @@ export class DigitalSourceImportOrchestrator {
               source: "huggingface",
               starsOrLikes: m.likes,
             });
-            recordsCreated += 2;
           }
 
           rawSnapshotPayload = artifacts as unknown as Record<string, unknown>;
@@ -795,16 +742,6 @@ export class DigitalSourceImportOrchestrator {
 
           for (const w of orcidRecord.works) {
             const ref = w.doi ? `https://doi.org/${w.doi}` : w.sourceLocation;
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: `Publication: ${w.title}`,
-              value: w.doi ? `DOI: ${w.doi} (${w.publicationYear || "Year N/A"})` : `${w.journalTitle || "Published work"} (${w.publicationYear || ""})`,
-              source: "imported",
-              verificationStatus: w.doi ? "verified" : "unverified",
-              sourceReference: ref,
-              interpretation: `Scholarly work listed in official ORCID registry.`,
-              whyItMatters: "Peer-reviewed research and scholarly dissemination.",
-            });
 
             candidates.achievements?.push({
               title: w.title,
@@ -812,7 +749,6 @@ export class DigitalSourceImportOrchestrator {
               sourceReference: ref,
               value: w.doi ? `DOI: ${w.doi}` : undefined,
             });
-            recordsCreated++;
           }
 
           rawSnapshotPayload = orcidRecord as unknown as Record<string, unknown>;
@@ -847,44 +783,12 @@ export class DigitalSourceImportOrchestrator {
           });
 
           for (const art of devto.articles) {
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: `Article: ${art.title}`,
-              value: `${art.positiveReactionsCount} reactions. Tags: ${art.tags.join(", ")}`,
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: art.url,
-              interpretation: `Technical writing tutorial on DEV.to (${art.tags.join(", ")}).`,
-              whyItMatters: "Demonstrates technical communication, clarity, and community engagement.",
-            });
-
             candidates.achievements?.push({
               title: art.title,
               category: "writing",
               sourceReference: art.url,
               value: `${art.positiveReactionsCount} reactions`,
             });
-            recordsCreated++;
-          }
-
-          if (recordsCreated === 0) {
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: `DEV Community Profile: @${devto.username}`,
-              value: "Technical Author Profile on DEV.to",
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: devto.profileUrl,
-              interpretation: "Registered technical author on DEV.to.",
-              whyItMatters: "Demonstrates technical communication and community involvement.",
-            });
-            candidates.achievements?.push({
-              title: `DEV.to Author Profile (@${devto.username})`,
-              category: "writing",
-              sourceReference: devto.profileUrl,
-              value: "Technical Author",
-            });
-            recordsCreated++;
           }
 
           rawSnapshotPayload = devto as unknown as Record<string, unknown>;
@@ -929,56 +833,13 @@ export class DigitalSourceImportOrchestrator {
             }
           }
 
-          if (candidates.skills.length === 0) {
-            const defaultTags = ["C#", ".NET", "Java", "Software Engineering"];
-            for (const tag of defaultTags) {
-              candidates.skills.push({
-                name: tag,
-                sourceReference: so.profileUrl,
-                confidence: "Verified Contributor",
-              });
-            }
-          }
-
           if (so.reputation > 0) {
-            const topTagStr = so.topTags ? `. Top tags: ${so.topTags.map((t) => t.tagName).join(", ")}` : "";
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: "Stack Overflow Developer Reputation",
-              value: `${so.reputation} reputation${topTagStr}`,
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: so.profileUrl,
-              interpretation: `Public technical contributions on Stack Overflow.`,
-              whyItMatters: "Demonstrates real-world debugging, problem diagnosis, and peer helpfulness.",
-            });
-
             candidates.achievements?.push({
               title: `Stack Overflow Reputation: ${so.reputation}`,
               category: "community",
               sourceReference: so.profileUrl,
               value: `${so.reputation} points`,
             });
-            recordsCreated++;
-          } else {
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: "Stack Overflow Developer Profile",
-              value: `Stack Overflow User ${so.userId} (Profile reference)`,
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: so.profileUrl,
-              interpretation: `Public technical developer profile on Stack Overflow.`,
-              whyItMatters: "Demonstrates community participation and peer knowledge sharing.",
-            });
-
-            candidates.achievements?.push({
-              title: `Stack Overflow Profile (${so.userId})`,
-              category: "community",
-              sourceReference: so.profileUrl,
-              value: "Developer Profile",
-            });
-            recordsCreated++;
           }
 
           rawSnapshotPayload = so as unknown as Record<string, unknown>;
@@ -1014,29 +875,7 @@ export class DigitalSourceImportOrchestrator {
             },
           });
 
-          await createEvidenceRecord(personId, {
-            category: "project",
-            subject: meta.title || "Personal Portfolio Website",
-            value: meta.description || `Portfolio site at ${meta.url}`,
-            source: "imported",
-            verificationStatus: "unverified",
-            sourceReference: meta.url,
-            interpretation: `Public portfolio site with ${meta.detectedLinks.length} verified developer links.`,
-            whyItMatters: "Direct presentation of project catalog and personal domain.",
-          });
-          recordsCreated++;
-
           for (const dp of meta.discoveredProjects) {
-            await saveProject(personId, {
-              title: dp.title,
-              summary: dp.description || "Project discovered on portfolio website",
-              demoUrl: dp.url || meta.url,
-              technologies: dp.technologies || [],
-              sources: ["portfolio"],
-              status: "candidate",
-              projectType: "software",
-            });
-
             candidates.projects.push({
               title: dp.title,
               description: dp.description,
@@ -1044,7 +883,6 @@ export class DigitalSourceImportOrchestrator {
               url: dp.url || meta.url,
               source: "portfolio",
             });
-            recordsCreated++;
           }
 
           rawSnapshotPayload = meta as unknown as Record<string, unknown>;
@@ -1088,63 +926,46 @@ export class DigitalSourceImportOrchestrator {
             });
 
             for (const pos of parsed.positions || []) {
-              await createEvidenceRecord(personId, {
-                category: "experience",
-                subject: `${pos.title} at ${pos.companyName}`,
-                value: pos.description || `${pos.startedOn || ""} - ${pos.finishedOn || "Present"}`,
-                source: "self_reported",
-                verificationStatus: "unverified",
-                sourceReference: pos.sourceLocation,
-                interpretation: "Candidate work experience claim imported from student's LinkedIn export archive.",
-                whyItMatters: "Forms foundation for career timeline, pending student confirmation in Step 8.",
-              });
-
               candidates.experiences?.push({
                 title: pos.title,
                 company: pos.companyName,
                 duration: `${pos.startedOn || ""} - ${pos.finishedOn || "Present"}`,
                 sourceReference: pos.sourceLocation,
               });
-              recordsCreated++;
             }
 
             for (const edu of parsed.education || []) {
-              await createEvidenceRecord(personId, {
-                category: "education",
-                subject: edu.degreeName ? `${edu.degreeName} - ${edu.schoolName}` : edu.schoolName,
-                value: edu.notes || `${edu.startDate || ""} - ${edu.endDate || ""}`,
-                source: "self_reported",
-                verificationStatus: "unverified",
-                sourceReference: edu.sourceLocation,
-                interpretation: "Candidate degree claim imported from student's LinkedIn export archive.",
-                whyItMatters: "Identifies formal education and expected graduation year.",
-              });
-
               candidates.educations?.push({
                 school: edu.schoolName,
                 degree: edu.degreeName,
                 sourceReference: edu.sourceLocation,
               });
-              recordsCreated++;
             }
 
             for (const sk of (parsed.skills || []).slice(0, 20)) {
-              await createEvidenceRecord(personId, {
-                category: "skill",
-                subject: sk.name,
-                value: "Reported on LinkedIn archive",
-                source: "self_reported",
-                verificationStatus: "unverified",
-                sourceReference: sk.sourceLocation,
-                interpretation: "Candidate skill from student-authorized LinkedIn archive.",
-                whyItMatters: "Student-reported familiarity.",
-              });
-
               candidates.skills.push({
                 name: sk.name,
                 sourceReference: sk.sourceLocation,
               });
-              recordsCreated++;
+            }
+
+            for (const project of parsed.projects || []) {
+              candidates.projects.push({
+                title: project.title,
+                description: project.description,
+                technologies: [],
+                url: project.url,
+                source: "linkedin_export",
+              });
+            }
+
+            for (const certification of parsed.certifications || []) {
+              candidates.achievements?.push({
+                title: certification.name,
+                category: "certification",
+                sourceReference: certification.sourceLocation,
+                value: certification.authority,
+              });
             }
 
             rawSnapshotPayload = {
@@ -1152,8 +973,10 @@ export class DigitalSourceImportOrchestrator {
               positionsCount: parsed.positions?.length || 0,
               educationCount: parsed.education?.length || 0,
               skillsCount: parsed.skills?.length || 0,
+              projectsCount: parsed.projects?.length || 0,
+              certificationsCount: parsed.certifications?.length || 0,
             };
-            summary = `Parsed LinkedIn export (${exportFilename}): ${parsed.positions?.length || 0} roles, ${parsed.education?.length || 0} schools, and ${parsed.skills?.length || 0} skills.`;
+            summary = `Parsed LinkedIn export (${exportFilename}) into review candidates: ${parsed.positions?.length || 0} roles, ${parsed.education?.length || 0} schools, ${parsed.skills?.length || 0} skills, ${parsed.projects?.length || 0} projects, and ${parsed.certifications?.length || 0} certifications.`;
           } else {
             // Profile reference only (scraping prohibited)
             const val = this.validateProfile("linkedin", identifier);
@@ -1174,18 +997,6 @@ export class DigitalSourceImportOrchestrator {
                 notice: "Automated profile scraping prohibited by LinkedIn ToS; export archive supported.",
               },
             });
-
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: "LinkedIn Profile Reference",
-              value: val.normalizedUrl,
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: val.normalizedUrl,
-              interpretation: "Verified LinkedIn profile URL link.",
-              whyItMatters: "Professional network reference provided by student.",
-            });
-            recordsCreated = 1;
 
             summary = `Saved LinkedIn profile reference (${val.normalizedUrl}). To import career history, upload your LinkedIn ZIP/CSV archive.`;
           }
@@ -1226,43 +1037,12 @@ export class DigitalSourceImportOrchestrator {
             });
 
             if (stats.totalSolved > 0) {
-              await createEvidenceRecord(personId, {
-                category: "other",
-                subject: "LeetCode Problem Solving",
-                value: `${stats.totalSolved} solved (${stats.easySolved} Easy, ${stats.mediumSolved} Medium, ${stats.hardSolved} Hard)`,
-                source: "imported",
-                verificationStatus: "unverified",
-                sourceReference: stats.profileUrl,
-                interpretation: `Public LeetCode problem solving record. Global Rank: ${stats.globalRanking ?? "N/A"}.`,
-                whyItMatters: "Demonstrates consistent algorithmic practice and data structure implementation.",
-              });
-
               candidates.achievements?.push({
                 title: `LeetCode: ${stats.totalSolved} Solved`,
                 category: "competitive",
                 sourceReference: stats.profileUrl,
                 value: `${stats.totalSolved} problems`,
               });
-              recordsCreated++;
-            } else {
-              await createEvidenceRecord(personId, {
-                category: "other",
-                subject: "LeetCode Profile Reference",
-                value: `LeetCode User @${stats.username} (Competitive Programming Profile)`,
-                source: "imported",
-                verificationStatus: "unverified",
-                sourceReference: stats.profileUrl,
-                interpretation: "Public LeetCode profile reference.",
-                whyItMatters: "Demonstrates algorithmic practice and platform participation.",
-              });
-
-              candidates.achievements?.push({
-                title: `LeetCode Profile (@${stats.username})`,
-                category: "competitive",
-                sourceReference: stats.profileUrl,
-                value: "Active Profile Reference",
-              });
-              recordsCreated++;
             }
 
             rawSnapshotPayload = stats as unknown as Record<string, unknown>;
@@ -1285,24 +1065,12 @@ export class DigitalSourceImportOrchestrator {
             });
 
             for (const b of profile.badges || []) {
-              await createEvidenceRecord(personId, {
-                category: "other",
-                subject: `HackerRank ${b.badge} Badge`,
-                value: b.stars ? `${b.stars} Stars` : "Earned Badge",
-                source: "imported",
-                verificationStatus: "unverified",
-                sourceReference: profile.profileUrl,
-                interpretation: "Public skill badge from HackerRank profile.",
-                whyItMatters: "Corroborates topic practice and domain fluency.",
-              });
-
               candidates.achievements?.push({
                 title: `HackerRank Badge: ${b.badge}`,
                 category: "competitive",
                 sourceReference: profile.profileUrl,
                 value: b.stars ? `${b.stars} Stars` : undefined,
               });
-              recordsCreated++;
             }
 
             rawSnapshotPayload = profile as unknown as Record<string, unknown>;
@@ -1319,17 +1087,6 @@ export class DigitalSourceImportOrchestrator {
               status: "reference_only",
               metadata: { lastSyncedAt: new Date().toISOString() },
             });
-            await createEvidenceRecord(personId, {
-              category: "other",
-              subject: `${provider} Profile Reference`,
-              value: profileUrl,
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: profileUrl,
-              interpretation: `${provider} competitive programming profile reference.`,
-              whyItMatters: "Demonstrates participation in competitive programming platforms.",
-            });
-            recordsCreated = 1;
             summary = `${provider} profile reference linked (${profileUrl}).`;
           }
           break;
@@ -1362,35 +1119,13 @@ export class DigitalSourceImportOrchestrator {
           });
 
           for (const item of kaggleData.studentReportedArtifacts || []) {
-            await saveProject(personId, {
-              title: item.title,
-              summary: item.description || "Public Kaggle artifact",
-              demoUrl: item.url || kaggleData.profileUrl,
-              sources: ["kaggle"],
-              status: "candidate",
-              projectType: item.type === "dataset" ? "research" : "software",
-              technologies: ["Kaggle", "Data Science", "Python"],
-            });
-
-            await createEvidenceRecord(personId, {
-              category: "project",
-              subject: item.title,
-              value: item.description || "Discovered public Kaggle artifact",
-              source: "imported",
-              verificationStatus: "unverified",
-              sourceReference: item.url || kaggleData.profileUrl,
-              interpretation: `Discovered from public Kaggle API for user ${kaggleData.username}.`,
-              whyItMatters: "Demonstrates practical data science, notebook analysis, or competition modeling.",
-            });
-
             candidates.projects.push({
               title: item.title,
               description: item.description,
-              technologies: ["Kaggle", "Data Science", "Python"],
+              technologies: [],
               url: item.url || kaggleData.profileUrl,
               source: "kaggle",
             });
-            recordsCreated += 2;
           }
 
           rawSnapshotPayload = kaggleData as unknown as Record<string, unknown>;
@@ -1421,18 +1156,6 @@ export class DigitalSourceImportOrchestrator {
             },
           });
 
-          await createEvidenceRecord(personId, {
-            category: "other",
-            subject: "Google Scholar Profile Reference",
-            value: val.normalizedUrl,
-            source: "imported",
-            verificationStatus: "unverified",
-            sourceReference: val.normalizedUrl,
-            interpretation: "Student-provided Google Scholar citation profile reference.",
-            whyItMatters: "Scholarly citation profile used for publication and DOI matching.",
-          });
-          recordsCreated = 1;
-
           summary = `Google Scholar profile reference preserved (${val.normalizedUrl}).`;
           break;
         }
@@ -1441,7 +1164,10 @@ export class DigitalSourceImportOrchestrator {
           throw new Error(`Unsupported provider: '${provider}'.`);
       }
 
-      // 3. Persist Source Snapshot in Neon Database
+      // 3. Persist the fetched source snapshot; review candidates remain unconfirmed.
+      const candidateCount = candidates.projects.length + candidates.skills.length +
+        (candidates.experiences?.length || 0) + (candidates.educations?.length || 0) +
+        (candidates.achievements?.length || 0);
       await SourceProcessingJobService.updateStage(jobId, personId, "validate");
       const snapshotChecksum = crypto
         .createHash("sha256")
@@ -1462,10 +1188,11 @@ export class DigitalSourceImportOrchestrator {
         personId,
         resultReference: profileUrl,
         metadata: {
-          recordsCreated,
+          recordsCreated: 0,
+          candidateCount,
           projectsCount: candidates.projects.length,
           skillsCount: candidates.skills.length,
-          evidenceCount: recordsCreated,
+          evidenceCount: 0,
         },
       });
 
@@ -1475,10 +1202,11 @@ export class DigitalSourceImportOrchestrator {
         acquisitionMode,
         externalUsername,
         profileUrl,
-        recordsCreated,
+        recordsCreated: 0,
+        candidateCount,
         projectsCount: candidates.projects.length,
         skillsCount: candidates.skills.length,
-        evidenceCount: recordsCreated,
+        evidenceCount: 0,
         summary,
         candidates,
         lastSyncedAt: new Date().toISOString(),
@@ -1523,16 +1251,17 @@ export class DigitalSourceImportOrchestrator {
     }
 
     const isConnected = conn.status === "connected";
+    const publicDataImported = (conn.metadata as Record<string, unknown> | null)?.connectionState === "PUBLIC_DATA_IMPORTED";
     const lastSynced = conn.lastSyncedAt ? conn.lastSyncedAt.toISOString() : undefined;
 
     return {
       provider,
-      status: isConnected ? "Connected" : "Profile Linked",
+      status: publicDataImported ? "Public Data Imported" : isConnected ? "Connected" : "Profile Linked",
       actionLabel: isConnected ? "Refresh" : this.getConsentDisclosure(provider).actionLabel,
       profileUrl: conn.profileUrl,
       lastSyncedAt: lastSynced,
-      recordCount: (conn.metadata as Record<string, unknown> | null)?.analyzedReposCount
-        ? Number((conn.metadata as Record<string, unknown>).analyzedReposCount)
+      recordCount: (conn.metadata as Record<string, unknown> | null)?.fetchedReposCount
+        ? Number((conn.metadata as Record<string, unknown>).fetchedReposCount)
         : 0,
     };
   }

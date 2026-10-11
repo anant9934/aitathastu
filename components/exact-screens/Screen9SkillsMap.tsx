@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { CheckCircle2, Sparkles, Zap, ShieldCheck, Layers, ArrowUpRight, Cpu } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
+import { candidateNames } from "@/lib/onboarding-import-candidates";
 
 interface Screen9SkillsMapProps {
   skills?: string[];
@@ -176,8 +177,10 @@ function classifyReviewSkill(skill: string): SkillNode["category"] {
 }
 
 export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryMode = false, onNext, onBack, onJumpToStep }: Screen9SkillsMapProps) {
-  const confirmed = new Set(skills.map((skill) => skill.toLowerCase()));
-  const allSkills = [...skills, ...suggestedSkills.filter((skill) => !confirmed.has(skill.toLowerCase()))];
+  const safeSkills = candidateNames(skills);
+  const safeSuggested = candidateNames(suggestedSkills);
+  const confirmed = new Set(safeSkills.map((skill) => skill.toLowerCase()));
+  const allSkills = [...safeSkills, ...safeSuggested.filter((skill) => !confirmed.has(skill.toLowerCase()))];
   const allNodes: SkillNode[] = isGalleryMode ? skillNodes : allSkills.map((skill, index) => ({
     ...skillNodes[index % skillNodes.length],
     id: `recorded_${index}`,
@@ -251,7 +254,7 @@ export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryM
       <ScreenHeader
         onBack={onBack}
         showBack={true}
-        rightLabel="Step 8 of 10"
+        rightLabel="Skills map"
       />
 
       <main
@@ -273,7 +276,7 @@ export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryM
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#5642EF", background: "rgba(86, 66, 239, 0.08)", border: "1px solid rgba(86, 66, 239, 0.2)", padding: "4px 12px", borderRadius: 9999, marginBottom: 8 }}>
               <Sparkles size={12} />
-              <span>Step 6 · Skills Intelligence Map</span>
+              <span>Skills Intelligence Map</span>
             </div>
             <h1 style={{ fontSize: "clamp(26px, 3vw, 36px)", fontWeight: 850, color: "#171626", margin: "0 0 6px", letterSpacing: "-0.03em" }}>
               Your Skills & Evidence Network

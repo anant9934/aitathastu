@@ -17,29 +17,29 @@ export interface Screen11OnboardingCompleteProps {
 const milestones = [
   {
     icon: Bot,
-    title: "EORA AI Copilot Activated",
-    desc: "24/7 intelligent companion calibrated to your career ambitions and skill graph.",
+    title: "EORA Companion",
+    desc: "Use your saved goals and profile details to guide future conversations.",
     color: "#5642EF",
     bg: "#EDE9FE",
   },
   {
     icon: ShieldCheck,
-    title: "Cryptographic Evidence Ledger",
-    desc: "Verified portfolio with repo commits, research citations, and course proofs.",
+    title: "Evidence Review",
+    desc: "Add sources and review claims before treating them as verified.",
     color: "#10B981",
     bg: "#DCFCE7",
   },
   {
     icon: Compass,
-    title: "Dynamic Career Roadmap",
-    desc: "5-stage personalized learning sequence closing your core engineering gaps.",
+    title: "Learning Roadmap",
+    desc: "Explore paths based on the goals and skills you choose to save.",
     color: "#0284C7",
     bg: "#E0F2FE",
   },
   {
     icon: Briefcase,
-    title: "Targeted Opportunities Unlocked",
-    desc: "Curated internships, hackathons, and mentor connections tailored to you.",
+    title: "Opportunity Discovery",
+    desc: "Browse available internships, hackathons and mentor connections.",
     color: "#D97706",
     bg: "#FEF3C7",
   },
@@ -145,14 +145,14 @@ export function Screen11OnboardingComplete({
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 800, color: "#5642EF", background: "rgba(86, 66, 239, 0.08)", border: "1px solid rgba(86, 66, 239, 0.2)", padding: "4px 14px", borderRadius: 9999, marginBottom: 12, alignSelf: "flex-start" }}>
               <Sparkles size={14} color="#02C5F5" />
-              <span>Step 7 · Intelligence Workspace Initialized</span>
+              <span>Step 10 · Launch Student Workspace</span>
             </div>
 
             <h1 style={{ fontSize: "clamp(32px, 3.6vw, 44px)", fontWeight: 850, color: "#171626", lineHeight: 1.15, marginBottom: 10, letterSpacing: "-0.03em" }}>
               Welcome aboard, {firstName}! 🚀
             </h1>
             <p style={{ fontSize: 15.5, color: "#64748B", lineHeight: 1.55, marginBottom: 24 }}>
-              Your profile has been synthesized into a live, auditable intelligence workspace. Here is what EORA has built for you:
+              Open your student workspace to save your reviewed starting profile. You can keep adding and correcting details later.
             </p>
 
             {/* 4 Generated Asset Milestone Cards */}

@@ -359,13 +359,13 @@ export function Screen10GitHubProjects({
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#5642EF", background: "rgba(86, 66, 239, 0.08)", border: "1px solid rgba(86, 66, 239, 0.2)", padding: "4px 12px", borderRadius: 9999, marginBottom: 8 }}>
               <Sparkles size={12} />
-              <span>Step 6 · Verified Project Evidence</span>
+              <span>Step 9 · Project Evidence Review</span>
             </div>
             <h1 style={{ fontSize: "clamp(26px, 3.2vw, 36px)", fontWeight: 850, color: "#171626", margin: "0 0 6px", letterSpacing: "-0.03em" }}>
               Your Project Evidence Ledger
             </h1>
             <p style={{ fontSize: 14.5, color: "#64748B", margin: 0 }}>
-              Click any project card to inspect deep architecture telemetry, code rollouts, and verified impact metrics.
+              Review each project&apos;s source, contribution and available evidence before confirming it.
             </p>
           </div>
 
@@ -553,21 +553,24 @@ export function Screen10GitHubProjects({
 
                     {/* Tech chips */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 12 }}>
-                      {proj.technologies.slice(0, 3).map((t) => (
-                        <span
-                          key={t}
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "2px 7px",
-                            borderRadius: 4,
-                            background: isSelected ? "#EDE9FE" : "#EFF6FF",
-                            color: isSelected ? "#5642EF" : "#2563EB",
-                          }}
-                        >
-                          {t}
-                        </span>
-                      ))}
+                      {proj.technologies.slice(0, 3).map((t) => {
+                        const name = typeof t === "string" ? t : (t as any)?.name || String(t);
+                        return (
+                          <span
+                            key={name}
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: "2px 7px",
+                              borderRadius: 4,
+                              background: isSelected ? "#EDE9FE" : "#EFF6FF",
+                              color: isSelected ? "#5642EF" : "#2563EB",
+                            }}
+                          >
+                            {name}
+                          </span>
+                        );
+                      })}
                     </div>
 
                     {/* Footer Metrics Row: Stars, Forks, AI Impact */}

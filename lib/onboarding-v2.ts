@@ -20,14 +20,14 @@ export const stageIds = [
   "reveal",
 ] as const;
 export type StageId = (typeof stageIds)[number];
-export type SourceId = "github" | "linkedin" | "leetcode" | "hackerrank" | "hackerearth" | "codechef";
+export type SourceId = "github" | "linkedin" | "leetcode" | "hackerrank" | "hackerearth" | "codechef" | "portfolio" | "huggingface" | "orcid" | "kaggle" | "devto" | "stackoverflow" | "google_scholar";
 export type Project = {
   id: string;
   title: string;
   description?: string;
   technologies: string[];
   sources: string[];
-  status: "suggested" | "confirmed" | "removed";
+  status: "candidate" | "suggested" | "confirmed" | "removed";
   contribution: string[];
   contributionNote: string;
   url?: string;
@@ -67,6 +67,7 @@ export type OnboardingDraft = {
   githubConsent: boolean;
   python: "yes" | "not_yet" | "";
   skills: string[];
+  techCandidates?: Array<{ name: string; category?: string; source: string; provenance?: string; sourceFile?: string }>;
   certifications: string[];
   projects: Project[];
   education?: OnboardingEducationEntry[];
@@ -108,7 +109,7 @@ export type OnboardingExperienceEntry = {
 
 export type OnboardingAchievementEntry = {
   title: string;
-  category: "award" | "certification" | "competition" | "publication" | "patent" | "academic";
+  category: "award" | "certification" | "competition" | "publication" | "patent" | "academic" | "other" | "hackathon" | "book";
   subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
   status?: string;
   issuer?: string;
@@ -141,6 +142,7 @@ export const initialDraft: OnboardingDraft = {
   githubConsent: false,
   python: "",
   skills: [],
+  techCandidates: [],
   certifications: [],
   projects: [],
   education: [],
@@ -201,7 +203,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
           .map((x) => x.slice(0, 120))
       : [];
   const profiles: OnboardingDraft["profiles"] = {};
-  for (const id of ["github", "linkedin", "leetcode", "hackerrank", "hackerearth", "codechef"] as SourceId[]) {
+  for (const id of ["github", "linkedin", "leetcode", "hackerrank", "hackerearth", "codechef", "portfolio", "huggingface", "orcid", "kaggle", "devto", "stackoverflow", "google_scholar"] as SourceId[]) {
     if (raw.profiles?.[id]) profiles[id] = str(raw.profiles[id], 300);
   }
   const gradYear =
@@ -255,6 +257,14 @@ export function safeDraft(value: unknown): OnboardingDraft {
     githubConsent: raw.githubConsent === true,
     python: raw.python === "yes" || raw.python === "not_yet" ? raw.python : "",
     skills: strings(raw.skills),
+    techCandidates: Array.isArray(raw.techCandidates)
+      ? raw.techCandidates.slice(0, 100).filter((entry) => entry && typeof entry.name === "string" && entry.name.trim())
+          .map((entry) => ({
+            name: str(entry.name, 120), category: str(entry.category, 80) || undefined,
+            source: str(entry.source, 160), provenance: str(entry.provenance, 80) || undefined,
+            sourceFile: str(entry.sourceFile, 160) || undefined,
+          }))
+      : [],
     certifications: strings(raw.certifications),
     projects: Array.isArray(raw.projects)
       ? raw.projects
@@ -266,7 +276,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
             description: str(p.description, 500),
             technologies: strings(p.technologies),
             sources: strings(p.sources),
-            status: p.status === "confirmed" || p.status === "removed" ? p.status : "suggested",
+            status: p.status === "confirmed" || p.status === "removed" || p.status === "candidate" ? p.status : "suggested",
             contribution: strings(p.contribution),
             contributionNote: str(p.contributionNote),
             url: str(p.url, 500),
@@ -319,9 +329,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
           .filter((a) => a && typeof a.title === "string")
           .map((a) => ({
             title: str(a.title, 200),
-            category: ["award", "certification", "competition", "publication", "patent", "academic"].includes(a.category)
+            category: ["award", "certification", "competition", "publication", "patent", "academic", "other", "hackathon", "book"].includes(a.category)
               ? a.category
-              : "academic",
+              : "other",
             subType: ["patent_application", "patent_granted", "published_paper", "manuscript", "book", "book_coauthor", "hackathon", "honor", "other"].includes(a.subType || "")
               ? (a.subType as OnboardingAchievementEntry["subType"])
               : undefined,

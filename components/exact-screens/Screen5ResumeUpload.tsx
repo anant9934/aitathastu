@@ -193,6 +193,20 @@ export function Screen5ResumeUpload({
     if (!file) return;
     selectedFileRef.current = file;
 
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (extension === "doc") {
+      setErrorMessage("Legacy .doc files are not supported. Open the file in Word or LibreOffice and save it as .docx or PDF.");
+      return;
+    }
+    if (extension !== "pdf" && extension !== "docx") {
+      setErrorMessage("Choose a PDF or DOCX resume.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Choose a file under 5 MB, or enter details manually.");
+      return;
+    }
+
     if (uploadBlocked) {
       setErrorMessage("Resume upload is temporarily unavailable. Use \"Skip for now\" to enter your details manually.");
       return;
@@ -204,8 +218,11 @@ export function Screen5ResumeUpload({
 
     setErrorMessage(null);
     setProcessingState("UPLOADING");
+    setFileName(null);
+    setIsUploaded(false);
     setReviewSaved(false);
     setCandidates([]);
+    setExtraData({});
 
     // Signal EORA extraction started (exact required copy)
     eora?.speak(
@@ -307,7 +324,7 @@ export function Screen5ResumeUpload({
                 sourceSpan,
                 documentId,
                 corrected: false,
-                selected: true,
+                selected: false,
               },
             ];
           })

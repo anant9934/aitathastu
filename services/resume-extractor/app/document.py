@@ -66,26 +66,44 @@ def _order(blocks,width):
     return sorted(blocks,key=lambda b:(round(b[1]/8),b[0],b[1]))
 
 def _ocr(im,page,seconds,warnings):
-    im=ImageOps.exif_transpose(im).convert('L')
-    if min(im.size)<500: warnings.append(f'Page {page}: low resolution, OCR may be unreliable.')
+    im_gray = ImageOps.exif_transpose(im).convert('L')
+    if min(im_gray.size)<500: warnings.append(f'Page {page}: low resolution, OCR may be unreliable.')
     # Only detect orientation if image is landscape (unusual for portrait resumes)
-    if im.width > im.height * 1.2:
+    if im_gray.width > im_gray.height * 1.2:
         try:
-            orientation = pytesseract.image_to_osd(im,timeout=min(2,seconds))
+            orientation = pytesseract.image_to_osd(im_gray,timeout=min(2,seconds))
             match = re.search(r'Rotate: (\d+)',orientation)
             if match and int(match.group(1)) in (90,180,270):
-                im=im.rotate(-int(match.group(1)),expand=True)
+                im_gray = im_gray.rotate(-int(match.group(1)),expand=True)
         except Exception:
             pass
-    # High-speed contrast stretch (100x faster than MedianFilter across 2M pixels)
-    im=ImageOps.autocontrast(im)
+
+    # Try high-speed contrast stretch first
+    im_enhanced = ImageOps.autocontrast(im_gray)
+    raw = ""
     try:
-        raw=pytesseract.image_to_string(im,config='--psm 3',timeout=seconds)
-        lines=[Line(line.strip(),page,'ocr',f'ocr-{page}-{i}') for i,line in enumerate(raw.splitlines()) if line.strip()]
-        return lines
-    except Exception as e:
-        warnings.append(f'Page {page}: OCR failed or exceeded timeout ({type(e).__name__}).')
-        return []
+        raw = pytesseract.image_to_string(im_enhanced, config='--psm 3', timeout=seconds)
+    except Exception:
+        pass
+
+    # Fallback 1: If psm 3 returned empty or very short, try without psm
+    if not raw or len(raw.strip()) < 30:
+        try:
+            raw = pytesseract.image_to_string(im_enhanced, timeout=seconds)
+        except Exception:
+            pass
+
+    # Fallback 2: Try psm 6 (single uniform block) on raw grayscale if still empty
+    if not raw or len(raw.strip()) < 30:
+        try:
+            raw = pytesseract.image_to_string(im_gray, config='--psm 6', timeout=seconds)
+        except Exception:
+            pass
+
+    lines = [Line(line.strip(),page,'ocr',f'ocr-{page}-{i}') for i,line in enumerate(raw.splitlines()) if line.strip()]
+    if not lines:
+        warnings.append(f'Page {page}: OCR returned no legible text.')
+    return lines
 
 def _rtf(data):
     s=data.decode('latin1',errors='replace')
@@ -123,7 +141,7 @@ def read_document(data,fmt,settings):
                         if page.rect.width*page.rect.height*4>30_000_000:
                             warnings.append(f'Page {pageno}: rendered OCR image exceeds safe pixel limit.')
                             continue
-                        pix=page.get_pixmap(matrix=fitz.Matrix(1.2,1.2),alpha=False)
+                        pix=page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False)
                         ocr=_ocr(Image.open(BytesIO(pix.tobytes('png'))),pageno,max(1,min(settings.max_ocr_seconds,int(deadline-time.monotonic()))),warnings)
                         # Only skip OCR lines that are substantial exact duplicates of native lines
                         existing={l.text.lower().strip() for l in native if len(l.text.strip())>10}

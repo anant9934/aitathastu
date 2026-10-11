@@ -241,7 +241,12 @@ export async function POST(request: Request) {
           role: "student",
         });
 
-        if (!renderResult.ok || !renderResult.raw_text?.trim()) {
+        const hasProfileRecords = Boolean(
+          renderResult.profile?.groups &&
+          Object.values(renderResult.profile.groups).some((arr: any) => Array.isArray(arr) && arr.length > 0)
+        );
+
+        if (!renderResult.ok || (!renderResult.raw_text?.trim() && !hasProfileRecords)) {
           return fail(
             "OCR_RENDER_EMPTY",
             "We could not read the scanned pages clearly. Try a sharper scan or enter details manually.",
@@ -250,7 +255,7 @@ export async function POST(request: Request) {
         }
 
         renderDocId = renderResult.document_id;
-        const renderText = renderResult.raw_text;
+        const renderText = renderResult.raw_text?.trim() ? renderResult.raw_text : "Extracted from scanned resume";
 
         // Continue extraction pipeline using Render's OCR text
         await SourceProcessingJobService.updateStage(jobId, personId, "validate");

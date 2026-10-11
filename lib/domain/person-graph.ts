@@ -10,6 +10,7 @@ import {
 import type { StudentActivity } from "./integrations";
 import { getUnifiedStudentActivities } from "../services/activity-service";
 import { AI_ML_TECH_REGISTRY } from "../connectors/github/mapper";
+import { SkillIntelligenceService } from "../services/skill-intelligence-service";
 
 export type SkillEvidenceState =
   | "Unknown"
@@ -22,6 +23,9 @@ export type SkillGraphNode = {
   name: string;
   category: "AI & ML" | "GenAI" | "Data" | "Backend" | "Tools" | "Cloud" | "Other";
   state: SkillEvidenceState;
+  level?: import("../services/skill-intelligence-service").SkillProficiencyLevel;
+  goalRelevance?: import("../services/skill-intelligence-service").GoalRelevance;
+  isGoalPrerequisite?: boolean;
   evidenceCount: number;
   evidenceItems: Array<{
     id: string;
@@ -38,6 +42,9 @@ export type SkillGraphNode = {
     personalContributionRoles: string[];
   }>;
   whyTathastuThinksThis: string;
+  conciseExplanation?: string;
+  sevenQuestions?: import("../services/skill-intelligence-service").SevenQuestionsAnalysis;
+  graph?: import("../services/skill-intelligence-service").SkillEvidenceGraph;
   lastObservedAt: string;
 };
 
@@ -79,7 +86,9 @@ export type PersonGraphSummary = {
   }>;
   stats: {
     totalSkills: number;
+    evidencedSkills?: number;
     demonstratedSkills: number;
+    assessedSkills?: number;
     verifiedSkills: number;
     totalProjects: number;
     totalEvidence: number;
@@ -223,111 +232,55 @@ export async function buildPersonGraph(personId: string): Promise<PersonGraphSum
       };
     });
 
-  // Collect skills from evidenceItems and confirmed projects
-  const skillNodesMap = new Map<string, SkillGraphNode>();
+  // Build canonical explainable skill intelligence
+  const intel = await SkillIntelligenceService.getSkillsIntelligence(personId);
 
-  const skillEvidence = (person360.evidence || []).filter(
-    (e) => e.category === "skill" || e.category === "assessment"
-  );
-
-  for (const ev of skillEvidence) {
-    const name = ev.subject;
-    const existing: SkillGraphNode = skillNodesMap.get(name) || {
-      name,
-      category: categorizeSkill(name),
-      state: "Claimed" as SkillEvidenceState,
-      evidenceCount: 0,
-      evidenceItems: [],
-      relatedProjects: [],
-      whyTathastuThinksThis: "",
-      lastObservedAt: ev.observedAt || new Date().toISOString(),
-    };
-
-    existing.evidenceCount++;
-    existing.evidenceItems.push({
-      id: ev.id,
-      source: ev.source,
-      verificationStatus: ev.verificationStatus,
-      sourceReference: ev.sourceReference || null,
-      observedAt: ev.observedAt || new Date().toISOString(),
-      interpretation: ev.interpretation,
-    });
-
-    skillNodesMap.set(name, existing);
-  }
-
-  // Also connect confirmed projects to skill nodes
-  for (const proj of confirmedProjects) {
-    for (const tech of proj.technologies) {
-      const existing: SkillGraphNode = skillNodesMap.get(tech) || {
-        name: tech,
-        category: categorizeSkill(tech),
-        state: "Claimed" as SkillEvidenceState,
-        evidenceCount: 1,
-        evidenceItems: [],
-        relatedProjects: [],
-        whyTathastuThinksThis: "",
-        lastObservedAt: new Date().toISOString(),
-      };
-
-      if (!existing.relatedProjects.some((p) => p.id === proj.id)) {
-        existing.relatedProjects.push({
-          id: proj.id,
-          title: proj.title,
-          repositoryUrl: proj.repositoryUrl,
-          personalContributionRoles: proj.personalContributionRoles,
-        });
-      }
-
-      skillNodesMap.set(tech, existing);
-    }
-  }
-
-  // Evaluate final state & generate "Why Tathastu Thinks This" for each skill
-  const skillNodes: SkillGraphNode[] = [];
-  for (const [name, node] of skillNodesMap.entries()) {
-    let finalState: SkillEvidenceState = "Claimed";
-
-    const hasVerified = node.evidenceItems.some((e) => e.verificationStatus === "verified");
-    const hasConfirmedProject = node.relatedProjects.length > 0;
-    const hasImported = node.evidenceItems.some((e) => e.source === "imported" || e.source === "github");
-    const evidenceCount = node.evidenceItems.length;
-
-    if (hasVerified) {
-      finalState = "Verified";
-    } else if (hasConfirmedProject) {
-      finalState = "Demonstrated";
-    } else if (hasImported || evidenceCount >= 2) {
-      finalState = "Evidence available";
-    } else if (evidenceCount === 1) {
-      finalState = "Claimed";
+  const skillNodes: SkillGraphNode[] = intel.skills.map((s) => {
+    let mappedState: SkillEvidenceState = "Claimed";
+    if (s.level === "Verified" || s.level === "Assessed") {
+      mappedState = "Verified";
+    } else if (s.level === "Demonstrated") {
+      mappedState = "Demonstrated";
+    } else if (s.level === "Applied evidence available" || s.level === "Exposure recorded") {
+      mappedState = "Evidence available";
+    } else if (s.level === "Claimed") {
+      mappedState = "Claimed";
     } else {
-      finalState = "Unknown";
+      mappedState = "Unknown";
     }
 
-    node.state = finalState;
-    node.whyTathastuThinksThis = generateWhyTathastuThinksThis(
-      name,
-      finalState,
-      node.evidenceItems,
-      node.relatedProjects
-    );
+    const cat: "AI & ML" | "GenAI" | "Data" | "Backend" | "Tools" | "Cloud" | "Other" =
+      s.category === "Languages" ? "Tools" : (s.category as any);
 
-    skillNodes.push(node);
-  }
-
-  // Sort by state strength, then evidence count
-  const stateWeight: Record<SkillEvidenceState, number> = {
-    Verified: 4,
-    Demonstrated: 3,
-    "Evidence available": 2,
-    Claimed: 1,
-    Unknown: 0,
-  };
-  skillNodes.sort((a, b) => stateWeight[b.state] - stateWeight[a.state] || b.evidenceCount - a.evidenceCount);
-
-  const demonstratedCount = skillNodes.filter((s) => s.state === "Demonstrated" || s.state === "Verified").length;
-  const verifiedCount = skillNodes.filter((s) => s.state === "Verified").length;
+    return {
+      name: s.canonicalName,
+      category: cat,
+      state: mappedState,
+      level: s.level,
+      goalRelevance: s.goalRelevance,
+      isGoalPrerequisite: s.isGoalPrerequisite,
+      evidenceCount: s.observations.length,
+      evidenceItems: s.observations.map((o) => ({
+        id: o.id,
+        source: o.source,
+        verificationStatus: o.sourceType === "faculty_verification" ? "verified" : "unverified",
+        sourceReference: o.sourceReference,
+        observedAt: o.observedAt,
+        interpretation: o.summary,
+      })),
+      relatedProjects: s.dimensions.demonstratedApplication.projects.map((p) => ({
+        id: p.id,
+        title: p.title,
+        repositoryUrl: p.repositoryUrl || null,
+        personalContributionRoles: p.roles,
+      })),
+      whyTathastuThinksThis: s.conciseExplanation,
+      conciseExplanation: s.conciseExplanation,
+      sevenQuestions: s.sevenQuestions,
+      graph: s.graph,
+      lastObservedAt: s.lastObservedAt,
+    };
+  });
 
   return {
     person: {
@@ -343,7 +296,7 @@ export async function buildPersonGraph(personId: string): Promise<PersonGraphSum
     },
     goal: {
       id: person360.activeGoal?.id,
-      title: person360.activeGoal?.title || "GenAI Engineer",
+      title: intel.targetRole || person360.activeGoal?.title || "GenAI Engineer",
       description: person360.activeGoal?.description || "",
       status: person360.activeGoal?.status || "active",
     },
@@ -356,9 +309,11 @@ export async function buildPersonGraph(personId: string): Promise<PersonGraphSum
       lastSyncedAt: c.lastSyncedAt ? new Date(c.lastSyncedAt).toISOString() : null,
     })),
     stats: {
-      totalSkills: skillNodes.length,
-      demonstratedSkills: demonstratedCount,
-      verifiedSkills: verifiedCount,
+      totalSkills: intel.stats.trackedSkills,
+      evidencedSkills: intel.stats.evidencedSkills,
+      demonstratedSkills: intel.stats.demonstratedSkills,
+      assessedSkills: intel.stats.assessedSkills,
+      verifiedSkills: intel.stats.verifiedSkills,
       totalProjects: confirmedProjects.length,
       totalEvidence: person360.evidence?.length || 0,
     },

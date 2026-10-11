@@ -9,6 +9,10 @@ AI Tathastu transforms student career aspirations into structured, verifiable pa
 ## Key Highlights & Architectural Pillars
 
 - **Zero Mock Data in Runtime**: Authenticated student dashboards operate exclusively on real, persisted records from remote Neon PostgreSQL.
+- **Universal Multi-Tier Resume Extraction Engine (v5.0)**:
+  - 4-Tier fallback pipeline: PDF.js native stream parsing $\to$ structural layout reconstruction $\to$ canvas rasterization + OCR engine fallback $\to$ vector/path glyph heuristics.
+  - Deterministic entity recognition across arbitrary international resume layouts (single-column, multi-column, icon-contact headers, compact tables).
+  - Robust extraction across work experience, educational credentials, chronological date resolution, project artifacts, verified skill lexicons, and publication records.
 - **Enterprise Multi-Provider LLM Router**: Seamless integration with **Groq** (`openai/gpt-oss-120b`), **OpenRouter** (`meta-llama/llama-3.3-70b-instruct`), and **Google Gemini** (`gemini-3.5-flash-lite`), protected by Zod structured output validation and automatic zero-downtime deterministic fallback.
 - **Grounded RAG Knowledge Engine**: 16 canonical AI/ML domains providing verified technical and academic citations (ArXiv, official documentation).
 - **96 Priority-Aware Personalization Configurations**: Mathematically verified multi-interest composition engine spanning 6 core modes (Learning, Jobs, People, Collaboration, Projects, Research & Events).
@@ -22,6 +26,7 @@ AI Tathastu transforms student career aspirations into structured, verifiable pa
 
 - **Framework**: [Next.js 15 App Router](https://nextjs.org/) (React 19, TypeScript)
 - **Database & Persistence**: [Neon PostgreSQL](https://neon.tech/) Serverless via `@neondatabase/serverless` & [Drizzle ORM](https://orm.drizzle.team/)
+- **Document & Resume Parser**: Native PDF.js worker with structural layout reconstruction, canvas rendering heuristics, and deterministic semantic extraction
 - **Distributed Cache & Rate Limiting**: [Redis](https://redis.io/) with failover to in-memory rate limiting
 - **Intelligence Providers**: Groq, OpenRouter, Google Gemini, Cerebras, Mistral, SambaNova
 - **Styling**: Tailwind CSS & Vanilla CSS Design System tokens
@@ -91,6 +96,7 @@ npm run build
 
 Full architectural documentation and certification audits are located in the [`docs/`](docs/) directory:
 
+### Core Architecture & Production Certification
 - [`docs/FUNCTIONAL_AUDIT.md`](docs/FUNCTIONAL_AUDIT.md) — Master route-to-service-to-DB dependency map and capability audit.
 - [`docs/LLM_PROVIDER_CERTIFICATION.md`](docs/LLM_PROVIDER_CERTIFICATION.md) — Multi-provider LLM engine, schemas, tool executor, and fallback behavior.
 - [`docs/REAL_DATA_SOURCE_MATRIX.md`](docs/REAL_DATA_SOURCE_MATRIX.md) — Data connector architecture, GitHub sync, resume extraction, and trust levels.
@@ -101,6 +107,13 @@ Full architectural documentation and certification audits are located in the [`d
 - [`docs/PRODUCTION_SECURITY_REVIEW.md`](docs/PRODUCTION_SECURITY_REVIEW.md) — Threat model, IDOR protection, SSRF filtering, and prompt injection defense.
 - [`docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md) — Health probes, deployment steps, and rollback procedures.
 - [`docs/FINAL_PRODUCTION_READINESS_REPORT.md`](docs/FINAL_PRODUCTION_READINESS_REPORT.md) — Complete launch certification verdict and sign-off.
+
+### Universal Resume Extraction & Benchmark Reports (v5.0)
+- [`docs/V5_0_1_DATASET_AUDIT.md`](docs/V5_0_1_DATASET_AUDIT.md) — Multi-format PDF dataset audit, layout profiling, and edge cases.
+- [`docs/V5_0_2_BASELINE_BENCHMARK.md`](docs/V5_0_2_BASELINE_BENCHMARK.md) — Baseline extraction accuracy and latency metrics.
+- [`docs/V5_0_3_UNIVERSAL_PARSER_REPORT.md`](docs/V5_0_3_UNIVERSAL_PARSER_REPORT.md) — Universal multi-tier document parsing architecture & performance.
+- [`docs/V5_0_4_STRUCTURED_EXTRACTION_REPORT.md`](docs/V5_0_4_STRUCTURED_EXTRACTION_REPORT.md) — Deterministic structured extraction and section segmentation.
+- [`docs/V5_0_5_GROUND_TRUTH_AND_ACCURACY_REPORT.md`](docs/V5_0_5_GROUND_TRUTH_AND_ACCURACY_REPORT.md) — Ground-truth comparison and evaluation benchmarks.
 
 ---
 

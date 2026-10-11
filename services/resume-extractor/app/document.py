@@ -90,15 +90,23 @@ def _ocr(im,page,seconds,warnings):
                 im=Image.fromarray(cv2.warpAffine(bw,matrix,(gray.shape[1],gray.shape[0]),borderValue=255))
     try:
         txt=pytesseract.image_to_data(im,config='--psm 3',output_type=pytesseract.Output.DICT,timeout=seconds)
-    except (RuntimeError,pytesseract.TesseractNotFoundError):
-        warnings.append(f'Page {page}: OCR failed or exceeded timeout.')
+        groups={}
+        for i,word in enumerate(txt['text']):
+            if word.strip():
+                key=(txt['block_num'][i],txt['par_num'][i],txt['line_num'][i])
+                groups.setdefault(key,[]).append((txt['left'][i],word))
+        return [Line(' '.join(w for _,w in sorted(words)),page,'ocr',f'ocr-{page}-{k}') for k,words in groups.items()]
+    except Exception as e:
+        # Fast fallback to image_to_string if image_to_data timed out or failed
+        try:
+            raw=pytesseract.image_to_string(im,config='--psm 3',timeout=max(5,min(20,seconds)))
+            lines=[Line(line.strip(),page,'ocr',f'ocr-{page}-{i}') for i,line in enumerate(raw.splitlines()) if line.strip()]
+            if lines:
+                return lines
+        except Exception:
+            pass
+        warnings.append(f'Page {page}: OCR failed or exceeded timeout ({type(e).__name__}).')
         return []
-    groups={}
-    for i,word in enumerate(txt['text']):
-        if word.strip():
-            key=(txt['block_num'][i],txt['par_num'][i],txt['line_num'][i])
-            groups.setdefault(key,[]).append((txt['left'][i],word))
-    return [Line(' '.join(w for _,w in sorted(words)),page,'ocr',f'ocr-{page}-{k}') for k,words in groups.items()]
 
 def _rtf(data):
     s=data.decode('latin1',errors='replace')
@@ -134,7 +142,7 @@ def read_document(data,fmt,settings):
                         if page.rect.width*page.rect.height*4>30_000_000:
                             warnings.append(f'Page {pageno}: rendered OCR image exceeds safe pixel limit.')
                             continue
-                        pix=page.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
+                        pix=page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False)
                         ocr=_ocr(Image.open(BytesIO(pix.tobytes('png'))),pageno,max(1,min(settings.max_ocr_seconds,int(deadline-time.monotonic()))),warnings)
                         # Only skip OCR lines that are substantial exact duplicates of native lines
                         existing={l.text.lower().strip() for l in native if len(l.text.strip())>10}

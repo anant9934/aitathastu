@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     storage_dir: Path = Path('data/private')
     max_upload_mb: int = Field(default=12, ge=1, le=100)
     max_pages: int = Field(default=15, ge=1, le=200)
-    max_ocr_seconds: int = Field(default=15, ge=1, le=120)
+    max_ocr_seconds: int = Field(default=35, ge=1, le=120)
     max_processing_seconds: int = Field(default=90, ge=5, le=600)
     retention_days: int = Field(default=7, ge=1, le=365)
     allowed_origin: str = 'http://localhost:3000'

@@ -203,6 +203,48 @@ export class ExtractorServiceClient {
   }
 
   /**
+   * Synchronous upload + extract in a single Render request.
+   * Returns the full extracted profile without polling.
+   * Used as the OCR fallback when Vercel serverless cannot run Tesseract.
+   */
+  static async uploadAndExtract(params: {
+    fileBuffer: Buffer;
+    filename: string;
+    mimeType: string;
+    personId: string;
+    role?: "student" | "verifier";
+  }): Promise<{
+    ok: boolean;
+    document_id: string;
+    status: string;
+    profile: ExtractorProfileV2;
+    raw_text: string;
+    warnings: string[];
+    ocr_used: boolean;
+    processing_seconds: number;
+  }> {
+    const { fileBuffer, filename, mimeType, personId, role = "student" } = params;
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
+    formData.append("file", blob, filename);
+
+    const res = await fetch(`${this.getBaseUrl()}/api/resumes/upload-and-extract`, {
+      method: "POST",
+      headers: this.makeHeaders(personId, role),
+      body: formData,
+      // 90s timeout — Render has no serverless limit, handles complex OCR docs
+      signal: AbortSignal.timeout(90000),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Extraction failed");
+      throw new Error(`Render extraction failed (${res.status}): ${errorText}`);
+    }
+
+    return res.json();
+  }
+
+  /**
    * Triggers background extraction for an uploaded document.
    */
   static async startExtraction(documentId: string, personId: string): Promise<ExtractorStatusResponse> {

@@ -141,6 +141,78 @@ def extract(
     tasks.add_task(processing, request.document_id)
     return StatusResponse(document_id=request.document_id, status='queued')
 
+
+@app.post('/api/resumes/upload-and-extract', status_code=200)
+async def upload_and_extract(
+    file: Annotated[UploadFile, File()],
+    user: UserContext = Depends(authorize_action('upload'))
+):
+    """Synchronous single-request upload + extract. Returns the full profile in one call.
+    Used by Vercel onboarding flow to bypass Vercel serverless OCR limitations.
+    Extraction runs synchronously (max settings.max_processing_seconds).
+    """
+    original = (file.filename or 'resume').replace('\\', '/').split('/')[-1][:120]
+    payload = await file.read(settings.max_upload_mb * 1024 * 1024 + 1)
+
+    try:
+        fmt = validate_upload(original, payload, settings.max_upload_mb, settings.max_pages)
+    except IngestionError as e:
+        raise HTTPException(400, str(e)) from None
+
+    docid = str(uuid.uuid4())
+    store.create(
+        docid,
+        original,
+        payload,
+        {
+            'document_id': docid,
+            'filename': original,
+            'owner_id': user.user_id,
+            'org_id': user.org_id,
+            'format': fmt,
+            'status': 'uploaded',
+            'warnings': [],
+            'created_at': datetime.now(timezone.utc).isoformat()
+        }
+    )
+
+    # Run extraction synchronously (Render has Tesseract; this is safe outside serverless)
+    try:
+        store.update_meta(docid, {'status': 'processing'})
+        began = time.perf_counter()
+        content = read_document(payload, fmt, settings)
+        profile = extract_profile(content, docid, began)
+        store.save_json(docid, 'sections.json', [asdict(l) for l in content.lines])
+        store.save_json(docid, 'profile.json', profile.model_dump(mode='json'))
+        store.update_meta(docid, {'status': profile.metadata.status, 'warnings': profile.metadata.warnings})
+    except Exception as e:
+        store.update_meta(docid, {
+            'status': 'failed',
+            'warnings': [f'Processing error: {type(e).__name__}. Please retry or use another file.']
+        })
+        raise HTTPException(422, f'Extraction failed: {type(e).__name__}') from None
+
+    try:
+        profile_data = ResumeProfile.model_validate(store.read_json(docid, 'profile.json'))
+    except (KeyError, Exception):
+        raise HTTPException(409, 'Extraction completed but profile could not be read') from None
+
+    raw_text = '\n\n'.join(
+        line.text for line in content.lines if line.text.strip()
+    ) if content.lines else ''
+
+    return JSONResponse({
+        'ok': True,
+        'document_id': docid,
+        'status': profile_data.metadata.status,
+        'profile': profile_data.model_dump(mode='json'),
+        'raw_text': raw_text[:50000],  # cap to 50k chars for network efficiency
+        'warnings': profile_data.metadata.warnings,
+        'ocr_used': profile_data.metadata.ocr_used,
+        'processing_seconds': profile_data.metadata.processing_seconds,
+    })
+
+
 @app.get('/api/resumes/{document_id}/status', response_model=StatusResponse)
 def status(
     document_id: str,

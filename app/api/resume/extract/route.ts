@@ -205,14 +205,134 @@ export async function POST(request: Request) {
     }
 
     const rawText = parsedDoc.text;
+
+    // --- Render OCR Fallback ---
+    // Vercel serverless has no Tesseract binary. When local parsing yields empty text
+    // (scanned PDF, image-only PDF, broken encoding), forward to the Render Docker
+    // service which has Tesseract 5.5 installed and runs outside serverless constraints.
+    let renderDocId: string | null = null;
     if (!rawText.trim()) {
-      return fail(
-        parsedDoc.ocrUsed ? "OCR_LOW_QUALITY" : "NATIVE_TEXT_UNAVAILABLE",
-        parsedDoc.ocrUsed
-          ? "We could not read the scanned pages clearly. Try a sharper scan or enter details manually."
-          : "No readable text was found. Try exporting the document again or enter details manually.",
-        422
+      const hasRenderUrl = !!(
+        process.env.RESUME_EXTRACTOR_URL ||
+        process.env.RESUME_EXTRACTOR_SERVICE_URL
       );
+
+      if (!hasRenderUrl) {
+        // No Render service configured — fail gracefully
+        return fail(
+          parsedDoc.ocrUsed ? "OCR_LOW_QUALITY" : "NATIVE_TEXT_UNAVAILABLE",
+          parsedDoc.ocrUsed
+            ? "We could not read the scanned pages clearly. Try a sharper scan or enter details manually."
+            : "No readable text was found. Try exporting the document again or enter details manually.",
+          422
+        );
+      }
+
+      // Forward to Render for full OCR extraction
+      try {
+        const { ExtractorServiceClient } = await import("@/lib/services/extractor-service-client");
+        await SourceProcessingJobService.updateStage(jobId, personId, "extract");
+
+        const renderResult = await ExtractorServiceClient.uploadAndExtract({
+          fileBuffer: bytes,
+          filename: file.name,
+          mimeType: file.type || (extension === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+          personId,
+          role: "student",
+        });
+
+        if (!renderResult.ok || !renderResult.raw_text?.trim()) {
+          return fail(
+            "OCR_RENDER_EMPTY",
+            "We could not read the scanned pages clearly. Try a sharper scan or enter details manually.",
+            422
+          );
+        }
+
+        renderDocId = renderResult.document_id;
+        const renderText = renderResult.raw_text;
+
+        // Continue extraction pipeline using Render's OCR text
+        await SourceProcessingJobService.updateStage(jobId, personId, "validate");
+        const { extractResumeStructured } = await import("@/lib/services/resume-extraction-service");
+        const { resumeCandidates, saveResumeCandidates } = await import("@/lib/services/resume-review-service");
+        const { resumeSuggestions, resumeDiscovery } = await import("@/lib/resume-suggestions");
+
+        const legacySuggestions = resumeSuggestions(renderText);
+        const legacyDiscovery = resumeDiscovery(renderText);
+        const extraction = await extractResumeStructured(renderText, personId, []);
+
+        if (!extraction.success || !extraction.extracted) {
+          return fail("EXTRACTION_FAILED", "We could not extract reviewable details. Please retry or enter details manually.", 422);
+        }
+
+        const reviewCandidates = resumeCandidates(extraction.extracted, renderText);
+        if (reviewCandidates.length === 0) {
+          return fail("NO_CLAIMS_FOUND", "No supported claims were found for review. Please enter details manually.", 422);
+        }
+
+        await SourceProcessingJobService.updateStage(jobId, personId, "persist");
+        await saveResumeCandidates(personId, documentId, extraction.extracted, renderText);
+
+        // Save durable blob
+        const { ObjectStorageService } = await import("@/lib/storage/object-storage");
+        await ObjectStorageService.storeDocument({
+          documentId,
+          personId,
+          filename: file.name,
+          mimeType: file.type || "application/pdf",
+          buffer: bytes,
+        }).catch(() => null);
+
+        await SourceProcessingJobService.completeJob({
+          jobId,
+          personId,
+          resultReference: `resume:sha256:${documentId}`,
+          metadata: { candidates: reviewCandidates.length, via: "render-ocr" },
+        });
+
+        return makeJsonResponse(
+          {
+            ok: true,
+            status: "completed",
+            documentId,
+            jobId,
+            structured: extraction.extracted,
+            extractedProfile: extraction.extractedProfile,
+            discoveredProfiles: extraction.discoveredProfiles,
+            discoveredRepositories: extraction.discoveredRepositories,
+            candidates: extraction.candidates,
+            reviewCandidates,
+            extractionMeta: {
+              success: true,
+              provider: "render-tesseract",
+              modelUsed: "universal-extractor-v2",
+              llmUsed: false,
+              ocrUsed: renderResult.ocr_used,
+              ocrFailed: false,
+              fallbackUsed: true,
+              latencyMs: Math.round(renderResult.processing_seconds * 1000),
+              textTruncated: false,
+              error: null,
+            },
+            suggestions: legacySuggestions,
+            discovery: legacyDiscovery,
+            message: "Your resume was analysed with OCR on the Render extraction engine. Source-backed suggestions were saved for review.",
+            requestId,
+          },
+          200,
+          requestId
+        );
+
+      } catch (renderErr) {
+        // Render is unreachable or timed out — fail with actionable message
+        console.error("Render OCR fallback failed:", renderErr);
+        return fail(
+          "OCR_SERVICE_UNAVAILABLE",
+          "Our OCR service is temporarily unavailable. Please try again in a moment, or enter details manually.",
+          503
+        );
+      }
     }
 
     // --- Deterministic Extraction (ZERO-LLM) ---

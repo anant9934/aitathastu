@@ -1078,6 +1078,36 @@ export interface OcrResult {
   error?: string;
 }
 
+export function resolveLocalTrainedDataPath(): { dir: string; fullPath: string; checksumValid: boolean } {
+  const candidateDirs = [
+    process.cwd(),
+    path.join(process.cwd(), "public"),
+    path.join(__dirname, "..", ".."),
+    path.join(__dirname, "..", "..", "public"),
+    "/var/task",
+    "/var/task/public",
+  ];
+
+  for (const dir of candidateDirs) {
+    const fullPath = path.join(dir, "eng.traineddata");
+    if (fs.existsSync(fullPath)) {
+      try {
+        const modelBytes = fs.readFileSync(fullPath);
+        const hash = crypto.createHash("sha256").update(modelBytes).digest("hex");
+        if (hash === EXPECTED_ENG_TRAINEDDATA_SHA256) {
+          return { dir, fullPath, checksumValid: true };
+        }
+      } catch {}
+    }
+  }
+
+  return {
+    dir: process.cwd(),
+    fullPath: path.join(process.cwd(), "eng.traineddata"),
+    checksumValid: false,
+  };
+}
+
 export async function recognizeScannedDocument(
   buffer: Buffer,
   timeoutMs = 15000,
@@ -1087,16 +1117,8 @@ export async function recognizeScannedDocument(
   const pageResults: Array<{ pageNumber: number; text: string; confidence: number }> = [];
   const preprocessingApplied: string[] = [];
 
-  // Check local eng.traineddata asset and verify checksum
-  let checksumValid = false;
-  const localModelPath = path.join(process.cwd(), "eng.traineddata");
-  if (fs.existsSync(localModelPath)) {
-    try {
-      const modelBytes = fs.readFileSync(localModelPath);
-      const hash = crypto.createHash("sha256").update(modelBytes).digest("hex");
-      checksumValid = hash === EXPECTED_ENG_TRAINEDDATA_SHA256;
-    } catch {}
-  }
+  // Check local eng.traineddata asset and verify checksum across search paths
+  const { dir: langDir, checksumValid } = resolveLocalTrainedDataPath();
 
   // Identify target candidate images
   let targetImages: Array<{ pageNumber: number; buffer: Buffer; applied: string[] }> = [];
@@ -1144,9 +1166,9 @@ export async function recognizeScannedDocument(
   try {
     const { createWorker } = await import("tesseract.js");
 
-    // Configure worker with local traineddata path
+    // Configure worker with resolved traineddata path
     const workerOptions: Record<string, any> = {
-      langPath: process.cwd(),
+      langPath: langDir,
       cacheMethod: "readOnly",
       errorHandler: () => {},
     };

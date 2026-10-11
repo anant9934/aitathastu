@@ -24,7 +24,14 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  serverExternalPackages: ["@napi-rs/canvas", "pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js"],
+  serverExternalPackages: ["@napi-rs/canvas", "pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js", "tesseract.js-core"],
+  outputFileTracingIncludes: {
+    "/api/**/*": [
+      "./eng.traineddata",
+      "./public/eng.traineddata",
+      "./node_modules/tesseract.js-core/**/*",
+    ],
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

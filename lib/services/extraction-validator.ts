@@ -190,8 +190,8 @@ export class ExtractionValidator {
       .replace(/\b([A-Za-z])\s+([A-Za-z]{2,})\b/g, "$1$2")
       .replace(/\b([A-Za-z]\s+){2,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ""))
       .replace(/\s*,\s*/g, ", ")
-      .replace(/\s*&\s*/g, " & ")
       .toLowerCase()
+      .replace(/[:.\s—–\-]+$/, "")
       .trim();
 
     // 3. Output prefix tags (e.g. "Patent: ...", "Book - ...", "Paper | ...")
@@ -204,8 +204,8 @@ export class ExtractionValidator {
       return true;
     }
 
-    // 5. In-line publication or patent metadata
-    if (/\b(?:patent\s+(?:application|no|grant|granted)|published\s+in|accepted\s+at\s+ieee|springer|packt\s+publishing|isbn\b|application\s+no\b)/i.test(cleaned)) {
+    // 6. Explicit absence or negative indicators
+    if (/^(none|none\s+to\s+date|n\/a|nil|na|no\s+projects?|null)$/i.test(cleaned)) {
       return true;
     }
 

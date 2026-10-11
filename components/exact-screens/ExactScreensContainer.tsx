@@ -683,7 +683,7 @@ export function ExactScreensContainer({
             }}
             onCandidatesDiscovered={(cands) => {
               // 1. Projects
-              let nextProjects = [...projects];
+              const nextProjects = [...projects];
               if (cands.projects && cands.projects.length > 0) {
                 const mappedProjects: ProjectEntry[] = cands.projects.map((p, idx) => ({
                   id: p.id || `proj_${Date.now()}_${idx}`,
@@ -719,7 +719,7 @@ export function ExactScreensContainer({
               }
 
               // 3. Experiences
-              let nextExperiences = [...experienceEntries];
+              const nextExperiences = [...experienceEntries];
               if (cands.experiences && cands.experiences.length > 0) {
                 for (const exp of cands.experiences) {
                   if (
@@ -745,7 +745,7 @@ export function ExactScreensContainer({
               }
 
               // 4. Education
-              let nextEducation = [...educationEntries];
+              const nextEducation = [...educationEntries];
               if (cands.educations && cands.educations.length > 0) {
                 for (const edu of cands.educations) {
                   if (
@@ -774,7 +774,7 @@ export function ExactScreensContainer({
               }
 
               // 5. Achievements
-              let nextAchievements = [...achievementEntries];
+              const nextAchievements = [...achievementEntries];
               if (cands.achievements && cands.achievements.length > 0) {
                 for (const ach of cands.achievements) {
                   if (

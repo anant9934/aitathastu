@@ -197,8 +197,8 @@ async def upload_and_extract(
     except (KeyError, Exception):
         raise HTTPException(409, 'Extraction completed but profile could not be read') from None
 
-    raw_text = '\n\n'.join(
-        line.text for line in content.lines if line.text.strip()
+    raw_text = '\n'.join(
+        line.text for line in content.lines if line.text and line.text.strip()
     ) if content.lines else ''
 
     return JSONResponse({

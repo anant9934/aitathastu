@@ -128,7 +128,7 @@ def read_document(data,fmt,settings):
                     if url:=link.get('uri'):
                         if url.startswith(('https://','http://','mailto:')): links.append((url,pageno))
                 if native: lines.extend(native); methods.append('native_pdf')
-                if sum(len(x.text) for x in native)<55:
+                if sum(len(x.text) for x in native) < 40:
                     attempted=True
                     try:
                         if page.rect.width*page.rect.height*4>30_000_000:
@@ -136,8 +136,9 @@ def read_document(data,fmt,settings):
                             continue
                         pix=page.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
                         ocr=_ocr(Image.open(BytesIO(pix.tobytes('png'))),pageno,max(1,min(settings.max_ocr_seconds,int(deadline-time.monotonic()))),warnings)
-                        existing={l.text.lower() for l in native}
-                        fresh=[l for l in ocr if l.text.lower() not in existing]
+                        # Only skip OCR lines that are substantial exact duplicates of native lines
+                        existing={l.text.lower().strip() for l in native if len(l.text.strip())>10}
+                        fresh=[l for l in ocr if l.text.lower().strip() not in existing]
                         if fresh: lines.extend(fresh); used=True; methods.append('ocr')
                     except Exception as e: warnings.append(f'Page {pageno}: OCR setup error ({type(e).__name__}).')
     elif fmt=='docx':

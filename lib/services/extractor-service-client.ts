@@ -232,8 +232,8 @@ export class ExtractorServiceClient {
       method: "POST",
       headers: this.makeHeaders(personId, role),
       body: formData,
-      // 90s timeout — Render has no serverless limit, handles complex OCR docs
-      signal: AbortSignal.timeout(90000),
+      // 45s timeout — keeps total duration safely within Vercel's 60s execution budget
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {

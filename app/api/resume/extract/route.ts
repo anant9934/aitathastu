@@ -190,10 +190,15 @@ export async function POST(request: Request) {
     // --- Deterministic Document Parsing & OCR ---
     await SourceProcessingJobService.updateStage(jobId, personId, "parse");
 
+    const hasRenderUrl = !!(
+      process.env.RESUME_EXTRACTOR_URL ||
+      process.env.RESUME_EXTRACTOR_SERVICE_URL
+    );
+
     let parsedDoc;
     try {
       parsedDoc = await parseResumeDocument(bytes, extension as "pdf" | "docx", {
-        enableOcr: true,
+        enableOcr: !hasRenderUrl,
         ocrTimeoutMs: 15000,
       });
     } catch {
@@ -207,16 +212,11 @@ export async function POST(request: Request) {
     const rawText = parsedDoc.text;
 
     // --- Render OCR Fallback ---
-    // Vercel serverless has no Tesseract binary. When local parsing yields empty text
+    // Vercel serverless has no Tesseract binary. When local parsing yields empty or sparse text
     // (scanned PDF, image-only PDF, broken encoding), forward to the Render Docker
     // service which has Tesseract 5.5 installed and runs outside serverless constraints.
     let renderDocId: string | null = null;
-    if (!rawText.trim()) {
-      const hasRenderUrl = !!(
-        process.env.RESUME_EXTRACTOR_URL ||
-        process.env.RESUME_EXTRACTOR_SERVICE_URL
-      );
-
+    if (!rawText.trim() || rawText.replace(/\s+/g, "").length < 40) {
       if (!hasRenderUrl) {
         // No Render service configured — fail gracefully
         return fail(
@@ -266,7 +266,72 @@ export async function POST(request: Request) {
           return fail("EXTRACTION_FAILED", "We could not extract reviewable details. Please retry or enter details manually.", 422);
         }
 
-        const reviewCandidates = resumeCandidates(extraction.extracted, renderText);
+        let reviewCandidates = resumeCandidates(extraction.extracted, renderText);
+
+        // If deterministic regex found no claims in raw OCR text, pull directly from Render's structured profile
+        if (reviewCandidates.length === 0 && renderResult.profile?.groups) {
+          const groups = renderResult.profile.groups as Record<string, any[]>;
+          const fallbackCandidates: Array<{ candidateId: string; category: any; value: string; sourceSpan: string }> = [];
+
+          (groups.skills || []).forEach((r: any, idx: number) => {
+            const val = r.fields?.canonical_name?.value || r.fields?.original_wording?.value;
+            if (val && typeof val === "string" && val.trim()) {
+              fallbackCandidates.push({ candidateId: `skill_${idx}`, category: "skill", value: val.trim(), sourceSpan: val.trim() });
+              if (!extraction.extracted!.skills.some((s) => s.name.toLowerCase() === val.trim().toLowerCase())) {
+                extraction.extracted!.skills.push({ name: val.trim(), category: "other", proficiencyHint: "unknown", sourceSpan: val.trim() });
+              }
+            }
+          });
+
+          (groups.education || []).forEach((r: any, idx: number) => {
+            const deg = r.fields?.degree_title?.value || r.fields?.qualification?.value || "";
+            const inst = r.fields?.institution?.value || r.fields?.university?.value || "";
+            const val = [deg, inst].filter(Boolean).join(" · ");
+            if (val && val.trim()) {
+              fallbackCandidates.push({ candidateId: `education_${idx}`, category: "education", value: val.trim(), sourceSpan: val.trim() });
+              if (!extraction.extracted!.education.some((e) => e.institution.toLowerCase() === inst.toLowerCase())) {
+                extraction.extracted!.education.push({ institution: inst || "Academic Institution", degree: deg || "Degree", sourceSpan: val.trim() });
+              }
+            }
+          });
+
+          (groups.experience || []).forEach((r: any, idx: number) => {
+            const role = r.fields?.job_title?.value || "";
+            const org = r.fields?.organization?.value || "";
+            const val = [role, org].filter(Boolean).join(" · ");
+            if (val && val.trim()) {
+              fallbackCandidates.push({ candidateId: `experience_${idx}`, category: "experience", value: val.trim(), sourceSpan: val.trim() });
+              if (!extraction.extracted!.experience.some((ex) => ex.company.toLowerCase() === org.toLowerCase())) {
+                extraction.extracted!.experience.push({ role: role || "Role", company: org || "Organization", sourceSpan: val.trim() });
+              }
+            }
+          });
+
+          (groups.projects || []).forEach((r: any, idx: number) => {
+            const title = r.fields?.title?.value;
+            if (title && typeof title === "string" && title.trim()) {
+              fallbackCandidates.push({ candidateId: `project_${idx}`, category: "project", value: title.trim(), sourceSpan: title.trim() });
+              if (!extraction.extracted!.projects.some((p) => p.title.toLowerCase() === title.trim().toLowerCase())) {
+                extraction.extracted!.projects.push({ title: title.trim(), description: "", technologies: [], sourceSpan: title.trim() });
+              }
+            }
+          });
+
+          (groups.certifications || []).forEach((r: any, idx: number) => {
+            const title = r.fields?.title?.value;
+            if (title && typeof title === "string" && title.trim()) {
+              fallbackCandidates.push({ candidateId: `certification_${idx}`, category: "certification", value: title.trim(), sourceSpan: title.trim() });
+              if (!extraction.extracted!.certifications.some((c) => c.name.toLowerCase() === title.trim().toLowerCase())) {
+                extraction.extracted!.certifications.push({ name: title.trim(), sourceSpan: title.trim() });
+              }
+            }
+          });
+
+          if (fallbackCandidates.length > 0) {
+            reviewCandidates = fallbackCandidates;
+          }
+        }
+
         if (reviewCandidates.length === 0) {
           return fail("NO_CLAIMS_FOUND", "No supported claims were found for review. Please enter details manually.", 422);
         }

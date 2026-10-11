@@ -523,17 +523,50 @@ export function Screen6DigitalFootprints({
   onBack,
   onJumpToStep,
 }: Screen6DigitalFootprintsProps) {
-  const [profiles, setProfiles] = useState<Partial<Record<string, string>>>(initialProfiles);
+  // Auto-merge discovered resume profiles so they appear as "Profile Linked" immediately.
+  const mergedInitial = { ...discoveredResumeProfiles, ...initialProfiles };
+
+  const [profiles, setProfiles] = useState<Partial<Record<string, string>>>(mergedInitial);
   const [statuses, setStatuses] = useState<Partial<Record<string, FootprintHonestStatus>>>(() => {
     const init: Partial<Record<string, FootprintHonestStatus>> = {};
-    for (const [k, v] of Object.entries(initialProfiles)) {
+    for (const [k, v] of Object.entries(mergedInitial)) {
       if (v) init[k] = "Profile Linked";
     }
     return init;
   });
-  const [ignoredResumeCandidates, setIgnoredResumeCandidates] = useState<Set<string>>(new Set());
+  const [autoLinkedKeys] = useState<Set<string>>(() => new Set(Object.keys(discoveredResumeProfiles).filter((k) => Boolean(discoveredResumeProfiles[k]))));
   const [lastSyncedTimes, setLastSyncedTimes] = useState<Record<string, string>>({});
   const [syncSummaries, setSyncSummaries] = useState<Record<string, string>>({});
+
+  // Silently register auto-discovered resume profiles with the backend on first mount.
+  // No user confirmation needed — they can edit or remove at any time.
+  useEffect(() => {
+    const toRegister = Object.entries(discoveredResumeProfiles).filter(([, v]) => Boolean(v));
+    if (toRegister.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const [platformId, url] of toRegister) {
+        if (cancelled || !url) continue;
+        if (!platforms.some((p) => p.id === platformId)) continue;
+        try {
+          await fetch("/api/student/footprints/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: platformId,
+              identifier: url,
+              consent: true,
+              referenceOnly: true,  // just link, don't scrape yet
+            }),
+          });
+        } catch {
+          // silent — UI already shows the link optimistically
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -581,14 +614,6 @@ export function Screen6DigitalFootprints({
     };
   }, []);
 
-  const handleConfirmResumeCandidate = (platformId: string, url: string) => {
-    handleOpenPrompt(platformId, url);
-  };
-
-  const handleRemoveResumeCandidate = (platformId: string) => {
-    setIgnoredResumeCandidates((prev) => new Set([...prev, platformId]));
-  };
-
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
   const [inputVal, setInputVal] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -602,7 +627,6 @@ export function Screen6DigitalFootprints({
     setInputVal(
       overrideValue ??
         profiles[platformId] ??
-        (!ignoredResumeCandidates.has(platformId) ? discoveredResumeProfiles?.[platformId] : "") ??
         ""
     );
     setStatusMessage(null);
@@ -986,11 +1010,7 @@ export function Screen6DigitalFootprints({
               const isConnected = Boolean(profiles[p.id]);
               const currentStatus: FootprintHonestStatus = statuses[p.id] || "Not Connected";
               const isCurrentOpen = activePrompt === p.id;
-              const resumeCandidate = !ignoredResumeCandidates.has(p.id)
-                ? discoveredResumeProfiles?.[p.id]
-                : undefined;
-              const isCandidateOnly = !isConnected && Boolean(resumeCandidate);
-              const hasConflict = isConnected && Boolean(resumeCandidate) && profiles[p.id] !== resumeCandidate;
+              const isAutoLinked = autoLinkedKeys.has(p.id) && isConnected;
               const isSyncingThis = isSyncing && syncingProvider === p.id;
 
               // Compute Card Action State based on exact V4.6 specification
@@ -1014,9 +1034,6 @@ export function Screen6DigitalFootprints({
               ) {
                 actionLabel = "Refresh";
                 actionStyleType = "refresh";
-              } else if (isCandidateOnly) {
-                actionLabel = "Review Profile";
-                actionStyleType = "candidate";
               } else if (p.type === "EXPORT_REQUIRED") {
                 actionLabel = "Import Your Data";
                 actionStyleType = "primary";
@@ -1042,15 +1059,11 @@ export function Screen6DigitalFootprints({
                     borderRadius: 16,
                     border: isConnected
                       ? "2px solid #10B981"
-                      : isCandidateOnly
-                      ? "2px solid #93C5FD"
                       : isCurrentOpen
                       ? "2px solid #5942DC"
                       : "2px solid #FFFFFF",
                     background: isConnected
                       ? "#F0FDF4"
-                      : isCandidateOnly
-                      ? "#F8FAFC"
                       : isCurrentOpen
                       ? "rgba(89, 66, 220, 0.04)"
                       : "#FFFFFF",
@@ -1069,7 +1082,7 @@ export function Screen6DigitalFootprints({
                   }}
                   onMouseLeave={(e) => {
                     if (!isConnected && !isCurrentOpen) {
-                      e.currentTarget.style.borderColor = isCandidateOnly ? "#93C5FD" : "#FFFFFF";
+                      e.currentTarget.style.borderColor = "#FFFFFF";
                       e.currentTarget.style.transform = "translateY(0)";
                       e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.03)";
                     }
@@ -1096,37 +1109,23 @@ export function Screen6DigitalFootprints({
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontSize: 15, fontWeight: 750, color: "#1E1B4B" }}>{p.name}</span>
                       </div>
-                      {isCandidateOnly ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 2 }}>
+                        {isAutoLinked && (
                           <span
                             style={{
                               fontSize: 10.5,
                               fontWeight: 700,
-                              color: "#1D4ED8",
-                              background: "#EFF6FF",
-                              border: "1px solid #BFDBFE",
+                              color: "#059669",
+                              background: "#ECFDF5",
+                              border: "1px solid #A7F3D0",
                               padding: "1px 7px",
                               borderRadius: 9999,
                               width: "fit-content",
                             }}
                           >
-                            Found in your resume
+                            ✓ From your resume
                           </span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: "#64748B",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              maxWidth: 130,
-                            }}
-                            title={resumeCandidate}
-                          >
-                            {resumeCandidate}
-                          </span>
-                        </div>
-                      ) : (
+                        )}
                         <div
                           style={{
                             fontSize: 12,
@@ -1139,80 +1138,18 @@ export function Screen6DigitalFootprints({
                           }}
                         >
                           {isConnected ? (
-                            lastSynced ? (
-                              `Synced ${lastSynced}`
-                            ) : (
-                              currentStatus
-                            )
+                            lastSynced ? `Synced ${lastSynced}` : currentStatus
                           ) : (
                             p.supportedCapability
                           )}
                         </div>
-                      )}
-                      {hasConflict && (
-                        <div
-                          style={{
-                            fontSize: 10.5,
-                            color: "#92400E",
-                            background: "#FEF3C7",
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                            marginTop: 3,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            maxWidth: 140,
-                          }}
-                          title={`Resume has different URL: ${resumeCandidate}`}
-                        >
-                          Resume: {resumeCandidate}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Action Buttons Column */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    {isCandidateOnly ? (
-                      <div
-                        style={{ display: "flex", alignItems: "center", gap: 4 }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleConfirmResumeCandidate(p.id, resumeCandidate!)}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: 9999,
-                            fontSize: 11.5,
-                            fontWeight: 750,
-                            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-                            color: "#FFFFFF",
-                            border: "none",
-                            cursor: "pointer",
-                            boxShadow: "0 2px 6px rgba(37, 99, 235, 0.25)",
-                          }}
-                        >
-                          Review Profile
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveResumeCandidate(p.id)}
-                          title="Skip candidate suggestion"
-                          style={{
-                            padding: "4px 6px",
-                            borderRadius: 9999,
-                            fontSize: 11,
-                            color: "#94A3B8",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Skip
-                        </button>
-                      </div>
-                    ) : (
+                    {(
                       <button
                         type="button"
                         onClick={(e) => {

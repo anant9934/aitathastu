@@ -469,7 +469,7 @@ export function ExactScreensContainer({
             onExtractionReady={() => {
               eora?.signalSuccess("extraction_completed");
             }}
-            onExtractPreview={(ep) => {
+            onExtractPreview={(ep, discoveredProfiles) => {
               // Pre-fill name immediately after extraction, before the user saves the review.
               if (ep.fullName && !name) {
                 setName(ep.fullName);
@@ -481,6 +481,11 @@ export function ExactScreensContainer({
                   email: prev.email || ep.email || "",
                   mobile: prev.mobile || ep.mobile || "",
                 }));
+              }
+              // Immediately push discovered profile URLs into digital footprint page.
+              // No user confirmation needed — they appear as "Profile Linked" on Screen 6.
+              if (discoveredProfiles && Object.keys(discoveredProfiles).length > 0) {
+                setDiscoveredResumeProfiles((prev) => ({ ...discoveredProfiles, ...prev }));
               }
             }}
             onExtractSuccess={async (fileName, claims, extraData) => {

@@ -85,7 +85,7 @@ interface Screen5ResumeUploadProps {
   ) => Promise<boolean> | boolean;
   /** Fires immediately after a successful extraction, before the user reviews/saves.
    *  Use this to pre-fill profile fields (e.g. name) without waiting for review submission. */
-  onExtractPreview?: (extractedProfile: ExtractedProfileData) => void;
+  onExtractPreview?: (extractedProfile: ExtractedProfileData, discoveredProfiles?: Partial<Record<string, string>>) => void;
   onNext: () => void;
   onSkip?: () => void;
   onExtractionReady?: () => void;
@@ -387,7 +387,7 @@ export function Screen5ResumeUpload({
       // Immediately notify parent of extracted profile so name/contact can be pre-filled
       // before the user finishes reviewing candidates.
       if (data.extractedProfile && onExtractPreview) {
-        onExtractPreview(data.extractedProfile);
+        onExtractPreview(data.extractedProfile, data.discoveredProfiles ?? {});
       }
       setCandidates(rows);
 

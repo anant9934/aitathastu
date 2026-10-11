@@ -157,13 +157,21 @@ export function Screen5ResumeUpload({
   }>({});
   // null = probing, true = gate open, false = gate closed
   const [ingestionReady, setIngestionReady] = useState<boolean | null>(null);
+  // Track whether Render OCR service was warm during the preflight call
+  const renderReadyRef = useRef<boolean>(false);
 
-  // Probe server gate status once on mount so UI reflects reality before any interaction
+  // Probe server gate status once on mount so UI reflects reality before any interaction.
+  // The preflight also pre-warms the Render OCR service as a side effect.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/resume/preflight", { method: "GET", credentials: "same-origin" })
       .then((r) => r.json())
-      .then((data) => { if (!cancelled) setIngestionReady(Boolean(data?.ready)); })
+      .then((data) => {
+        if (!cancelled) {
+          setIngestionReady(Boolean(data?.ready));
+          renderReadyRef.current = Boolean(data?.renderReady);
+        }
+      })
       .catch(() => { if (!cancelled) setIngestionReady(false); });
     return () => {
       cancelled = true;
@@ -233,7 +241,21 @@ export function Screen5ResumeUpload({
       "WORKING"
     );
 
-    // Setup 45-second bounded client timeout to eliminate indefinite waiting
+    // Timeout: 120s when Render OCR is available (legitimate OCR work takes up to 90s),
+    // 45s otherwise (native PDF text extraction is fast; timeout indicates a real hang).
+    // If Render was cold during preflight, fire a quick wake-up ping first so the
+    // actual upload lands on a warm instance (~1s cost vs ~30s cold-start cost).
+    const extractionTimeoutMs = 120000;
+    if (!renderReadyRef.current) {
+      // Render was cold — try to warm it up before we send the actual file
+      fetch("/api/resume/preflight", { method: "GET", credentials: "same-origin" })
+        .then((r) => r.json())
+        .then((d) => { renderReadyRef.current = Boolean(d?.renderReady); })
+        .catch(() => null);
+      // Give Render 3s to wake up before the upload starts
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -241,7 +263,7 @@ export function Screen5ResumeUpload({
     abortControllerRef.current = abortController;
     const timeoutTimer = setTimeout(() => {
       abortController.abort("CLIENT_TIMEOUT");
-    }, 45000);
+    }, extractionTimeoutMs);
 
     let currentJobId: string | null = null;
 
@@ -401,7 +423,7 @@ export function Screen5ResumeUpload({
         abortController.signal.aborted;
 
       const userMessage = isTimeout
-        ? "Resume extraction took longer than 45 seconds. You can retry or enter your details manually."
+        ? "Resume extraction took longer than expected. You can retry or enter your details manually."
         : err instanceof Error
         ? err.message
         : "Network error during resume extraction. You can continue manually.";

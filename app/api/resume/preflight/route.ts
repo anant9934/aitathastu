@@ -64,8 +64,25 @@ export async function GET() {
   const headers: Record<string, string> = { "Cache-Control": "private, no-store" };
   const ready = coreIngestionReady();
 
+  // Pre-warm the Render OCR service in the background.
+  // The preflight is called before the file picker, so by the time the user
+  // picks a file and uploads, Render has already woken from cold-start sleep.
+  const renderUrl = (process.env.RESUME_EXTRACTOR_URL || process.env.RESUME_EXTRACTOR_SERVICE_URL || "").trim();
+  let renderReady = false;
+  if (renderUrl) {
+    try {
+      const warmRes = await fetch(`${renderUrl.replace(/\/+$/, "")}/health`, {
+        method: "GET",
+        signal: AbortSignal.timeout(8000), // don't block preflight more than 8s
+      });
+      renderReady = warmRes.ok;
+    } catch {
+      renderReady = false; // Render sleeping — user will experience cold-start delay
+    }
+  }
+
   if (ready) {
-    return NextResponse.json({ ready: true }, { headers });
+    return NextResponse.json({ ready: true, renderReady }, { headers });
   }
 
   // Build a CV-scoped, secret-safe failure summary for operators.
@@ -89,6 +106,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ready: false,
+      renderReady,
       reason:
         "Resume upload is temporarily unavailable. You can still enter your details manually.",
       // Sanitised — key names only, no values. Ecosystem integrations excluded.

@@ -95,5 +95,6 @@ export async function GET() {
       authHttpStatus: authStatus,
     },
     verdict,
+    gitCommit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "dev",
   });
 }

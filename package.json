@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@napi-rs/canvas": "^0.1.80",
     "@neondatabase/serverless": "^1.2.0",
     "@tailwindcss/postcss": "^4.1.13",
     "@types/bcryptjs": "^2.4.6",

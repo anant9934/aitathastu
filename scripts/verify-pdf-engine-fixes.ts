@@ -7,6 +7,7 @@ import {
   decodePdfString,
   isSupportedImageBuffer,
   extractEmbeddedPdfImages,
+  renderPdfPagesToImages,
 } from "../lib/services/document-parser-service";
 
 function createPdfWithStream(streamBody: string): Buffer {
@@ -145,8 +146,32 @@ ET`;
     process.exit(1);
   }
 
+  // Test 7: Canvas Page Rendering & Vector-Curved PDF Recovery
+  console.log("\n[Test 7] Canvas Page Rendering & Vector-Curved PDF Recovery");
+  const myResumePath = "/Users/quantumanant/Downloads/myresume.pdf";
+  if (fs.existsSync(myResumePath)) {
+    const vectorPdf = fs.readFileSync(myResumePath);
+    const vectorParsed = await parseResumeDocument(vectorPdf, "pdf", { enableOcr: true, ocrTimeoutMs: 15000 });
+    console.log("Vector PDF Chars:", vectorParsed.text.length, "Non-ws:", vectorParsed.text.replace(/\s/g, "").length);
+    if (vectorParsed.text.includes("SHIVAM KUMAR SINGH") && vectorParsed.text.replace(/\s/g, "").length > 2000) {
+      console.log("✅ PASS: Outlined vector-curved PDF rendered via canvas and extracted via OCR!");
+    } else {
+      console.error("❌ FAIL: Vector PDF OCR extraction failed!");
+      process.exit(1);
+    }
+  } else {
+    // If external fixture is absent, verify canvas rendering on test_student_cv.pdf
+    const rendered = await renderPdfPagesToImages(f2, 1, 1.5);
+    if (rendered.length === 1 && isSupportedImageBuffer(rendered[0])) {
+      console.log("✅ PASS: Canvas page rendering generated valid high-resolution PNG buffer!");
+    } else {
+      console.error("❌ FAIL: Canvas page rendering failed!");
+      process.exit(1);
+    }
+  }
+
   console.log("\n============================================");
-  console.log("   ALL 6 PDF ENGINE TESTS PASSED (100%)");
+  console.log("   ALL 7 PDF ENGINE TESTS PASSED (100%)");
   console.log("============================================\n");
 }
 

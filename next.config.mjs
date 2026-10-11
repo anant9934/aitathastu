@@ -24,7 +24,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js"],
+  serverExternalPackages: ["@napi-rs/canvas", "pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js"],
   eslint: {
     ignoreDuringBuilds: true,
   },

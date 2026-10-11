@@ -486,6 +486,82 @@ export function extractEmbeddedPdfImages(pdfBuffer: Buffer, maxImages = 3): Buff
 }
 
 /**
+ * Renders PDF document pages to raster PNG image buffers using PDF.js and @napi-rs/canvas.
+ * Essential for recovering text from outlined / vector-curved PDFs (e.g. Canva "convert to curves",
+ * Illustrator, Figma, or print-ready flattened files) where font glyphs and text operators do not exist,
+ * but page visual content is complete.
+ */
+export async function renderPdfPagesToImages(
+  pdfBuffer: Buffer,
+  maxPages = 2,
+  scale = 2.0
+): Promise<Buffer[]> {
+  const images: Buffer[] = [];
+  let doc: any = null;
+
+  try {
+    const { createCanvas } = await import("@napi-rs/canvas");
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
+    // Standard font and cmap setup
+    let cMapUrl: string | undefined;
+    const cmapDir = path.join(process.cwd(), "node_modules/pdfjs-dist/cmaps/");
+    if (fs.existsSync(cmapDir)) {
+      cMapUrl = cmapDir;
+    }
+
+    let standardFontDataUrl: string | undefined;
+    const fontDir = path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/");
+    if (fs.existsSync(fontDir)) {
+      standardFontDataUrl = fontDir;
+    }
+
+    const loadingTask = getDocument({
+      data: new Uint8Array(pdfBuffer),
+      useSystemFonts: true,
+      cMapUrl,
+      cMapPacked: true,
+      standardFontDataUrl,
+      verbosity: 0,
+    });
+
+    doc = await loadingTask.promise;
+    const pagesToRender = Math.min(doc.numPages, maxPages);
+
+    for (let p = 1; p <= pagesToRender; p++) {
+      try {
+        const page = await doc.getPage(p);
+        const viewport = page.getViewport({ scale });
+        const canvas = createCanvas(Math.floor(viewport.width), Math.floor(viewport.height));
+        const ctx = canvas.getContext("2d");
+
+        await page.render({
+          canvasContext: ctx as any,
+          viewport,
+        }).promise;
+
+        const png = canvas.toBuffer("image/png");
+        if (png && png.length > 1000) {
+          images.push(png);
+        }
+      } catch {
+        // Individual page render error non-fatal
+      }
+    }
+  } catch {
+    // If canvas is unavailable or rendering fails, images remains empty
+  } finally {
+    if (doc) {
+      try {
+        await doc.destroy();
+      } catch {}
+    }
+  }
+
+  return images;
+}
+
+/**
  * Performs local OCR on an image buffer using Tesseract.js in a strictly bounded sandbox.
  * Zero-LLM: strictly classical computer vision / neural OCR.
  *
@@ -499,18 +575,32 @@ export async function recognizeScannedDocument(
   buffer: Buffer,
   timeoutMs = 15000
 ): Promise<{ text: string; success: boolean; error?: string }> {
-  // If input is a PDF, attempt to extract embedded scanned image stream first
+  // If input is a PDF, attempt to extract or render decodable page images
   let targetBuffers: Buffer[] = [];
   if (!isSupportedImageBuffer(buffer)) {
-    const extractedImages = extractEmbeddedPdfImages(buffer, 3);
-    if (extractedImages.length > 0) {
-      targetBuffers = extractedImages;
-    } else {
-      return {
-        text: "",
-        success: false,
-        error: "Document does not contain a decodable raster image for OCR.",
-      };
+    // 1. First attempt to render pages to high-resolution PNGs via Mozilla PDF.js + @napi-rs/canvas.
+    // Handles outlined vector-curved PDFs (Canva, Illustrator, Figma), non-JPEG scanned PDFs, etc.
+    try {
+      const rendered = await renderPdfPagesToImages(buffer, 2, 2.0);
+      if (rendered.length > 0) {
+        targetBuffers = rendered;
+      }
+    } catch {
+      // Non-fatal, try direct image stream extraction
+    }
+
+    // 2. If canvas rendering produced no images (or canvas unavailable), scan for embedded raster image streams
+    if (targetBuffers.length === 0) {
+      const extractedImages = extractEmbeddedPdfImages(buffer, 3);
+      if (extractedImages.length > 0) {
+        targetBuffers = extractedImages;
+      } else {
+        return {
+          text: "",
+          success: false,
+          error: "Document does not contain decodable pages or raster images for OCR.",
+        };
+      }
     }
   } else {
     targetBuffers = [buffer];

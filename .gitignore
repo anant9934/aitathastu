@@ -22,6 +22,8 @@
 *.pem
 *.traineddata
 Anant-Kumar-Resume.pdf
+Resumes PDF/
+resume 2/
 scripts/reproduce*
 
 # debug

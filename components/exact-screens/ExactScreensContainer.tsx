@@ -469,6 +469,20 @@ export function ExactScreensContainer({
             onExtractionReady={() => {
               eora?.signalSuccess("extraction_completed");
             }}
+            onExtractPreview={(ep) => {
+              // Pre-fill name immediately after extraction, before the user saves the review.
+              if (ep.fullName && !name) {
+                setName(ep.fullName);
+              }
+              if (ep.fullName || ep.email || ep.mobile) {
+                setAcademic((prev) => ({
+                  ...prev,
+                  fullName: prev.fullName || ep.fullName || "",
+                  email: prev.email || ep.email || "",
+                  mobile: prev.mobile || ep.mobile || "",
+                }));
+              }
+            }}
             onExtractSuccess={async (fileName, claims, extraData) => {
               const nextDiscoveredProfiles = {
                 ...discoveredResumeProfiles,

@@ -277,28 +277,43 @@ export function extractPersonalDetails(
     }
   }
 
-  // 3. Name candidate: check top 6 lines of document before any section
-  // V5.0.4: occupational title words must not be extracted as names
-  const OCCUPATIONAL_TITLE_WORDS = /\b(?:NURSE|NURSING|REP|OFFICER|TECHNICIAN|ENGINEER|MANAGER|ASSISTANT|SPECIALIST|DEVELOPER|DIRECTOR|CONSULTANT|ANALYST|ARCHITECT|DESIGNER|COORDINATOR|SUPERVISOR|ADMINISTRATOR|ACCOUNTANT|TEACHER|PROFESSOR|PHYSICIAN|THERAPIST|COUNSELOR|SECRETARY|PROGRAMMER|SCIENTIST|RESEARCHER|INTERN|ASSOCIATE|EXECUTIVE|PRESIDENT|DRIVER|OPERATOR|MECHANIC|PLANNER|SCHEDULER|AGENT|BROKER|AUDITOR|TRAINER|CHEF|COOK|PHARMACIST|TECHNOLOGIST|RADIOLOGIST|PATHOLOGIST|PEDIATRICIAN|SURGEON|DENTIST|ATTORNEY|PARALEGAL|INSPECTOR|INVESTIGATOR|SOCIAL WORKER|PUBLIC RELATIONS|CUSTOMER SERVICE|PATIENT ACCESS|CLAIMS|BILLING)\b/i;
+  // 3. Name candidate: check top 10 header lines of document
+  // V5.1.0: Occupational title words must not be extracted as names (only when the ENTIRE
+  // line is a job title, not when it looks like a proper name containing those words).
+  const STANDALONE_TITLE_PATTERN = /^(?:NURSE|NURSING|REP|OFFICER|TECHNICIAN|ENGINEER|MANAGER|ASSISTANT|SPECIALIST|DEVELOPER|DIRECTOR|CONSULTANT|ANALYST|ARCHITECT|DESIGNER|COORDINATOR|SUPERVISOR|ADMINISTRATOR|ACCOUNTANT|TEACHER|PROFESSOR|PHYSICIAN|THERAPIST|COUNSELOR|SECRETARY|PROGRAMMER|SCIENTIST|RESEARCHER|INTERN|ASSOCIATE|EXECUTIVE|PRESIDENT|DRIVER|OPERATOR|MECHANIC|PLANNER|SCHEDULER|AGENT|BROKER|AUDITOR|TRAINER|CHEF|COOK|PHARMACIST|TECHNOLOGIST|RADIOLOGIST|PATHOLOGIST|PEDIATRICIAN|SURGEON|DENTIST|ATTORNEY|PARALEGAL|INSPECTOR|INVESTIGATOR|SOCIAL WORKER|PUBLIC RELATIONS|CUSTOMER SERVICE|PATIENT ACCESS|CLAIMS|BILLING)(?:\s+(?:ENGINEER|MANAGER|ASSISTANT|SPECIALIST|DEVELOPER|DIRECTOR|CONSULTANT|ANALYST|ARCHITECT|DESIGNER|COORDINATOR|SUPERVISOR))*$/i;
 
   let fullName = "";
-  for (const line of headerLines.slice(0, 6)) {
-    // Support names sharing the line with contact details (e.g. "Alex Morgan Email: alex@example.test")
-    const beforeContact = line
-      .split(/\b(?:Email|Mail|Phone|Mobile|Tel|LinkedIn|Github|Portfolio)\b|[:|•–—\-]|\b[a-zA-Z0-9._%+-]+@/i)[0]
-      .trim();
-    const cleaned = (beforeContact || line).replace(/[*_#:`]/g, "").trim();
-    if (!cleaned || /\d/.test(cleaned)) continue;
-    if (/curriculum|resume|vitae|contact|phone|email|profile|github|linkedin|portfolio/i.test(cleaned)) continue;
-    // V5.0.4: Skip lines that are occupational job titles (all-caps or mixed)
-    if (OCCUPATIONAL_TITLE_WORDS.test(cleaned)) continue;
 
-    const words = cleaned.split(/\s+/);
-    if (words.length >= 2 && words.length <= 4 && cleaned.length >= 4 && cleaned.length <= 45) {
-      // Must look like a name (letters, hyphens, periods, spaces)
-      if (/^[\p{L}.''\- ]+$/u.test(cleaned)) {
-        fullName = cleaned;
-        break;
+  // Strategy A: look for an explicit "Name:" or "Full Name:" label anywhere in the first ~300 chars
+  const nameLabel = fullText.slice(0, 500).match(/(?:^|\n)\s*(?:full\s+)?name\s*[:\-]\s*([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F .'''\-]{1,44})/i);
+  if (nameLabel) {
+    const candidate = nameLabel[1].trim();
+    if (!STANDALONE_TITLE_PATTERN.test(candidate)) {
+      fullName = candidate;
+    }
+  }
+
+  // Strategy B: positional scan of the first 10 header lines
+  if (!fullName) {
+    for (const line of headerLines.slice(0, 10)) {
+      // Support names sharing the line with contact details (e.g. "Alex Morgan Email: alex@example.test")
+      const beforeContact = line
+        .split(/\b(?:Email|Mail|Phone|Mobile|Tel|LinkedIn|Github|Portfolio)\b|[:|•–—]|\b[a-zA-Z0-9._%+-]+@/i)[0]
+        .trim();
+      const cleaned = (beforeContact || line).replace(/[*_#:`]/g, "").trim();
+      if (!cleaned || /\d/.test(cleaned)) continue;
+      if (/curriculum|resume|vitae|contact|phone|email|profile|github|linkedin|portfolio/i.test(cleaned)) continue;
+      // Skip lines that are exclusively a job title (standalone title pattern)
+      if (STANDALONE_TITLE_PATTERN.test(cleaned)) continue;
+
+      const words = cleaned.split(/\s+/);
+      // Allow 1–4 words: single-word names common in Indian/Asian naming conventions
+      if (words.length >= 1 && words.length <= 4 && cleaned.length >= 2 && cleaned.length <= 45) {
+        // Must look like a name (Unicode letters, hyphens, periods, apostrophes, spaces)
+        if (/^[\p{L}.'''\- ]+$/u.test(cleaned)) {
+          fullName = cleaned;
+          break;
+        }
       }
     }
   }

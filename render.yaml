@@ -1,0 +1,35 @@
+# ==============================================================================
+# AI TATHASTU — UNIVERSAL RESUME EXTRACTOR RENDER BLUEPRINT
+# Deploy via: Render Dashboard -> Blueprints -> Connect aitathastu repository
+# Documentation: https://render.com/docs/blueprint-spec
+# ==============================================================================
+
+services:
+  - type: web
+    name: aitathastu-resume-extractor
+    runtime: docker
+    rootDir: services/resume-extractor
+    dockerfilePath: Dockerfile
+    plan: starter
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: ENVIRONMENT
+        value: production
+      - key: EXTRACTOR_API_TOKEN
+        generateValue: true
+      - key: ALLOWED_ORIGIN
+        sync: false
+      - key: MAX_UPLOAD_MB
+        value: "25"
+      - key: MAX_PAGES
+        value: "20"
+      - key: MAX_OCR_SECONDS
+        value: "30"
+      - key: MAX_PROCESSING_SECONDS
+        value: "120"
+      - key: WORKERS
+        value: "2"

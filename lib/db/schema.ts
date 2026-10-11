@@ -686,3 +686,69 @@ export const intelligenceArtifacts = pgTable(
   ]
 );
 
+// Universal Resume Extractor V2.0 Integration Tables
+export const resumeDocuments = pgTable(
+  "resume_documents",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+    filename: text("filename").notNull(),
+    fileFormat: text("file_format").notNull(),
+    fileSize: integer("file_size").notNull(),
+    checksum: text("checksum"),
+    status: text("status").default("uploaded").notNull(), // 'uploaded' | 'queued' | 'processing' | 'completed' | 'partial' | 'failed' | 'deleted'
+    warnings: jsonb("warnings").default([]).notNull(),
+    metadata: jsonb("metadata").default({}).notNull(),
+    extractedProfile: jsonb("extracted_profile"), // Canonical ResumeProfile Schema 2.0
+    sectionsPreview: jsonb("sections_preview").default([]).notNull(),
+    retentionExpiresAt: timestamp("retention_expires_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_resume_documents_person").on(table.personId),
+    index("idx_resume_documents_status").on(table.status),
+    index("idx_resume_documents_checksum").on(table.checksum),
+  ]
+);
+
+export const resumeDocumentBlobs = pgTable(
+  "resume_document_blobs",
+  {
+    id: text("id").primaryKey(), // matches resume_documents.id
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    mimeType: text("mime_type").notNull(),
+    payloadBase64: text("payload_base64").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_resume_blobs_person").on(table.personId),
+  ]
+);
+
+export const resumeReviewHistory = pgTable(
+  "resume_review_history",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => resumeDocuments.id, { onDelete: "cascade" }),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    groupKey: text("group_key").notNull(),
+    recordId: text("record_id").notNull(),
+    fieldKey: text("field_key"),
+    action: text("action").notNull(), // 'accept' | 'correct' | 'reject' | 'uncertain' | 'confirm' | 'verify'
+    actor: text("actor").notNull(), // 'student' | 'verifier'
+    actorPersonId: text("actor_person_id"),
+    previousValue: text("previous_value"),
+    newValue: text("new_value"),
+    previousState: text("previous_state"),
+    newState: text("new_state").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_resume_review_document").on(table.documentId),
+    index("idx_resume_review_person").on(table.personId),
+  ]
+);
+

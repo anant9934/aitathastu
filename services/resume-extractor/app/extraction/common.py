@@ -1,0 +1,65 @@
+"""Evidence-preserving extraction helpers and normalization."""
+import re,uuid
+from urllib.parse import urlsplit,urlunsplit
+from ..schema import Evidence,ExtractedField,Record
+from ..document import Line
+
+EMAIL=re.compile(r'(?<![\w.\-])([\w.+\-]+@[\w.\-]+\.[a-zA-Z]{2,})(?![\w.])')
+URL=re.compile(r'(?<![@\w.])(?:(?:https?://)?(?:www\.)?(?:[\w-]+\.)+[a-z]{2,}(?:/[^\s\]>),;]*)?)',re.I)
+PHONE=re.compile(r'(?<![\w])(?:\+\d{1,3}[\s.\-]?)?(?:\(?\d{2,5}\)?[\s.\-]?)?\d{3,5}[\s.\-]?\d{3,5}(?!\w)')
+YEAR=re.compile(r'\b(?:19|20)\d{2}\b')
+EDU=re.compile(r'\b(?:B\.?Tech|B\.?E\.?|Bachelor|BSc|B\.Sc|BCA|M\.?Tech|Master|MSc|M\.Sc|MCA|MBA|Ph\.?D|Doctorate|Diploma|Class\s*(?:10|12|X|XII)\b|10th|12th|High School|Senior Secondary|Secondary School|Intermediate|Matriculation|Higher Secondary)\b',re.I)
+GRADE=re.compile(r'\b(?:CGPA|GPA)\s*[:\-]?\s*(\d{1,2}(?:\.\d{1,2})?(?:\s*/\s*\d{1,2})?)|\b\d{1,3}(?:\.\d+)?\s*%',re.I)
+METRIC=re.compile(r'\b\d+(?:\.\d+)?\s*(?:%|x\b|users\b|hours\b|ms\b|points\b|rank\b)',re.I)
+DOI=re.compile(r'\b10\.\d{4,9}/[^\s,;]+',re.I)
+SKILL_NAMES='Python,Java,C++,C#,JavaScript,TypeScript,HTML,CSS,SQL,Go,Rust,R,PyTorch,TensorFlow,Scikit-learn,Keras,OpenCV,NumPy,Pandas,Matplotlib,LangChain,LLM,RAG,Machine Learning,Deep Learning,NLP,Computer Vision,Generative AI,Transformers,FastAPI,Django,Flask,React,Next.js,Node.js,Express,PostgreSQL,MySQL,MongoDB,Redis,Docker,Kubernetes,AWS,Azure,GCP,Git,GitHub Actions,Linux,Tableau,Power BI,Excel,Data Structures,Algorithms,DBMS,Cybersecurity,Networking,Statistics,Data Analysis'.split(',')
+SKILLS={s.lower():s for s in SKILL_NAMES}
+SKILLS.update({'sklearn':'Scikit-learn','ml':'Machine Learning','gen ai':'Generative AI','retrieval augmented generation':'RAG','large language models':'LLM','postgres':'PostgreSQL','js':'JavaScript','ts':'TypeScript'})
+PLATFORMS={'github.com':'GitHub','linkedin.com':'LinkedIn','leetcode.com':'LeetCode','hackerrank.com':'HackerRank','hackerearth.com':'HackerEarth','codechef.com':'CodeChef','kaggle.com':'Kaggle','huggingface.co':'Hugging Face','orcid.org':'ORCID','scholar.google.com':'Google Scholar','stackoverflow.com':'Stack Overflow','dev.to':'DEV Community'}
+
+def evidence(line): return Evidence(page=line.page,section=line.section,snippet=line.text[:320],method=line.method,block_id=line.block_id)
+def field(value,line,confidence=.86):
+    value=str(value).strip()
+    return ExtractedField(value=value,original_value=value,evidence=[evidence(line)],confidence=round(min(confidence,.63) if line.method=='ocr' else confidence,2))
+def record(items): return Record(record_id=str(uuid.uuid4()),fields={k:field(*v) for k,v in items.items() if v and v[0]})
+def add(groups,group,items):
+    if items: groups[group].append(record(items))
+def lines_of(content,section): return [l for l in content.lines if l.section==section]
+def years(text):
+    match=YEAR.findall(text)
+    return (match[0] if match else None,match[-1] if len(match)>1 else None)
+def normalize_url(raw):
+    raw=raw.rstrip('.,);]>')
+    if raw.startswith('mailto:'): return None
+    raw=raw if raw.startswith(('https://','http://')) else 'https://'+raw
+    try:
+        p=urlsplit(raw)
+        if not p.hostname or '.' not in p.hostname or p.username or p.password: return None
+        return urlunsplit(('https',p.netloc.lower(),p.path.rstrip('/'),p.query,''))
+    except ValueError: return None
+
+def url_pairs(content):
+    found=[]
+    for line in content.lines:
+        for m in URL.finditer(line.text): found.append((m.group(0),line,'visible'))
+    for i,(url,page) in enumerate(content.hyperlinks):
+        found.append((url,Line(url,page,'hyperlink',f'link-{page}-{i}',section='embedded link'),'embedded'))
+    return found
+
+def detect_skills(text):
+    # Word boundaries avoid false matches such as "go" in "Google"; use curated dictionary only.
+    found=[]
+    for raw,canonical in sorted(SKILLS.items(),key=lambda x:-len(x[0])):
+        pat=r'(?<![\w+])'+re.escape(raw)+r'(?![\w+])'
+        if re.search(pat,text,re.I) and canonical not in found: found.append(canonical)
+    return found
+
+def category(skill):
+    if skill in ['Python','Java','C++','C#','JavaScript','TypeScript','SQL','Go','Rust','R']: return 'Programming'
+    if skill in ['PyTorch','TensorFlow','Scikit-learn','Keras','Machine Learning','Deep Learning','NLP','Computer Vision','OpenCV','Transformers']: return 'AI/ML'
+    if skill in ['LLM','RAG','LangChain','Generative AI']: return 'Generative AI'
+    if skill in ['Pandas','NumPy','Matplotlib','Statistics','Data Analysis','Tableau','Power BI','Excel']: return 'Data Science'
+    if skill in ['PostgreSQL','MySQL','MongoDB','Redis','DBMS']: return 'Databases'
+    if skill in ['Docker','Kubernetes','AWS','Azure','GCP','GitHub Actions']: return 'Cloud/DevOps'
+    if skill in ['FastAPI','Django','Flask','React','Next.js','Node.js','Express','HTML','CSS']: return 'Web Development'
+    return 'Tools & Fundamentals'

@@ -244,6 +244,279 @@ export async function POST(request: Request) {
     try {
       await SourceProcessingJobService.updateStage(jobId, personId, "persist");
       await saveResumeCandidates(personId, documentId, extraction.extracted, rawText);
+
+      // Persist durable document and blob in Neon PostgreSQL
+      const { ObjectStorageService } = await import("@/lib/storage/object-storage");
+      await ObjectStorageService.storeDocument({
+        documentId,
+        personId,
+        filename: file.name,
+        mimeType: file.type || (extension === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        buffer: bytes,
+      }).catch((storageErr) => console.warn("Durable storage notice:", storageErr));
+
+      // Synchronize Schema v2 profile to resumeDocuments table
+      const { getDb, resumeDocuments } = await import("@/lib/db");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+
+      // Convert candidates into Schema v2 record groups for unified persistence
+      const v2Groups: Record<string, any[]> = {
+        identity: [{
+          record_id: `id_${documentId.slice(0, 8)}`,
+          fields: {
+            full_name: {
+              value: extraction.extractedProfile?.fullName || "",
+              original_value: extraction.extractedProfile?.fullName || "",
+              confidence: 0.95,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "header", snippet: extraction.extractedProfile?.fullName || "", method: "native_pdf" }],
+              history: []
+            },
+            professional_headline: {
+              value: (extraction.extractedProfile as any)?.headline || "",
+              original_value: (extraction.extractedProfile as any)?.headline || "",
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "header", snippet: (extraction.extractedProfile as any)?.headline || "", method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        }],
+        contact: [{
+          record_id: `ct_${documentId.slice(0, 8)}`,
+          fields: {
+            email: {
+              value: extraction.extractedProfile?.email || "",
+              original_value: extraction.extractedProfile?.email || "",
+              confidence: 0.98,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "contact", snippet: extraction.extractedProfile?.email || "", method: "native_pdf" }],
+              history: []
+            },
+            phone: {
+              value: extraction.extractedProfile?.mobile || "",
+              original_value: extraction.extractedProfile?.mobile || "",
+              confidence: 0.92,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "contact", snippet: extraction.extractedProfile?.mobile || "", method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        }],
+        education: (extraction.extracted?.education || []).map((e, idx) => ({
+          record_id: `edu_${idx}`,
+          fields: {
+            qualification: {
+              value: e.degree || "",
+              original_value: e.degree || "",
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "education", snippet: e.sourceSpan || e.degree, method: "native_pdf" }],
+              history: []
+            },
+            institution: {
+              value: e.institution || "",
+              original_value: e.institution || "",
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "education", snippet: e.sourceSpan || e.institution, method: "native_pdf" }],
+              history: []
+            },
+            specialization: {
+              value: e.fieldOfStudy || "",
+              original_value: e.fieldOfStudy || "",
+              confidence: 0.85,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "education", snippet: e.sourceSpan || e.fieldOfStudy || "", method: "native_pdf" }],
+              history: []
+            },
+            expected_graduation: {
+              value: e.graduationYear || "",
+              original_value: e.graduationYear || "",
+              confidence: 0.85,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "education", snippet: e.sourceSpan || e.graduationYear || "", method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        skills: (extraction.extracted?.skills || []).map((s, idx) => ({
+          record_id: `sk_${idx}`,
+          fields: {
+            canonical_name: {
+              value: s.name,
+              original_value: s.name,
+              confidence: 0.95,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "skills", snippet: s.sourceSpan || s.name, method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        projects: (extraction.extracted?.projects || []).map((p, idx) => ({
+          record_id: `pr_${idx}`,
+          fields: {
+            title: {
+              value: p.title,
+              original_value: p.title,
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "projects", snippet: p.sourceSpan || p.title, method: "native_pdf" }],
+              history: []
+            },
+            description: {
+              value: p.description || "",
+              original_value: p.description || "",
+              confidence: 0.85,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "projects", snippet: p.sourceSpan || p.description || "", method: "native_pdf" }],
+              history: []
+            },
+            technologies: {
+              value: (p.technologies || []).join(", "),
+              original_value: (p.technologies || []).join(", "),
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "projects", snippet: p.sourceSpan || "", method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        experience: (extraction.extracted?.experience || []).map((ex, idx) => ({
+          record_id: `exp_${idx}`,
+          fields: {
+            organization: {
+              value: ex.company,
+              original_value: ex.company,
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "experience", snippet: ex.sourceSpan || ex.company, method: "native_pdf" }],
+              history: []
+            },
+            job_title: {
+              value: ex.role,
+              original_value: ex.role,
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "experience", snippet: ex.sourceSpan || ex.role, method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        certifications: (extraction.extracted?.certifications || []).map((c, idx) => ({
+          record_id: `cert_${idx}`,
+          fields: {
+            title: {
+              value: c.name,
+              original_value: c.name,
+              confidence: 0.9,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "certifications", snippet: c.sourceSpan || c.name, method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        awards: (extraction.extracted?.achievements || []).map((a, idx) => ({
+          record_id: `aw_${idx}`,
+          fields: {
+            name: {
+              value: a.title,
+              original_value: a.title,
+              confidence: 0.88,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "awards", snippet: a.sourceSpan || a.title, method: "native_pdf" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        digital_footprint: Object.entries(extraction.discoveredProfiles || {}).map(([platform, url], idx) => ({
+          record_id: `df_${idx}`,
+          fields: {
+            platform: {
+              value: platform,
+              original_value: platform,
+              confidence: 0.95,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "links", snippet: String(url), method: "hyperlink" }],
+              history: []
+            },
+            original_url: {
+              value: String(url),
+              original_value: String(url),
+              confidence: 0.95,
+              confidence_kind: "heuristic",
+              review_state: "extracted",
+              evidence: [{ page: 1, section: "links", snippet: String(url), method: "hyperlink" }],
+              history: []
+            }
+          },
+          record_state: "extracted"
+        })),
+        summary: [],
+        internships: [],
+        research: [],
+        books_patents: [],
+        leadership: [],
+        extraction_metadata: []
+      };
+
+      const canonicalV2Profile = {
+        schema_version: "2.0",
+        document_id: documentId,
+        groups: v2Groups,
+        metadata: {
+          document_id: documentId,
+          file_format: extension,
+          page_count: parsedDoc.pages?.length || 1,
+          ocr_attempted: Boolean(parsedDoc.ocrUsed || parsedDoc.ocrFailed),
+          ocr_used: parsedDoc.ocrUsed || false,
+          text_quality: "good",
+          processing_seconds: (extraction.latencyMs || 500) / 1000,
+          extraction_methods: [parsedDoc.ocrUsed ? "ocr" : "native_pdf"],
+          parser_version: "2.0.0",
+          model_version: "v3.9-zero-llm",
+          warnings: [],
+          status: "completed",
+        }
+      };
+
+      await db
+        .update(resumeDocuments)
+        .set({
+          status: "completed",
+          extractedProfile: canonicalV2Profile,
+          metadata: canonicalV2Profile.metadata,
+          updatedAt: new Date(),
+        })
+        .where(eq(resumeDocuments.id, documentId))
+        .catch(() => null);
+
     } catch {
       return fail(
         "PERSIST_FAILED",

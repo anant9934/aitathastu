@@ -45,3 +45,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python & integration temporary sources
+.venv*/
+__pycache__/
+*.pyc
+.pytest_cache/
+.test-data/
+services/resume-extractor/.test-data/
+services/resume-extractor/.venv*/
+_integration_source/
+universal-resume-extractor/

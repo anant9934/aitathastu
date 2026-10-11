@@ -533,7 +533,55 @@ export const MIGRATION_SQL_STATEMENTS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL
   );`,
-  `CREATE INDEX IF NOT EXISTS "idx_intel_artifacts_person_type" ON "intelligence_artifacts" ("person_id", "artifact_type");`
+  `CREATE INDEX IF NOT EXISTS "idx_intel_artifacts_person_type" ON "intelligence_artifacts" ("person_id", "artifact_type");`,
+  // Universal Resume Extractor V2.0 Integration Tables
+  `CREATE TABLE IF NOT EXISTS "resume_documents" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "organization_id" text REFERENCES "organizations"("id") ON DELETE SET NULL,
+    "filename" text NOT NULL,
+    "file_format" text NOT NULL,
+    "file_size" integer NOT NULL,
+    "checksum" text,
+    "status" text DEFAULT 'uploaded' NOT NULL,
+    "warnings" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "extracted_profile" jsonb,
+    "sections_preview" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "retention_expires_at" timestamp with time zone,
+    "deleted_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_documents_person" ON "resume_documents" ("person_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_documents_status" ON "resume_documents" ("status");`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_documents_checksum" ON "resume_documents" ("checksum");`,
+  `CREATE TABLE IF NOT EXISTS "resume_document_blobs" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "mime_type" text NOT NULL,
+    "payload_base64" text NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_blobs_person" ON "resume_document_blobs" ("person_id");`,
+  `CREATE TABLE IF NOT EXISTS "resume_review_history" (
+    "id" text PRIMARY KEY NOT NULL,
+    "document_id" text NOT NULL REFERENCES "resume_documents"("id") ON DELETE CASCADE,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "group_key" text NOT NULL,
+    "record_id" text NOT NULL,
+    "field_key" text,
+    "action" text NOT NULL,
+    "actor" text NOT NULL,
+    "actor_person_id" text,
+    "previous_value" text,
+    "new_value" text,
+    "previous_state" text,
+    "new_state" text NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_review_document" ON "resume_review_history" ("document_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_review_person" ON "resume_review_history" ("person_id");`
 ];
 
 

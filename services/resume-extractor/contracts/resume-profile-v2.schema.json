@@ -1,0 +1,349 @@
+{
+  "$defs": {
+    "Evidence": {
+      "properties": {
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section"
+        },
+        "snippet": {
+          "maxLength": 320,
+          "title": "Snippet",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "native_pdf",
+            "ocr",
+            "docx",
+            "txt",
+            "rtf",
+            "image",
+            "hyperlink",
+            "derived"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "block_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Id"
+        }
+      },
+      "required": [
+        "snippet",
+        "method"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "ExtractedField": {
+      "properties": {
+        "value": {
+          "maxLength": 6000,
+          "title": "Value",
+          "type": "string"
+        },
+        "original_value": {
+          "maxLength": 6000,
+          "title": "Original Value",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "confidence_kind": {
+          "const": "heuristic",
+          "default": "heuristic",
+          "title": "Confidence Kind",
+          "type": "string"
+        },
+        "review_state": {
+          "$ref": "#/$defs/ReviewState",
+          "default": "extracted"
+        },
+        "history": {
+          "items": {
+            "$ref": "#/$defs/ReviewEvent"
+          },
+          "title": "History",
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "original_value",
+        "confidence"
+      ],
+      "title": "ExtractedField",
+      "type": "object"
+    },
+    "ExtractionMetadata": {
+      "properties": {
+        "document_id": {
+          "title": "Document Id",
+          "type": "string"
+        },
+        "file_format": {
+          "title": "File Format",
+          "type": "string"
+        },
+        "page_count": {
+          "minimum": 0,
+          "title": "Page Count",
+          "type": "integer"
+        },
+        "ocr_attempted": {
+          "default": false,
+          "title": "Ocr Attempted",
+          "type": "boolean"
+        },
+        "ocr_used": {
+          "default": false,
+          "title": "Ocr Used",
+          "type": "boolean"
+        },
+        "text_quality": {
+          "default": "empty",
+          "enum": [
+            "good",
+            "limited",
+            "poor",
+            "empty"
+          ],
+          "title": "Text Quality",
+          "type": "string"
+        },
+        "processing_seconds": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Processing Seconds",
+          "type": "number"
+        },
+        "extraction_methods": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Extraction Methods",
+          "type": "array"
+        },
+        "parser_version": {
+          "default": "1.0.0",
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "model_version": {
+          "default": "deterministic-1",
+          "title": "Model Version",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "status": {
+          "default": "uploaded",
+          "enum": [
+            "uploaded",
+            "queued",
+            "processing",
+            "completed",
+            "partial",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewed At"
+        }
+      },
+      "required": [
+        "document_id",
+        "file_format",
+        "page_count"
+      ],
+      "title": "ExtractionMetadata",
+      "type": "object"
+    },
+    "Record": {
+      "properties": {
+        "record_id": {
+          "title": "Record Id",
+          "type": "string"
+        },
+        "fields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ExtractedField"
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "record_state": {
+          "$ref": "#/$defs/ReviewState",
+          "default": "extracted"
+        }
+      },
+      "required": [
+        "record_id"
+      ],
+      "title": "Record",
+      "type": "object"
+    },
+    "ReviewEvent": {
+      "properties": {
+        "action": {
+          "enum": [
+            "accept",
+            "correct",
+            "reject",
+            "uncertain",
+            "confirm",
+            "verify"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "actor": {
+          "title": "Actor",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "previous_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Value"
+        },
+        "new_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Value"
+        },
+        "previous_state": {
+          "$ref": "#/$defs/ReviewState"
+        }
+      },
+      "required": [
+        "action",
+        "actor",
+        "previous_state"
+      ],
+      "title": "ReviewEvent",
+      "type": "object"
+    },
+    "ReviewState": {
+      "enum": [
+        "extracted",
+        "reviewed",
+        "student_confirmed",
+        "independently_verified",
+        "rejected",
+        "uncertain"
+      ],
+      "title": "ReviewState",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "document_id": {
+      "title": "Document Id",
+      "type": "string"
+    },
+    "groups": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/Record"
+        },
+        "type": "array"
+      },
+      "title": "Groups",
+      "type": "object"
+    },
+    "metadata": {
+      "$ref": "#/$defs/ExtractionMetadata"
+    }
+  },
+  "required": [
+    "document_id",
+    "groups",
+    "metadata"
+  ],
+  "title": "ResumeProfile",
+  "type": "object"
+}

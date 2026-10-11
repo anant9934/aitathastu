@@ -17,5 +17,5 @@
     "paths": { "@/*": ["./*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "scripts/demo-*.ts"]
+  "exclude": ["node_modules", "scripts/demo-*.ts", "universal-resume-extractor", "services"]
 }

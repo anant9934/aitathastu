@@ -116,6 +116,9 @@ export function Screen5ResumeUpload({
   const [candidates, setCandidates] = useState<ResumeCandidate[]>([]);
   const [reviewSaved, setReviewSaved] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [eoraAdvice, setEoraAdvice] = useState<string | null>(null);
   const [extraData, setExtraData] = useState<{
     extractedProfile?: ExtractedProfileData;
     discoveredProfiles?: Partial<Record<string, string>>;
@@ -344,6 +347,7 @@ export function Screen5ResumeUpload({
 
       setFileName(file.name);
       setIsUploaded(true);
+      setActiveDocumentId(documentId);
       setProcessingState("REVIEW_REQUIRED");
       setReviewSaved(false);
       setExtraData({
@@ -355,6 +359,22 @@ export function Screen5ResumeUpload({
         extractedAchievements: Array.isArray(data.structured?.achievements) ? data.structured.achievements : [],
       });
       setCandidates(rows);
+
+      // Fetch EORA contextual review advice from server if available
+      if (documentId) {
+        fetch(`/api/resume/${documentId}`)
+          .then((res) => res.json())
+          .then((docData) => {
+            if (docData?.eoraGuidance?.primaryMessage) {
+              setEoraAdvice(docData.eoraGuidance.primaryMessage);
+              eora?.speak(
+                docData.eoraGuidance.primaryMessage,
+                docData.eoraGuidance.mood || "CHEERFUL"
+              );
+            }
+          })
+          .catch(() => null);
+      }
 
       // Contextual EORA event guidance based on completeness
       const hasAcademic = Boolean(data.extractedProfile?.degree && data.extractedProfile?.institution);
@@ -453,6 +473,12 @@ export function Screen5ResumeUpload({
     try {
       const saved = await onExtractSuccess?.(fileName || "resume", selected, extraData);
       if (saved === false) throw new Error("Review save failed");
+
+      // Transactionally synchronize approved claims into Person 360
+      if (activeDocumentId) {
+        await fetch(`/api/resume/${activeDocumentId}/apply`, { method: "POST" }).catch(() => null);
+      }
+
       setReviewSaved(true);
       setProcessingState("COMPLETED");
       setErrorMessage(null);
@@ -796,20 +822,172 @@ export function Screen5ResumeUpload({
               )}
             </div>
 
-            {isUploaded && candidates.length > 0 && <div style={{ marginTop: 16, maxHeight: 260, overflowY: "auto", border: "1px solid #E2E8F0", borderRadius: 12, padding: 12, background: "#FFFFFF" }}>
-              <strong style={{ color: "#1E1B4B", fontSize: 13 }}>Review suggested claims</strong>
-              <p style={{ color: "#64748B", fontSize: 12, margin: "6px 0 10px" }}>Select only accurate items. You can correct the text before saving. These are not independently verified.</p>
-              {candidates.map((candidate, index) => <div key={candidate.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
-                <input aria-label={`Select ${candidate.category} ${candidate.value}`} type="checkbox" checked={candidate.selected} onChange={(event) => { setReviewSaved(false); setCandidates((current) => current.map((item, i) => i === index ? { ...item, selected: event.target.checked } : item)); }} />
-                <div style={{ flex: 1 }}>
-                  <span style={{ color: "#5642EF", fontWeight: 750, fontSize: 11, textTransform: "uppercase" }}>{candidate.category}</span>
-                  <input aria-label={`Edit ${candidate.category}`} value={candidate.value} onChange={(event) => { setReviewSaved(false); setCandidates((current) => current.map((item, i) => i === index ? { ...item, value: event.target.value, corrected: true } : item)); }} style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12 }} />
-                  <small style={{ color: "#64748B" }}>Source: “{candidate.sourceSpan}”</small>
+            {isUploaded && candidates.length > 0 && (
+              <div style={{ marginTop: 16, maxHeight: 380, overflowY: "auto", border: "1px solid #E2E8F0", borderRadius: 14, padding: 14, background: "#FFFFFF", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <strong style={{ color: "#1E1B4B", fontSize: 13.5 }}>Review Extracted Resume Claims</strong>
+                  <span style={{ fontSize: 11.5, color: "#64748B", background: "#F1F5F9", padding: "2px 8px", borderRadius: 999 }}>
+                    {candidates.filter((c) => c.selected).length} of {candidates.length} selected
+                  </span>
                 </div>
-              </div>)}
-              <button type="button" disabled={isBusy} onClick={saveReviewedClaims} style={{ background: isBusy ? "#94A3B8" : "#5642EF", color: "#FFFFFF", border: 0, borderRadius: 8, padding: "8px 14px", cursor: isBusy ? "not-allowed" : "pointer" }}>Save selected claims</button>
-              {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12 }}>Review saved</span>}
-            </div>}
+
+                {eoraAdvice && (
+                  <div style={{ margin: "8px 0 10px", padding: "10px 12px", borderRadius: 10, background: "rgba(86, 66, 239, 0.05)", border: "1px solid rgba(86, 66, 239, 0.15)", display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "#312E81" }}>
+                    <Sparkles size={15} color="#5642EF" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <strong>EORA Review Assistant:</strong> {eoraAdvice}
+                    </div>
+                  </div>
+                )}
+
+                <p style={{ color: "#64748B", fontSize: 12, margin: "4px 0 8px" }}>
+                  Select accurate items to link to your Person 360 profile. You can correct wording before saving. Heuristic confidence is not independent verification.
+                </p>
+
+                {/* Category Filters */}
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
+                  {["all", "education", "skill", "project", "experience", "certification", "achievement"].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat)}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: categoryFilter === cat ? 700 : 500,
+                        background: categoryFilter === cat ? "#5642EF" : "#F1F5F9",
+                        color: categoryFilter === cat ? "#FFFFFF" : "#475569",
+                        border: "none",
+                        cursor: "pointer",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Batch selection */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 10, fontSize: 11.5 }}>
+                  <button
+                    type="button"
+                    onClick={() => setCandidates((current) => current.map((item) => ({ ...item, selected: true })))}
+                    style={{ background: "none", border: "none", color: "#5642EF", cursor: "pointer", fontWeight: 650, padding: 0 }}
+                  >
+                    Select all
+                  </button>
+                  <span style={{ color: "#CBD5E1" }}>&bull;</span>
+                  <button
+                    type="button"
+                    onClick={() => setCandidates((current) => current.map((item) => ({ ...item, selected: false })))}
+                    style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontWeight: 500, padding: 0 }}
+                  >
+                    Clear selection
+                  </button>
+                </div>
+
+                {/* Candidate list filtered */}
+                {candidates
+                  .filter((c) => categoryFilter === "all" || c.category === categoryFilter)
+                  .map((candidate) => {
+                    const originalIndex = candidates.findIndex((c) => c.id === candidate.id);
+                    return (
+                      <div key={candidate.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10, padding: "8px", borderRadius: 8, background: candidate.selected ? "rgba(86, 66, 239, 0.03)" : "transparent", border: "1px solid #F1F5F9" }}>
+                        <input
+                          aria-label={`Select ${candidate.category} ${candidate.value}`}
+                          type="checkbox"
+                          checked={candidate.selected}
+                          onChange={(event) => {
+                            setReviewSaved(false);
+                            setCandidates((current) =>
+                              current.map((item, i) => (i === originalIndex ? { ...item, selected: event.target.checked } : item))
+                            );
+                          }}
+                          style={{ marginTop: 3 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <span style={{ color: "#5642EF", fontWeight: 750, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                            {candidate.category}
+                          </span>
+                          <input
+                            aria-label={`Edit ${candidate.category}`}
+                            value={candidate.value}
+                            onChange={(event) => {
+                              setReviewSaved(false);
+                              setCandidates((current) =>
+                                current.map((item, i) => (i === originalIndex ? { ...item, value: event.target.value, corrected: true } : item))
+                              );
+                            }}
+                            style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12, marginTop: 2 }}
+                          />
+                          <small style={{ color: "#64748B", display: "block", marginTop: 3, fontSize: 11 }}>
+                            Source: “{candidate.sourceSpan}”
+                          </small>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* Action controls */}
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid #F1F5F9" }}>
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={saveReviewedClaims}
+                    style={{
+                      background: isBusy ? "#94A3B8" : "#5642EF",
+                      color: "#FFFFFF",
+                      border: 0,
+                      borderRadius: 8,
+                      padding: "8px 14px",
+                      cursor: isBusy ? "not-allowed" : "pointer",
+                      fontSize: 12.5,
+                      fontWeight: 650,
+                    }}
+                  >
+                    Save selected claims
+                  </button>
+
+                  {activeDocumentId && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => window.open(`/api/resume/${activeDocumentId}/export?format=json`, "_blank")}
+                        style={{ background: "#F8FAFC", color: "#334155", border: "1px solid #CBD5E1", borderRadius: 8, padding: "7px 11px", cursor: "pointer", fontSize: 11.5, fontWeight: 600 }}
+                      >
+                        Export JSON
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.open(`/api/resume/${activeDocumentId}/export?format=summary`, "_blank")}
+                        style={{ background: "#F8FAFC", color: "#334155", border: "1px solid #CBD5E1", borderRadius: 8, padding: "7px 11px", cursor: "pointer", fontSize: 11.5, fontWeight: 600 }}
+                      >
+                        Export Summary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm("Delete this uploaded resume and its extracted claims?")) {
+                            await fetch(`/api/resume/${activeDocumentId}`, { method: "DELETE" }).catch(() => null);
+                            setFileName(null);
+                            setIsUploaded(false);
+                            setCandidates([]);
+                            setActiveDocumentId(null);
+                            setProcessingState("IDLE");
+                          }
+                        }}
+                        style={{ background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, padding: "7px 11px", cursor: "pointer", fontSize: 11.5, fontWeight: 600, marginLeft: "auto" }}
+                      >
+                        Delete File
+                      </button>
+                    </>
+                  )}
+
+                  {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12, fontWeight: 600 }}>✓ Review saved to Person 360</span>}
+                </div>
+              </div>
+            )}
             {Boolean(activeJobId) && processingState !== "IDLE" && (
               <ProcessingActivity source="resume" activeJobId={activeJobId} />
             )}

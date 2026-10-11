@@ -48,7 +48,8 @@
     "demo:padho-code-event": "node --import tsx scripts/demo-padho-code-event.ts",
     "demo:eris-event": "node --import tsx scripts/demo-eris-event.ts",
     "demo:mentormaze-event": "node --import tsx scripts/demo-mentormaze-event.ts",
-    "demo:interview-event": "node --import tsx scripts/demo-interview-event.ts"
+    "demo:interview-event": "node --import tsx scripts/demo-interview-event.ts",
+    "test:resume-integration": "node --import tsx scripts/test-universal-resume-integration.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -60,7 +61,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "bcryptjs": "^3.0.3",
-    "drizzle-kit": "^0.31.11",
     "drizzle-orm": "^0.45.3",
     "lucide-react": "^0.468.0",
     "mammoth": "^1.13.0",
@@ -78,7 +78,12 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
     "@playwright/test": "^1.64.0",
+    "drizzle-kit": "^0.31.11",
     "eslint": "^9.36.0",
     "eslint-config-next": "^15.5.3"
+  },
+  "overrides": {
+    "braces": "^3.0.3",
+    "sprintf-js": "^1.1.3"
   }
 }

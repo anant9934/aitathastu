@@ -232,8 +232,8 @@ export class ExtractorServiceClient {
       method: "POST",
       headers: this.makeHeaders(personId, role),
       body: formData,
-      // 45s timeout — keeps total duration safely within Vercel's 60s execution budget
-      signal: AbortSignal.timeout(45000),
+      // 55s timeout — allows Render maximum headroom while staying safely within Vercel's 60s ceiling
+      signal: AbortSignal.timeout(55000),
     });
 
     if (!res.ok) {

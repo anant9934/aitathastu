@@ -1,6 +1,13 @@
 # AI TATHASTU — V5.0.5 CONSOLIDATED REPORT
 ## Independent Ground Truth, Benchmark Integrity & Scientifically Valid Resume Extraction Evaluation
 
+> [!CAUTION]
+> **FORMAL RETRACTION & SUPERSEDED NOTICE (V5.0.5R):**  
+> The accuracy claims and "GOLD / Human-adjudicated" labels reported in this document have been **FORMALLY RETRACTED**.  
+> The V5.0.5 audit revealed that the 25 records claimed as "HUMAN_EXPERT_REVIEWED_AND_ADJUDICATED" were programmatically generated via regex heuristics without human expert annotation.  
+> **Actual HUMAN_GOLD count: 0.** All 65 records have been reclassified to `SILVER_HEURISTIC`.  
+> For the scientifically valid, defenceless evaluation, refer to [`docs/V5_0_5R_EVALUATION_INTEGRITY_REPAIR.md`](file:///Users/quantumanant/aitathastu/docs/V5_0_5R_EVALUATION_INTEGRITY_REPAIR.md).
+
 **Date:** October 11, 2026  
 **Repository:** `/Users/quantumanant/aitathastu`  
 **Execution Mode:** Audit → Repair Evaluation → Independent Annotation → Benchmark → Report → STOP  

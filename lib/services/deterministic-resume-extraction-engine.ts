@@ -132,12 +132,12 @@ export const SECTION_REGISTRY_V3_9: SectionDefinition[] = [
   {
     id: "achievements",
     canonicalName: "Achievements",
-    pattern: /^(achievements|awards|honors|awards\s*&\s*achievements|accomplishments|honors\s*&\s*awards)$/i,
+    pattern: /^(achievements|awards|honors|awards\s*&\s*achievements|achievements\s*&\s*awards|accomplishments|honors\s*&\s*awards|honors\s*&\s*scholarships|publications\s*&\s*awards|publications\s*&\s*honors|patents\s*&\s*honors|certifications\s*&\s*awards)$/i,
   },
   {
     id: "research",
     canonicalName: "Research & Publications",
-    pattern: /^(research|publications|papers|research papers|patents|selected publications|research\s*&\s*publications|research\s*,\s*patents\s*&\s*books|research\s*&\s*patents|patents\s*&\s*books)$/i,
+    pattern: /^(research|publications|papers|research papers|patents|selected publications|research\s*&\s*publications|research\s*,\s*patents\s*&\s*books|research\s*&\s*patents|patents\s*&\s*books|books\s*&\s*publications|patents\s*&\s*inventions|publications\s*&\s*patents|patents\s*&\s*publications)$/i,
   },
   {
     id: "profiles",

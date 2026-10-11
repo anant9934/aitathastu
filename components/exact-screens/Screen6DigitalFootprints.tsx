@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Check,
   Loader2,
@@ -15,12 +15,11 @@ import {
   ShieldCheck,
   CheckCircle2,
   FileText,
-  Clock,
-  ExternalLink,
 } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 import { ProcessingActivity } from "./ProcessingActivity";
+import { normalizeImportCandidates } from "@/lib/onboarding-import-candidates";
 
 export interface DiscoveredCandidates {
   projects?: Array<{
@@ -29,6 +28,7 @@ export interface DiscoveredCandidates {
     description?: string;
     technologies?: string[];
     url?: string;
+    source?: string;
     primaryLanguage?: string | null;
     aiMlCategories?: string[];
     technologyFindings?: Array<{
@@ -73,25 +73,7 @@ interface Screen6DigitalFootprintsProps {
   initialProfiles?: Partial<Record<string, string>>;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
   onProfilesChange?: (profiles: Partial<Record<string, string>>) => void;
-  onCandidatesDiscovered?: (candidates: DiscoveredCandidates) => void;
-  onGitHubProjectsDiscovered?: (
-    projects: Array<{
-      id: string;
-      title: string;
-      description?: string;
-      technologies?: string[];
-      url?: string;
-      primaryLanguage?: string | null;
-      aiMlCategories?: string[];
-      technologyFindings?: Array<{
-        name: string;
-        category?: string;
-        sourceFile?: string;
-        confidence?: string;
-      }>;
-    }>,
-    technologies?: string[]
-  ) => void;
+  onCandidatesDiscovered?: (candidates: DiscoveredCandidates, provider: string) => void;
   onNext: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
@@ -243,7 +225,7 @@ const platforms: PlatformConfig[] = [
     color: "#181717",
     bg: "#F3F4F6",
     type: "PUBLIC_API",
-    primaryActionLabel: "Connect & Import",
+    primaryActionLabel: "Import Public Data",
     supportedCapability: "Connect Account",
     dataCollected: [
       "Public account bio, followers & public repositories",
@@ -537,7 +519,6 @@ export function Screen6DigitalFootprints({
   discoveredResumeProfiles = {},
   onProfilesChange,
   onCandidatesDiscovered,
-  onGitHubProjectsDiscovered,
   onNext,
   onBack,
   onJumpToStep,
@@ -574,7 +555,9 @@ export function Screen6DigitalFootprints({
             continue;
           }
           found[connection.provider] = connection.profileUrl;
-          nextStatuses[connection.provider] = connection.lastSyncedAt ? "Import Completed" : "Connected";
+          nextStatuses[connection.provider] = connection.status === "reference_only"
+            ? "Profile Linked"
+            : connection.lastSyncedAt ? "Public Data Imported" : "Connected";
           if (connection.lastSyncedAt) {
             const date = new Date(connection.lastSyncedAt);
             nextSyncTimes[connection.provider] = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -728,13 +711,14 @@ export function Screen6DigitalFootprints({
 
       // 3. Update status & UI summaries
       const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      setStatuses((prev) => ({ ...prev, [platformId]: "Import Completed" }));
+      const imported = data.acquisitionStatus !== "MANUAL_PROFILE_REFERENCE" && Number(data.candidateCount) > 0;
+      setStatuses((prev) => ({ ...prev, [platformId]: imported ? "Public Data Imported" : "Profile Linked" }));
       setLastSyncedTimes((prev) => ({ ...prev, [platformId]: nowTime }));
       setSyncSummaries((prev) => ({
         ...prev,
-        [platformId]: data.summary || `${data.recordsCreated || 0} records imported`,
+        [platformId]: data.summary || `${data.candidateCount || 0} candidates ready for review`,
       }));
-      setStatusMessage(data.summary || `Successfully imported ${platformId}.`);
+      setStatusMessage(data.summary || (imported ? `Imported public ${platformId} data for review.` : `Linked ${platformId} profile for review.`));
 
       const nextVal = selectedUpload ? `Archive: ${selectedUpload.name}` : rawVal;
       const nextProfiles = { ...profiles, [platformId]: nextVal };
@@ -743,10 +727,8 @@ export function Screen6DigitalFootprints({
 
       // 4. Pass candidates to parent container & Step 8 Review
       if (data.candidates) {
-        onCandidatesDiscovered?.(data.candidates);
-        if (platformId === "github" && Array.isArray(data.candidates.projects)) {
-          onGitHubProjectsDiscovered?.(data.candidates.projects, data.candidates.skills);
-        }
+        const candidates = normalizeImportCandidates(data.candidates);
+        onCandidatesDiscovered?.(candidates as DiscoveredCandidates, platformId);
       }
 
       setTimeout(() => {
@@ -771,7 +753,7 @@ export function Screen6DigitalFootprints({
 
   const connectedCount = Object.keys(profiles).filter((k) => Boolean(profiles[k])).length;
   const connectedAccounts = Object.entries(statuses).filter(
-    ([_, s]) => s === "Connected" || s === "Public Data Imported" || s === "Import Completed"
+    ([_, s]) => s === "Connected"
   ).length;
   const importedSources = Object.entries(statuses).filter(
     ([_, s]) => s === "Import Completed" || s === "Review Required" || s === "Public Data Imported"
@@ -873,7 +855,7 @@ export function Screen6DigitalFootprints({
               lineHeight: 1.55,
             }}
           >
-            One click to connect and import verified code, competitive programming stats, ML models, and research links so EORA can construct your authentic evidence ledger.
+            Review profile links and import supported public data with your approval. Imported records are suggestions until you confirm them.
           </p>
         </div>
 
@@ -901,7 +883,7 @@ export function Screen6DigitalFootprints({
           >
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1E293B", margin: "0 0 4px" }}>
-                Connected Platforms ({connectedCount})
+                Linked Profiles ({connectedCount})
               </h2>
               <p style={{ fontSize: 13.5, color: "#64748B", margin: 0 }}>
                 Link any profiles you have. All connections are consent-based and reviewable anytime.
@@ -1047,7 +1029,6 @@ export function Screen6DigitalFootprints({
               }
 
               const lastSynced = lastSyncedTimes[p.id];
-              const summaryText = syncSummaries[p.id];
 
               return (
                 <div
@@ -1129,7 +1110,7 @@ export function Screen6DigitalFootprints({
                               width: "fit-content",
                             }}
                           >
-                            Found in CV
+                            Found in your resume
                           </span>
                           <span
                             style={{

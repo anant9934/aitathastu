@@ -30,6 +30,8 @@ const nextConfig = {
       "./eng.traineddata",
       "./public/eng.traineddata",
       "./node_modules/tesseract.js-core/**/*",
+      "./node_modules/pdfjs-dist/cmaps/**/*",
+      "./node_modules/pdfjs-dist/standard_fonts/**/*",
     ],
   },
   eslint: {

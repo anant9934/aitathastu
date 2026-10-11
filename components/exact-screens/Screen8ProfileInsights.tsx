@@ -12,11 +12,11 @@ import {
   CheckCircle2,
   ShieldCheck,
   FileCheck,
-  Trash2,
-  ExternalLink
+  Trash2
 } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
+import { candidateNames } from "@/lib/onboarding-import-candidates";
 
 export interface Screen8EducationEntry {
   institution: string;
@@ -107,6 +107,8 @@ export interface Screen8ProfileInsightsProps {
   onToggleConfirmAchievement?: (title: string) => void;
   onRemoveAchievement?: (title: string) => void;
   onConfirmAllAchievements?: () => void;
+  onConfirmSkill?: (name: string) => void;
+  onRejectSkill?: (name: string, source: string) => void;
 }
 
 const navSections = [
@@ -167,6 +169,8 @@ export function Screen8ProfileInsights({
   onToggleConfirmAchievement,
   onRemoveAchievement,
   onConfirmAllAchievements,
+  onConfirmSkill,
+  onRejectSkill,
 }: Screen8ProfileInsightsProps) {
   const [activeTab, setActiveTab] = useState("personal");
   const firstName = studentName.trim().split(" ")[0] || "Student";
@@ -185,7 +189,7 @@ export function Screen8ProfileInsights({
     "XGBoost",
   ];
 
-  const displayedSkills = isGalleryMode && skills.length === 0 ? defaultSkills : skills;
+  const displayedSkills = candidateNames(isGalleryMode && skills.length === 0 ? defaultSkills : skills);
 
   return (
     <div
@@ -884,21 +888,13 @@ export function Screen8ProfileInsights({
                             <div>
                               <span style={{ fontSize: 13.5, fontWeight: 750, color: "#166534" }}>{tc.name}</span>
                               <span style={{ display: "block", fontSize: 10.5, color: "#15803D" }}>
-                                Observed in GitHub {tc.sourceFile ? `(${tc.sourceFile})` : ""}
+                                Suggested from {tc.source}{tc.sourceFile ? ` (${tc.sourceFile})` : ""}
                               </span>
                             </div>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: "#16A34A",
-                                background: "#DCFCE7",
-                                padding: "2px 7px",
-                                borderRadius: 6,
-                              }}
-                            >
-                              Observed
-                            </span>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button type="button" onClick={() => onConfirmSkill?.(tc.name)} style={{ fontSize: 11, fontWeight: 700, color: "#166534", background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 6, padding: "3px 7px" }}>Confirm</button>
+                              <button type="button" onClick={() => onRejectSkill?.(tc.name, tc.source)} style={{ fontSize: 11, fontWeight: 700, color: "#64748B", background: "#F8FAFC", border: "1px solid #CBD5E1", borderRadius: 6, padding: "3px 7px" }}>Remove</button>
+                            </div>
                           </div>
                         ))}
                   </div>

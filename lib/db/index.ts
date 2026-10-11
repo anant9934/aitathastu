@@ -33,6 +33,9 @@ export async function getDb(): Promise<TathastuDb> {
     }
     const isProd = process.env.NODE_ENV === "production";
     const databaseMode = process.env.DATABASE_MODE || (isProd ? "postgres" : "auto");
+    // A least-privilege preview runtime must never attempt schema DDL. Migrations
+    // remain an explicit setup step using the branch owner credential.
+    const autoMigrate = process.env.DATABASE_AUTO_MIGRATE !== "false";
 
     // 1. Production / Explicit PostgreSQL Mode Validation
     if (databaseMode === "postgres" || isProd) {
@@ -59,10 +62,12 @@ export async function getDb(): Promise<TathastuDb> {
         const db = drizzle(sql, { schema });
 
         try {
+          if (autoMigrate) await sql.query("CREATE SCHEMA IF NOT EXISTS public");
           const check = await sql`SELECT to_regclass('public.organizations') as reg`;
           const isInitialized = Boolean(check[0]?.reg);
 
           if (!isInitialized) {
+            if (!autoMigrate) throw new Error("Database schema is not initialized; runtime migrations are disabled.");
             for (const stmt of MIGRATION_SQL_STATEMENTS) {
               await sql.query(stmt);
             }
@@ -85,10 +90,12 @@ export async function getDb(): Promise<TathastuDb> {
         const db = drizzle(client, { schema });
 
         try {
+          if (autoMigrate) await client`CREATE SCHEMA IF NOT EXISTS public`;
           const check = await client`SELECT to_regclass('public.organizations') as reg`;
           const isInitialized = Boolean(check[0]?.reg);
 
           if (!isInitialized) {
+            if (!autoMigrate) throw new Error("Database schema is not initialized; runtime migrations are disabled.");
             for (const stmt of MIGRATION_SQL_STATEMENTS) {
               await client.unsafe(stmt);
             }

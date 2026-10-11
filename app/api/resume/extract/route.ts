@@ -13,7 +13,6 @@
 
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { and, eq } from "drizzle-orm";
 import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
@@ -22,7 +21,7 @@ import { resumeCandidates, saveResumeCandidates } from "@/lib/services/resume-re
 import { parseResumeDocument } from "@/lib/services/document-parser-service";
 import { resumeSuggestions, resumeDiscovery } from "@/lib/resume-suggestions";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
-import { getDb, sourceSnapshots } from "@/lib/db";
+import { validateDocumentSafety } from "@/lib/services/document-parser-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -157,7 +156,7 @@ export async function POST(request: Request) {
 
     const bytes = Buffer.from(await file.arrayBuffer());
 
-    // Magic byte validation
+    // Magic byte and encrypted-document validation
     const isPdf = bytes.subarray(0, 5).toString() === "%PDF-";
     const isDocx = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes.includes(Buffer.from("[Content_Types].xml"));
     if ((extension === "pdf" && !isPdf) || (extension === "docx" && !isDocx)) {
@@ -166,6 +165,13 @@ export async function POST(request: Request) {
         "The file content does not match its extension. Please choose another file.",
         415
       );
+    }
+    const safety = validateDocumentSafety(bytes, extension as "pdf" | "docx");
+    if (safety.isEncrypted) {
+      return fail("ENCRYPTED_DOCUMENT", "Remove the document password, then upload the unencrypted PDF.", 422);
+    }
+    if (!safety.isValid) {
+      return fail("INVALID_DOCUMENT", "This document is damaged or uses an unsupported structure. Export it again as PDF or DOCX.", 422);
     }
 
     // Track job lifecycle
@@ -177,82 +183,9 @@ export async function POST(request: Request) {
       });
     }
 
-    // --- Content Hash Fast-Path ---
+    // Reprocess identical uploads: older cached snapshots hold only review claims,
+    // not OCR text or profile links, so a cache hit would silently lose them.
     const documentId = crypto.createHash("sha256").update(bytes).digest("hex");
-    const db = await getDb();
-    const existingSnapshots = await db
-      .select()
-      .from(sourceSnapshots)
-      .where(
-        and(
-          eq(sourceSnapshots.personId, personId),
-          eq(sourceSnapshots.source, "resume"),
-          eq(sourceSnapshots.checksum, documentId)
-        )
-      )
-      .limit(1)
-      .catch(() => []);
-
-    // Check if we can reuse an identical already-extracted snapshot
-    if (existingSnapshots.length > 0) {
-      const snap = existingSnapshots[0];
-      const snapData = snap.snapshotData as any;
-      if (snapData && Array.isArray(snapData.candidates) && snapData.candidates.length > 0) {
-        await SourceProcessingJobService.updateStage(jobId, personId, "persist");
-        await SourceProcessingJobService.completeJob({
-          jobId,
-          personId,
-          resultReference: `resume:sha256:${documentId}`,
-          metadata: { candidates: snapData.candidates.length, cached: true },
-        });
-
-        // Fast parse for profile details if not cached
-        const parsedDoc = await parseResumeDocument(bytes, extension as "pdf" | "docx", {
-          enableOcr: false,
-        }).catch(() => null);
-        const rawText = parsedDoc?.text || "";
-        const extraction = await extractResumeStructured(rawText, personId, parsedDoc?.hyperlinks);
-
-        const responsePayload = {
-          ok: true,
-          status: "completed",
-          documentId,
-          jobId,
-          structured: extraction.extracted,
-          extractedProfile: extraction.extractedProfile,
-          discoveredProfiles: extraction.discoveredProfiles,
-          discoveredRepositories: extraction.discoveredRepositories,
-          candidates: extraction.candidates,
-          reviewCandidates: snapData.candidates,
-          extractionMeta: {
-            success: true,
-            provider: "deterministic-engine",
-            modelUsed: "v3.9-zero-llm",
-            llmUsed: false,
-            ocrUsed: false,
-            ocrFailed: false,
-            fallbackUsed: false,
-            latencyMs: 15,
-            textTruncated: false,
-            cached: true,
-          },
-          suggestions: resumeSuggestions(rawText),
-          discovery: resumeDiscovery(rawText),
-          message: "Resume extracted deterministically (instant cache hit).",
-          requestId,
-        };
-
-        const res = makeJsonResponse(responsePayload, 200, requestId);
-        if (authRes.sessionCookieToSet) {
-          res.cookies.set(
-            authRes.sessionCookieToSet.name,
-            authRes.sessionCookieToSet.value,
-            authRes.sessionCookieToSet.options as Parameters<typeof res.cookies.set>[2]
-          );
-        }
-        return res;
-      }
-    }
 
     // --- Deterministic Document Parsing & OCR ---
     await SourceProcessingJobService.updateStage(jobId, personId, "parse");
@@ -272,10 +205,12 @@ export async function POST(request: Request) {
     }
 
     const rawText = parsedDoc.text;
-    if (rawText.replace(/\s/g, "").length < 40) {
+    if (!rawText.trim()) {
       return fail(
-        "INSUFFICIENT_TEXT",
-        "We could not read enough text from this document. Please use a text-based resume or enter details manually.",
+        parsedDoc.ocrUsed ? "OCR_LOW_QUALITY" : "NATIVE_TEXT_UNAVAILABLE",
+        parsedDoc.ocrUsed
+          ? "We could not read the scanned pages clearly. Try a sharper scan or enter details manually."
+          : "No readable text was found. Try exporting the document again or enter details manually.",
         422
       );
     }
@@ -369,7 +304,6 @@ export async function POST(request: Request) {
 
     return successResponse;
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : "Internal server exception";
-    return fail("UNHANDLED_EXCEPTION", `Processing error: ${errorMsg}. Please try again or enter details manually.`, 500);
+    return fail("UNKNOWN_PROCESSING_FAILURE", "We could not process this document. Please retry or enter details manually.", 500);
   }
 }

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerAuthContext, getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
 import { completeOnboarding, readOnboardingDraft, writeOnboardingDraft } from "@/lib/services/onboarding-v2-service";
-import { createUser, findUserByEmail, updateUserCredentials } from "@/lib/repositories/user-repository";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { createSession, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/auth/session";
+import { findUserByEmail, updateUserCredentials } from "@/lib/repositories/user-repository";
+import { updatePersonProfileData } from "@/lib/repositories/person-repository";
+import { hashPassword } from "@/lib/auth/password";
+import { SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/auth/session";
 
 export async function GET() {
   const auth = await getServerAuthContext();
@@ -27,49 +28,26 @@ export async function PUT(request: Request) {
     }
   }
 
-  // Seamless account linking / upgrade if credentials are provided in draft
+  // Upgrade the current guest in place so resume snapshots and review claims keep the same owner.
   if (body.email && typeof body.email === "string" && body.password && typeof body.password === "string" && body.password.length >= 6) {
     const normalizedEmail = body.email.trim().toLowerCase();
     const existing = await findUserByEmail(normalizedEmail);
-    if (existing) {
-      if (existing.id !== auth.user.id) {
-        const valid = await verifyPassword(body.password, existing.passwordHash);
-        if (valid) {
-          const sess = await createSession(existing.id);
-          sessionToken = sess.token;
-          sessionExpires = sess.expiresAt;
-          auth = {
-            user: { id: existing.id, email: existing.email },
-            person: { id: existing.personId || existing.id, displayName: existing.displayName || "Student" },
-            session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-          };
-        }
+    if (existing && existing.id !== auth.user.id) {
+      return NextResponse.json({ error: "This email already has an account. Please sign in first." }, { status: 409 });
+    }
+    if (!existing && auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
+      const passwordHash = await hashPassword(body.password);
+      await updateUserCredentials(auth.user.id, {
+        email: normalizedEmail,
+        passwordHash,
+        displayName: typeof body.name === "string" ? body.name.trim() : "",
+      });
+      if (typeof body.name === "string" && body.name.trim()) {
+        await updatePersonProfileData(auth.person.id, { displayName: body.name.trim() });
       }
-    } else {
-      if (auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
-        const passwordHash = await hashPassword(body.password);
-        await updateUserCredentials(auth.user.id, {
-          email: normalizedEmail,
-          passwordHash,
-          displayName: body.name || "Student",
-        });
-        auth.user.email = normalizedEmail;
-      } else {
-        const passwordHash = await hashPassword(body.password);
-        const created = await createUser({
-          email: normalizedEmail,
-          passwordHash,
-          displayName: body.name || "Student",
-        });
-        const sess = await createSession(created.userId);
-        sessionToken = sess.token;
-        sessionExpires = sess.expiresAt;
-        auth = {
-          user: { id: created.userId, email: created.email },
-          person: { id: created.personId, displayName: created.displayName },
-          session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-        };
-      }
+      auth.user.email = normalizedEmail;
+    } else if (!existing && auth.user.email !== normalizedEmail) {
+      return NextResponse.json({ error: "Sign out before creating a different account." }, { status: 409 });
     }
   }
 
@@ -110,49 +88,23 @@ export async function POST(request: Request) {
     }
   }
 
-  // Auto-login / Auto-upgrade during final onboarding launch if email & password are provided
+  // Final save must never silently switch owners or create a second person.
   if (body.email && typeof body.email === "string" && body.password && typeof body.password === "string" && body.password.length >= 6) {
     const normalizedEmail = body.email.trim().toLowerCase();
     const existing = await findUserByEmail(normalizedEmail);
-    if (existing) {
-      if (existing.id !== auth.user.id) {
-        const valid = await verifyPassword(body.password, existing.passwordHash);
-        if (valid) {
-          const sess = await createSession(existing.id);
-          sessionToken = sess.token;
-          sessionExpires = sess.expiresAt;
-          auth = {
-            user: { id: existing.id, email: existing.email },
-            person: { id: existing.personId || existing.id, displayName: existing.displayName || "Student" },
-            session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-          };
-        }
-      }
-    } else {
-      if (auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
-        const passwordHash = await hashPassword(body.password);
-        await updateUserCredentials(auth.user.id, {
-          email: normalizedEmail,
-          passwordHash,
-          displayName: body.name || "Student",
-        });
-        auth.user.email = normalizedEmail;
-      } else {
-        const passwordHash = await hashPassword(body.password);
-        const created = await createUser({
-          email: normalizedEmail,
-          passwordHash,
-          displayName: body.name || "Student",
-        });
-        const sess = await createSession(created.userId);
-        sessionToken = sess.token;
-        sessionExpires = sess.expiresAt;
-        auth = {
-          user: { id: created.userId, email: created.email },
-          person: { id: created.personId, displayName: created.displayName },
-          session: { id: sess.sessionId, token: sess.token, expiresAt: sess.expiresAt },
-        };
-      }
+    if (existing && existing.id !== auth.user.id) {
+      return NextResponse.json({ error: "This email already has an account. Please sign in first." }, { status: 409 });
+    }
+    if (!existing && auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
+      const passwordHash = await hashPassword(body.password);
+      await updateUserCredentials(auth.user.id, {
+        email: normalizedEmail,
+        passwordHash,
+        displayName: typeof body.name === "string" ? body.name.trim() : "",
+      });
+      auth.user.email = normalizedEmail;
+    } else if (!existing && auth.user.email !== normalizedEmail) {
+      return NextResponse.json({ error: "Sign out before creating a different account." }, { status: 409 });
     }
   }
 

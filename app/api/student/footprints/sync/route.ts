@@ -9,7 +9,6 @@
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { DigitalSourceImportOrchestrator } from "@/lib/services/digital-source-import-orchestrator";
-import { CrossSourceFusionService } from "@/lib/services/cross-source-fusion-service";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
 
 export async function POST(req: Request) {
@@ -46,19 +45,13 @@ export async function POST(req: Request) {
       jobId: typeof jobId === "string" ? jobId : undefined,
     });
 
-    // Record Profile Version & Journey Event for Downstream Dashboard & EORA Refresh
-    await CrossSourceFusionService.recordProfileVersion(
-      personId,
-      "evidence_added",
-      `Connected ${provider} footprint with ${result.recordsCreated} evidence items.`,
-      { provider, acquisitionStatus: result.acquisitionMode, recordsCreated: result.recordsCreated, summary: result.summary }
-    ).catch(() => null);
-
+    // The import creates review candidates and a source snapshot. Canonical evidence
+    // is written only after the student confirms candidates in onboarding.
     await createJourneyEventRecord(personId, {
       type: "footprint_connected",
       title: `Connected ${provider.toUpperCase()}`,
       description: result.summary,
-      metadata: { provider, acquisitionStatus: result.acquisitionMode, recordsCreated: result.recordsCreated },
+      metadata: { provider, acquisitionStatus: result.acquisitionMode, candidateCount: result.candidateCount },
     }).catch(() => null);
 
     return NextResponse.json({
@@ -67,6 +60,7 @@ export async function POST(req: Request) {
       provider: result.provider,
       acquisitionStatus: result.acquisitionMode,
       recordsCreated: result.recordsCreated,
+      candidateCount: result.candidateCount,
       summary: result.summary,
       candidates: result.candidates,
       lastSyncedAt: result.lastSyncedAt,

@@ -619,7 +619,7 @@ export function Screen1Landing({ onStartJourney }: Screen1LandingProps) {
                 Showcase your expertise and research, mentor students, collaborate on projects, discover promising talent, and connect learning with real-world opportunities.
               </p>
             </div>
-            <Link href="/faculty" style={{ color: "#C084FC", fontWeight: 700, fontSize: 14.5, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+            <Link href="/faculty/verification" style={{ color: "#C084FC", fontWeight: 700, fontSize: 14.5, display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
               <span>Explore Faculty Experience</span>
               <ArrowRight size={16} />
             </Link>

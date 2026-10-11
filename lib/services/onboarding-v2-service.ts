@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb, onboardingDrafts, userPreferences } from "@/lib/db";
 import { safeDraft, type OnboardingDraft } from "@/lib/onboarding-v2";
 import { updatePersonProfileData, getPersonProfile } from "@/lib/repositories/person-repository";
@@ -14,13 +14,30 @@ export async function readOnboardingDraft(personId: string) {
 }
 
 export async function writeOnboardingDraft(personId: string, input: unknown) {
-  const draft = safeDraft(input);
+  const raw = input && typeof input === "object" && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : {};
+  const normalized = safeDraft(raw);
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(raw)) {
+    if (Object.prototype.hasOwnProperty.call(normalized, key)) {
+      const value = normalized[key as keyof OnboardingDraft];
+      patch[key] = value === undefined && raw[key] === null ? null : value;
+    }
+  }
+  const draft = safeDraft(patch);
   const db = await getDb();
   await db
     .insert(onboardingDrafts)
     .values({ personId, draft, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: onboardingDrafts.personId, set: { draft, updatedAt: new Date() } });
-  return draft;
+    .onConflictDoUpdate({
+      target: onboardingDrafts.personId,
+      set: {
+        draft: sql`${onboardingDrafts.draft} || ${JSON.stringify(patch)}::jsonb`,
+        updatedAt: new Date(),
+      },
+    });
+  return await readOnboardingDraft(personId);
 }
 
 function allowedProfileUrl(source: string, value: string) {
@@ -51,18 +68,18 @@ export async function completeOnboarding(personId: string, input: unknown) {
   if (draft.role !== "student") {
     throw new Error("This role's onboarding journey is coming soon. Please choose Student to continue.");
   }
-  const rawInput = (input && typeof input === "object") ? (input as Record<string, unknown>) : {};
   const existingProfile = await getPersonProfile(personId);
 
-  const studentName = draft.name?.trim() || "Student";
+  const studentName = draft.name?.trim() || "";
   const degree = draft.degree?.trim() || existingProfile?.degree || "";
   const specialization = draft.specialization?.trim() || existingProfile?.specialization || "";
   const year = draft.year?.trim() || existingProfile?.currentYear || "";
   const goal = draft.goal?.trim() || "";
 
   let institution = draft.institution?.trim() || "";
-  if (!institution && Array.isArray(rawInput.education) && rawInput.education.length > 0) {
-    const firstEdu = rawInput.education[0] as Record<string, unknown>;
+  const confirmedEducation = (draft.education || []).filter((entry) => entry.status === "confirmed");
+  if (!institution && confirmedEducation.length > 0) {
+    const firstEdu = confirmedEducation[0] as Record<string, unknown>;
     if (typeof firstEdu?.institution === "string") {
       institution = firstEdu.institution.trim();
     }
@@ -90,21 +107,17 @@ export async function completeOnboarding(personId: string, input: unknown) {
 
   const education = [degree, institution, specialization, year, draft.semester].filter(Boolean).join(" · ");
 
-  const headline = draft.targetRole ? `Aspiring ${draft.targetRole}` : "AI/ML Student";
+  const headline = draft.targetRole ? `Aspiring ${draft.targetRole}` : undefined;
 
   await updatePersonProfileData(personId, {
-    displayName: studentName,
+    displayName: studentName || undefined,
     headline,
-    education,
-    experience: draft.projects
-      .filter((p) => p.status === "confirmed")
-      .map((p) => p.title)
-      .join("; "),
-    degree,
-    specialization,
-    institution,
-    currentYear: year,
-    semester: draft.semester,
+    education: education || undefined,
+    degree: degree || undefined,
+    specialization: specialization || undefined,
+    institution: institution || undefined,
+    currentYear: year || undefined,
+    semester: draft.semester || undefined,
     expectedGraduationYear: draft.expectedGraduationYear || existingProfile?.expectedGraduationYear || undefined,
   });
 
@@ -195,9 +208,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
   }
 
   // Record all confirmed education qualifications
-  const inputEducation = Array.isArray(rawInput.education) && rawInput.education.length > 0
-    ? rawInput.education
-    : (draft.education || []);
+  const inputEducation = confirmedEducation;
   for (const edu of inputEducation) {
     if (edu && typeof edu === "object") {
       const inst = String((edu as any).institution || "").trim();
@@ -222,9 +233,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
   }
 
   // Record confirmed student experiences
-  const inputExperiences = Array.isArray(rawInput.experiences) && rawInput.experiences.length > 0
-    ? rawInput.experiences
-    : (draft.experiences || []);
+  const inputExperiences = (draft.experiences || []).filter((entry) => entry.status === "confirmed");
   for (const exp of inputExperiences) {
     if (exp && typeof exp === "object") {
       const company = String((exp as any).company || (exp as any).organization || "").trim();
@@ -251,9 +260,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
   }
 
   // Record confirmed student achievements (patents, publications, awards, books)
-  const inputAchievements = Array.isArray(rawInput.achievements) && rawInput.achievements.length > 0
-    ? rawInput.achievements
-    : (draft.achievements || []);
+  const inputAchievements = (draft.achievements || []).filter((entry) => entry.status === "confirmed");
   for (const ach of inputAchievements) {
     if (ach && typeof ach === "object") {
       const title = String((ach as any).title || "").trim();
@@ -354,37 +361,37 @@ export async function completeOnboarding(personId: string, input: unknown) {
   });
 
   const db = await getDb();
-  const primary = draft.primaryPriority || (draft.priorities && draft.priorities.length > 0 ? draft.priorities[0] : "learning");
+  const primary = draft.primaryPriority || (draft.priorities && draft.priorities.length > 0 ? draft.priorities[0] : "");
   const secondary = draft.priorities ? draft.priorities.filter((p) => p !== primary) : [];
+  const directionMetadata = Object.fromEntries(
+    Object.entries({
+      targetRole: draft.targetRole,
+      targetRoleId: draft.targetRoleId,
+      targetTimeline: draft.targetTimeline,
+      customGoalText: draft.customGoalText,
+    }).filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+  );
 
-  await db
+  if (primary || Object.keys(directionMetadata).length > 0) await db
     .insert(userPreferences)
     .values({
       id: crypto.randomUUID(),
       personId,
-      primaryPriority: primary,
+      primaryPriority: primary || null,
       secondaryPriorities: secondary,
-      preferenceSource: "user_selected",
-      metadata: {
-        targetRole: draft.targetRole,
-        targetRoleId: draft.targetRoleId,
-        targetTimeline: draft.targetTimeline,
-        customGoalText: draft.customGoalText,
-      },
+      preferenceSource: primary ? "user_selected" : "not_selected",
+      metadata: directionMetadata,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: userPreferences.personId,
       set: {
-        primaryPriority: primary,
-        secondaryPriorities: secondary,
-        preferenceSource: "user_selected",
-        metadata: {
-          targetRole: draft.targetRole,
-          targetRoleId: draft.targetRoleId,
-          targetTimeline: draft.targetTimeline,
-          customGoalText: draft.customGoalText,
-        },
+        ...(primary ? {
+          primaryPriority: primary,
+          secondaryPriorities: secondary,
+          preferenceSource: "user_selected",
+        } : {}),
+        metadata: sql`coalesce(${userPreferences.metadata}, '{}'::jsonb) || ${JSON.stringify(directionMetadata)}::jsonb`,
         updatedAt: new Date(),
       },
     });

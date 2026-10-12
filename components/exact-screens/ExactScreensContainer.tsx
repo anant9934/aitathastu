@@ -109,6 +109,7 @@ export function ExactScreensContainer({
   >([]);
   const [experienceEntries, setExperienceEntries] = useState<Screen8ExperienceEntry[]>([]);
   const [achievementEntries, setAchievementEntries] = useState<Screen8AchievementEntry[]>([]);
+  const [isFresher, setIsFresher] = useState<boolean>(false);
 
   // Restore draft or session on mount
   useEffect(() => {
@@ -197,6 +198,9 @@ export function ExactScreensContainer({
             }
             if (Array.isArray((d as any).achievements) && (d as any).achievements.length > 0) {
               setAchievementEntries((d as any).achievements);
+            }
+            if (typeof (d as any).isFresher === "boolean") {
+              setIsFresher((d as any).isFresher);
             }
           }
         }
@@ -845,6 +849,9 @@ export function ExactScreensContainer({
             specialization={academic.department}
             institution={academic.institution || educationEntries[0]?.institution}
             year={academic.currentYear}
+            expectedGraduationYear={academic.expectedGraduationYear}
+            email={academic.email}
+            mobile={academic.mobile}
             goal={goal}
             skills={skills}
             educationEntries={educationEntries.length > 0 ? educationEntries : undefined}
@@ -869,6 +876,13 @@ export function ExactScreensContainer({
             onConfirmAllEducation={() => {
               setEducationEntries((prev) => {
                 const next = prev.map((e) => ({ ...e, status: "confirmed" as const }));
+                persistDraft({ education: next });
+                return next;
+              });
+            }}
+            onAddEducation={(entry) => {
+              setEducationEntries((prev) => {
+                const next = [...prev, entry];
                 persistDraft({ education: next });
                 return next;
               });
@@ -899,6 +913,18 @@ export function ExactScreensContainer({
                 return next;
               });
             }}
+            onAddExperience={(entry) => {
+              setExperienceEntries((prev) => {
+                const next = [...prev, entry];
+                persistDraft({ experiences: next });
+                return next;
+              });
+            }}
+            isFresher={isFresher}
+            onToggleFresher={(fresher) => {
+              setIsFresher(fresher);
+              persistDraft({ isFresher: fresher });
+            }}
             achievements={achievementEntries}
             onToggleConfirmAchievement={(title) => {
               setAchievementEntries((prev) => {
@@ -921,6 +947,13 @@ export function ExactScreensContainer({
             onConfirmAllAchievements={() => {
               setAchievementEntries((prev) => {
                 const next = prev.map((a) => ({ ...a, status: "confirmed" as const }));
+                persistDraft({ achievements: next });
+                return next;
+              });
+            }}
+            onAddAchievement={(entry) => {
+              setAchievementEntries((prev) => {
+                const next = [...prev, entry];
                 persistDraft({ achievements: next });
                 return next;
               });
@@ -958,6 +991,25 @@ export function ExactScreensContainer({
                 return next;
               });
             }}
+            onAddProject={(entry) => {
+              setProjects((prev) => {
+                const mapped: ProjectEntry = {
+                  id: `proj_manual_${Date.now()}`,
+                  title: entry.title,
+                  description: entry.description,
+                  technologies: entry.technologies || [],
+                  sources: entry.sources || ["manual"],
+                  status: "confirmed",
+                  contribution: [],
+                  contributionNote: "",
+                  url: entry.url,
+                  aiPurpose: entry.aiCategories?.join(", "),
+                };
+                const next = [...prev, mapped];
+                persistDraft({ projects: next });
+                return next;
+              });
+            }}
             projectsCount={projects.filter((p) => p.status !== "removed").length}
             projects={projects
               .filter((p) => p.status !== "removed")
@@ -972,6 +1024,8 @@ export function ExactScreensContainer({
                 aiCategories: (p as any).aiMlCategories || (p.aiPurpose ? p.aiPurpose.split(", ") : undefined),
               }))}
             technologyCandidates={techCandidates}
+            profiles={profiles}
+            discoveredResumeProfiles={discoveredResumeProfiles}
             onConfirmSkill={(skill) => {
               const next = Array.from(new Set([...skills, skill]));
               setSkills(next);
@@ -981,6 +1035,50 @@ export function ExactScreensContainer({
               const next = techCandidates.filter((candidate) => !(candidate.name === skill && candidate.source === source));
               setTechCandidates(next);
               persistDraft({ techCandidates: next });
+            }}
+            onAddSkill={(skill) => {
+              const trimmed = skill.trim();
+              if (!trimmed) return;
+              setSkills((prev) => {
+                if (prev.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return prev;
+                const next = [...prev, trimmed];
+                persistDraft({ skills: next });
+                return next;
+              });
+            }}
+            onRemoveSkill={(skill) => {
+              setSkills((prev) => {
+                const next = prev.filter((s) => s.toLowerCase() !== skill.toLowerCase());
+                persistDraft({ skills: next });
+                return next;
+              });
+            }}
+            onUpdatePersonalInfo={(data) => {
+              if (data.name) setName(data.name);
+              setAcademic((prev) => {
+                const next = {
+                  ...prev,
+                  fullName: data.name || prev.fullName,
+                  institution: data.institution !== undefined ? data.institution : prev.institution,
+                  degree: data.degree !== undefined ? data.degree : prev.degree,
+                  department: data.specialization !== undefined ? data.specialization : prev.department,
+                  currentYear: data.year !== undefined ? data.year : prev.currentYear,
+                  expectedGraduationYear: data.expectedGraduationYear !== undefined ? data.expectedGraduationYear : prev.expectedGraduationYear,
+                  email: data.email !== undefined ? data.email : prev.email,
+                  mobile: data.mobile !== undefined ? data.mobile : prev.mobile,
+                };
+                persistDraft({
+                  name: next.fullName,
+                  institution: next.institution,
+                  degree: next.degree,
+                  specialization: next.department,
+                  year: next.currentYear,
+                  expectedGraduationYear: next.expectedGraduationYear,
+                  email: next.email,
+                  mobile: next.mobile,
+                });
+                return next;
+              });
             }}
             isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(9)}

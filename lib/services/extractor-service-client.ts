@@ -232,9 +232,8 @@ export class ExtractorServiceClient {
       method: "POST",
       headers: this.makeHeaders(personId, role),
       body: formData,
-      // Leave time for local OCR, persistence, and the API response inside the
-      // route's 60-second function budget.
-      signal: AbortSignal.timeout(35000),
+      // Cap Render fallback timeout strictly to 6 seconds so it never exhausts serverless function limits.
+      signal: AbortSignal.timeout(6000),
     });
 
     if (!res.ok) {

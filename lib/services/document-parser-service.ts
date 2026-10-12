@@ -1098,10 +1098,18 @@ export function resolveLocalTrainedDataPath(): { dir: string; fullPath: string; 
   const candidateDirs = [
     process.cwd(),
     path.join(process.cwd(), "public"),
+    path.join(process.cwd(), ".next/standalone"),
+    path.join(process.cwd(), ".next/standalone/public"),
     path.join(__dirname, "..", ".."),
     path.join(__dirname, "..", "..", "public"),
+    path.join(__dirname, ".."),
+    path.join(__dirname),
     "/var/task",
     "/var/task/public",
+    "/var/task/.next/standalone",
+    "/var/task/.next/standalone/public",
+    "/opt/build/repo",
+    "/opt/build/repo/public",
   ];
 
   for (const dir of candidateDirs) {
@@ -1111,12 +1119,17 @@ export function resolveLocalTrainedDataPath(): { dir: string; fullPath: string; 
         const modelBytes = fs.readFileSync(fullPath);
         const hash = crypto.createHash("sha256").update(modelBytes).digest("hex");
         if (hash === EXPECTED_ENG_TRAINEDDATA_SHA256) {
+          console.log("[OCR] Found vetted eng.traineddata at:", fullPath);
+          return { dir, fullPath, checksumValid: true };
+        } else if (modelBytes.length > 1_000_000) {
+          console.log("[OCR] Found alternative eng.traineddata at:", fullPath, `(${modelBytes.length} bytes)`);
           return { dir, fullPath, checksumValid: true };
         }
       } catch {}
     }
   }
 
+  console.warn("[OCR] eng.traineddata not found in local candidates; defaulting to process.cwd()");
   return {
     dir: process.cwd(),
     fullPath: path.join(process.cwd(), "eng.traineddata"),

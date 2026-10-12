@@ -190,7 +190,8 @@ export async function POST(request: Request) {
     // --- Deterministic Document Parsing & OCR ---
     await SourceProcessingJobService.updateStage(jobId, personId, "parse");
 
-    const hasRenderUrl = !!(
+    const isNetlify = Boolean(process.env.NETLIFY || process.env.NETLIFY_CONTEXT);
+    const hasRenderUrl = !isNetlify && !!(
       process.env.RESUME_EXTRACTOR_URL ||
       process.env.RESUME_EXTRACTOR_SERVICE_URL
     );
@@ -199,9 +200,9 @@ export async function POST(request: Request) {
     try {
       parsedDoc = await parseResumeDocument(bytes, extension as "pdf" | "docx", {
         // The packaged Tesseract.js model can OCR these PDFs within the function
-        // budget. Use Render only when local OCR cannot recover readable text.
+        // budget. Keep budget strictly bounded on Netlify (12s) to prevent gateway timeouts.
         enableOcr: true,
-        ocrTimeoutMs: 15000,
+        ocrTimeoutMs: isNetlify ? 12000 : 15000,
       });
     } catch {
       return fail(
@@ -213,12 +214,12 @@ export async function POST(request: Request) {
 
     const rawText = parsedDoc.text;
 
-    // --- Render OCR Fallback ---
-    // If bundled Tesseract.js cannot recover text, try the Render service.
+    // --- Render OCR Fallback (Non-Netlify only) ---
+    // If bundled Tesseract.js cannot recover text and NOT on Netlify, try Render service.
     let renderDocId: string | null = null;
     if (!rawText.trim() || rawText.replace(/\s+/g, "").length < 40) {
-      if (!hasRenderUrl) {
-        // No Render service configured — fail gracefully
+      if (isNetlify || !hasRenderUrl) {
+        // On Netlify: Do NOT block on external Render service (which causes 502 gateway timeouts).
         return fail(
           parsedDoc.ocrUsed ? "OCR_LOW_QUALITY" : "NATIVE_TEXT_UNAVAILABLE",
           parsedDoc.ocrUsed

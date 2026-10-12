@@ -18,7 +18,7 @@ scripts/reproduce*
 
 # Heavy OCR trained models (bundle verified 5MB eng.traineddata, exclude other models)
 *.traineddata
-!eng.traineddata
+!/eng.traineddata
 
 # Local testing, coverage & test fixtures
 coverage/

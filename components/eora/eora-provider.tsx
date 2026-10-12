@@ -519,10 +519,14 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
 
         setTourTargetAvailable(true);
         effectiveTarget.setAttribute("data-eora-spotlight", "true");
-        effectiveTarget.scrollIntoView({
-          behavior: preferences.reducedMotion ? "instant" : "smooth",
-          block: "nearest",
-        });
+        // Compact onboarding keeps guidance available from the EORA orb.
+        // Moving the page to each spotlight target would hide the new step's heading.
+        if (!(pathname === "/onboarding" && window.matchMedia("(max-width: 480px)").matches)) {
+          effectiveTarget.scrollIntoView({
+            behavior: preferences.reducedMotion ? "instant" : "smooth",
+            block: "nearest",
+          });
+        }
         return true;
       }
       setTourTargetAvailable(false);

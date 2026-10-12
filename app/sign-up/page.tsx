@@ -52,8 +52,8 @@ function SignUpContent() {
         throw new Error(data.error || "Unable to create account. Please try again.");
       }
 
-      // Successfully created account & session cookie set
-      router.push(from);
+      // New accounts complete onboarding before entering the workspace.
+      router.push("/onboarding");
       router.refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred. Please try again.";

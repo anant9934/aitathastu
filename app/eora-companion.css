@@ -739,21 +739,20 @@
   .eora-floating-root[data-eora-route="onboarding"].eora-floating-root--spatial {
     right: 12px !important;
     left: auto !important;
-    width: min(310px, calc(100vw - 24px));
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 76px) !important;
+    width: auto;
   }
   .eora-floating-root[data-eora-route="onboarding"] .eora-floating-row {
-    display: block;
-    width: 100%;
+    display: flex;
+    width: auto;
   }
   .eora-floating-root[data-eora-route="onboarding"] .eora-avatar-wrapper {
-    position: absolute;
-    right: 0;
-    top: -68px;
+    position: static;
   }
-  .eora-floating-root[data-eora-route="onboarding"]:has(.eora-speech-cloud-wrapper) .eora-avatar-wrapper { display: none; }
+  .eora-floating-root[data-eora-route="onboarding"]:has(.eora-speech-cloud-wrapper) .eora-avatar-wrapper { display: flex; }
   .eora-floating-root[data-eora-route="onboarding"] .eora-speech-cloud-wrapper {
-    width: 100%;
-    max-width: none;
+    display: none;
   }
   .eora-floating-root[data-eora-route="onboarding"] .eora-speech-cloud-card {
     max-height: 170px;

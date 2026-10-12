@@ -610,6 +610,7 @@ export function Screen9SkillsMap({
 
           {/* Top Filter Chips */}
           <div
+            className="skills-map-filters"
             style={{
               display: "flex",
               alignItems: "center",

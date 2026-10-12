@@ -8,8 +8,8 @@ import { ArrowRight, Lock, Mail, AlertCircle, Eye, EyeOff, Sparkles } from "luci
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const rawFrom = searchParams.get("from") || "/student";
-  const from = (rawFrom.startsWith("/") && !rawFrom.startsWith("//") && !rawFrom.includes("://")) ? rawFrom : "/student";
+  const rawFrom = searchParams.get("from") || "/start";
+  const from = (rawFrom.startsWith("/") && !rawFrom.startsWith("//") && !rawFrom.includes("://")) ? rawFrom : "/start";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,8 +39,9 @@ function SignInContent() {
         throw new Error(data.error || "Unable to sign in. Please verify your credentials.");
       }
 
-      // Successfully signed in -> route to destination
-      router.push(from);
+      // The entry route restores unfinished onboarding before honoring a
+      // requested student page.
+      router.push(from.startsWith("/student/") ? `/start?from=${encodeURIComponent(from)}` : "/start");
       router.refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred. Please try again.";

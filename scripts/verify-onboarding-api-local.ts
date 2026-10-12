@@ -76,6 +76,7 @@ async function main() {
     const completion = await student.post("/api/onboarding-v2", {
       data: {
         version: 2, name: "Alex Morgan", role: "student", email, password: "SyntheticPass123!",
+        priorities: ["learning"], primaryPriority: "learning",
         resumeReviewed: [reviewedClaim],
         education: [{ institution: "Unconfirmed University", degree: "MSc", status: "candidate" }],
         experiences: [{ company: "Unconfirmed Lab", role: "Researcher", status: "candidate" }],

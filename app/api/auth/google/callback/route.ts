@@ -82,11 +82,10 @@ export async function GET(req: Request) {
     const email = profile.email?.trim().toLowerCase();
     const emailVerified = Boolean(profile.email_verified);
     const googleSub = profile.sub;
-    const displayName = profile.name?.trim() || profile.given_name?.trim() || email.split("@")[0];
-
     if (!email || !emailVerified) {
       return NextResponse.redirect(new URL("/sign-in?error=unverified_email", baseUrl));
     }
+    const displayName = profile.name?.trim() || profile.given_name?.trim() || email.split("@")[0];
 
     const existingUser = await findUserByEmail(email);
     let userId: string;
@@ -141,7 +140,12 @@ export async function GET(req: Request) {
 
     const { token, expiresAt } = await createSession(userId);
 
-    const destination = isNewUser ? "/onboarding" : (parsedState?.from || "/student");
+    const requested = parsedState?.from;
+    const destination = isNewUser ? "/onboarding" : (
+      requested?.startsWith("/student/") && !requested.startsWith("//")
+        ? `/start?from=${encodeURIComponent(requested)}`
+        : "/start"
+    );
     const response = NextResponse.redirect(new URL(destination, baseUrl));
 
     const isProduction = process.env.NODE_ENV === "production";

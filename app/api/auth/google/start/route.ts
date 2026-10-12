@@ -4,7 +4,7 @@ import { getCanonicalOrigin } from "@/lib/auth/origin";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const from = url.searchParams.get("from") || "/student";
+  const from = url.searchParams.get("from") || "/start";
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
 
   const baseUrl = getCanonicalOrigin(req);

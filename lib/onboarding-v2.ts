@@ -46,6 +46,7 @@ export type ReviewedResumeClaim = {
 export type OnboardingDraft = {
   version: 2;
   stage: StageId;
+  currentScreen?: number;
   name: string;
   role: string;
   targetRole: string;
@@ -122,6 +123,7 @@ export type OnboardingAchievementEntry = {
 export const initialDraft: OnboardingDraft = {
   version: 2,
   stage: "name",
+  currentScreen: 2,
   name: "",
   role: "",
   targetRole: "",
@@ -218,6 +220,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
   return {
     version: 2,
     stage: stageIds.includes(raw.stage as StageId) ? (raw.stage as StageId) : "name",
+    currentScreen: [2, 3, 3.2, 3.5, 3.7, 4, 5, 6, 7, 8, 9, 10, 11].includes(raw.currentScreen as number)
+      ? raw.currentScreen
+      : undefined,
     name: str(raw.name, 80),
     role: raw.role === "student" || raw.role === "faculty" ? raw.role : "",
     targetRole: str(raw.targetRole, 100),

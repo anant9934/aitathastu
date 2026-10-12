@@ -15,7 +15,7 @@ interface Screen3ChooseRoleProps {
 
 const roles = [
   { id: "student", title: "I'm a Student", subtitle: "Build an intelligent profile, learn AI/ML, and discover opportunities", icon: GraduationCap, available: true },
-  { id: "faculty", title: "I'm Faculty", subtitle: "Shape learning, research, and mentorship. Privileged tools require institution approval.", icon: User, available: true },
+  { id: "faculty", title: "I'm Faculty", subtitle: "Shape learning, research, and mentorship. Privileged tools require institution approval.", icon: User, available: false },
   { id: "professional", title: "I'm a Professional", subtitle: "Share domain expertise, review architectures, and collaborate", icon: Briefcase, available: false },
   { id: "mentor", title: "I'm a Mentor", subtitle: "Conduct mock assessments and guide aspiring engineers", icon: Users, available: false },
   { id: "alumni", title: "I'm an Alumni", subtitle: "Connect with students and give back to your institution", icon: Award, available: false },
@@ -35,7 +35,7 @@ export function Screen3ChooseRole({
 
   const handleSelect = (id: string, available: boolean) => {
     if (!available) {
-      setNotice("This role workspace is coming soon. Student and Faculty are available today.");
+      setNotice("This role workspace is coming soon. Student onboarding is available today.");
       return;
     }
     setNotice(null);
@@ -149,6 +149,7 @@ export function Screen3ChooseRole({
                   data-eora-id={`eora-role-${r.id}`}
                   onClick={() => handleSelect(r.id, r.available)}
                   role="button"
+                  aria-disabled={!r.available}
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {

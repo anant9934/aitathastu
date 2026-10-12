@@ -101,7 +101,7 @@ export function Screen11OnboardingComplete({
       />
 
       <main
-        className="screen-body"
+        className="screen-body onboarding-complete-body"
         style={{
           position: "relative",
           zIndex: 1,
@@ -114,7 +114,7 @@ export function Screen11OnboardingComplete({
           padding: "24px 36px 36px",
         }}
       >
-        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1.2fr", alignItems: "center", gap: 56, margin: "auto 0" }}>
+        <div className="onboarding-complete-grid" style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1.2fr", alignItems: "center", gap: 56, margin: "auto 0" }}>
           
           {/* Approved celebration pose, compact outside the landing hero. */}
           <div style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -156,7 +156,7 @@ export function Screen11OnboardingComplete({
             </p>
 
             {/* 4 Generated Asset Milestone Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 28 }}>
+            <div className="onboarding-complete-milestones" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 28 }}>
               {milestones.map((m, idx) => {
                 const Icon = m.icon;
                 return (
@@ -202,7 +202,7 @@ export function Screen11OnboardingComplete({
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div className="onboarding-complete-actions" style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <button
                 type="button"
                 id="eora-onboarding-finish"

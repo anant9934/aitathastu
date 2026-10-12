@@ -108,6 +108,7 @@ export interface Screen8ProfileInsightsProps {
   profiles?: Partial<Record<string, string>>;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
   isFresher?: boolean;
+  hasResumeExtraction?: boolean;
   isGalleryMode?: boolean;
   onNext: () => void;
   onBack: () => void;
@@ -195,6 +196,7 @@ export function Screen8ProfileInsights({
   profiles = {},
   discoveredResumeProfiles = {},
   isFresher = false,
+  hasResumeExtraction = false,
   isGalleryMode = false,
   onNext,
   onBack,
@@ -425,7 +427,7 @@ export function Screen8ProfileInsights({
       />
 
       <main
-        className="screen-body"
+        className="screen-body profile-insights-body"
         style={{
           position: "relative",
           zIndex: 1,
@@ -490,15 +492,15 @@ export function Screen8ProfileInsights({
                 gap: 6,
                 padding: "6px 12px",
                 borderRadius: 10,
-                background: "rgba(16, 185, 129, 0.1)",
-                border: "1px solid rgba(16, 185, 129, 0.25)",
-                color: "#059669",
+                background: hasResumeExtraction ? "rgba(16, 185, 129, 0.1)" : "rgba(100, 116, 139, 0.08)",
+                border: hasResumeExtraction ? "1px solid rgba(16, 185, 129, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+                color: hasResumeExtraction ? "#059669" : "#475569",
                 fontSize: 12.5,
                 fontWeight: 750,
               }}
             >
               <FileCheck size={14} />
-              <span>Resume Extracted</span>
+              <span>{hasResumeExtraction ? "Resume extracted" : "No CV added"}</span>
             </div>
 
             {connectedFootprints.length > 0 ? (
@@ -535,7 +537,7 @@ export function Screen8ProfileInsights({
                 }}
               >
                 <Globe size={14} />
-                <span>Stand-alone CV Extraction</span>
+                <span>No digital accounts connected</span>
               </div>
             )}
 
@@ -635,6 +637,7 @@ export function Screen8ProfileInsights({
 
         {/* Broad Two-Column Layout */}
         <div
+          className="profile-insights-grid"
           data-eora-id="eora-profile-insights"
           style={{
             display: "grid",
@@ -646,7 +649,7 @@ export function Screen8ProfileInsights({
           }}
         >
           {/* Left Vertical Menu with Intelligence Badges */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="profile-insights-nav" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {navSections.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -773,6 +776,7 @@ export function Screen8ProfileInsights({
 
           {/* Right Broad Profile Details Card with Dynamic Content based on Active Tab */}
           <div
+            className="profile-insights-detail"
             style={{
               background: "#FFFFFF",
               borderRadius: 24,
@@ -787,6 +791,7 @@ export function Screen8ProfileInsights({
             <div>
               {/* Profile Header Row */}
               <div
+                className="profile-insights-detail-header"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -1511,7 +1516,7 @@ export function Screen8ProfileInsights({
                     </div>
 
                     {/* Inline Quick Add Skill */}
-                    <form onSubmit={handleQuickAddSkill} style={{ display: "flex", gap: 6 }}>
+                    <form className="profile-insights-skills-form" onSubmit={handleQuickAddSkill} style={{ display: "flex", gap: 6 }}>
                       <input
                         type="text"
                         value={newSkillText}

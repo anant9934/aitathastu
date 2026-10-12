@@ -32,6 +32,8 @@ export function ExactScreensContainer({
   isGalleryMode = false,
 }: ExactScreensContainerProps) {
   const [currentScreen, setCurrentScreen] = useState<number>(initialScreen);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [draftSaveError, setDraftSaveError] = useState(false);
   // ── EORA wiring ─────────────────────────────────────────────────────────
   const eora = useEoraSafe();
   // Dedup refs — prevent firing success signals more than once per event
@@ -45,6 +47,10 @@ export function ExactScreensContainer({
     const step = screenNumberToOnboardingStep(currentScreen);
     eora.setOnboardingStep(step);
   }, [currentScreen, eora]);
+
+  React.useLayoutEffect(() => {
+    if (!isGalleryMode) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [currentScreen, isGalleryMode]);
 
   useEffect(() => {
     setCurrentScreen(initialScreen);
@@ -146,6 +152,13 @@ export function ExactScreensContainer({
           const draftData = await draftRes.json();
           if (active && draftData.draft) {
             const d = draftData.draft;
+            if (d.completed) {
+              window.location.replace("/student");
+              return;
+            }
+            const restoredScreen = d.currentScreen ??
+              (d.priorities?.length ? 5 : d.targetRole ? 3.5 : d.role ? 3.2 : d.name ? 3 : 2);
+            setCurrentScreen(restoredScreen);
             if (d.name) setName(d.name);
             if (d.role) setRole(d.role);
             if (d.targetRole) setTargetRole(d.targetRole);
@@ -208,6 +221,8 @@ export function ExactScreensContainer({
         }
       } catch {
         // Fallback gracefully to local state
+      } finally {
+        if (active) setDraftLoaded(true);
       }
     }
 
@@ -243,6 +258,11 @@ export function ExactScreensContainer({
     },
     [isGalleryMode]
   );
+
+  useEffect(() => {
+    if (!draftLoaded || isGalleryMode || currentScreen < 2 || currentScreen > 11) return;
+    void persistDraft({ currentScreen }).then((saved) => setDraftSaveError(!saved));
+  }, [currentScreen, draftLoaded, isGalleryMode, persistDraft]);
 
   const handleAcademicSave = async (data: AcademicDetailsData) => {
     setAcademic(data);
@@ -367,6 +387,7 @@ export function ExactScreensContainer({
 
   return (
     <div className="exact-screen-root" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {draftSaveError && <div role="alert" style={{ padding: "10px 20px", background: "#FEF2F2", color: "#991B1B", textAlign: "center" }}>Your onboarding progress could not be saved. Check your connection and try this step again.</div>}
       {/* Top sticky screen switcher toolbar for development/gallery review */}
       {isGalleryMode && (
         <ScreenNavigator
@@ -873,6 +894,7 @@ export function ExactScreensContainer({
             mobile={academic.mobile}
             goal={goal}
             skills={skills}
+            hasResumeExtraction={resumeReviewed.length > 0}
             educationEntries={educationEntries.length > 0 ? educationEntries : undefined}
             onToggleConfirmEducation={(institution, degree) => {
               setEducationEntries((prev) => {

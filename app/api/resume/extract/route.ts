@@ -198,7 +198,9 @@ export async function POST(request: Request) {
     let parsedDoc;
     try {
       parsedDoc = await parseResumeDocument(bytes, extension as "pdf" | "docx", {
-        enableOcr: !hasRenderUrl,
+        // The packaged Tesseract.js model can OCR these PDFs within the function
+        // budget. Use Render only when local OCR cannot recover readable text.
+        enableOcr: true,
         ocrTimeoutMs: 15000,
       });
     } catch {
@@ -212,9 +214,7 @@ export async function POST(request: Request) {
     const rawText = parsedDoc.text;
 
     // --- Render OCR Fallback ---
-    // Vercel serverless has no Tesseract binary. When local parsing yields empty or sparse text
-    // (scanned PDF, image-only PDF, broken encoding), forward to the Render Docker
-    // service which has Tesseract 5.5 installed and runs outside serverless constraints.
+    // If bundled Tesseract.js cannot recover text, try the Render service.
     let renderDocId: string | null = null;
     if (!rawText.trim() || rawText.replace(/\s+/g, "").length < 40) {
       if (!hasRenderUrl) {
@@ -431,8 +431,10 @@ export async function POST(request: Request) {
     }
 
     // --- Snapshot Persistence ---
+    let persistenceStep = "job stage";
     try {
       await SourceProcessingJobService.updateStage(jobId, personId, "persist");
+      persistenceStep = "candidate snapshot";
       await saveResumeCandidates(personId, documentId, extraction.extracted, rawText);
 
       // Persist durable document and blob in Neon PostgreSQL
@@ -448,6 +450,7 @@ export async function POST(request: Request) {
       // Synchronize Schema v2 profile to resumeDocuments table
       const { getDb, resumeDocuments } = await import("@/lib/db");
       const { eq } = await import("drizzle-orm");
+      persistenceStep = "document database";
       const db = await getDb();
 
       // Convert candidates into Schema v2 record groups for unified persistence
@@ -707,7 +710,11 @@ export async function POST(request: Request) {
         .where(eq(resumeDocuments.id, documentId))
         .catch(() => null);
 
-    } catch {
+    } catch (persistErr) {
+      console.error("Resume persistence failed", {
+        step: persistenceStep,
+        errorType: persistErr instanceof Error ? persistErr.name : typeof persistErr,
+      });
       return fail(
         "PERSIST_FAILED",
         "We could not save the extraction for review. Please retry or enter details manually.",

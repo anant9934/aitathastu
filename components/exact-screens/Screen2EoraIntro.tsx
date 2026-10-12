@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
@@ -21,6 +21,10 @@ export function Screen2EoraIntro({
   onBack,
 }: Screen2EoraIntroProps) {
   const [val, setVal] = useState(name || "");
+
+  useEffect(() => {
+    if (name) setVal((current) => current || name);
+  }, [name]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

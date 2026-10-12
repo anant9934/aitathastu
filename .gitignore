@@ -21,12 +21,14 @@
 .DS_Store
 *.pem
 *.traineddata
+!/eng.traineddata
 Anant-Kumar-Resume.pdf
 Resumes PDF/
 resume 2/
 benchmarks/
 scripts/reproduce*
 scripts/test-live*
+!scripts/test-live-production-extract.ts
 
 # debug
 *.log

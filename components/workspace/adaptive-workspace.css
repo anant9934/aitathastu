@@ -1,0 +1,140 @@
+.adaptive-workspace {
+  min-height: 100vh;
+  background: radial-gradient(circle at 85% -10%, rgba(120, 101, 245, .12), transparent 30%), var(--site-paper) !important;
+  color: var(--site-ink) !important;
+  font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif !important;
+}
+
+.adaptive-workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  background: rgba(8, 9, 11, .96) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .1) !important;
+  box-shadow: 0 12px 34px rgba(8, 9, 11, .12);
+  backdrop-filter: blur(18px);
+}
+
+.adaptive-workspace-header > a {
+  color: var(--site-paper) !important;
+  font-family: "Space Grotesk", "DM Sans", sans-serif;
+  letter-spacing: -.035em;
+}
+
+.adaptive-workspace-nav a {
+  color: #dce6fa;
+  padding: 8px 3px;
+  transition: color var(--dur-hover, 240ms) ease;
+}
+
+.adaptive-workspace-nav a:hover,
+.adaptive-workspace-nav a:focus-visible { color: var(--site-cyan); }
+
+.adaptive-workspace-customize {
+  color: #231b13 !important;
+  border-color: var(--site-gold) !important;
+  background: linear-gradient(120deg, var(--site-gold), var(--site-amber)) !important;
+  border-radius: 999px !important;
+  padding: 9px 14px !important;
+  box-shadow: 0 5px 18px rgba(244, 154, 71, .16);
+  transition: transform 240ms cubic-bezier(.22, 1, .36, 1), box-shadow 240ms ease;
+}
+
+.adaptive-workspace-customize:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(244, 154, 71, .28);
+}
+
+.adaptive-workspace-main > div:first-child h1,
+.adaptive-workspace-card h2,
+.adaptive-workspace-dialog h2,
+.adaptive-workspace-dialog h3 {
+  font-family: "Space Grotesk", "DM Sans", sans-serif;
+}
+
+.adaptive-workspace-main > div:first-child span { color: #6753da !important; }
+.adaptive-workspace-main > div:first-child p { color: var(--site-muted) !important; }
+
+.adaptive-workspace-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.adaptive-workspace-card {
+  max-width: none !important;
+  min-width: 0;
+  background: #fff !important;
+  border: 1px solid var(--site-border) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 12px 34px rgba(23, 23, 31, .06) !important;
+  transition: transform 240ms cubic-bezier(.22, 1, .36, 1), box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.adaptive-workspace-card:first-child {
+  grid-column: 1 / -1;
+  background: linear-gradient(120deg, #fff 55%, #f4f1ea) !important;
+  border-color: rgba(201, 164, 109, .45) !important;
+}
+
+.adaptive-workspace-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(120, 101, 245, .4) !important;
+  box-shadow: 0 22px 50px rgba(23, 23, 31, .11) !important;
+}
+
+.adaptive-workspace-card > div:first-child > span:first-child,
+.adaptive-workspace-eora > span:first-child { color: #6552d2 !important; }
+
+.adaptive-workspace-card:first-child > div:first-child > span:last-child {
+  color: #271f15 !important;
+  background: linear-gradient(120deg, var(--site-gold), var(--site-amber)) !important;
+}
+
+.adaptive-workspace-card p,
+.adaptive-workspace-card li { overflow-wrap: anywhere; }
+.adaptive-workspace-card > a { color: #5f4cc8 !important; }
+.adaptive-workspace-card > a:hover { text-decoration: underline !important; }
+
+.adaptive-workspace-eora {
+  color: #f4f4f2;
+  background: linear-gradient(125deg, var(--site-obsidian), var(--site-indigo)) !important;
+  border: 1px solid rgba(201, 164, 109, .28) !important;
+  box-shadow: 0 20px 45px rgba(8, 9, 11, .17) !important;
+}
+.adaptive-workspace-eora > span:first-child { color: var(--site-gold) !important; }
+.adaptive-workspace-eora p { color: #e0dfeb; }
+
+.adaptive-workspace-overlay {
+  backdrop-filter: blur(8px);
+  animation: workspace-fade 180ms ease-out both;
+}
+.adaptive-workspace-dialog {
+  background: var(--site-paper) !important;
+  color: var(--site-ink);
+  border: 1px solid var(--site-border);
+  box-shadow: 0 35px 90px rgba(8, 9, 11, .3);
+  animation: workspace-dialog-in 260ms cubic-bezier(.22, 1, .36, 1) both;
+}
+.adaptive-workspace-dialog button:not(:disabled):hover { border-color: var(--site-violet) !important; }
+.adaptive-workspace-dialog button:disabled { opacity: .45; cursor: not-allowed; }
+
+@keyframes workspace-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes workspace-dialog-in { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+@media (max-width: 700px) {
+  .adaptive-workspace-header { position: relative; }
+  .adaptive-workspace-nav { width: 100%; gap: 10px 15px !important; }
+  .adaptive-workspace-nav a { font-size: 12px; }
+  .adaptive-workspace-customize { width: 100%; }
+  .adaptive-workspace-grid { grid-template-columns: minmax(0, 1fr); }
+  .adaptive-workspace-card:first-child { grid-column: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adaptive-workspace-overlay,
+  .adaptive-workspace-dialog { animation: none !important; }
+  .adaptive-workspace-card,
+  .adaptive-workspace-customize { transition: none !important; }
+  .adaptive-workspace-card:hover,
+  .adaptive-workspace-customize:hover { transform: none; }
+}

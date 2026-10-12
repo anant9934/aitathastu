@@ -9,6 +9,7 @@ import { Screen2EoraIntro } from "./Screen2EoraIntro";
 import { Screen3ChooseRole } from "./Screen3ChooseRole";
 import { Screen3bAiMlDirection } from "./Screen3bAiMlDirection";
 import { Screen3aPriorities } from "./Screen3aPriorities";
+import { FacultySetup, type FacultyDetails } from "./FacultySetup";
 import { Screen4AcademicDetails, type AcademicDetailsData } from "./Screen4AcademicDetails";
 import { Screen5ResumeUpload, type ReviewedResumeClaim } from "./Screen5ResumeUpload";
 import { Screen6DigitalFootprints } from "./Screen6DigitalFootprints";
@@ -51,7 +52,8 @@ export function ExactScreensContainer({
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [name, setName] = useState<string>(isGalleryMode ? "Rahul Sharma" : "");
-  const [role, setRole] = useState<string>("student");
+  const [role, setRole] = useState<string>("");
+  const [facultyError, setFacultyError] = useState("");
   const [targetRole, setTargetRole] = useState<string>(isGalleryMode ? "Generative AI Engineer" : "");
   const [targetRoleId, setTargetRoleId] = useState<string>(isGalleryMode ? "genai_engineer" : "");
   const [goal, setGoal] = useState<string>(isGalleryMode ? "Get an AI/ML internship" : "");
@@ -333,6 +335,18 @@ export function ExactScreensContainer({
     }
   };
 
+  const handleFacultyFinish = async (details: FacultyDetails) => {
+    if (isGalleryMode) { setCurrentScreen(12); return; }
+    setIsSubmitting(true);
+    setFacultyError("");
+    try {
+      const response = await fetch("/api/onboarding-v2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: 2, role: "faculty", name: details.name, institution: details.institution, specialization: details.department, email: details.email, password: details.password, priorities, primaryPriority: priorities[0] }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not finish faculty setup.");
+      window.location.assign("/faculty");
+    } catch (error) { setFacultyError(error instanceof Error ? error.message : "Could not finish faculty setup."); setIsSubmitting(false); }
+  };
+
   const handleJumpToStep = (step: number) => {
     const stepMap: Record<number, number> = {
       1: 3,
@@ -394,9 +408,11 @@ export function ExactScreensContainer({
             selectedRole={role}
             onSelectRole={(r) => {
               setRole(r);
-              persistDraft({ role: r });
+              setPriorities([]);
+              setPrimaryPriority(undefined);
+              persistDraft({ role: r, priorities: [], primaryPriority: null });
             }}
-            onNext={() => setCurrentScreen(3.2)}
+            onNext={() => setCurrentScreen(role === "faculty" ? 3.5 : 3.2)}
             onBack={() => setCurrentScreen(2)}
             onJumpToStep={handleJumpToStep}
           />
@@ -432,6 +448,7 @@ export function ExactScreensContainer({
         {/* STEP 3: Priorities / Interests */}
         {currentScreen === 3.5 && (
           <Screen3aPriorities
+            role={role === "faculty" ? "faculty" : "student"}
             initialPriorities={priorities}
             initialPrimary={primaryPriority}
             onSavePriorities={(selected, primary) => {
@@ -439,11 +456,13 @@ export function ExactScreensContainer({
               setPrimaryPriority(primary);
               persistDraft({ priorities: selected, primaryPriority: primary ?? null });
             }}
-            onNext={() => setCurrentScreen(5)}
-            onBack={() => setCurrentScreen(3.2)}
+            onNext={() => setCurrentScreen(role === "faculty" ? 3.7 : 5)}
+            onBack={() => setCurrentScreen(role === "faculty" ? 3 : 3.2)}
             onJumpToStep={handleJumpToStep}
           />
         )}
+
+        {currentScreen === 3.7 && <FacultySetup initial={{ name, institution: academic.institution || "", department: academic.department || "", email: academic.email || "", password: academic.password || "" }} onBack={() => setCurrentScreen(3.5)} onSubmit={handleFacultyFinish} submitting={isSubmitting} error={facultyError} />}
 
         {/* STEP 4/5: Academic Details (Conditional Missing Details or Manual Profile) */}
         {currentScreen === 4 && (
@@ -1092,6 +1111,14 @@ export function ExactScreensContainer({
           <Screen9SkillsMap
             skills={skills}
             suggestedSkills={Array.from(new Set(projects.filter((project) => project.sources.includes("github")).flatMap((project) => project.technologies)))}
+            projects={projects}
+            experiences={experienceEntries}
+            educationEntries={educationEntries}
+            achievements={achievementEntries}
+            profiles={profiles}
+            resumeFileName={resumeFileName}
+            resumeReviewed={resumeReviewed}
+            goal={goal}
             isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(10)}
             onBack={() => setCurrentScreen(8)}

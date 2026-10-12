@@ -1,0 +1,249 @@
+{
+  "results": [
+    {
+      "route": "/",
+      "width": 320,
+      "status": 200,
+      "overflow": 0,
+      "heading": "You imagine.\n        AI makes it\n        happen.",
+      "errors": []
+    },
+    {
+      "route": "/",
+      "width": 390,
+      "status": 200,
+      "overflow": 0,
+      "heading": "You imagine.\n        AI makes it\n        happen.",
+      "errors": []
+    },
+    {
+      "route": "/",
+      "width": 768,
+      "status": 200,
+      "overflow": 0,
+      "heading": "You imagine.\n        AI makes it\n        happen.",
+      "errors": []
+    },
+    {
+      "route": "/",
+      "width": 1024,
+      "status": 200,
+      "overflow": 0,
+      "heading": "You imagine.\n        AI makes it\n        happen.",
+      "errors": []
+    },
+    {
+      "route": "/",
+      "width": 1440,
+      "status": 200,
+      "overflow": 0,
+      "heading": "You imagine.\n        AI makes it\n        happen.",
+      "errors": []
+    },
+    {
+      "route": "/sign-in",
+      "width": 320,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Welcome back to Tathastu",
+      "errors": []
+    },
+    {
+      "route": "/sign-in",
+      "width": 390,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Welcome back to Tathastu",
+      "errors": []
+    },
+    {
+      "route": "/sign-in",
+      "width": 768,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Welcome back to Tathastu",
+      "errors": []
+    },
+    {
+      "route": "/sign-in",
+      "width": 1024,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Welcome back to Tathastu",
+      "errors": []
+    },
+    {
+      "route": "/sign-in",
+      "width": 1440,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Welcome back to Tathastu",
+      "errors": []
+    },
+    {
+      "route": "/sign-up",
+      "width": 320,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Create your account",
+      "errors": []
+    },
+    {
+      "route": "/sign-up",
+      "width": 390,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Create your account",
+      "errors": []
+    },
+    {
+      "route": "/sign-up",
+      "width": 768,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Create your account",
+      "errors": []
+    },
+    {
+      "route": "/sign-up",
+      "width": 1024,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Create your account",
+      "errors": []
+    },
+    {
+      "route": "/sign-up",
+      "width": 1440,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Create your account",
+      "errors": []
+    },
+    {
+      "route": "/onboarding",
+      "width": 320,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Let's get to know you.",
+      "errors": []
+    },
+    {
+      "route": "/onboarding",
+      "width": 390,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Let's get to know you.",
+      "errors": []
+    },
+    {
+      "route": "/onboarding",
+      "width": 768,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Let's get to know you.",
+      "errors": []
+    },
+    {
+      "route": "/onboarding",
+      "width": 1024,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Let's get to know you.",
+      "errors": []
+    },
+    {
+      "route": "/onboarding",
+      "width": 1440,
+      "status": 200,
+      "overflow": 0,
+      "heading": "Let's get to know you.",
+      "errors": []
+    },
+    {
+      "route": "/student",
+      "width": 320,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/student",
+      "width": 390,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/student",
+      "width": 768,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/student",
+      "width": 1024,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/student",
+      "width": 1440,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/faculty",
+      "width": 320,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/faculty",
+      "width": 390,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/faculty",
+      "width": 768,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/faculty",
+      "width": 1024,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    },
+    {
+      "route": "/faculty",
+      "width": 1440,
+      "status": 200,
+      "overflow": 0,
+      "heading": "",
+      "errors": []
+    }
+  ],
+  "authValidation": {
+    "signup": 400,
+    "signin": 400,
+    "session": 200
+  }
+}

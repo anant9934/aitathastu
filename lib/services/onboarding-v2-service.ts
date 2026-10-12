@@ -6,6 +6,7 @@ import { setActiveGoal } from "@/lib/repositories/goal-repository";
 import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
 import { validateReviewedResumeClaims } from "@/lib/services/resume-review-service";
+import { validatePurposes } from "@/lib/domain/adaptive-workspace";
 
 export async function readOnboardingDraft(personId: string) {
   const db = await getDb();
@@ -17,6 +18,14 @@ export async function writeOnboardingDraft(personId: string, input: unknown) {
   const raw = input && typeof input === "object" && !Array.isArray(input)
     ? input as Record<string, unknown>
     : {};
+  if ("role" in raw && raw.role !== "student" && raw.role !== "faculty") throw new Error("Choose Student or Faculty.");
+  if ("priorities" in raw) {
+    const previous = await readOnboardingDraft(personId);
+    const role = raw.role || previous?.role;
+    if (role !== "student" && role !== "faculty") throw new Error("Choose a role before choosing purposes.");
+    if (!Array.isArray(raw.priorities) || raw.priorities.length > 3) throw new Error("Choose up to three purposes.");
+    if (raw.priorities.length) validatePurposes(role, raw.priorities);
+  }
   const normalized = safeDraft(raw);
   const patch: Record<string, unknown> = {};
   for (const key of Object.keys(raw)) {
@@ -64,10 +73,21 @@ function allowedProfileUrl(source: string, value: string) {
 
 export async function completeOnboarding(personId: string, input: unknown) {
   const draft: OnboardingDraft = safeDraft(input);
-  await validateReviewedResumeClaims(personId, draft.resumeReviewed);
-  if (draft.role !== "student") {
-    throw new Error("This role's onboarding journey is coming soon. Please choose Student to continue.");
+  if (draft.role !== "student" && draft.role !== "faculty") throw new Error("Choose Student or Faculty to continue.");
+  const rankedPurposes = validatePurposes(draft.role, draft.priorities);
+  if (draft.primaryPriority && draft.primaryPriority !== rankedPurposes[0]) throw new Error("Primary purpose must be first in your ranking.");
+  draft.priorities = rankedPurposes;
+  draft.primaryPriority = rankedPurposes[0];
+  if (draft.role === "faculty") {
+    if (!draft.name.trim() || !draft.institution?.trim()) throw new Error("Add your name and institution to request faculty access.");
+    await updatePersonProfileData(personId, { displayName: draft.name, institution: draft.institution, specialization: draft.specialization || undefined, headline: "Faculty access requested" });
+    const db = await getDb();
+    await db.insert(userPreferences).values({ id: crypto.randomUUID(), personId, primaryPriority: rankedPurposes[0], secondaryPriorities: rankedPurposes.slice(1), preferenceSource: "user_selected", metadata: { requestedRole: "faculty", facultyAccessStatus: "pending", purposeVersion: 4 }, updatedAt: new Date() }).onConflictDoUpdate({ target: userPreferences.personId, set: { primaryPriority: rankedPurposes[0], secondaryPriorities: rankedPurposes.slice(1), preferenceSource: "user_selected", metadata: sql`coalesce(${userPreferences.metadata}, '{}'::jsonb) || ${JSON.stringify({ requestedRole: "faculty", facultyAccessStatus: "pending", purposeVersion: 4 })}::jsonb`, updatedAt: new Date() } });
+    draft.completed = true;
+    await writeOnboardingDraft(personId, draft);
+    return draft;
   }
+  await validateReviewedResumeClaims(personId, draft.resumeReviewed);
   const existingProfile = await getPersonProfile(personId);
 
   const studentName = draft.name?.trim() || "";
@@ -371,6 +391,8 @@ export async function completeOnboarding(personId: string, input: unknown) {
       customGoalText: draft.customGoalText,
     }).filter(([, value]) => typeof value === "string" && value.trim().length > 0)
   );
+  directionMetadata.requestedRole = "student";
+  directionMetadata.purposeVersion = "4";
 
   if (primary || Object.keys(directionMetadata).length > 0) await db
     .insert(userPreferences)

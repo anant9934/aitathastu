@@ -67,8 +67,9 @@ export async function PUT(request: Request) {
       });
     }
     return response;
-  } catch {
-    return NextResponse.json({ error: "We couldn't save your progress. Please try again." }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "We couldn't save your progress. Please try again.";
+    return NextResponse.json({ error: message }, { status: /role|purpose|choose/i.test(message) ? 400 : 500 });
   }
 }
 

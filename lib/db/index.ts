@@ -121,7 +121,8 @@ export async function getDb(): Promise<TathastuDb> {
 
       const isTest = process.env.NODE_ENV === "test";
       const isMemory = process.env.PGLITE_IN_MEMORY === "true";
-      const dbPath = isTest || isMemory ? undefined : path.join(process.cwd(), ".pgdata");
+      const dbPath = isTest || isMemory ? undefined : path.resolve(process.env.PGLITE_DATA_DIR || path.join(process.cwd(), ".pgdata"));
+      if (dbPath) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
       if (dbPath && fs.existsSync(dbPath)) {
         const pidFile = path.join(dbPath, "postmaster.pid");

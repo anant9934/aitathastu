@@ -533,7 +533,7 @@ export default function SkillsPage() {
             }}
           >
             {/* Relevance filter */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", minWidth: 0, alignItems: "center", gap: 6 }}>
               <span
                 style={{
                   fontSize: 12,
@@ -579,7 +579,7 @@ export default function SkillsPage() {
             {/* Search Input */}
             <div
               data-eora-id="eora-skills-search"
-              style={{ position: "relative", minWidth: 260 }}
+              style={{ position: "relative", minWidth: "min(260px, 100%)", width: "min(100%, 320px)" }}
             >
               <Search
                 size={15}
@@ -679,7 +679,7 @@ export default function SkillsPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 330px), 1fr))",
               gap: 16,
             }}
           >
@@ -816,7 +816,7 @@ export default function SkillsPage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
                 gap: 12,
               }}
             >

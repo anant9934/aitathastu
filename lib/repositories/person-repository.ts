@@ -136,7 +136,7 @@ export async function updateUserPreferences(
         personId,
         reducedGuidance: prefs.reducedGuidance ?? false,
         eoraDismissed: prefs.eoraDismissed ?? false,
-        primaryPriority: prefs.primaryPriority || "learning",
+        primaryPriority: prefs.primaryPriority || null,
         secondaryPriorities: prefs.secondaryPriorities || [],
         metadata: prefs.metadata || {},
         preferenceSource: "user_selected",

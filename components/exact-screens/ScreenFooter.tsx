@@ -55,7 +55,7 @@ export function ScreenFooter({
       }}
     >
       {/* 1. Back Button */}
-      <div style={{ flex: "0 0 100px" }}>
+      <div className="stepper-back-wrap" style={{ flex: "0 0 100px" }}>
         {showBack && onBack ? (
           <button
             type="button"
@@ -99,6 +99,7 @@ export function ScreenFooter({
 
       {/* 2. Interactive Center Stepper & Progress Bar */}
       <div
+        className="stepper-center"
         style={{
           flex: 1,
           maxWidth: 420,
@@ -236,7 +237,7 @@ export function ScreenFooter({
       </div>
 
       {/* 3. Next Button */}
-      <div style={{ flex: "0 0 130px", display: "flex", justifyContent: "flex-end" }}>
+      <div className="stepper-next-wrap" style={{ flex: "0 0 130px", display: "flex", justifyContent: "flex-end" }}>
         {showNext && onNext ? (
           <button
             type="button"
@@ -282,6 +283,7 @@ export function ScreenFooter({
           <div style={{ width: 130 }} />
         )}
       </div>
+      <style jsx>{`@media(max-width:700px){.screen-stepper-footer{display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;gap:14px!important}.stepper-back-wrap{grid-column:1;grid-row:1;flex:none!important}.stepper-next-wrap{grid-column:2;grid-row:1;flex:none!important;justify-content:flex-end!important}.stepper-center{grid-column:1/-1;grid-row:2;max-width:none!important;width:100%;min-width:0}.btn-purple-next{padding:10px 16px!important;font-size:13px!important}}`}</style>
     </footer>
   );
 }

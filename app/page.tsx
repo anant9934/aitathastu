@@ -1,11 +1,11 @@
-import { ExactScreensContainer } from "@/components/exact-screens/ExactScreensContainer";
+import { EcosystemLanding } from "@/components/landing/EcosystemLanding";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "AI Tathastu — You imagine. AI makes it happen.",
-  description: "An intelligent platform that understands your journey, connects your skills, projects and achievements, and opens doors to real opportunities.",
+  description: "Explore the AI Tathastu ecosystem for learning, building, collaboration and growth, with EORA helping you find your next step.",
 };
 
 export default function Home() {
-  return <ExactScreensContainer initialScreen={1} isGalleryMode={false} />;
+  return <EcosystemLanding />;
 }

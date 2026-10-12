@@ -25,12 +25,15 @@ import { getProjectsByPersonId } from "@/lib/repositories/project-repository";
 import { getExternalConnections } from "@/lib/repositories/connection-repository";
 import { generatePersonalizedRoadmap } from "@/lib/domain/roadmap";
 import { normalizeInterest } from "@/lib/domain/personalization-engine";
-import type { CanonicalInterest } from "@/lib/domain/personalization-engine";
+import { validPurposeIds } from "@/lib/domain/adaptive-workspace";
+import { can } from "@/lib/auth/rbac";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export interface EoraContextResponse {
+  role: "student" | "faculty";
+  facultyAuthorized: boolean;
   personId: string;
   displayName: string;
   activeGoalTitle: string | null;
@@ -83,18 +86,13 @@ export async function GET() {
 
     // ── Priorities ─────────────────────────────────────────────────────────
     const rawMetadata = (prefs?.metadata as Record<string, unknown>) || {};
+    const facultyAuthorized = await can(personId, "student.verify_skill");
+    const role = rawMetadata.requestedRole === "faculty" || facultyAuthorized ? "faculty" : "student";
     const rawPrimary = prefs?.primaryPriority || (rawMetadata.primaryPriority as string) || null;
-    const primaryPriority: CanonicalInterest | null = rawPrimary
-      ? normalizeInterest(rawPrimary)
-      : null;
+    const rankedPurposes = validPurposeIds(role, [rawPrimary, ...(Array.isArray(prefs?.secondaryPriorities) ? prefs.secondaryPriorities : [])]);
+    const primaryPriority: string | null = rankedPurposes[0] || null;
 
-    const rawSecondary: string[] =
-      (prefs?.secondaryPriorities as string[]) ||
-      (rawMetadata.secondaryPriorities as string[]) ||
-      [];
-    const secondaryPriorities: string[] = rawSecondary
-      .map((s) => normalizeInterest(s))
-      .filter((s) => s !== primaryPriority);
+    const secondaryPriorities: string[] = rankedPurposes.slice(1);
 
     // ── Target role ────────────────────────────────────────────────────────
     const targetRole =
@@ -104,7 +102,7 @@ export async function GET() {
     let nextMilestoneTitle: string | null = null;
     let nextMilestoneDescription: string | null = null;
 
-    if (activeGoal?.title) {
+    if (role === "student" && activeGoal?.title) {
       try {
         const evidencedSkills = skills
           .filter((e) => e.verificationStatus === "verified")
@@ -118,7 +116,7 @@ export async function GET() {
           {
             targetRole: targetRole ?? undefined,
             specificGoal: activeGoal.title,
-            primaryPriority: primaryPriority ?? undefined,
+            primaryPriority: primaryPriority ? normalizeInterest(primaryPriority) : undefined,
             confirmedProjectCount: confirmedProjects.length,
           }
         );
@@ -144,6 +142,8 @@ export async function GET() {
     );
 
     const response: EoraContextResponse = {
+      role,
+      facultyAuthorized,
       personId,
       displayName: auth.person.displayName,
       activeGoalTitle: activeGoal?.title ?? null,

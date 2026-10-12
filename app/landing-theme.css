@@ -1,0 +1,189 @@
+/* Shared product theme derived from the ecosystem landing page. */
+:root {
+  --site-obsidian: #08090b;
+  --site-midnight: #0b1020;
+  --site-indigo: #17132d;
+  --site-paper: #faf9f6;
+  --site-warm-paper: #f4f1ea;
+  --site-ink: #17171f;
+  --site-muted: #69707e;
+  --site-border: #e4e0dc;
+  --site-gold: #c9a46d;
+  --site-amber: #f49a47;
+  --site-cyan: #66d9f7;
+  --site-violet: #7865f5;
+  --site-orchid: #e37bc9;
+  --site-focus: rgba(102, 217, 247, .28);
+  --bg: var(--site-paper);
+  --ink: var(--site-ink);
+  --muted: var(--site-muted);
+  --violet: var(--site-violet);
+  --violet-dark: #5d4be0;
+  --line: var(--site-border);
+}
+
+body {
+  background: var(--site-paper);
+  color: var(--site-ink);
+  font-family: "DM Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+button, input, textarea, select { font-family: inherit; }
+:focus-visible { outline-color: var(--site-cyan); }
+
+@keyframes site-page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes site-shimmer {
+  0% { background-position: 180% 0; }
+  100% { background-position: -180% 0; }
+}
+@keyframes site-orbit-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(102,217,247,0); }
+  50% { box-shadow: 0 0 0 6px rgba(102,217,247,.10); }
+}
+
+/* Shared motion language for product pages. Landing-page motion remains scoped to its own root. */
+body:not(:has(.ecosystem-landing)) .student-workspace-main,
+body:not(:has(.ecosystem-landing)) .exact-screen-wrapper,
+body:not(:has(.ecosystem-landing)) .auth-main {
+  animation: site-page-in .5s cubic-bezier(.22,1,.36,1) both;
+}
+.workspace-card, .next-action-card, .project-card, .footprint-card, .role-card,
+.evidence-detail-card, .preset-card, .academic-form-group, .dash-metric-card {
+  transition: transform 240ms cubic-bezier(.22,1,.36,1), box-shadow 240ms ease, border-color 240ms ease;
+}
+.workspace-card:hover, .next-action-card:hover, .project-card:hover, .footprint-card:hover,
+.role-card:hover, .evidence-detail-card:hover, .preset-card:hover, .dash-metric-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(120,101,245,.42) !important;
+  box-shadow: 0 22px 48px rgba(23,23,31,.12) !important;
+}
+.button-primary, .btn-purple-next, .ws-btn-primary, .landing-btn-getstarted {
+  background-image: linear-gradient(110deg, var(--site-violet), #5c47d6 46%, var(--site-cyan));
+  background-size: 180% 100%;
+  transition: transform 220ms ease, box-shadow 220ms ease, background-position 420ms ease;
+}
+.button-primary:hover, .btn-purple-next:hover, .ws-btn-primary:hover, .landing-btn-getstarted:hover {
+  background-position: 100% 0;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px rgba(120,101,245,.28);
+}
+.button-primary:focus-visible, .btn-purple-next:focus-visible, .ws-btn-primary:focus-visible { animation: site-orbit-pulse 1.6s ease-in-out infinite; }
+
+/* Make utility routes that use Tailwind or inline paper backgrounds share the same frame. */
+body:not(:has(.ecosystem-landing)) .min-h-screen,
+body:not(:has(.ecosystem-landing)) [style*="#F9F8F5"],
+body:not(:has(.ecosystem-landing)) [style*="#f9f8f5"] {
+  background: radial-gradient(circle at 88% 0%, rgba(120,101,245,.10), transparent 28%), var(--site-paper) !important;
+  color: var(--site-ink) !important;
+}
+body:not(:has(.ecosystem-landing)) .min-h-screen > header,
+body:not(:has(.ecosystem-landing)) .min-h-screen > div > header {
+  background: rgba(250,249,246,.96) !important;
+  border-color: var(--site-border) !important;
+  color: var(--site-ink) !important;
+  backdrop-filter: blur(16px);
+}
+body:not(:has(.ecosystem-landing)) .min-h-screen > header a,
+body:not(:has(.ecosystem-landing)) .min-h-screen > div > header a { color: var(--site-ink) !important; }
+
+/* The gallery dashboard uses its own shell vocabulary. Bring it into the same system. */
+.dash-shell { background: var(--site-paper) !important; color: var(--site-ink); }
+.dash-sidebar { background: var(--site-obsidian) !important; border-color: rgba(255,255,255,.10) !important; }
+.dash-sidebar-brand, .dash-nav-item { color: #dce6fa !important; }
+.dash-nav-item:hover, .dash-nav-item.active { background: rgba(120,101,245,.24) !important; color: #fff !important; }
+.dash-topbar { background: rgba(250,249,246,.92) !important; border-color: var(--site-border) !important; }
+.dash-hero-banner { background: linear-gradient(125deg, var(--site-indigo), var(--site-midnight)) !important; }
+.dash-hero-title, .dash-section-title { font-family: "Space Grotesk", "DM Sans", sans-serif; }
+.dash-metric-card { background: #fff !important; border-color: var(--site-border) !important; }
+
+/* Forms, modals and drawers should feel like the same product wherever they appear. */
+.modal-panel, .drawer-panel, .ws-eora-card { border-color: var(--site-border) !important; background: rgba(250,249,246,.98) !important; box-shadow: 0 30px 80px rgba(8,9,11,.22) !important; }
+.modal-overlay, .drawer-overlay { background: rgba(8,9,11,.56) !important; backdrop-filter: blur(8px); }
+.modal-eyebrow, .drawer-eyebrow, .card-eyebrow, .hero-eyebrow { color: #6353dc !important; }
+.modal-title, .drawer-title, .card-heading, .hero-greeting-title { font-family: "Space Grotesk", "DM Sans", sans-serif; color: var(--site-ink); }
+.search-main-input, .custom-goal-input, .academic-form-input, .academic-form-select { background: #fff !important; border-color: var(--site-border) !important; color: var(--site-ink) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Auth is the first transition from the landing page into the product. */
+.auth-page-container {
+  min-height: 100vh;
+  background: radial-gradient(circle at 18% 12%, rgba(120, 101, 245, .16), transparent 30%),
+    radial-gradient(circle at 86% 84%, rgba(102, 217, 247, .10), transparent 28%), var(--site-midnight);
+  color: var(--site-paper);
+}
+.auth-nav { background: rgba(8, 9, 11, .82); border-color: rgba(255,255,255,.10); }
+.auth-nav .brand { color: var(--site-paper); }
+.auth-nav .brand-mark { background: linear-gradient(135deg, var(--site-gold), var(--site-amber)); color: var(--site-obsidian); }
+.auth-nav .brand-text small { color: #b8bfd2; }
+.auth-back-link { color: #b8bfd2; }
+.auth-back-link:hover { color: var(--site-cyan); }
+.auth-card { background: rgba(250,249,246,.98); border-color: rgba(255,255,255,.18); box-shadow: 0 30px 80px rgba(0,0,0,.34); }
+.auth-eyebrow, .auth-link { color: #6353dc; }
+.auth-title, .auth-label { color: var(--site-ink); }
+.auth-subtitle, .auth-footer-prompt { color: var(--site-muted); }
+.auth-input { background: #fff; border-color: var(--site-border); color: var(--site-ink); }
+.auth-input:focus { border-color: var(--site-violet); box-shadow: 0 0 0 3px rgba(120,101,245,.18); }
+.auth-submit-btn { background: linear-gradient(120deg, var(--site-violet), #5e48d9); }
+.auth-submit-btn:hover { background: linear-gradient(120deg, #6957e9, #4f3cc8); }
+.auth-card .auth-google-btn { background: #fff !important; border: 1px solid var(--site-border) !important; color: var(--site-ink) !important; }
+.auth-card .auth-google-btn:hover { border-color: var(--site-violet) !important; box-shadow: 0 7px 22px rgba(23,23,31,.09); }
+.auth-eora-aside { border-color: var(--site-border); }
+.auth-eora-quote { color: var(--site-muted); }
+
+/* Onboarding and exact screens use the landing page's paper surface and type scale. */
+.exact-screen-wrapper,
+.onboarding-page {
+  background: radial-gradient(circle at 84% 8%, rgba(120,101,245,.12), transparent 30%), var(--site-paper) !important;
+  color: var(--site-ink);
+  font-family: "DM Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.screen-nav-bar, .screen-header-bar { background: rgba(250,249,246,.92); border-color: var(--site-border); }
+.screen-nav-title, .screen-header-bar { color: var(--site-ink); }
+.screen-nav-pill, .screen-nav-btn { border-color: var(--site-border); background: #fff; color: var(--site-muted); }
+.screen-nav-pill.active, .screen-nav-btn.primary { background: var(--site-violet); border-color: var(--site-violet); }
+.onboarding-shell { background: #fff; border-color: var(--site-border); box-shadow: 0 30px 70px rgba(23,23,31,.12); }
+.onboarding-character { background: radial-gradient(circle at 50% 40%, rgba(120,101,245,.22), rgba(102,217,247,.08) 38%, var(--site-warm-paper) 78%); }
+
+/* Student and faculty workspace surfaces. */
+.student-workspace-root {
+  background: var(--site-paper);
+  color: var(--site-ink);
+}
+.student-topbar {
+  background: rgba(8,9,11,.94);
+  border-bottom-color: rgba(255,255,255,.10);
+}
+.student-topbar .topbar-brand-link,
+.student-topbar .profile-name-text,
+.student-topbar .topbar-left { color: var(--site-paper); }
+.student-topbar .workspace-badge { background: rgba(120,101,245,.20); color: #c7c0ff; }
+.topbar-search-trigger { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); color: #aab4c8; }
+.topbar-search-trigger:hover { background: rgba(255,255,255,.12); border-color: rgba(102,217,247,.55); }
+.search-kbd { background: rgba(255,255,255,.12); color: #c7cfde; }
+.utility-icon-btn, .topbar-profile-chip { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.14); color: #dce6fa; }
+.utility-icon-btn:hover, .topbar-profile-chip:hover { background: rgba(120,101,245,.24); border-color: rgba(120,101,245,.60); }
+.student-sidebar { background: var(--site-warm-paper); border-right-color: var(--site-border); }
+.sidebar-nav-item { color: var(--site-muted); }
+.sidebar-nav-item:hover, .sidebar-nav-item.active { background: rgba(120,101,245,.12); color: #5142c8; }
+.student-workspace-main { background: var(--site-paper); }
+.workspace-card { border-color: var(--site-border) !important; background: #fff !important; box-shadow: 0 18px 45px rgba(23,23,31,.07) !important; }
+.workspace-card h1, .workspace-card h2, .workspace-card h3 { color: var(--site-ink); }
+.workspace-card p, .workspace-card small { color: var(--site-muted); }
+.workspace-card button, .workspace-card a { accent-color: var(--site-violet); }
+
+/* Verification and utility pages inherit the same paper, border and accent language. */
+select, input, textarea { border-color: var(--site-border); }
+button:hover { border-color: rgba(120,101,245,.48); }
+.site-panel, .panel, .card { border-color: var(--site-border); }
+
+@media (max-width: 700px) {
+  .student-sidebar { background: var(--site-paper); }
+  .topbar-center { display: none; }
+  .auth-card { box-shadow: 0 18px 48px rgba(0,0,0,.24); }
+}

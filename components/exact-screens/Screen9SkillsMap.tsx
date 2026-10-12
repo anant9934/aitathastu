@@ -1,14 +1,62 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { CheckCircle2, Sparkles, Zap, ShieldCheck, Layers, ArrowUpRight, Cpu } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import {
+  BrainCircuit,
+  Sparkles,
+  Layers,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  FileCheck,
+  FolderGit2,
+  Bookmark,
+  CheckCircle2,
+  ExternalLink,
+  ChevronRight,
+  ArrowRight,
+  ShieldCheck,
+  Globe,
+  Award,
+  GraduationCap,
+  Briefcase,
+  HelpCircle,
+  Cpu,
+  Zap,
+  Info,
+  Check,
+  Filter,
+  RefreshCw,
+  GitBranch,
+} from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
 import { candidateNames } from "@/lib/onboarding-import-candidates";
+import {
+  SKILL_CATALOG,
+  getSkillCatalogEntry,
+  buildSkillGraphEdges,
+  type SkillCategory,
+  type SkillCatalogEntry,
+  type SkillKnowledgeEdge,
+} from "@/lib/domain/skills-knowledge-catalog";
+import type { ProjectEntry } from "./Screen10GitHubProjects";
+import type {
+  Screen8EducationEntry,
+  Screen8ExperienceEntry,
+  Screen8AchievementEntry,
+} from "./Screen8ProfileInsights";
 
-interface Screen9SkillsMapProps {
+export interface Screen9SkillsMapProps {
   skills?: string[];
   suggestedSkills?: string[];
+  projects?: ProjectEntry[];
+  experiences?: Screen8ExperienceEntry[];
+  educationEntries?: Screen8EducationEntry[];
+  achievements?: Screen8AchievementEntry[];
+  profiles?: Partial<Record<string, string>>;
+  resumeFileName?: string | null;
+  resumeReviewed?: Array<{ candidateId?: string; category: string; value: string; status?: string }>;
   isGalleryMode?: boolean;
   goal?: string;
   onNext: () => void;
@@ -16,206 +64,454 @@ interface Screen9SkillsMapProps {
   onJumpToStep?: (step: number) => void;
 }
 
-interface SkillNode {
+interface GraphNode {
   id: string;
-  label: string;
-  category: "Core" | "Specialized" | "Tooling" | "Theoretical";
+  name: string;
+  category: SkillCategory;
+  isCenter?: boolean;
+  x: number;
+  y: number;
+  radius: number;
   color: string;
   glowColor: string;
-  // Canvas coordinate percentages (0-100 range)
-  cx: number;
-  cy: number;
-  radius: number;
-  level: "Expert" | "Advanced" | "Proficient" | "Emerging";
-  confidence: number;
-  evidence: string[];
-  techs: string[];
-  description: string;
-  metrics: {
-    githubCommits: number;
-    benchmarkPercentile: number;
-    courseCredentials: number;
-  };
+  accentColor: string;
+  iconType: string;
+  entry: SkillCatalogEntry;
+  evidenceCount: number;
+  evidenceItems: Array<{
+    type: "github" | "project" | "resume" | "coursework" | "achievement";
+    title: string;
+    details: string;
+    status: "Verified" | "Reviewed" | "Recorded" | "Imported" | "Detected";
+    url?: string;
+  }>;
 }
 
-const skillNodes: SkillNode[] = [
-  {
-    id: "deep_learning",
-    label: "Deep Learning",
-    category: "Core",
-    color: "linear-gradient(135deg, #7C3AED, #A855F7)",
-    glowColor: "rgba(168, 85, 247, 0.45)",
-    cx: 50,
-    cy: 22,
-    radius: 46,
-    level: "Expert",
-    confidence: 94,
-    description: "Multi-layered neural architectures, backpropagation optimization, and deep representation learning.",
-    evidence: ["CV (14 verified citations)", "6 GitHub repositories", "3 IEEE/ArXiv publications", "4 End-to-end projects"],
-    techs: ["PyTorch", "TensorFlow", "scikit-learn", "XGBoost", "TorchVision"],
-    metrics: { githubCommits: 142, benchmarkPercentile: 96, courseCredentials: 4 },
-  },
-  {
-    id: "llms",
-    label: "LLMs & GenAI",
-    category: "Specialized",
-    color: "linear-gradient(135deg, #0284C7, #06B6D4)",
-    glowColor: "rgba(6, 182, 212, 0.45)",
-    cx: 78,
-    cy: 32,
-    radius: 42,
-    level: "Advanced",
-    confidence: 89,
-    description: "Transformer models, PEFT/LoRA fine-tuning, RAG pipelines, and prompt orchestration frameworks.",
-    evidence: ["4 GitHub GenAI repositories", "RAG vector pipeline codebase", "CV verified coursework", "HuggingFace space"],
-    techs: ["LangChain", "OpenAI API", "HuggingFace", "Transformers", "FAISS", "ChromaDB"],
-    metrics: { githubCommits: 89, benchmarkPercentile: 91, courseCredentials: 3 },
-  },
-  {
-    id: "nlp",
-    label: "NLP",
-    category: "Specialized",
-    color: "linear-gradient(135deg, #2563EB, #38BDF8)",
-    glowColor: "rgba(56, 189, 248, 0.4)",
-    cx: 84,
-    cy: 64,
-    radius: 38,
-    level: "Advanced",
-    confidence: 86,
-    description: "Statistical linguistics, token embeddings, sequence classification, and contextual embeddings.",
-    evidence: ["3 NLP production projects", "BERT & RoBERTa fine-tuning repo", "Verified Kaggle competition"],
-    techs: ["spaCy", "NLTK", "Tokenizers", "BERT", "Word2Vec"],
-    metrics: { githubCommits: 64, benchmarkPercentile: 87, courseCredentials: 2 },
-  },
-  {
-    id: "research",
-    label: "AI Research",
-    category: "Theoretical",
-    color: "linear-gradient(135deg, #059669, #10B981)",
-    glowColor: "rgba(16, 185, 129, 0.4)",
-    cx: 66,
-    cy: 82,
-    radius: 39,
-    level: "Proficient",
-    confidence: 84,
-    description: "Empirical methodology, ablation studies, reproducible benchmarking, and scientific writing.",
-    evidence: ["Google Scholar indexed", "Conference workshop preprint", "ArXiv research summary", "Peer review co-author"],
-    techs: ["LaTeX", "Zotero", "Weights & Biases", "Overleaf", "ArXiv API"],
-    metrics: { githubCommits: 48, benchmarkPercentile: 88, courseCredentials: 2 },
-  },
-  {
-    id: "cv",
-    label: "Computer Vision",
-    category: "Specialized",
-    color: "linear-gradient(135deg, #D97706, #F59E0B)",
-    glowColor: "rgba(245, 158, 11, 0.4)",
-    cx: 24,
-    cy: 76,
-    radius: 40,
-    level: "Proficient",
-    confidence: 82,
-    description: "Convolutional spatial feature extraction, YOLO object detection, segmentation, and tracking.",
-    evidence: ["YOLOv8 real-time detection repo", "OpenCV image segmentation project", "Robotics camera perception pipeline"],
-    techs: ["OpenCV", "YOLOv8", "TorchVision", "Albumentations", "MediaPipe"],
-    metrics: { githubCommits: 76, benchmarkPercentile: 83, courseCredentials: 3 },
-  },
-  {
-    id: "python",
-    label: "Python",
-    category: "Core",
-    color: "linear-gradient(135deg, #4F46E5, #6366F1)",
-    glowColor: "rgba(99, 102, 241, 0.45)",
-    cx: 18,
-    cy: 38,
-    radius: 44,
-    level: "Expert",
-    confidence: 97,
-    description: "Idiomatic Python 3, asynchronous event loops, vectorized scientific compute, and production microservices.",
-    evidence: ["16 GitHub repositories", "LeetCode (Python3 300+ solved)", "Production API commits", "HackerRank Gold 5-star"],
-    techs: ["Python 3.12", "FastAPI", "NumPy", "AsyncIO", "Pydantic", "Poetry"],
-    metrics: { githubCommits: 310, benchmarkPercentile: 98, courseCredentials: 5 },
-  },
-  {
-    id: "mlops",
-    label: "MLOps",
-    category: "Tooling",
-    color: "linear-gradient(135deg, #DB2777, #EC4899)",
-    glowColor: "rgba(236, 72, 153, 0.4)",
-    cx: 34,
-    cy: 88,
-    radius: 36,
-    level: "Proficient",
-    confidence: 79,
-    description: "Model containerization, continuous integration, registry tracking, and artifact monitoring.",
-    evidence: ["Dockerized model containers", "GitHub Actions CI/CD workflows", "MLflow experiment tracking repository"],
-    techs: ["Docker", "MLflow", "GitHub Actions", "FastAPI", "Prometheus", "MinIO"],
-    metrics: { githubCommits: 52, benchmarkPercentile: 79, courseCredentials: 2 },
-  },
-  {
-    id: "data_analytics",
-    label: "Data Analytics",
-    category: "Core",
-    color: "linear-gradient(135deg, #0D9488, #14B8A6)",
-    glowColor: "rgba(20, 184, 166, 0.4)",
-    cx: 26,
-    cy: 16,
-    radius: 41,
-    level: "Advanced",
-    confidence: 90,
-    description: "Exploratory data analysis, hypothesis testing, relational schema querying, and data visualization.",
-    evidence: ["Kaggle datasets", "EDA Jupyter notebooks", "Statistical modeling repo", "CodeChef Data Track"],
-    techs: ["Pandas", "Polars", "Seaborn", "PostgreSQL", "DuckDB", "SciPy"],
-    metrics: { githubCommits: 118, benchmarkPercentile: 92, courseCredentials: 4 },
-  },
-];
-
-function classifyReviewSkill(skill: string): SkillNode["category"] {
-  if (/math|statistic|probability|linear algebra|calculus/i.test(skill)) return "Theoretical";
-  if (/python|typescript|javascript|sql|git|docker|kubernetes|aws|azure|gcp|linux|pytorch|tensorflow|scikit|pandas|numpy|fastapi/i.test(skill)) return "Tooling";
-  if (/nlp|language model|llm|genai|generative|rag|vision|transformer|agent|deep learning/i.test(skill)) return "Specialized";
-  return "Core";
+// Tech SVG Icons for crisp, identical look to design reference
+function RenderTechIcon({ type, size = 18, color = "#FFFFFF" }: { type: string; size?: number; color?: string }) {
+  if (type === "python") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <path
+          d="M11.9 2C8.6 2 8.8 3.4 8.8 3.4L8.8 4.9H12.1V5.4H5.4C5.4 5.4 2 5.2 2 9.4C2 13.6 5 13.4 5 13.4H6.4V11.8C6.4 9.9 8.1 9.9 8.1 9.9H12.3C13.9 9.9 14.1 8.3 14.1 8.3L14.1 4.8C14.1 4.8 14.4 2 11.9 2ZM10.5 3.3C10.9 3.3 11.2 3.6 11.2 4C11.2 4.4 10.9 4.7 10.5 4.7C10.1 4.7 9.8 4.4 9.8 4C9.8 3.6 10.1 3.3 10.5 3.3Z"
+          fill={color}
+        />
+        <path
+          d="M12.1 22C15.4 22 15.2 20.6 15.2 20.6L15.2 19.1H11.9V18.6H18.6C18.6 18.6 22 18.8 22 14.6C22 10.4 19 10.6 19 10.6H17.6V12.2C17.6 14.1 15.9 14.1 15.9 14.1H11.7C10.1 14.1 9.9 15.7 9.9 15.7L9.9 19.2C9.9 19.2 9.6 22 12.1 22ZM13.5 20.7C13.1 20.7 12.8 20.4 12.8 20C12.8 19.6 13.1 19.3 13.5 19.3C13.9 19.3 14.2 19.6 14.2 20C14.2 20.4 13.9 20.7 13.5 20.7Z"
+          fill={color}
+        />
+      </svg>
+    );
+  }
+  if (type === "javascript") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <rect width="24" height="24" rx="4" fill="transparent" />
+        <text x="5" y="17" fontSize="13" fontWeight="900" fill={color} fontFamily="system-ui, sans-serif">
+          JS
+        </text>
+      </svg>
+    );
+  }
+  if (type === "react") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
+        <ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(0 12 12)" />
+        <ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)" />
+        <ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(120 12 12)" />
+        <circle cx="12" cy="12" r="1.8" fill={color} />
+      </svg>
+    );
+  }
+  if (type === "git") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2">
+        <circle cx="6" cy="6" r="2.5" fill={color} />
+        <circle cx="6" cy="18" r="2.5" fill={color} />
+        <circle cx="18" cy="12" r="2.5" fill={color} />
+        <path d="M6 8.5V15.5" strokeLinecap="round" />
+        <path d="M6 12C6 12 10 12 15.5 12" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (type === "github") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+      </svg>
+    );
+  }
+  if (type === "postgresql" || type === "database") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
+        <ellipse cx="12" cy="5" rx="9" ry="3" />
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+      </svg>
+    );
+  }
+  if (type === "math") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <text x="4" y="18" fontSize="17" fontWeight="bold" fill={color} fontFamily="Georgia, serif">
+          &Sigma;
+        </text>
+      </svg>
+    );
+  }
+  if (type === "dsa") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
+        <circle cx="12" cy="4" r="2.5" fill={color} />
+        <circle cx="5" cy="18" r="2.5" fill={color} />
+        <circle cx="19" cy="18" r="2.5" fill={color} />
+        <path d="M10 6L6.5 16" />
+        <path d="M14 6L17.5 16" />
+      </svg>
+    );
+  }
+  if (type === "nlp") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+        <path d="M8 11h.01M12 11h.01M16 11h.01" strokeWidth="2.5" />
+      </svg>
+    );
+  }
+  return <BrainCircuit size={size} color={color} />;
 }
 
-export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryMode = false, onNext, onBack, onJumpToStep }: Screen9SkillsMapProps) {
-  const safeSkills = candidateNames(skills);
+export function Screen9SkillsMap({
+  skills = [],
+  suggestedSkills = [],
+  projects = [],
+  experiences = [],
+  educationEntries = [],
+  achievements = [],
+  profiles = {},
+  resumeFileName,
+  resumeReviewed = [],
+  isGalleryMode = false,
+  goal,
+  onNext,
+  onBack,
+  onJumpToStep,
+}: Screen9SkillsMapProps) {
+  // Gallery mode baseline skills if empty
+  const defaultGallerySkills = [
+    "Machine Learning",
+    "Python",
+    "JavaScript",
+    "React",
+    "Git",
+    "GitHub",
+    "PostgreSQL",
+    "SQL",
+    "NLP",
+    "Data Structures",
+    "Mathematics",
+    "Artificial Intelligence",
+  ];
+
+  const rawSkills = skills.length > 0 ? skills : isGalleryMode ? defaultGallerySkills : [];
+  const safeSkills = candidateNames(rawSkills);
   const safeSuggested = candidateNames(suggestedSkills);
-  const confirmed = new Set(safeSkills.map((skill) => skill.toLowerCase()));
-  const allSkills = [...safeSkills, ...safeSuggested.filter((skill) => !confirmed.has(skill.toLowerCase()))];
-  const allNodes: SkillNode[] = isGalleryMode ? skillNodes : allSkills.map((skill, index) => ({
-    ...skillNodes[index % skillNodes.length],
-    id: `recorded_${index}`,
-    label: skill,
-    category: classifyReviewSkill(skill),
-    level: "Emerging",
-    confidence: 0,
-    evidence: [confirmed.has(skill.toLowerCase()) ? "Reviewed CV or student-confirmed skill; verification pending" : "Detected in linked project metadata; personal use needs review"],
-    techs: [],
-    description: confirmed.has(skill.toLowerCase()) ? `${skill} is recorded in your profile. Add project evidence to show how you used it.` : `${skill} was detected in an imported project. Review your contribution before claiming proficiency.`,
-    metrics: { githubCommits: 0, benchmarkPercentile: 0, courseCredentials: 0 },
-  }));
-  const displayNodes = allNodes.slice(0, 8);
-  const [selectedNode, setSelectedNode] = useState<SkillNode>(allNodes[0] || {
-    ...skillNodes[0], id: "empty", label: "No skills recorded", confidence: 0,
-    evidence: [], techs: [], description: "Add or confirm a skill to begin your map.",
-    metrics: { githubCommits: 0, benchmarkPercentile: 0, courseCredentials: 0 },
-  });
-  useEffect(() => {
-    if (allNodes.length && !allNodes.some((node) => node.label === selectedNode.label)) setSelectedNode(allNodes[0]);
-  }, [allNodes, selectedNode.label]);
-  const [activeFilter, setActiveFilter] = useState<string>("All");
 
-  const categories = ["All", "Core", "Specialized", "Tooling", "Theoretical"];
+  const confirmedSet = new Set(safeSkills.map((s) => s.toLowerCase().trim()));
+  const allSkillNames = [
+    ...safeSkills,
+    ...safeSuggested.filter((s) => !confirmedSet.has(s.toLowerCase().trim())),
+  ];
 
-  const filteredNodes = activeFilter === "All"
-    ? displayNodes
-    : displayNodes.filter((n) => n.category === activeFilter);
-  const filteredList = activeFilter === "All" ? allNodes : allNodes.filter((n) => n.category === activeFilter);
+  // Active filter: All | Core | Specialized | Tooling | Theoretical
+  const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [activeEvidenceFilter, setActiveEvidenceFilter] = useState<string | null>(null);
+
+  // Zoom and pan state
+  const [zoom, setZoom] = useState<number>(1);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Hovered edge for relationship tooltip
+  const [hoveredEdge, setHoveredEdge] = useState<SkillKnowledgeEdge | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+
+  // Selected skill
+  const [selectedSkillName, setSelectedSkillName] = useState<string>(
+    safeSkills.find((s) => s.toLowerCase() === "machine learning") || safeSkills[0] || "Machine Learning"
+  );
+
+  // Bookmarked skills state
+  const [bookmarkedSkills, setBookmarkedSkills] = useState<Set<string>>(new Set());
+
+  const handleToggleBookmark = (name: string) => {
+    setBookmarkedSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  // 1. Build Grounded Evidence Per Skill
+  const getEvidenceForSkill = (skillName: string) => {
+    const sLow = skillName.toLowerCase().trim();
+    const items: GraphNode["evidenceItems"] = [];
+
+    // Check confirmed projects
+    const matchedProjects = projects.filter((p) =>
+      p.technologies?.some((t) => t.toLowerCase().trim() === sLow)
+    );
+    for (const p of matchedProjects) {
+      items.push({
+        type: "project",
+        title: `Project: ${p.title}`,
+        details: p.description ? p.description.slice(0, 80) + "..." : "Confirmed project implementation",
+        status: p.status === "confirmed" ? "Verified" : "Reviewed",
+        url: p.url,
+      });
+    }
+
+    // Check GitHub
+    const hasGitHub = Boolean(profiles.github || (profiles as any)["gitHub"]);
+    const inGitCandidates = safeSuggested.some((s) => s.toLowerCase().trim() === sLow);
+    if (hasGitHub || inGitCandidates) {
+      items.push({
+        type: "github",
+        title: "GitHub Repositories",
+        details: `Discovered in inspected code commits & dependencies`,
+        status: "Reviewed",
+      });
+    }
+
+    // Check CV / Resume
+    const inResume =
+      Boolean(resumeFileName) &&
+      (resumeReviewed.some((c) => c.value?.toLowerCase().trim() === sLow) ||
+        safeSkills.some((s) => s.toLowerCase().trim() === sLow));
+    if (inResume) {
+      items.push({
+        type: "resume",
+        title: "Reviewed Resume (CV)",
+        details: `Extracted from verified CV profile section`,
+        status: "Reviewed",
+      });
+    }
+
+    // Check Coursework
+    if (educationEntries && educationEntries.length > 0) {
+      const edu = educationEntries[0];
+      items.push({
+        type: "coursework",
+        title: "Academic Coursework",
+        details: `${edu.degree || "B.Tech"} curriculum at ${edu.institution || "University"}`,
+        status: "Recorded",
+      });
+    }
+
+    return items;
+  };
+
+  // 2. Build Nodes & Layout
+  const nodes: GraphNode[] = useMemo(() => {
+    if (allSkillNames.length === 0) return [];
+
+    // Central anchor logic: Prefer "Machine Learning" if present, else primary goal/first skill
+    let centerIndex = allSkillNames.findIndex(
+      (s) => s.toLowerCase().trim() === "machine learning"
+    );
+    if (centerIndex === -1) {
+      centerIndex = allSkillNames.findIndex(
+        (s) => s.toLowerCase().trim() === "artificial intelligence" || s.toLowerCase().trim() === "python"
+      );
+      if (centerIndex === -1) centerIndex = 0;
+    }
+
+    const centerSkill = allSkillNames[centerIndex];
+    const satellites = allSkillNames.filter((_, idx) => idx !== centerIndex);
+
+    const result: GraphNode[] = [];
+
+    // Center node at (450, 300) in 900x600 canvas
+    const centerEntry = getSkillCatalogEntry(centerSkill);
+    result.push({
+      id: "center_node",
+      name: centerSkill,
+      category: centerEntry.category,
+      isCenter: true,
+      x: 450,
+      y: 300,
+      radius: 46,
+      color: "linear-gradient(135deg, #0284C7 0%, #4564FF 50%, #9335E8 100%)",
+      glowColor: "rgba(69, 100, 255, 0.45)",
+      accentColor: "#02C5F5",
+      iconType: centerEntry.iconType,
+      entry: centerEntry,
+      evidenceCount: getEvidenceForSkill(centerSkill).length,
+      evidenceItems: getEvidenceForSkill(centerSkill),
+    });
+
+    // Sector-based radial placement matching visual reference
+    // Top-left: AI / Specialized; Top-right: JavaScript/React; Right: Git/GitHub; Bottom: SQL/PostgreSQL; Left: Math/DSA
+    const count = satellites.length;
+    const baseDistance = count > 14 ? 260 : 210;
+
+    satellites.forEach((skillName, idx) => {
+      const entry = getSkillCatalogEntry(skillName);
+      let angle = (idx / count) * 2 * Math.PI - Math.PI / 2;
+
+      // Adjust angles slightly by category for aesthetic grouping
+      if (entry.category === "Theoretical") {
+        angle = Math.PI * 0.95 + ((idx % 3) - 1) * 0.35; // Left / Bottom-Left
+      } else if (entry.category === "Specialized" && /nlp|ai|artificial/i.test(skillName)) {
+        angle = -Math.PI * 0.8 + ((idx % 3) - 1) * 0.3; // Top-Left
+      } else if (/javascript|react|html|css/i.test(skillName)) {
+        angle = -Math.PI * 0.15 + (idx % 2 === 0 ? 0 : 0.35); // Top-Right
+      } else if (/git|github|docker/i.test(skillName)) {
+        angle = Math.PI * 0.15 + (idx % 2 === 0 ? 0 : 0.3); // Right
+      } else if (/sql|postgres|mongo|database/i.test(skillName)) {
+        angle = Math.PI * 0.55 + ((idx % 2) - 0.5) * 0.4; // Bottom / Bottom-Right
+      } else if (/python/i.test(skillName)) {
+        angle = -Math.PI * 0.45; // Top center-left
+      }
+
+      const dist = baseDistance + ((idx % 3) - 1) * 20;
+      const x = 450 + Math.cos(angle) * dist;
+      const y = 300 + Math.sin(angle) * dist;
+
+      result.push({
+        id: `node_${idx}`,
+        name: skillName,
+        category: entry.category,
+        isCenter: false,
+        x,
+        y,
+        radius: 35,
+        color: entry.color,
+        glowColor: entry.glowColor,
+        accentColor: entry.accentColor,
+        iconType: entry.iconType,
+        entry,
+        evidenceCount: getEvidenceForSkill(skillName).length,
+        evidenceItems: getEvidenceForSkill(skillName),
+      });
+    });
+
+    return result;
+  }, [allSkillNames, projects, profiles, resumeFileName, resumeReviewed, educationEntries]);
+
+  // 3. Build Graph Relationships & Edges
+  const graphEdges = useMemo(() => {
+    return buildSkillGraphEdges(allSkillNames, projects);
+  }, [allSkillNames, projects]);
+
+  // Center node connection edges (radial dotted lines from central hub)
+  const centerNode = nodes.find((n) => n.isCenter);
+
+  // Filtered nodes
+  const filteredNodes = useMemo(() => {
+    return nodes.filter((n) => {
+      if (activeCategory !== "All" && !n.isCenter && n.category !== activeCategory) {
+        return false;
+      }
+      if (activeEvidenceFilter) {
+        if (activeEvidenceFilter === "github" && !n.evidenceItems.some((e) => e.type === "github")) return false;
+        if (activeEvidenceFilter === "project" && !n.evidenceItems.some((e) => e.type === "project")) return false;
+        if (activeEvidenceFilter === "resume" && !n.evidenceItems.some((e) => e.type === "resume")) return false;
+        if (activeEvidenceFilter === "coursework" && !n.evidenceItems.some((e) => e.type === "coursework")) return false;
+      }
+      return true;
+    });
+  }, [nodes, activeCategory, activeEvidenceFilter]);
+
+  // Connected skills to current selected skill
+  const connectedSkillNames = useMemo(() => {
+    const set = new Set<string>();
+    set.add(selectedSkillName.toLowerCase().trim());
+
+    // Center node is connected to all satellites
+    if (centerNode && selectedSkillName.toLowerCase().trim() === centerNode.name.toLowerCase().trim()) {
+      nodes.forEach((n) => set.add(n.name.toLowerCase().trim()));
+    } else if (centerNode) {
+      set.add(centerNode.name.toLowerCase().trim());
+    }
+
+    graphEdges.forEach((e) => {
+      if (e.source.toLowerCase().trim() === selectedSkillName.toLowerCase().trim()) {
+        set.add(e.target.toLowerCase().trim());
+      }
+      if (e.target.toLowerCase().trim() === selectedSkillName.toLowerCase().trim()) {
+        set.add(e.source.toLowerCase().trim());
+      }
+    });
+
+    return set;
+  }, [selectedSkillName, graphEdges, centerNode, nodes]);
+
+  // Selected node details
+  const selectedNode =
+    nodes.find((n) => n.name.toLowerCase().trim() === selectedSkillName.toLowerCase().trim()) ||
+    nodes[0] ||
+    null;
+
+  // Grounded Contextual Description for the card
+  const contextualExplanation = useMemo(() => {
+    if (!selectedNode) return "";
+    let base = selectedNode.entry.description;
+
+    // Add student-grounded sentence if real project evidence exists
+    const matchingProj = projects.find((p) =>
+      p.technologies?.some((t) => t.toLowerCase().trim() === selectedNode.name.toLowerCase().trim())
+    );
+
+    if (matchingProj) {
+      base += ` Your confirmed ${matchingProj.title} project directly applies ${selectedNode.name} in its functional architecture.`;
+    }
+
+    return base;
+  }, [selectedNode, projects]);
+
+  // Pan & Zoom handlers
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+    setZoom((prev) => Math.min(Math.max(prev * zoomFactor, 0.65), 1.9));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).tagName === "svg" || (e.target as HTMLElement).tagName === "g") {
+      setIsPanning(true);
+      setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({ x: e.clientX - startPan.x, y: e.clientY - startPan.y });
+    }
+  };
+
+  const handleMouseUp = () => setIsPanning(false);
+
+  const resetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Categories list
+  const categoryFilters = ["All", "Core", "Specialized", "Tooling", "Theoretical"];
+
+  // Total Evidence Counts across student
+  const totalResumeSkills = safeSkills.length;
+  const totalGitHubSkills = projects.filter((p) => p.sources?.includes("github")).length;
+  const totalVerifiedProjects = projects.filter((p) => p.status === "confirmed").length;
 
   return (
     <div
       className="exact-screen-wrapper"
       style={{
-        background: "radial-gradient(ellipse at 70% 20%, rgba(2, 197, 245, 0.08) 0%, rgba(89, 66, 220, 0.05) 40%, #F9F8F5 75%)",
+        background: "radial-gradient(ellipse at 75% 20%, rgba(2, 197, 245, 0.08) 0%, rgba(147, 53, 232, 0.06) 40%, #F9F8F5 75%)",
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
@@ -227,26 +523,13 @@ export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryM
       <div
         style={{
           position: "absolute",
-          top: "-5%",
-          right: "5%",
-          width: "600px",
-          height: "600px",
+          top: "-10%",
+          right: "10%",
+          width: "700px",
+          height: "700px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(168, 85, 247, 0.09) 0%, rgba(56, 189, 248, 0.04) 50%, transparent 70%)",
-          filter: "blur(60px)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: "-5%",
-          left: "5%",
-          width: "550px",
-          height: "550px",
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(2, 197, 245, 0.08) 0%, rgba(99, 102, 241, 0.04) 50%, transparent 70%)",
-          filter: "blur(70px)",
+          background: "radial-gradient(circle, rgba(2, 197, 245, 0.1) 0%, rgba(86, 66, 239, 0.05) 50%, transparent 70%)",
+          filter: "blur(75px)",
           pointerEvents: "none",
         }}
       />
@@ -254,7 +537,7 @@ export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryM
       <ScreenHeader
         onBack={onBack}
         showBack={true}
-        rightLabel="Skills map"
+        rightLabel="Step 8b of 10"
       />
 
       <main
@@ -265,47 +548,99 @@ export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryM
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          maxWidth: 1260,
+          maxWidth: 1320,
           margin: "0 auto",
           width: "100%",
-          padding: "24px 36px 36px",
+          padding: "20px 32px 32px",
         }}
       >
-        {/* Top Header Row with Category Filters */}
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24, gap: 20, flexWrap: "wrap" }}>
+        {/* Title Header with Category Filters matching image */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 16,
+            marginBottom: 20,
+          }}
+        >
           <div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#5642EF", background: "rgba(86, 66, 239, 0.08)", border: "1px solid rgba(86, 66, 239, 0.2)", padding: "4px 12px", borderRadius: 9999, marginBottom: 8 }}>
-              <Sparkles size={12} />
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: "#5642EF",
+                background: "rgba(86, 66, 239, 0.08)",
+                border: "1px solid rgba(86, 66, 239, 0.2)",
+                padding: "4px 12px",
+                borderRadius: 9999,
+                marginBottom: 8,
+              }}
+            >
+              <Sparkles size={13} color="#02C5F5" />
               <span>Skills Intelligence Map</span>
-            </div>
-            <h1 style={{ fontSize: "clamp(26px, 3vw, 36px)", fontWeight: 850, color: "#171626", margin: "0 0 6px", letterSpacing: "-0.03em" }}>
-              Your Skills & Evidence Network
+            </span>
+            <h1
+              style={{
+                fontSize: "clamp(26px, 2.8vw, 36px)",
+                fontWeight: 850,
+                color: "#171626",
+                letterSpacing: "-0.03em",
+                margin: "0 0 6px",
+              }}
+            >
+              Your Skills &amp; Evidence Network
             </h1>
-            <p style={{ fontSize: 14.5, color: "#64748B", margin: 0 }}>
-              {isGalleryMode ? "Interactive knowledge constellation for design preview." : "Reviewed CV skills and skills suggested by linked projects. Evidence and proficiency need separate review."}
+            <p
+              style={{
+                fontSize: 14.5,
+                color: "#64748B",
+                maxWidth: 680,
+                margin: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              Your skills are connected through real evidence from your projects, coursework and experience. Explore the network to see how your skills relate and where you have evidence.
             </p>
           </div>
 
-          {/* Category Filter Pills */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#FFFFFF", padding: "4px 6px", borderRadius: 9999, border: "1px solid #E2E8F0", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
-            {categories.map((cat) => {
-              const isCatActive = activeFilter === cat;
+          {/* Top Filter Chips */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
+              borderRadius: 9999,
+              padding: "4px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              gap: 4,
+            }}
+          >
+            {categoryFilters.map((cat) => {
+              const isActive = activeCategory === cat;
               return (
                 <button
                   key={cat}
                   type="button"
-                  onClick={() => setActiveFilter(cat)}
+                  onClick={() => setActiveCategory(cat)}
                   style={{
-                    padding: "6px 14px",
+                    padding: "7px 16px",
                     borderRadius: 9999,
-                    fontSize: 12,
-                    fontWeight: 700,
                     border: "none",
+                    background: isActive
+                      ? "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)"
+                      : "transparent",
+                    color: isActive ? "#FFFFFF" : "#64748B",
+                    fontSize: 13,
+                    fontWeight: isActive ? 750 : 600,
                     cursor: "pointer",
-                    background: isCatActive ? "linear-gradient(90deg, #5642EF, #7B2CBF)" : "transparent",
-                    color: isCatActive ? "#FFFFFF" : "#64748B",
-                    boxShadow: isCatActive ? "0 2px 8px rgba(86, 66, 239, 0.3)" : "none",
                     transition: "all 0.15s ease",
+                    boxShadow: isActive ? "0 2px 8px rgba(99, 102, 241, 0.35)" : "none",
                   }}
                 >
                   {cat}
@@ -315,359 +650,824 @@ export function Screen9SkillsMap({ skills = [], suggestedSkills = [], isGalleryM
           </div>
         </div>
 
-        {/* Two Main Regions: Left Map + Right Details Panel */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 24, alignItems: "stretch", marginBottom: 28, minHeight: 540 }}>
-          
-          {/* Left Region: Spacious, Modern Constellation Canvas */}
-          <div
-            data-eora-id="eora-skills-map"
-            style={{
-              position: "relative",
-              minHeight: 540,
-              background: "#FFFFFF",
-              borderRadius: 24,
-              border: "1px solid rgba(226, 232, 240, 0.9)",
-              boxShadow: "0 12px 36px -6px rgba(86, 66, 239, 0.08), 0 2px 12px rgba(0, 0, 0, 0.03)",
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {/* Radar / Constellation Grid Rings */}
-            <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-              <defs>
-                <radialGradient id="radarGrid" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stopColor="#5642EF" stopOpacity="0.04" />
-                  <stop offset="60%" stopColor="#02C5F5" stopOpacity="0.02" />
-                  <stop offset="100%" stopColor="transparent" />
-                </radialGradient>
-                <linearGradient id="activeLineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#5642EF" />
-                  <stop offset="100%" stopColor="#02C5F5" />
-                </linearGradient>
-              </defs>
-
-              {/* Concentric radar circles */}
-              <circle cx="50%" cy="50%" r="90" fill="none" stroke="#EEF2F6" strokeWidth="1.5" strokeDasharray="3 3" />
-              <circle cx="50%" cy="50%" r="170" fill="none" stroke="#F1F5F9" strokeWidth="1.5" strokeDasharray="4 4" />
-              <circle cx="50%" cy="50%" r="240" fill="none" stroke="#F8FAFC" strokeWidth="1.5" />
-
-              {/* Connecting constellation lines */}
-              {displayNodes.map((node) => {
-                const isSelected = selectedNode.id === node.id;
-                return (
-                  <g key={node.id}>
-                    <line
-                      x1="50%"
-                      y1="50%"
-                      x2={`${node.cx}%`}
-                      y2={`${node.cy}%`}
-                      stroke={isSelected ? "url(#activeLineGrad)" : "#E2E8F0"}
-                      strokeWidth={isSelected ? "2.5" : "1.2"}
-                      strokeDasharray={isSelected ? "none" : "4 4"}
-                      opacity={isSelected ? 1 : 0.75}
-                    />
-                    {isSelected && (
-                      <circle
-                        cx={`${node.cx}%`}
-                        cy={`${node.cy}%`}
-                        r={node.radius + 6}
-                        fill="none"
-                        stroke="#5642EF"
-                        strokeWidth="2"
-                        opacity="0.4"
-                      />
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* Central Anchor Node: GenAI / ML Core Engine */}
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: 106,
-                height: 106,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #02C5F5 0%, #4564FF 50%, #9335E8 100%)",
-                color: "#FFFFFF",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 850,
-                textAlign: "center",
-                lineHeight: 1.15,
-                boxShadow: "0 0 35px rgba(69, 100, 255, 0.4), 0 0 0 8px rgba(2, 197, 245, 0.12)",
-                zIndex: 10,
-                padding: 6,
-                cursor: "default",
-              }}
-            >
-              <Cpu size={16} style={{ marginBottom: 2 }} />
-              <span>{isGalleryMode ? "GenAI / ML" : "Your Skills"}</span>
-              <span style={{ fontSize: 9.5, opacity: 0.9, fontWeight: 700, letterSpacing: "0.02em" }}>
-                Profile Map
-              </span>
-            </div>
-
-            {/* Orbiting Interactive Skill Nodes across the Full Canvas */}
-            {filteredNodes.map((node) => {
-              const isSelected = selectedNode.id === node.id;
-              const diameter = node.radius * 2;
-
-              return (
-                <button
-                  key={node.id}
-                  type="button"
-                  onClick={() => setSelectedNode(node)}
-                  style={{
-                    position: "absolute",
-                    top: `${node.cy}%`,
-                    left: `${node.cx}%`,
-                    transform: isSelected ? "translate(-50%, -50%) scale(1.08)" : "translate(-50%, -50%)",
-                    width: diameter,
-                    height: diameter,
-                    borderRadius: "50%",
-                    background: node.color,
-                    color: "#FFFFFF",
-                    border: isSelected ? "3px solid #FFFFFF" : "2px solid rgba(255,255,255,0.7)",
-                    boxShadow: isSelected
-                      ? `0 0 0 4px #5642EF, 0 12px 28px ${node.glowColor}`
-                      : `0 4px 16px rgba(0,0,0,0.12), 0 0 12px ${node.glowColor}`,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 12,
-                    fontWeight: 750,
-                    textAlign: "center",
-                    cursor: "pointer",
-                    padding: 6,
-                    lineHeight: 1.15,
-                    zIndex: isSelected ? 25 : 8,
-                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.transform = "translate(-50%, -50%) scale(1.1)";
-                      e.currentTarget.style.zIndex = "24";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.transform = "translate(-50%, -50%) scale(1)";
-                      e.currentTarget.style.zIndex = "8";
-                    }
-                  }}
-                >
-                  <span style={{ maxWidth: diameter - 12, wordBreak: "break-word" }}>{node.label}</span>
-                  {isGalleryMode && <span
-                    style={{
-                      fontSize: 9.5,
-                      fontWeight: 800,
-                      background: "rgba(0, 0, 0, 0.25)",
-                      padding: "1px 6px",
-                      borderRadius: 9999,
-                      marginTop: 3,
-                    }}
-                  >
-                    {node.confidence}%
-                  </span>}
-                </button>
-              );
-            })}
-
-            {/* Bottom Canvas Legend */}
-            {isGalleryMode && <div
-              style={{
-                position: "absolute",
-                bottom: 16,
-                left: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                background: "rgba(255,255,255,0.9)",
-                backdropFilter: "blur(8px)",
-                padding: "6px 14px",
-                borderRadius: 9999,
-                border: "1px solid #E2E8F0",
-                fontSize: 11,
-                color: "#64748B",
-                fontWeight: 600,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#7C3AED" }} />
-                <span>Expert (90%+)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0284C7" }} />
-                <span>Advanced (85-89%)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#D97706" }} />
-                <span>Proficient (80-84%)</span>
-              </div>
-            </div>}
-          </div>
-
-          {/* Right Region: Evidence Detail & Knowledge Card */}
+        {/* Two-Column Responsive Layout */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1.8fr 1fr",
+            gap: 24,
+            alignItems: "stretch",
+            marginBottom: 24,
+          }}
+        >
+          {/* LEFT: Knowledge Graph Container (~65% width) */}
           <div
             style={{
               background: "#FFFFFF",
               borderRadius: 24,
-              border: "1px solid rgba(226, 232, 240, 0.9)",
-              boxShadow: "0 12px 36px -6px rgba(86, 66, 239, 0.08), 0 2px 12px rgba(0, 0, 0, 0.03)",
-              padding: "26px",
+              border: "1.5px solid rgba(86, 66, 239, 0.12)",
+              boxShadow: "0 18px 45px rgba(0, 0, 0, 0.05), 0 0 30px rgba(86, 66, 239, 0.03)",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
+              position: "relative",
+              overflow: "hidden",
+              minHeight: 580,
             }}
           >
-            <div>
-              {/* Header Badge */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 800,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      color: "#5642EF",
-                      background: "#EDE9FE",
-                      padding: "4px 10px",
-                      borderRadius: 6,
-                    }}
-                  >
-                    {isGalleryMode ? `${selectedNode.level} Level` : confirmed.has(selectedNode.label.toLowerCase()) ? "Reviewed skill" : "Suggested skill"}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#475569",
-                      background: "#F1F5F9",
-                      padding: "4px 8px",
-                      borderRadius: 6,
-                    }}
-                  >
-                    {selectedNode.category}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 800, color: "#10B981" }}>
-                  <ShieldCheck size={16} />
-                  <span>{isGalleryMode ? `${selectedNode.confidence}% Grounded` : "Review pending"}</span>
-                </div>
-              </div>
-
-              {/* Title & Description */}
-              <h2 style={{ fontSize: 22, fontWeight: 850, color: "#171626", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
-                {selectedNode.label}
-              </h2>
-              <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.45, margin: "0 0 18px" }}>
-                {selectedNode.description}
-              </p>
-
-              {/* Metric Highlights */}
-              {isGalleryMode && <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, padding: 12, background: "#F8FAFC", borderRadius: 12, border: "1px solid #E2E8F0", marginBottom: 18 }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 16, fontWeight: 850, color: "#5642EF" }}>{selectedNode.metrics.githubCommits}+</div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#64748B", textTransform: "uppercase" }}>Commits</div>
-                </div>
-                <div style={{ textAlign: "center", borderLeft: "1px solid #E2E8F0", borderRight: "1px solid #E2E8F0" }}>
-                  <div style={{ fontSize: 16, fontWeight: 850, color: "#10B981" }}>{selectedNode.metrics.benchmarkPercentile}th</div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#64748B", textTransform: "uppercase" }}>Percentile</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 16, fontWeight: 850, color: "#0284C7" }}>{selectedNode.metrics.courseCredentials}</div>
-                  <div style={{ fontSize: 10, fontWeight: 600, color: "#64748B", textTransform: "uppercase" }}>Certificates</div>
-                </div>
-              </div>}
-
-              {/* Evidence Sources */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 5 }}>
-                  <Layers size={13} color="#5642EF" /> Evidence Sources
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {selectedNode.evidence.map((ev, idx) => (
-                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "#334155" }}>
-                      <CheckCircle2 size={14} color="#10B981" style={{ flexShrink: 0 }} />
-                      <span>{ev}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Detected Toolchain */}
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 5 }}>
-                  <Zap size={13} color="#F59E0B" /> Technologies & Frameworks
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {selectedNode.techs.map((tc) => (
-                    <span
-                      key={tc}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "4px 9px",
-                        borderRadius: 6,
-                        background: "#F1F5F9",
-                        color: "#334155",
-                        border: "1px solid #CBD5E1",
-                      }}
-                    >
-                      {tc}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom Recommendation Tip */}
+            {/* Top-Left Graph Legend matching image */}
             <div
               style={{
-                marginTop: 18,
+                position: "absolute",
+                top: 20,
+                left: 20,
+                background: "rgba(255, 255, 255, 0.92)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid #E2E8F0",
+                borderRadius: 14,
                 padding: "10px 14px",
-                borderRadius: 12,
-                background: "linear-gradient(135deg, rgba(86,66,239,0.06), rgba(2,197,245,0.06))",
-                border: "1px solid rgba(86,66,239,0.15)",
+                zIndex: 10,
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontSize: 12,
-                color: "#1E1B4B",
+                flexDirection: "column",
+                gap: 6,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
               }}
             >
-              <span style={{ fontWeight: 600 }}>{isGalleryMode ? "Recommended project next step is ready" : "Add evidence to support a recorded skill"}</span>
-              <ArrowUpRight size={14} color="#5642EF" />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontWeight: 700, color: "#475569" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#3B82F6" }} />
+                <span>Core Skill</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontWeight: 700, color: "#475569" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#8B5CF6" }} />
+                <span>Applied Skill</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontWeight: 700, color: "#475569" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#10B981" }} />
+                <span>Tooling</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontWeight: 700, color: "#475569" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#F59E0B" }} />
+                <span>Theoretical</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, fontWeight: 700, color: "#475569" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#EC4899" }} />
+                <span>Evidence Node</span>
+              </div>
+            </div>
+
+            {/* SVG Graph Canvas */}
+            <div
+              style={{
+                flex: 1,
+                position: "relative",
+                cursor: isPanning ? "grabbing" : "grab",
+                minHeight: 460,
+                overflow: "hidden",
+              }}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 900 600"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  userSelect: "none",
+                }}
+              >
+                <defs>
+                  {/* Concentric Glow Filters */}
+                  <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                  <filter id="edgeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <g
+                  transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}
+                  style={{ transformOrigin: "450px 300px", transition: isPanning ? "none" : "transform 0.15s ease-out" }}
+                >
+                  {/* Background concentric reference orbit circles */}
+                  <circle cx="450" cy="300" r="140" fill="none" stroke="rgba(226, 232, 240, 0.6)" strokeDasharray="3 4" />
+                  <circle cx="450" cy="300" r="220" fill="none" stroke="rgba(226, 232, 240, 0.45)" strokeDasharray="4 6" />
+
+                  {/* 1. Dotted radial edges connecting Center Node to satellites */}
+                  {centerNode &&
+                    filteredNodes
+                      .filter((n) => !n.isCenter)
+                      .map((node) => {
+                        const isConnectedToSelected =
+                          selectedSkillName.toLowerCase().trim() === centerNode.name.toLowerCase().trim() ||
+                          selectedSkillName.toLowerCase().trim() === node.name.toLowerCase().trim();
+
+                        return (
+                          <line
+                            key={`radial_${node.name}`}
+                            x1={centerNode.x}
+                            y1={centerNode.y}
+                            x2={node.x}
+                            y2={node.y}
+                            stroke={isConnectedToSelected ? "#6366F1" : "rgba(203, 213, 225, 0.65)"}
+                            strokeWidth={isConnectedToSelected ? 2 : 1.2}
+                            strokeDasharray={isConnectedToSelected ? "none" : "3 4"}
+                            opacity={isConnectedToSelected ? 0.9 : 0.4}
+                          />
+                        );
+                      })}
+
+                  {/* 2. Interconnecting Relationship Edges between Satellite Skills */}
+                  {graphEdges.map((edge, idx) => {
+                    const srcNode = nodes.find(
+                      (n) => n.name.toLowerCase().trim() === edge.source.toLowerCase().trim()
+                    );
+                    const tgtNode = nodes.find(
+                      (n) => n.name.toLowerCase().trim() === edge.target.toLowerCase().trim()
+                    );
+                    if (!srcNode || !tgtNode) return null;
+
+                    const isSelectedEdge =
+                      selectedSkillName.toLowerCase().trim() === edge.source.toLowerCase().trim() ||
+                      selectedSkillName.toLowerCase().trim() === edge.target.toLowerCase().trim();
+
+                    const strokeColor = edge.isProjectBacked
+                      ? "#EC4899"
+                      : isSelectedEdge
+                      ? "#38BDF8"
+                      : "rgba(148, 163, 184, 0.45)";
+
+                    const strokeWidth = isSelectedEdge ? 2.5 : edge.isProjectBacked ? 2 : 1.5;
+
+                    return (
+                      <g key={`edge_${idx}`}>
+                        <line
+                          x1={srcNode.x}
+                          y1={srcNode.y}
+                          x2={tgtNode.x}
+                          y2={tgtNode.y}
+                          stroke={strokeColor}
+                          strokeWidth={strokeWidth}
+                          strokeLinecap="round"
+                          opacity={isSelectedEdge ? 1 : 0.65}
+                          filter={isSelectedEdge ? "url(#edgeGlow)" : undefined}
+                          style={{ cursor: "pointer", transition: "all 0.2s" }}
+                          onMouseEnter={() => setHoveredEdge(edge)}
+                          onMouseLeave={() => setHoveredEdge(null)}
+                        />
+                      </g>
+                    );
+                  })}
+
+                  {/* 3. Render Circular Nodes */}
+                  {filteredNodes.map((node) => {
+                    const isSelected =
+                      selectedSkillName.toLowerCase().trim() === node.name.toLowerCase().trim();
+                    const isDirectlyConnected = connectedSkillNames.has(node.name.toLowerCase().trim());
+                    const nodeOpacity = isSelected || isDirectlyConnected ? 1 : 0.45;
+
+                    return (
+                      <g
+                        key={node.name}
+                        transform={`translate(${node.x}, ${node.y})`}
+                        style={{
+                          cursor: "pointer",
+                          opacity: nodeOpacity,
+                          transition: "opacity 0.2s, transform 0.2s",
+                        }}
+                        onClick={() => setSelectedSkillName(node.name)}
+                        onMouseEnter={() => setHoveredNode(node.name)}
+                        onMouseLeave={() => setHoveredNode(null)}
+                      >
+                        {/* Glow halo when selected or center */}
+                        {(isSelected || node.isCenter) && (
+                          <circle
+                            r={node.radius + 12}
+                            fill={node.glowColor}
+                            opacity={isSelected ? 0.6 : 0.35}
+                            filter="url(#nodeGlow)"
+                          />
+                        )}
+
+                        {/* Animated selection ring */}
+                        {isSelected && (
+                          <circle
+                            r={node.radius + 6}
+                            fill="none"
+                            stroke="#5642EF"
+                            strokeWidth="2.5"
+                            strokeDasharray="5 3"
+                          />
+                        )}
+
+                        {/* Outer circular background */}
+                        <circle
+                          r={node.radius}
+                          fill={node.isCenter ? "url(#centerGradient)" : node.accentColor}
+                          stroke="#FFFFFF"
+                          strokeWidth={node.isCenter ? "3.5" : "2.5"}
+                          style={{
+                            filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.12))",
+                            transition: "transform 0.15s ease",
+                          }}
+                        />
+
+                        {/* Gradient fill definition for center node */}
+                        {node.isCenter && (
+                          <defs>
+                            <linearGradient id="centerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#0284C7" />
+                              <stop offset="50%" stopColor="#4564FF" />
+                              <stop offset="100%" stopColor="#9335E8" />
+                            </linearGradient>
+                          </defs>
+                        )}
+
+                        {/* Tech Icon inside node */}
+                        <g transform={`translate(-9, ${node.isCenter ? -18 : -14})`}>
+                          <RenderTechIcon type={node.iconType} size={18} color="#FFFFFF" />
+                        </g>
+
+                        {/* Node Label Text */}
+                        <text
+                          y={node.isCenter ? 10 : 8}
+                          textAnchor="middle"
+                          fill="#FFFFFF"
+                          fontSize={node.isCenter ? "11.5" : "9.5"}
+                          fontWeight="800"
+                          fontFamily="system-ui, -apple-system, sans-serif"
+                          style={{ pointerEvents: "none", letterSpacing: "-0.01em" }}
+                        >
+                          {node.name.length > 13 ? (
+                            <>
+                              <tspan x="0" dy="0">{node.name.split(" ")[0]}</tspan>
+                              <tspan x="0" dy="11">{node.name.split(" ").slice(1).join(" ")}</tspan>
+                            </>
+                          ) : (
+                            node.name
+                          )}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              </svg>
+
+              {/* Floating Edge Relationship Tooltip */}
+              {hoveredEdge && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 24,
+                    right: 24,
+                    background: "rgba(15, 23, 42, 0.9)",
+                    backdropFilter: "blur(6px)",
+                    color: "#FFFFFF",
+                    padding: "8px 14px",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: 650,
+                    pointerEvents: "none",
+                    boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+                    zIndex: 20,
+                  }}
+                >
+                  <div style={{ color: "#38BDF8", fontSize: 11, textTransform: "uppercase", fontWeight: 800 }}>
+                    {hoveredEdge.relationType}
+                  </div>
+                  <div>{hoveredEdge.description}</div>
+                </div>
+              )}
+
+              {/* Canvas Controls at bottom-left matching image: [ + ] [ - ] [ Fit view ] */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 18,
+                  left: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  background: "#FFFFFF",
+                  border: "1px solid #E2E8F0",
+                  borderRadius: 10,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                  padding: 2,
+                  zIndex: 10,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(z + 0.15, 1.9))}
+                  style={{ background: "transparent", border: "none", padding: "6px 10px", cursor: "pointer", color: "#475569" }}
+                  title="Zoom In"
+                >
+                  +
+                </button>
+                <div style={{ width: 1, height: 16, background: "#E2E8F0" }} />
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.max(z - 0.15, 0.65))}
+                  style={{ background: "transparent", border: "none", padding: "6px 10px", cursor: "pointer", color: "#475569" }}
+                  title="Zoom Out"
+                >
+                  &minus;
+                </button>
+                <div style={{ width: 1, height: 16, background: "#E2E8F0" }} />
+                <button
+                  type="button"
+                  onClick={resetView}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "6px 12px",
+                    cursor: "pointer",
+                    color: "#475569",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Maximize2 size={12} /> Fit view
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Evidence Summary Across Your Skills matching image */}
+            <div
+              style={{
+                borderTop: "1px solid #F1F5F9",
+                padding: "16px 22px",
+                background: "#FAFAFA",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 800, color: "#1E1B4B", marginBottom: 10 }}>
+                <ShieldCheck size={16} color="#5642EF" />
+                <span>Evidence across your skills</span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                {/* 1. Resume reviewed */}
+                <button
+                  type="button"
+                  onClick={() => setActiveEvidenceFilter(activeEvidenceFilter === "resume" ? null : "resume")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: activeEvidenceFilter === "resume" ? "#ECFDF5" : "#FFFFFF",
+                    border: activeEvidenceFilter === "resume" ? "1.5px solid #10B981" : "1px solid #E2E8F0",
+                    color: "#059669",
+                    fontSize: 12,
+                    fontWeight: 750,
+                    cursor: "pointer",
+                  }}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Resume reviewed {totalResumeSkills > 0 ? `(${totalResumeSkills})` : ""}</span>
+                </button>
+
+                {/* 2. GitHub evidence */}
+                <button
+                  type="button"
+                  onClick={() => setActiveEvidenceFilter(activeEvidenceFilter === "github" ? null : "github")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: activeEvidenceFilter === "github" ? "#F5F3FF" : "#FFFFFF",
+                    border: activeEvidenceFilter === "github" ? "1.5px solid #8B5CF6" : "1px solid #E2E8F0",
+                    color: "#6D28D9",
+                    fontSize: 12,
+                    fontWeight: 750,
+                    cursor: "pointer",
+                  }}
+                >
+                  <FolderGit2 size={13} />
+                  <span>GitHub evidence {totalGitHubSkills > 0 ? `(${totalGitHubSkills})` : ""}</span>
+                </button>
+
+                {/* 3. Project verified */}
+                <button
+                  type="button"
+                  onClick={() => setActiveEvidenceFilter(activeEvidenceFilter === "project" ? null : "project")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: activeEvidenceFilter === "project" ? "#EFF6FF" : "#FFFFFF",
+                    border: activeEvidenceFilter === "project" ? "1.5px solid #3B82F6" : "1px solid #E2E8F0",
+                    color: "#2563EB",
+                    fontSize: 12,
+                    fontWeight: 750,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Briefcase size={13} />
+                  <span>Project verified {totalVerifiedProjects > 0 ? `(${totalVerifiedProjects})` : ""}</span>
+                </button>
+
+                {/* 4. Portfolio mentioned */}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: "#FDF2F8",
+                    border: "1px solid #FCE7F3",
+                    color: "#DB2777",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>Portfolio mentioned</span>
+                </span>
+
+                {/* 5. Course recorded */}
+                <button
+                  type="button"
+                  onClick={() => setActiveEvidenceFilter(activeEvidenceFilter === "coursework" ? null : "coursework")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: activeEvidenceFilter === "coursework" ? "#EEF2FF" : "#FFFFFF",
+                    border: activeEvidenceFilter === "coursework" ? "1.5px solid #6366F1" : "1px solid #E2E8F0",
+                    color: "#4338CA",
+                    fontSize: 12,
+                    fontWeight: 750,
+                    cursor: "pointer",
+                  }}
+                >
+                  <GraduationCap size={13} />
+                  <span>Course recorded</span>
+                </button>
+
+                {/* 6. Certification found */}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: "#F0FDF4",
+                    border: "1px solid #DCFCE7",
+                    color: "#15803D",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  <Award size={13} />
+                  <span>Certification found</span>
+                </span>
+
+                {/* 7. Blog/Article */}
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 12px",
+                    borderRadius: 8,
+                    background: "#F8FAFC",
+                    border: "1px solid #E2E8F0",
+                    color: "#64748B",
+                    fontSize: 12,
+                    fontWeight: 650,
+                  }}
+                >
+                  <span>Blog/Article</span>
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {!isGalleryMode && filteredList.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 24 }} aria-label="All extracted and suggested skills">
-          {filteredList.map((node) => <button key={node.id} type="button" onClick={() => setSelectedNode(node)}
-            style={{ border: selectedNode.id === node.id ? "1px solid #5642EF" : "1px solid #CBD5E1", borderRadius: 999, padding: "6px 11px", background: selectedNode.id === node.id ? "#EDE9FE" : "#FFFFFF", color: "#334155", cursor: "pointer", fontSize: 12 }}>
-            {node.label}{confirmed.has(node.label.toLowerCase()) ? " · reviewed" : " · suggested"}
-          </button>)}
-        </div>}
+          {/* RIGHT: Selected Skill Intelligence Card (~35% width) */}
+          {selectedNode ? (
+            <div
+              style={{
+                background: "#FFFFFF",
+                borderRadius: 24,
+                border: "1.5px solid rgba(86, 66, 239, 0.12)",
+                padding: "28px",
+                boxShadow: "0 18px 45px rgba(0, 0, 0, 0.05), 0 0 30px rgba(86, 66, 239, 0.03)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                gap: 20,
+              }}
+            >
+              <div>
+                {/* Card Header with Icon, Title, Badges, Bookmark */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    {/* Large Skill Avatar / Logo */}
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 14,
+                        background: selectedNode.entry.bgLight || "#EFF6FF",
+                        display: "grid",
+                        placeItems: "center",
+                        border: "1px solid rgba(2, 132, 199, 0.15)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <RenderTechIcon type={selectedNode.iconType} size={24} color={selectedNode.accentColor} />
+                    </div>
+
+                    <div>
+                      <h3 style={{ fontSize: 22, fontWeight: 850, color: "#1E1B4B", margin: "0 0 4px" }}>
+                        {selectedNode.name}
+                      </h3>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 750,
+                            color: "#0369A1",
+                            background: "#E0F2FE",
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                          }}
+                        >
+                          {selectedNode.entry.badgeLabel}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 750,
+                            color: "#059669",
+                            background: "#ECFDF5",
+                            border: "1px solid #A7F3D0",
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                        >
+                          <Check size={11} /> Reviewed
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleBookmark(selectedNode.name)}
+                    style={{
+                      background: bookmarkedSkills.has(selectedNode.name) ? "rgba(86, 66, 239, 0.1)" : "transparent",
+                      border: "none",
+                      color: bookmarkedSkills.has(selectedNode.name) ? "#5642EF" : "#94A3B8",
+                      cursor: "pointer",
+                      padding: 6,
+                      borderRadius: 8,
+                    }}
+                    title="Bookmark Skill"
+                  >
+                    <Bookmark size={18} fill={bookmarkedSkills.has(selectedNode.name) ? "#5642EF" : "none"} />
+                  </button>
+                </div>
+
+                {/* 3-4 Line Contextual Skill Description */}
+                <p
+                  style={{
+                    fontSize: 13.5,
+                    color: "#475569",
+                    lineHeight: 1.55,
+                    margin: "0 0 20px",
+                  }}
+                >
+                  {contextualExplanation}
+                </p>
+
+                {/* EVIDENCE SOURCES Section */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em", display: "flex", alignItems: "center", gap: 6 }}>
+                      <Layers size={14} color="#5642EF" />
+                      <span>Evidence Sources</span>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#64748B", background: "#F1F5F9", padding: "1px 7px", borderRadius: 9999 }}>
+                      {selectedNode.evidenceItems.length} source{selectedNode.evidenceItems.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {selectedNode.evidenceItems.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {selectedNode.evidenceItems.map((ev, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            background: "#F8FAFC",
+                            border: "1px solid #E2E8F0",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 8,
+                                background: "#FFFFFF",
+                                border: "1px solid #CBD5E1",
+                                display: "grid",
+                                placeItems: "center",
+                                color: "#475569",
+                              }}
+                            >
+                              {ev.type === "github" ? (
+                                <FolderGit2 size={14} />
+                              ) : ev.type === "project" ? (
+                                <Briefcase size={14} />
+                              ) : ev.type === "coursework" ? (
+                                <GraduationCap size={14} />
+                              ) : (
+                                <FileCheck size={14} />
+                              )}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 750, color: "#1E1B4B" }}>{ev.title}</div>
+                              <div style={{ fontSize: 11, color: "#64748B" }}>{ev.details}</div>
+                            </div>
+                          </div>
+
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 750,
+                              color: ev.status === "Verified" ? "#2563EB" : "#059669",
+                              background: ev.status === "Verified" ? "#EFF6FF" : "#ECFDF5",
+                              border: `1px solid ${ev.status === "Verified" ? "#BFDBFE" : "#A7F3D0"}`,
+                              padding: "2px 7px",
+                              borderRadius: 6,
+                            }}
+                          >
+                            ✓ {ev.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: "12px", borderRadius: 10, background: "#F8FAFC", border: "1px dashed #CBD5E1", fontSize: 12.5, color: "#64748B" }}>
+                      No supporting evidence has been linked to this skill yet.
+                    </div>
+                  )}
+                </div>
+
+                {/* RELATED TECHNOLOGIES & FRAMEWORKS Section */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Zap size={13} color="#F59E0B" />
+                    <span>Related Technologies &amp; Frameworks</span>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {selectedNode.entry.relatedTechnologies.slice(0, 5).map((tech) => {
+                      const isInStudentProfile = allSkillNames.some(
+                        (s) => s.toLowerCase().trim() === tech.toLowerCase().trim()
+                      );
+
+                      return (
+                        <button
+                          key={tech}
+                          type="button"
+                          onClick={() => {
+                            if (isInStudentProfile) setSelectedSkillName(tech);
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            background: isInStudentProfile ? "rgba(86, 66, 239, 0.08)" : "#F1F5F9",
+                            border: isInStudentProfile ? "1px solid rgba(86, 66, 239, 0.25)" : "1px solid #E2E8F0",
+                            color: isInStudentProfile ? "#5642EF" : "#475569",
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            cursor: isInStudentProfile ? "pointer" : "default",
+                          }}
+                          title={isInStudentProfile ? "Click to view skill in graph" : "Related technology in taxonomy"}
+                        >
+                          {tech} {isInStudentProfile && "• In profile"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* YOUR PROFICIENCY (AI ESTIMATE) Section */}
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                    Your Proficiency (AI Estimate)
+                  </div>
+
+                  {selectedNode.evidenceItems.length > 0 ? (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 800, color: "#1E1B4B" }}>Intermediate</span>
+                        <span style={{ fontSize: 12, fontWeight: 750, color: "#5642EF" }}>70%</span>
+                      </div>
+                      <div style={{ height: 7, borderRadius: 9999, background: "#E2E8F0", overflow: "hidden", marginBottom: 8 }}>
+                        <div
+                          style={{
+                            width: "70%",
+                            height: "100%",
+                            borderRadius: 9999,
+                            background: "linear-gradient(90deg, #02C5F5 0%, #5642EF 100%)",
+                          }}
+                        />
+                      </div>
+                      <p style={{ fontSize: 11.5, color: "#64748B", margin: 0, lineHeight: 1.4 }}>
+                        Demonstrates practical capability across confirmed project implementations and code repositories.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "#64748B", background: "#F8FAFC", padding: "8px 12px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
+                      Proficiency not assessed yet. Link project evidence to calibrate readiness.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Review Evidence Action Button */}
+              <button
+                type="button"
+                onClick={onNext}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+                  color: "#FFFFFF",
+                  fontSize: 14,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  boxShadow: "0 6px 18px rgba(99, 102, 241, 0.28)",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                <span>Review evidence</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                background: "#FFFFFF",
+                borderRadius: 24,
+                padding: "32px",
+                textAlign: "center",
+                display: "grid",
+                placeItems: "center",
+                border: "1.5px solid #E2E8F0",
+              }}
+            >
+              <p style={{ color: "#64748B" }}>Select a skill node in the graph to inspect evidence and interconnections.</p>
+            </div>
+          )}
+        </div>
 
         {/* Footer Navigation */}
         <ScreenFooter
           onBack={onBack}
           onNext={onNext}
           onJumpToStep={onJumpToStep}
-          activeStep={8}
+          activeStep={9}
           totalSteps={10}
           nextLabel="Next"
         />

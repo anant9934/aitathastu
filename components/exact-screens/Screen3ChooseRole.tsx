@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { GraduationCap, User, Briefcase, Users, Award, Building2, Sparkles, Check } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
@@ -15,7 +15,7 @@ interface Screen3ChooseRoleProps {
 
 const roles = [
   { id: "student", title: "I'm a Student", subtitle: "Build an intelligent profile, learn AI/ML, and discover opportunities", icon: GraduationCap, available: true },
-  { id: "faculty", title: "I'm Faculty", subtitle: "Curate challenges, review projects, and mentor promising talent", icon: User, available: false },
+  { id: "faculty", title: "I'm Faculty", subtitle: "Shape learning, research, and mentorship. Privileged tools require institution approval.", icon: User, available: true },
   { id: "professional", title: "I'm a Professional", subtitle: "Share domain expertise, review architectures, and collaborate", icon: Briefcase, available: false },
   { id: "mentor", title: "I'm a Mentor", subtitle: "Conduct mock assessments and guide aspiring engineers", icon: Users, available: false },
   { id: "alumni", title: "I'm an Alumni", subtitle: "Connect with students and give back to your institution", icon: Award, available: false },
@@ -23,18 +23,19 @@ const roles = [
 ];
 
 export function Screen3ChooseRole({
-  selectedRole = "student",
+  selectedRole = "",
   onSelectRole,
   onNext,
   onBack,
   onJumpToStep,
 }: Screen3ChooseRoleProps) {
-  const [current, setCurrent] = useState(selectedRole || "student");
+  const [current, setCurrent] = useState(selectedRole || "");
+  useEffect(() => setCurrent(selectedRole || ""), [selectedRole]);
   const [notice, setNotice] = useState<string | null>(null);
 
   const handleSelect = (id: string, available: boolean) => {
     if (!available) {
-      setNotice("This role workspace is coming in an upcoming release. Please select Student to explore the active AI/ML progression engine.");
+      setNotice("This role workspace is coming soon. Student and Faculty are available today.");
       return;
     }
     setNotice(null);
@@ -76,7 +77,7 @@ export function Screen3ChooseRole({
       />
 
       <main
-        className="screen-body"
+        className="screen-body v4-role-main"
         style={{
           position: "relative",
           zIndex: 1,
@@ -125,6 +126,7 @@ export function Screen3ChooseRole({
 
         {/* 3x2 Role Grid in Glass Card Container */}
         <div
+          className="v4-role-panel"
           data-eora-id="eora-role-select"
           style={{
             background: "#FFFFFF",
@@ -135,12 +137,13 @@ export function Screen3ChooseRole({
             marginBottom: 28,
           }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+          <div className="v4-role-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
             {roles.map((r) => {
               const Icon = r.icon;
-              const isSelected = current === r.id;
+                  const isSelected = current === r.id;
               return (
                 <div
+                  className="v4-role-card"
                   key={r.id}
                   id={`eora-role-${r.id}`}
                   data-eora-id={`eora-role-${r.id}`}
@@ -267,13 +270,14 @@ export function Screen3ChooseRole({
         {/* Footer */}
         <ScreenFooter
           onBack={onBack}
-          onNext={onNext}
+          onNext={() => current ? onNext() : setNotice("Choose Student or Faculty to continue.")}
           onStepClick={onJumpToStep}
           activeStep={1}
           totalSteps={10}
           nextLabel="Next"
         />
       </main>
+      <style jsx>{`@media(max-width:700px){.v4-role-main{padding:20px 16px 28px!important}.v4-role-panel{padding:16px!important}.v4-role-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important}.v4-role-card{padding:22px 10px!important;min-height:170px}}`}</style>
     </div>
   );
 }

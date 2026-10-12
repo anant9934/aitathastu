@@ -4,6 +4,7 @@ import "./reference-refresh.css";
 import "./student-workspace.css";
 import "./exact-screens.css";
 import "./eora-companion.css";
+import "./landing-theme.css";
 import { EoraProvider } from "@/components/eora/eora-provider";
 import { EoraFloatingCompanion } from "@/components/eora/eora-floating-companion";
 

@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Screen12StudentDashboard } from "@/components/exact-screens/Screen12StudentDashboard";
+import { AdaptiveWorkspace, type WorkspaceSettings } from "@/components/workspace/AdaptiveWorkspace";
 import type { ComposedDashboardViewModel } from "@/lib/domain/personalization-engine";
 import { EoraStudentBridge } from "@/components/eora/eora-student-bridge";
 
 export default function StudentPage() {
   const [composition, setComposition] = useState<ComposedDashboardViewModel | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -17,7 +18,8 @@ export default function StudentPage() {
 
     const loadWorkspace = async () => {
       try {
-        const res = await fetch("/api/student/dashboard");
+        const [res, settingsRes] = await Promise.all([fetch("/api/student/dashboard"), fetch("/api/workspace/preferences")]);
+        if (settingsRes.ok) { const settings: WorkspaceSettings = await settingsRes.json(); if (settings.role === "faculty") { window.location.replace("/faculty"); return; } if (isMounted) setWorkspace(settings); }
         if (res.ok) {
           const data: ComposedDashboardViewModel = await res.json();
           if (isMounted) setComposition(data);
@@ -52,7 +54,7 @@ export default function StudentPage() {
     );
   }
 
-  if (loadError || !composition) {
+  if (loadError || !composition || !workspace) {
     return (
       <main style={{ minHeight: "100vh", display: "grid", placeContent: "center", textAlign: "center", padding: 24 }}>
         <p>{loadError || "Your workspace is unavailable."}</p>
@@ -69,7 +71,7 @@ export default function StudentPage() {
        * It fetches /api/eora/context for the real, full EORA context.
        */}
       <EoraStudentBridge hydrated={true} />
-      <Screen12StudentDashboard composition={composition} />
+      <AdaptiveWorkspace initial={workspace} model={composition} />
     </>
   );
 }

@@ -710,7 +710,7 @@ interface PdfJsExtractionOutput {
 
 async function extractTextWithPdfJs(bytes: Buffer): Promise<PdfJsExtractionOutput> {
   const hyperlinks: string[] = [];
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
   // Local cmaps and standard fonts
   let cMapUrl: string | undefined;
@@ -733,12 +733,27 @@ async function extractTextWithPdfJs(bytes: Buffer): Promise<PdfJsExtractionOutpu
   const doc = await loadingTask.promise;
   const canonicalPages: CanonicalPage[] = [];
   let documentIsMultiColumn = false;
+  let operatorVectors = false;
+  let operatorImages = false;
 
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const viewport = page.getViewport({ scale: 1.0 });
     const content = await page.getTextContent();
     const ordered = orderPageTextItems(content.items, viewport.width);
+
+    // Outlined glyphs are drawing paths rather than PDF text. Inspect the
+    // decoded operator list on unreadable pages; raw stream regexes miss
+    // compressed content and can misclassify a vector CV as a raster scan.
+    if (ordered.text.replace(/\s/g, "").length < 40) {
+      const operators = await page.getOperatorList();
+      operatorVectors ||= operators.fnArray.includes(OPS.constructPath);
+      operatorImages ||= operators.fnArray.some((operation) =>
+        operation === OPS.paintImageXObject ||
+        operation === OPS.paintInlineImageXObject ||
+        operation === OPS.paintImageMaskXObject
+      );
+    }
 
     if (ordered.isMultiColumn) documentIsMultiColumn = true;
 
@@ -773,10 +788,11 @@ async function extractTextWithPdfJs(bytes: Buffer): Promise<PdfJsExtractionOutpu
 
   // Quick scan for vector outline indicators vs raster images
   const rawStr = bytes.subarray(0, Math.min(65536, bytes.length)).toString("latin1");
-  const hasVectorOutlines = /\/Type\s*\/Page[\s\S]*?(?:BT[\s\S]*?ET|[0-9.\-]+\s+[0-9.\-]+\s+m[\s\S]*?f)/i.test(
+  const hasVectorOutlines = operatorVectors || /\/Type\s*\/Page[\s\S]*?(?:BT[\s\S]*?ET|[0-9.\-]+\s+[0-9.\-]+\s+m[\s\S]*?f)/i.test(
     rawStr
   );
   const hasEmbeddedImages =
+    operatorImages ||
     bytes.indexOf(Buffer.from([0xff, 0xd8, 0xff])) !== -1 ||
     bytes.indexOf(Buffer.from([0x89, 0x50, 0x4e, 0x47])) !== -1;
 

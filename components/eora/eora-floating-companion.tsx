@@ -16,6 +16,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import {
   Sparkles,
@@ -49,6 +50,7 @@ interface SpatialCoords {
 }
 
 export function EoraFloatingCompanion() {
+  const pathname = usePathname();
   const eora = useEoraSafe();
   const [inputText, setInputText] = useState("");
   const [placement, setPlacement] = useState<Placement>("bottom-right");
@@ -436,7 +438,9 @@ export function EoraFloatingCompanion() {
   };
 
   // ── Not initialized ────────────────────────────────────────────────────────
-  if (!eora) return null;
+  // The public landing page has its own reference EORA orb. Keep the
+  // authenticated companion available on every other route.
+  if (!eora || pathname === "/") return null;
 
   // ── Dismissed — minimal restore ───────────────────────────────────────────
   if (!eora.isVisible) {
@@ -608,6 +612,11 @@ export function EoraFloatingCompanion() {
             onClick={() => {
               if (eora.isPanelOpen) {
                 eora.closePanel();
+                return;
+              }
+              if (window.matchMedia("(max-width: 820px)").matches && !eora.activeTour && !eora.activeTask) {
+                eora.openPanel();
+                return;
               }
               handleAvatarBoop();
             }}

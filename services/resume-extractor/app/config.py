@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     extractor_owner_id: str = 'local-owner'
     extractor_verifier_token: str = ''
     storage_dir: Path = Path('data/private')
-    max_upload_mb: int = Field(default=12, ge=1, le=100)
+    # Keep in sync with RESUME_MAX_UPLOAD_MB in lib/config/upload-limits.ts.
+    max_upload_mb: int = Field(default=4, ge=1, le=100)
     max_pages: int = Field(default=15, ge=1, le=200)
     max_ocr_seconds: int = Field(default=35, ge=1, le=120)
     max_processing_seconds: int = Field(default=90, ge=5, le=600)

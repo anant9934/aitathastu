@@ -30,7 +30,12 @@ export interface DocumentDownloadResult {
 
 export class ObjectStorageService {
   /**
-   * Persists a document payload durably.
+   * Persists a new document payload durably.
+   *
+   * Callers pass a freshly generated random UUID. These are plain inserts on
+   * purpose: the old ON CONFLICT (id) DO UPDATE let a second uploader whose
+   * id collided (ids used to be content hashes) overwrite another person's
+   * blob and row. A collision now fails loudly instead.
    */
   static async storeDocument(params: {
     documentId: string;
@@ -45,24 +50,7 @@ export class ObjectStorageService {
     const db = await getDb();
 
     // 1. Store durable payload in Neon PostgreSQL
-    const payloadBase64 = buffer.toString("base64");
-    await db
-      .insert(resumeDocumentBlobs)
-      .values({
-        id: documentId,
-        personId,
-        mimeType,
-        payloadBase64,
-      })
-      .onConflictDoUpdate({
-        target: resumeDocumentBlobs.id,
-        set: {
-          payloadBase64,
-          mimeType,
-        },
-      });
-
-    // 2. Ensure parent resume document record exists or is synchronized
+    // Parent row first so a blob never exists without an owner record.
     const fileFormat = filename.split(".").pop()?.toLowerCase() || "pdf";
     await db
       .insert(resumeDocuments)
@@ -80,15 +68,14 @@ export class ObjectStorageService {
           storageDriver: "neon_blob",
           storedAt: new Date().toISOString(),
         },
-      })
-      .onConflictDoUpdate({
-        target: resumeDocuments.id,
-        set: {
-          fileSize: buffer.length,
-          checksum,
-          updatedAt: new Date(),
-        },
       });
+
+    await db.insert(resumeDocumentBlobs).values({
+      id: documentId,
+      personId,
+      mimeType,
+      payloadBase64: buffer.toString("base64"),
+    });
 
     return {
       documentId,
@@ -101,28 +88,22 @@ export class ObjectStorageService {
   /**
    * Retrieves a document payload with strict ownership check.
    */
-  static async getDocument(
-    documentId: string,
-    personId: string,
-    isVerifier: boolean = false
-  ): Promise<DocumentDownloadResult> {
+  static async getDocument(documentId: string, personId: string): Promise<DocumentDownloadResult> {
     const db = await getDb();
 
-    const docCondition = isVerifier
-      ? eq(resumeDocuments.id, documentId)
-      : and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId));
-
-    const docs = await db.select().from(resumeDocuments).where(docCondition);
+    const docs = await db
+      .select()
+      .from(resumeDocuments)
+      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
     if (!docs || docs.length === 0) {
       throw new Error("Document not found or access denied.");
     }
     const doc = docs[0];
 
-    const blobCondition = isVerifier
-      ? eq(resumeDocumentBlobs.id, documentId)
-      : and(eq(resumeDocumentBlobs.id, documentId), eq(resumeDocumentBlobs.personId, personId));
-
-    const blobs = await db.select().from(resumeDocumentBlobs).where(blobCondition);
+    const blobs = await db
+      .select()
+      .from(resumeDocumentBlobs)
+      .where(and(eq(resumeDocumentBlobs.id, documentId), eq(resumeDocumentBlobs.personId, personId)));
     if (!blobs || blobs.length === 0) {
       throw new Error("Document storage content unavailable.");
     }
@@ -163,10 +144,12 @@ export class ObjectStorageService {
         deletedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(resumeDocuments.id, documentId));
+      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
 
     // Remove blob from durable storage
-    await db.delete(resumeDocumentBlobs).where(eq(resumeDocumentBlobs.id, documentId));
+    await db
+      .delete(resumeDocumentBlobs)
+      .where(and(eq(resumeDocumentBlobs.id, documentId), eq(resumeDocumentBlobs.personId, personId)));
 
     return true;
   }

@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 
 export type RateLimitTier =
   | "auth"        // Login, signup, password attempts: 10 req/min
+  | "guest"       // Anonymous guest-account creation, keyed by client IP: 5 per 10 min
   | "resume"      // Resume file upload & parsing: 5 req/min
   | "ai"          // AI model requests: 15 req/min
   | "sync"        // Manual or GitHub sync: 5 req/min
@@ -27,6 +28,7 @@ export interface TierConfig {
 
 export const TIER_CONFIGS: Record<RateLimitTier, TierConfig> = {
   auth: { maxRequests: 10, windowMs: 60_000, isSensitive: true },
+  guest: { maxRequests: 5, windowMs: 10 * 60_000, isSensitive: true },
   resume: { maxRequests: 5, windowMs: 60_000, isSensitive: true },
   ai: { maxRequests: 15, windowMs: 60_000, isSensitive: true },
   sync: { maxRequests: 5, windowMs: 60_000, isSensitive: true },
@@ -225,17 +227,6 @@ export function initRateLimiter(): void {
 
 // Initialize on module load
 initRateLimiter();
-
-/**
- * Allows test suites to explicitly inject a rate limiter backend.
- */
-export function setRateLimiterBackend(backend: RateLimiterBackend): void {
-  activeLimiter = backend;
-}
-
-export function getRateLimiterBackend(): RateLimiterBackend {
-  return activeLimiter;
-}
 
 /**
  * Constructs an opaque, privacy-preserving rate limit key.

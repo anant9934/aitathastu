@@ -19,7 +19,7 @@
  * Scanned fallback (< 40 chars), and Corrupt file defense.
  */
 
-import { ExtractionValidator } from "./extraction-validator";
+import { ExtractionValidator } from "../../lib/services/extraction-validator";
 
 export type FieldDimension =
   | "name_academic"

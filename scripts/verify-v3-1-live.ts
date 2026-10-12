@@ -35,7 +35,7 @@ import {
   goals,
 } from "../lib/db/schema";
 import { ExtractionValidator } from "../lib/services/extraction-validator";
-import { runExtractionBenchmark } from "../lib/services/extraction-benchmark";
+import { runExtractionBenchmark } from "./lib/extraction-benchmark";
 import { CrossSourceFusionService } from "../lib/services/cross-source-fusion-service";
 import {
   analyzeArchitecturalComponents,

@@ -41,7 +41,7 @@ import {
 } from "../lib/db/schema";
 
 import { auditProductionSecrets } from "../lib/security/production-secrets";
-import { runFieldLevelBenchmark, LABELED_BENCHMARK_DATASET } from "../lib/services/extraction-benchmark";
+import { runFieldLevelBenchmark, LABELED_BENCHMARK_DATASET } from "./lib/extraction-benchmark";
 import { CrossSourceFusionService } from "../lib/services/cross-source-fusion-service";
 import { generatePersonalizedRoadmap } from "../lib/domain/roadmap";
 import { getPerson360 } from "../lib/services/person-360-service";

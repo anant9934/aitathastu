@@ -21,7 +21,7 @@ import {
   resolveMultiDimensionalState,
   type CanonicalProvenanceRecord,
   type MultiDimensionalConnectionState,
-} from "../lib/domain/provenance";
+} from "./lib/provenance";
 import {
   CrossSourceFusionService,
   type CandidateProjectMatch,

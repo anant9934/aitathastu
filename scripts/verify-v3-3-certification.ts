@@ -57,7 +57,7 @@ import zlib from "node:zlib";
 
 import { auditProductionSecrets } from "../lib/security/production-secrets";
 import { ExtractionValidator } from "../lib/services/extraction-validator";
-import { LABELED_BENCHMARK_DATASET } from "../lib/services/extraction-benchmark";
+import { LABELED_BENCHMARK_DATASET } from "./lib/extraction-benchmark";
 import { groundResumeInterpretation } from "../lib/services/resume-extraction-service";
 import { parseLinkedInDataExport, parseLinkedInZipArchive, validateLinkedInUrl } from "../lib/connectors/linkedin/client";
 import { fetchLeetCodeProfileStats, normalizeLeetCodeUsername } from "../lib/connectors/leetcode/client";

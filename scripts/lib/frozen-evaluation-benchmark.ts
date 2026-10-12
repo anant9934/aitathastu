@@ -13,7 +13,7 @@ import {
   filterAspirationalSkills,
   filterCourseworkFromSkills,
   isScannedOrUnusableDocument,
-} from "./extraction-validator";
+} from "../../lib/services/extraction-validator";
 
 export interface FrozenBenchmarkCase {
   id: string;

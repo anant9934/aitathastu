@@ -1,122 +1,96 @@
-# AI Tathastu — "You imagine. AI makes it happen."
+# AI Tathastu
 
-> **Production-Grade AI/ML Student Intelligence, Competency Verification & Personalization Platform**
+A career and learning platform for AI/ML students. A student goes through an
+EORA-guided onboarding (role, direction, CV upload and review, academic
+details, digital footprints, GitHub projects) and lands in an adaptive
+workspace built from reviewed evidence (Person 360, projects, skills,
+roadmap). There's also a faculty workspace with an evidence verification queue.
 
-AI Tathastu transforms student career aspirations into structured, verifiable pathways. Built for higher-education and engineering institutions, Tathastu unifies evidence from code repositories, course completions, proctored assessments, and mock interviews into an authoritative **Person 360** graph—powering personalized roadmaps, explainable readiness metrics, and dynamic student workspaces.
+## Stack
 
----
+| Part | Tech |
+|---|---|
+| Web app | Next.js 15 (App Router), React 19, TypeScript, Tailwind 4 |
+| Database | PostgreSQL (Neon in production) via Drizzle ORM; embedded PGlite for local dev |
+| Auth | Own session tokens (`sessions` table, httpOnly cookie), Google OIDC, GitHub OAuth |
+| CV parsing | In-process text extraction (pdf.js, mammoth). Scanned PDFs are OCR'd by the separate Python service |
+| Resume extractor | Python FastAPI + PyMuPDF + Tesseract in `services/resume-extractor/`, deployed on Render |
+| AI | Optional multi-provider LLM pool for EORA, with a deterministic fallback. CV extraction uses no LLM |
+| Hosting | Netlify (Next.js app), Render (extractor) |
 
-## Key Highlights & Architectural Pillars
+How it fits together: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). How to deploy it: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-- **Zero Mock Data in Runtime**: Authenticated student dashboards operate exclusively on real, persisted records from remote Neon PostgreSQL.
-- **Universal Multi-Tier Resume Extraction Engine (v5.0)**:
-  - 4-Tier fallback pipeline: PDF.js native stream parsing $\to$ structural layout reconstruction $\to$ canvas rasterization + OCR engine fallback $\to$ vector/path glyph heuristics.
-  - Deterministic entity recognition across arbitrary international resume layouts (single-column, multi-column, icon-contact headers, compact tables).
-  - Robust extraction across work experience, educational credentials, chronological date resolution, project artifacts, verified skill lexicons, and publication records.
-- **Enterprise Multi-Provider LLM Router**: Seamless integration with **Groq** (`openai/gpt-oss-120b`), **OpenRouter** (`meta-llama/llama-3.3-70b-instruct`), and **Google Gemini** (`gemini-3.5-flash-lite`), protected by Zod structured output validation and automatic zero-downtime deterministic fallback.
-- **Grounded RAG Knowledge Engine**: 16 canonical AI/ML domains providing verified technical and academic citations (ArXiv, official documentation).
-- **96 Priority-Aware Personalization Configurations**: Mathematically verified multi-interest composition engine spanning 6 core modes (Learning, Jobs, People, Collaboration, Projects, Research & Events).
-- **Safe Tool Execution & Confirmation Gates**: AI assistants cannot mutate application state without explicit student confirmation in the UI.
-- **Five Competency Evidence Tiers**: Clear trust depths separating *Institutionally Verified* (100%), *Demonstrated in Projects* (75%), *Source Detected* (50%), *Student Reported* (25%), and *Insufficient Evidence* (0%).
-- **Defensible Readiness Scoring**: Publishes numerical readiness scores only when verified evidence coverage meets strict policy gates ($\ge 60\%$).
+## Run locally
 
----
-
-## Tech Stack
-
-- **Framework**: [Next.js 15 App Router](https://nextjs.org/) (React 19, TypeScript)
-- **Database & Persistence**: [Neon PostgreSQL](https://neon.tech/) Serverless via `@neondatabase/serverless` & [Drizzle ORM](https://orm.drizzle.team/)
-- **Document & Resume Parser**: Native PDF.js worker with structural layout reconstruction, canvas rendering heuristics, and deterministic semantic extraction
-- **Distributed Cache & Rate Limiting**: [Redis](https://redis.io/) with failover to in-memory rate limiting
-- **Intelligence Providers**: Groq, OpenRouter, Google Gemini, Cerebras, Mistral, SambaNova
-- **Styling**: Tailwind CSS & Vanilla CSS Design System tokens
-- **Security**: Bcrypt password hashing, HttpOnly session cookies, timing-safe HMAC SHA-256 webhook signatures, SSRF protection
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+ or 22 LTS
-- Remote PostgreSQL database (Neon serverless recommended)
-
-### Installation
+Requires Node 22 (see `.nvmrc`).
 
 ```bash
-# Clone repository
-git clone https://github.com/anant9934/aitathastu.git
-cd aitathastu
-
-# Install dependencies
-npm install
-
-# Configure environment variables
-cp .env.example .env.local
-# Edit .env.local with your database and provider credentials
+npm ci
+cp .env.example .env      # leave DATABASE_URL empty to use embedded PGlite
+npm run dev               # http://localhost:3000
 ```
 
-### Database Migrations
+With `DATABASE_URL` empty and `NODE_ENV` not `production`, the app creates a
+PGlite database in `.pgdata/` and applies the schema on startup. Every
+variable is documented in [.env.example](.env.example).
+
+### Resume extractor (needed only for scanned/image PDFs)
+
+Text PDFs and DOCX are parsed by the Next app itself. Scanned PDFs need the
+Python service plus a Tesseract 5 install on your PATH:
 
 ```bash
-npm run db:migrate
+cd services/resume-extractor
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt -r requirements-dev.txt
+EXTRACTOR_API_TOKEN=local-dev-token uvicorn app.main:app --port 8000
 ```
 
-### Development Server
+Then set `RESUME_EXTRACTOR_URL=http://127.0.0.1:8000` and the same
+`EXTRACTOR_API_TOKEN` in the app's `.env`.
+
+## Database migrations
+
+`lib/db/migration-sql.ts` is the single, canonical, idempotent migration list.
+`lib/db/schema.ts` is the query model and is kept in step by hand.
 
 ```bash
-npm run dev
+npm run db:migrate        # applies migration-sql.ts to DATABASE_URL
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Production never runs DDL on cold start (`DATABASE_AUTO_MIGRATE` defaults to
+false there). Run `db:migrate` as a deploy step. If a unique index is skipped
+because of existing duplicates, `node --env-file=.env --import tsx scripts/report-duplicate-keys.ts`
+lists them.
 
----
+## Tests
 
-## Verification & Testing Suite
-
-The repository includes a comprehensive 58-suite test matrix with 307 automated tests verifying end-to-end functionality, security controls, and personalization permutations:
+There is no Jest/Vitest; tests are `tsx` scripts under `scripts/`.
 
 ```bash
-# Run all 307 unit, domain, and integration tests
-npm test
-
-# Run strict TypeScript typechecking
 npm run typecheck
-
-# Run ESLint validation
 npm run lint
+npm test                                   # core acceptance suite (in-memory DB when DATABASE_URL is empty)
+npm run test:v5-0-4-extraction             # deterministic CV extraction
 
-# Build optimized production bundle
-npm run build
+# Need a running `npm run dev` (and the extractor for --scanned):
+node --import tsx scripts/verify-resume-pipeline-local.ts --scanned path/to/scanned.pdf
+node --import tsx scripts/verify-onboarding-integrity-local.ts
+
+# Offline, in-memory DB:
+DATABASE_URL= PGLITE_IN_MEMORY=true node --import tsx scripts/verify-github-footprint-integrity.ts
+DATABASE_URL= PGLITE_IN_MEMORY=true node --import tsx scripts/verify-guest-purge.ts
+
+# Python extractor
+cd services/resume-extractor && pytest -q
 ```
 
----
+Many older `verify-v*` / `test:core-v*` scripts expect a live Neon database or
+local resume files that aren't in the repo.
 
-## Documentation
+## Maintenance
 
-Full architectural documentation and certification audits are located in the [`docs/`](docs/) directory:
+- `scripts/purge-stale-guests.ts`: deletes guest accounts older than 7 days that never finished onboarding (dry run unless `--apply`). Also runs daily from the cron route.
+- `/api/cron/cleanup-stuck-syncs`: daily cleanup, triggered by the Netlify scheduled function `netlify/functions/cleanup-stuck-syncs.mts`.
 
-### Core Architecture & Production Certification
-- [`docs/FUNCTIONAL_AUDIT.md`](docs/FUNCTIONAL_AUDIT.md) — Master route-to-service-to-DB dependency map and capability audit.
-- [`docs/LLM_PROVIDER_CERTIFICATION.md`](docs/LLM_PROVIDER_CERTIFICATION.md) — Multi-provider LLM engine, schemas, tool executor, and fallback behavior.
-- [`docs/REAL_DATA_SOURCE_MATRIX.md`](docs/REAL_DATA_SOURCE_MATRIX.md) — Data connector architecture, GitHub sync, resume extraction, and trust levels.
-- [`docs/PERSONALIZATION_RUNTIME_REPORT.md`](docs/PERSONALIZATION_RUNTIME_REPORT.md) — 96 configurations, 6 dashboard modes, and 5 evidence tiers.
-- [`docs/ROADMAP_ENGINE_VALIDATION.md`](docs/ROADMAP_ENGINE_VALIDATION.md) — Deterministic prerequisite graphs, taxonomy, and feedback loops.
-- [`docs/EORA_RUNTIME_VALIDATION.md`](docs/EORA_RUNTIME_VALIDATION.md) — EORA assistant mission, RAG knowledge retrieval, and tool confirmation gates.
-- [`docs/EXTERNAL_INTEGRATION_STATUS.md`](docs/EXTERNAL_INTEGRATION_STATUS.md) — Architectural boundaries for Study LPU, Padho Code, ERIS, and MentorMaze.
-- [`docs/PRODUCTION_SECURITY_REVIEW.md`](docs/PRODUCTION_SECURITY_REVIEW.md) — Threat model, IDOR protection, SSRF filtering, and prompt injection defense.
-- [`docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md`](docs/PRODUCTION_DEPLOYMENT_RUNBOOK.md) — Health probes, deployment steps, and rollback procedures.
-- [`docs/FINAL_PRODUCTION_READINESS_REPORT.md`](docs/FINAL_PRODUCTION_READINESS_REPORT.md) — Complete launch certification verdict and sign-off.
-
-### Universal Resume Extraction & Benchmark Reports (v5.0)
-- [`docs/V5_0_1_DATASET_AUDIT.md`](docs/V5_0_1_DATASET_AUDIT.md) — Multi-format PDF dataset audit, layout profiling, and edge cases.
-- [`docs/V5_0_2_BASELINE_BENCHMARK.md`](docs/V5_0_2_BASELINE_BENCHMARK.md) — Baseline extraction accuracy and latency metrics.
-- [`docs/V5_0_3_UNIVERSAL_PARSER_REPORT.md`](docs/V5_0_3_UNIVERSAL_PARSER_REPORT.md) — Universal multi-tier document parsing architecture & performance.
-- [`docs/V5_0_4_STRUCTURED_EXTRACTION_REPORT.md`](docs/V5_0_4_STRUCTURED_EXTRACTION_REPORT.md) — Deterministic structured extraction and section segmentation.
-- [`docs/V5_0_5_GROUND_TRUTH_AND_ACCURACY_REPORT.md`](docs/V5_0_5_GROUND_TRUTH_AND_ACCURACY_REPORT.md) — Ground-truth comparison and evaluation benchmarks.
-
----
-
-## License
-
-Private & Proprietary — AI Tathastu. All rights reserved.
+Older certification reports are kept in [docs/archive/](docs/archive/). They predate the 2026-10-12 audit and are not current.

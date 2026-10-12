@@ -82,7 +82,7 @@ import { SourceProcessingJobService } from "../lib/services/source-processing-jo
 import { getPerson360 } from "../lib/services/person-360-service";
 import { getStudentDashboardComposition } from "../lib/services/dashboard-service";
 import { generatePersonalizedRoadmap, persistRoadmapMilestones } from "../lib/domain/roadmap";
-import { CoreIntelligenceOrchestrator } from "../lib/intelligence/orchestrator";
+import { CoreIntelligenceOrchestrator } from "./lib/intelligence-orchestrator";
 import { saveProject, getProjectsByPersonId } from "../lib/repositories/project-repository";
 import { createEvidenceRecord, getEvidenceByPersonId } from "../lib/repositories/evidence-repository";
 import { saveExternalConnection, disconnectConnection, getExternalConnections } from "../lib/repositories/connection-repository";

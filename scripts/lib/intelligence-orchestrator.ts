@@ -22,13 +22,13 @@
  * - Deterministic fallback guarantees
  */
 
-import type { IntelligenceTask } from "./types";
-import { sanitizeTextForPrompt } from "./prompt-defense";
-import { CrossSourceFusionService } from "../services/cross-source-fusion-service";
-import { generatePersonalizedRoadmap, persistRoadmapMilestones, type StudentRoadmap } from "../domain/roadmap";
-import { retrieveKnowledge } from "../knowledge/rag-engine";
-import { getPerson360 } from "../services/person-360-service";
-import { getDb, intelligenceArtifacts, type TathastuDb } from "../db";
+import type { IntelligenceTask } from "../../lib/intelligence/types";
+import { sanitizeTextForPrompt } from "../../lib/intelligence/prompt-defense";
+import { CrossSourceFusionService } from "../../lib/services/cross-source-fusion-service";
+import { generatePersonalizedRoadmap, persistRoadmapMilestones, type StudentRoadmap } from "../../lib/domain/roadmap";
+import { retrieveKnowledge } from "../../lib/knowledge/rag-engine";
+import { getPerson360 } from "../../lib/services/person-360-service";
+import { getDb, intelligenceArtifacts, type TathastuDb } from "../../lib/db";
 import crypto from "node:crypto";
 
 export interface ContextBuilderOptions {

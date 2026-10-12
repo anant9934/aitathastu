@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     // is written only after the student confirms candidates in onboarding.
     await createJourneyEventRecord(personId, {
       type: "footprint_connected",
-      title: `Connected ${provider.toUpperCase()}`,
+      title: result.connectionStatus === "detected" ? `Detected ${provider.toUpperCase()} profile (unverified)` : `Connected ${provider.toUpperCase()}`,
       description: result.summary,
       metadata: { provider, acquisitionStatus: result.acquisitionMode, candidateCount: result.candidateCount },
     }).catch(() => null);
@@ -62,6 +62,8 @@ export async function POST(req: Request) {
       recordsCreated: result.recordsCreated,
       candidateCount: result.candidateCount,
       summary: result.summary,
+      connectionStatus: result.connectionStatus,
+      partial: Boolean(result.partial),
       candidates: result.candidates,
       lastSyncedAt: result.lastSyncedAt,
       projects: result.candidates.projects,

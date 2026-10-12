@@ -57,7 +57,7 @@ export type ReadinessResult = {
 };
 
 // Approved versioned readiness policies
-export const READINESS_POLICIES: Record<string, ReadinessPolicy> = {
+const READINESS_POLICIES: Record<string, ReadinessPolicy> = {
   "ml-engineer-v1": {
     key: "ml-engineer-v1",
     name: "AI Tathastu ML Engineer Readiness v1",
@@ -236,7 +236,7 @@ export const READINESS_POLICIES: Record<string, ReadinessPolicy> = {
 /**
  * Returns the active readiness policy matching a goal title or template key.
  */
-export function getReadinessPolicyForGoal(goalTitle: string): ReadinessPolicy | null {
+function getReadinessPolicyForGoal(goalTitle: string): ReadinessPolicy | null {
   const { template, isCustom } = getGoalTemplate(goalTitle);
   if (isCustom) return null;
 
@@ -256,7 +256,7 @@ export function getReadinessPolicyForGoal(goalTitle: string): ReadinessPolicy | 
  * Evaluates evidence strength for a dimension deterministically.
  * Avoids blind double-counting of correlated resume keywords.
  */
-export function evaluateDimensionStrength(
+function evaluateDimensionStrength(
   dim: DimensionPolicy,
   evidence: EvidenceItem[]
 ): {

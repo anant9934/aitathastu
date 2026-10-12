@@ -5,6 +5,7 @@
  * never their values. Confirms Render connectivity AND auth token validity.
  */
 import { NextResponse } from "next/server";
+import { resolveLocalTrainedDataPath } from "@/lib/services/document-parser-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +84,7 @@ export async function GET() {
     : "⚠️ Auth test inconclusive — check Render logs";
 
   return NextResponse.json({
+    localOcrModel: { checksumValid: resolveLocalTrainedDataPath().checksumValid },
     env: {
       RESUME_EXTRACTOR_URL: hasUrl ? `${renderUrl.slice(0, 35)}…` : "❌ NOT SET",
       EXTRACTOR_API_TOKEN: hasToken ? "✅ SET" : "❌ NOT SET",

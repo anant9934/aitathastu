@@ -1185,7 +1185,10 @@ export async function recognizeScannedDocument(
     // Configure worker with resolved traineddata path
     const workerOptions: Record<string, any> = {
       langPath: langDir,
-      cacheMethod: "readOnly",
+      // Always read the verified, uncompressed model from langPath. The
+      // default cache lookup uses process.cwd(), which can differ in Vercel.
+      cacheMethod: "none",
+      gzip: false,
       errorHandler: () => {},
     };
 

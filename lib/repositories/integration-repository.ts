@@ -28,33 +28,6 @@ export function hashIntegrationKey(key: string): string {
   return crypto.createHash("sha256").update(key).digest("hex");
 }
 
-export async function createIntegrationCredential(params: {
-  organizationId: string;
-  producer: ProducerType;
-  rawKey: string;
-  label?: string;
-}) {
-  const db = await getDb();
-  const id = `ic_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-  const keyHash = hashIntegrationKey(params.rawKey);
-  const keyPrefix = params.rawKey.slice(0, 8);
-
-  const [created] = await db
-    .insert(integrationCredentials)
-    .values({
-      id,
-      organizationId: params.organizationId,
-      producer: params.producer,
-      keyHash,
-      keyPrefix,
-      status: "active",
-      label: params.label || `${params.producer.toUpperCase()} Integration Key`,
-    })
-    .returning();
-
-  return created;
-}
-
 export async function getIntegrationCredentialByKey(rawKey: string) {
   const db = await getDb();
   const keyHash = hashIntegrationKey(rawKey);
@@ -79,54 +52,6 @@ export async function getIntegrationCredentialByKey(rawKey: string) {
   return rows[0];
 }
 
-export async function createIdentityLink(params: {
-  organizationId: string;
-  producer: ProducerType;
-  externalSubjectId: string;
-  personId: string;
-}) {
-  const db = await getDb();
-
-  // Check if link already exists
-  const existing = await db
-    .select()
-    .from(integrationIdentityLinks)
-    .where(
-      and(
-        eq(integrationIdentityLinks.organizationId, params.organizationId),
-        eq(integrationIdentityLinks.producer, params.producer),
-        eq(integrationIdentityLinks.externalSubjectId, params.externalSubjectId)
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    if (existing[0].personId !== params.personId) {
-      const [updated] = await db
-        .update(integrationIdentityLinks)
-        .set({ personId: params.personId, updatedAt: new Date() })
-        .where(eq(integrationIdentityLinks.id, existing[0].id))
-        .returning();
-      return updated;
-    }
-    return existing[0];
-  }
-
-  const id = `link_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-  const [created] = await db
-    .insert(integrationIdentityLinks)
-    .values({
-      id,
-      organizationId: params.organizationId,
-      producer: params.producer,
-      externalSubjectId: params.externalSubjectId,
-      personId: params.personId,
-    })
-    .returning();
-
-  return created;
-}
-
 export async function getIdentityLink(
   organizationId: string,
   producer: ProducerType,
@@ -146,19 +71,6 @@ export async function getIdentityLink(
     .limit(1);
 
   return rows.length > 0 ? rows[0].personId : null;
-}
-
-export async function getIdentityLinksByPersonId(personId: string): Promise<Array<{ producer: ProducerType; externalSubjectId: string }>> {
-  const db = await getDb();
-  const rows = await db
-    .select({
-      producer: integrationIdentityLinks.producer,
-      externalSubjectId: integrationIdentityLinks.externalSubjectId,
-    })
-    .from(integrationIdentityLinks)
-    .where(eq(integrationIdentityLinks.personId, personId));
-
-  return rows as Array<{ producer: ProducerType; externalSubjectId: string }>;
 }
 
 export async function getIntegrationEventByProducerAndExternalId(

@@ -33,9 +33,13 @@ export async function getDb(): Promise<TathastuDb> {
     }
     const isProd = process.env.NODE_ENV === "production";
     const databaseMode = process.env.DATABASE_MODE || (isProd ? "postgres" : "auto");
-    // A least-privilege preview runtime must never attempt schema DDL. Migrations
-    // remain an explicit setup step using the branch owner credential.
-    const autoMigrate = process.env.DATABASE_AUTO_MIGRATE !== "false";
+    // Runtime DDL is off by default in production: schema changes are applied
+    // by `npm run db:migrate` as an explicit deploy step, not by whichever cold
+    // start happens first. Development defaults to on for convenience.
+    // DATABASE_AUTO_MIGRATE=true|false overrides either default.
+    const autoMigrate = process.env.DATABASE_AUTO_MIGRATE
+      ? process.env.DATABASE_AUTO_MIGRATE === "true"
+      : !isProd;
 
     // 1. Production / Explicit PostgreSQL Mode Validation
     if (databaseMode === "postgres" || isProd) {

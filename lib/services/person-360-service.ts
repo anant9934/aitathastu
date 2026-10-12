@@ -139,22 +139,19 @@ export async function getPerson360(
     throw new Error("Unauthorized: Access to Person 360 denied.");
   }
 
-  const person = await getPersonById(personId);
-  if (!person) {
-    throw new Error("Person not found.");
-  }
-
-  const profile = await getPersonProfile(personId);
-  const activeGoal = await getActiveGoal(personId);
-  const allGoals = await getGoalsByPersonId(personId);
-  const evidenceList = await getEvidenceByPersonId(personId);
-  const journeyList = await getJourneyEventsByPersonId(personId);
-  const actionStates = await getActionStatesByPersonId(personId);
-  const prefs = await getUserPreferences(personId);
-
-  // Load organization memberships with roles
+  // These reads are independent; this function backs most dashboard, chat and
+  // context requests, so they run in parallel rather than one after another.
   const db = await getDb();
-  const rawMemberships = await db
+  const [person, profile, activeGoal, allGoals, evidenceList, journeyList, actionStates, prefs, rawMemberships] = await Promise.all([
+    getPersonById(personId),
+    getPersonProfile(personId),
+    getActiveGoal(personId),
+    getGoalsByPersonId(personId),
+    getEvidenceByPersonId(personId),
+    getJourneyEventsByPersonId(personId),
+    getActionStatesByPersonId(personId),
+    getUserPreferences(personId),
+    db
     .select({
       membershipId: organizationMemberships.id,
       orgId: organizations.id,
@@ -168,7 +165,11 @@ export async function getPerson360(
     .innerJoin(organizations, eq(organizations.id, organizationMemberships.organizationId))
     .leftJoin(membershipRoles, eq(membershipRoles.membershipId, organizationMemberships.id))
     .leftJoin(roles, eq(roles.id, membershipRoles.roleId))
-    .where(eq(organizationMemberships.personId, personId));
+    .where(eq(organizationMemberships.personId, personId)),
+  ]);
+  if (!person) {
+    throw new Error("Person not found.");
+  }
 
   type OrgMembershipItem = {
     organizationId: string;

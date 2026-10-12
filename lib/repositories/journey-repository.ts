@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { eq, and, desc } from "drizzle-orm";
 import { getDb, journeyEvents } from "../db";
 import type { JourneyEventType } from "../domain";
+import { pageBounds, type PageOptions } from "./pagination";
 
 export type JourneyEventRecord = {
   id: string;
@@ -27,13 +28,16 @@ export type JourneyEventInsertParams = {
   timestamp?: Date | string;
 };
 
-export async function getJourneyEventsByPersonId(personId: string): Promise<JourneyEventRecord[]> {
+export async function getJourneyEventsByPersonId(personId: string, page?: PageOptions): Promise<JourneyEventRecord[]> {
   const db = await getDb();
+  const { limit, offset } = pageBounds(page);
   const rows = await db
     .select()
     .from(journeyEvents)
     .where(eq(journeyEvents.personId, personId))
-    .orderBy(desc(journeyEvents.timestamp));
+    .orderBy(desc(journeyEvents.timestamp), desc(journeyEvents.id))
+    .limit(limit)
+    .offset(offset);
 
   return rows as JourneyEventRecord[];
 }
@@ -90,16 +94,4 @@ export async function createJourneyEventRecord(
     timestamp: ts,
     createdAt: now,
   };
-}
-
-export async function upsertJourneyEvents(
-  personId: string,
-  events: JourneyEventInsertParams[]
-): Promise<JourneyEventRecord[]> {
-  const results: JourneyEventRecord[] = [];
-  for (const ev of events) {
-    const record = await createJourneyEventRecord(personId, ev);
-    results.push(record);
-  }
-  return results;
 }

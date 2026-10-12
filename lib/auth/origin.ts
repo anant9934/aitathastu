@@ -1,35 +1,18 @@
 /**
- * AI TATHASTU — CANONICAL APPLICATION ORIGIN RESOLVER
+ * Canonical application origin, used for OAuth redirect URIs and other absolute links.
  *
- * Ensures consistent canonical origins across Google and GitHub OAuth flows.
- * Handles production Vercel proxies, custom domains, and local development.
+ * Production uses APP_BASE_URL only. Request headers (Host,
+ * X-Forwarded-Host) are client-influenced, and an OAuth redirect_uri built
+ * from them can be pointed at another host. In development, where
+ * APP_BASE_URL is often unset, the request's own host is an acceptable fallback.
  */
-
 export function getCanonicalOrigin(req?: Request): string {
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (req) {
-    const forwardedHost = req.headers.get("x-forwarded-host") || req.headers.get("host");
-    const forwardedProto = req.headers.get("x-forwarded-proto") || (isProduction ? "https" : "http");
-    if (forwardedHost) {
-      if (!isProduction || !forwardedHost.includes("localhost")) {
-        return `${forwardedProto}://${forwardedHost}`.replace(/\/$/, "");
-      }
-    }
+  const envUrl = process.env.APP_BASE_URL?.trim().replace(/\/+$/, "");
+  if (process.env.NODE_ENV === "production") {
+    if (!envUrl) throw new Error("APP_BASE_URL must be set in production.");
+    return envUrl;
   }
-
-  const envUrl = process.env.APP_BASE_URL?.trim();
-  if (envUrl && (!isProduction || !envUrl.includes("localhost"))) {
-    return envUrl.replace(/\/$/, "");
-  }
-
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.trim()}`.replace(/\/$/, "");
-  }
-
-  if (isProduction) {
-    return "https://www.aitathastu.com";
-  }
-
-  return envUrl ? envUrl.replace(/\/$/, "") : "http://localhost:3000";
+  if (envUrl) return envUrl;
+  const host = req?.headers.get("host");
+  return host ? `http://${host}` : "http://localhost:3000";
 }

@@ -29,10 +29,10 @@ const CORE_INGESTION_SECRETS = [
  * NOT errors, and cannot block CV upload or the ingestion gate.
  */
 const ECOSYSTEM_INTEGRATION_SECRETS = [
-  "INTEGRATION_STUDY_LPU_SECRET",
-  "INTEGRATION_PADHO_CODE_SECRET",
-  "INTEGRATION_ERIS_SECRET",
-  "INTEGRATION_MENTORMAZE_SECRET",
+  "STUDY_LPU_INTEGRATION_SECRET",
+  "PADHO_CODE_INTEGRATION_SECRET",
+  "ERIS_INTEGRATION_SECRET",
+  "MENTORMAZE_INTEGRATION_SECRET",
 ] as const;
 
 const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
@@ -54,19 +54,19 @@ const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
     "secret",
   ],
   EXTERNAL_TOKEN_ENCRYPTION_KEY: ["change-me", "secret", "replace-with-random-key"],
-  INTEGRATION_STUDY_LPU_SECRET: [
+  STUDY_LPU_INTEGRATION_SECRET: [
     "study_lpu_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  INTEGRATION_PADHO_CODE_SECRET: [
+  PADHO_CODE_INTEGRATION_SECRET: [
     "padho_code_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  INTEGRATION_ERIS_SECRET: [
+  ERIS_INTEGRATION_SECRET: [
     "eris_live_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  INTEGRATION_MENTORMAZE_SECRET: [
+  MENTORMAZE_INTEGRATION_SECRET: [
     "mentormaze_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
@@ -82,7 +82,8 @@ export function auditProductionSecrets(
 ): ProductionSecretAuditResult {
   const nodeEnv = env.NODE_ENV || "development";
   const isProd = nodeEnv === "production";
-  const isStaging = env.APP_ENV === "staging" || env.VERCEL_ENV === "preview";
+  // Netlify sets CONTEXT to "deploy-preview" / "branch-deploy" for non-production deploys.
+  const isStaging = env.APP_ENV === "staging" || env.CONTEXT === "deploy-preview" || env.CONTEXT === "branch-deploy";
   const environment = isProd ? "production" : isStaging ? "staging" : "development";
 
   const missingRequired: string[] = [];

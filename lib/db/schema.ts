@@ -117,7 +117,10 @@ export const evidenceItems = pgTable("evidence_items", {
   verificationDecisionId: text("verification_decision_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  // Closes the dedupe race in createEvidenceRecord (see migration-sql.ts for rollout).
+  uniqueIndex("uq_evidence_person_import_key").on(table.personId, table.importKey),
+]);
 
 export const verificationRequests = pgTable("verification_requests", {
   id: text("id").primaryKey(),
@@ -374,6 +377,8 @@ export const projects = pgTable(
     id: text("id").primaryKey(),
     personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    /** normalizeProjectTitle(title): matches the same project across CV, GitHub and manual entry. */
+    normalizedTitle: text("normalized_title"),
     summary: text("summary").default(""),
     description: text("description").default(""),
     category: text("category").default("Other AI/ML"),
@@ -396,6 +401,7 @@ export const projects = pgTable(
   },
   (table) => [
     index("idx_projects_person").on(table.personId),
+    uniqueIndex("uq_projects_person_normalized_title").on(table.personId, table.normalizedTitle),
   ]
 );
 

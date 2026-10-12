@@ -11,7 +11,7 @@ const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  */
 export function verifySameOrigin(
   req: Request,
-  allowedHostnames: string[] = ["localhost", "127.0.0.1"]
+  allowedHostnames: string[] = process.env.NODE_ENV === "production" ? [] : ["localhost", "127.0.0.1"]
 ): { valid: boolean; reason?: string } {
   if (!STATE_CHANGING_METHODS.has(req.method.toUpperCase())) {
     return { valid: true };

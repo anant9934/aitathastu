@@ -24,7 +24,7 @@ services:
       - key: ALLOWED_ORIGIN
         sync: false
       - key: MAX_UPLOAD_MB
-        value: "25"
+        value: "4" # keep in sync with lib/config/upload-limits.ts
       - key: MAX_PAGES
         value: "20"
       - key: MAX_OCR_SECONDS

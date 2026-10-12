@@ -78,11 +78,11 @@ export async function GET() {
     const confirmedProjects = allProjects.filter((p) => p.status === "confirmed");
 
     // ── Connected sources — provider names only, never tokens ──────────────
+    // Sources EORA may mention. "detected"/"reference_only" are included but
+    // tagged, so EORA never claims an unverified account is connected.
     const connectedSources = connections
-      .filter(
-        (c) => c.status === "connected" || c.status === "reference_only"
-      )
-      .map((c) => c.provider);
+      .filter((c) => c.status === "connected" || c.status === "reference_only" || c.status === "detected")
+      .map((c) => (c.status === "connected" ? c.provider : `${c.provider} (linked, unverified)`));
 
     // ── Priorities ─────────────────────────────────────────────────────────
     const rawMetadata = (prefs?.metadata as Record<string, unknown>) || {};

@@ -52,7 +52,7 @@ export const TOUR_REGISTRY: TourDefinition[] = [
     title: "Onboarding Introduction",
     description: "A quick walkthrough of the onboarding steps.",
     validRoute: "/onboarding",
-    validRouteAliases: ["/screens"],
+    validRouteAliases: [],
     persistent: true,
     steps: [
       {
@@ -243,7 +243,6 @@ export const TOUR_REGISTRY: TourDefinition[] = [
       "/student/profile",
       "/verification",
       "/faculty/verification",
-      "/screens",
     ],
     persistent: false,
     steps: [

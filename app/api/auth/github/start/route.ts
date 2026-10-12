@@ -9,6 +9,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const baseUrl = getCanonicalOrigin(req);
 
+  // Where to land after OAuth. Only these in-app paths are allowed (no open redirect).
+  const requested = url.searchParams.get("returnTo");
+  const returnTo = requested === "/onboarding" ? "/onboarding" : "/student/connections";
+
   const auth = await getServerAuthContext();
   if (!auth) {
     return NextResponse.redirect(
@@ -29,7 +33,7 @@ export async function GET(req: Request) {
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
   const state = crypto.randomBytes(24).toString("hex");
 
-  const statePayload = JSON.stringify({ state, personId: auth.person.id });
+  const statePayload = JSON.stringify({ state, personId: auth.person.id, returnTo });
   const encodedState = Buffer.from(statePayload).toString("base64url");
 
   const ghAuthUrl = new URL("https://github.com/login/oauth/authorize");

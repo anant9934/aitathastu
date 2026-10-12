@@ -1,3 +1,4 @@
+import { mergeGuestOnSignIn } from "@/lib/auth/guest-merge";
 import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth/password";
 import { createSession, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/auth/session";
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
       displayName: trimmedName,
     });
 
+    await mergeGuestOnSignIn({ userId: created.userId, personId: created.personId });
     const { token, expiresAt } = await createSession(created.userId);
 
     const response = NextResponse.json({

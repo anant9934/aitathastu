@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ScreenNavigator } from "./ScreenNavigator";
 import { Screen1Landing } from "./Screen1Landing";
 import { useEoraSafe } from "@/components/eora/eora-provider";
 import { screenNumberToOnboardingStep } from "@/lib/eora/context";
@@ -18,8 +17,6 @@ import { Screen8ProfileInsights, type Screen8EducationEntry, type Screen8Experie
 import { Screen9SkillsMap } from "./Screen9SkillsMap";
 import { Screen10GitHubProjects, type ProjectEntry } from "./Screen10GitHubProjects";
 import { Screen11OnboardingComplete } from "./Screen11OnboardingComplete";
-import { Screen12StudentDashboard } from "./Screen12StudentDashboard";
-import { ScreensGallery } from "./ScreensGallery";
 import { candidateNames } from "@/lib/onboarding-import-candidates";
 
 interface ExactScreensContainerProps {
@@ -32,7 +29,16 @@ export function ExactScreensContainer({
   isGalleryMode = false,
 }: ExactScreensContainerProps) {
   const [currentScreen, setCurrentScreen] = useState<number>(initialScreen);
-  const [draftLoaded, setDraftLoaded] = useState(false);
+  // "ready" only after the draft fetch succeeded (a 200 with draft:null counts as
+  // "no draft yet"). Nothing is persisted before that: a failed fetch used to
+  // fall through to the auto-save, which PUT default state over real progress.
+  const [draftLoadState, setDraftLoadState] = useState<"loading" | "ready" | "error">(isGalleryMode ? "ready" : "loading");
+  const draftLoaded = draftLoadState === "ready";
+  const draftLoadedRef = React.useRef(isGalleryMode);
+  // True once this browser holds a session cookie (guest or real), so requests
+  // that require a session are not fired before the first draft write made one.
+  const hasSessionRef = React.useRef(false);
+  const [draftLoadAttempt, setDraftLoadAttempt] = useState(0);
   const [draftSaveError, setDraftSaveError] = useState(false);
   // ── EORA wiring ─────────────────────────────────────────────────────────
   const eora = useEoraSafe();
@@ -82,6 +88,8 @@ export function ExactScreensContainer({
     isGalleryMode ? "Rahul_Sharma_Resume.pdf" : null
   );
   const [resumeReviewed, setResumeReviewed] = useState<ReviewedResumeClaim[]>([]);
+  // CV uploaded in this onboarding whose review may still be open (restored from the draft).
+  const [pendingResumeDocumentId, setPendingResumeDocumentId] = useState<string | null>(null);
   const [extractedResumeFields, setExtractedResumeFields] = useState<string[]>([]);
   const [visitedAcademicScreen, setVisitedAcademicScreen] = useState<boolean>(false);
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>({});
@@ -129,10 +137,12 @@ export function ExactScreensContainer({
           fetch("/api/onboarding-v2"),
           fetch("/api/auth/session"),
         ]);
+        if (!draftRes.ok) throw new Error(`draft fetch failed: ${draftRes.status}`);
 
         if (sessRes.ok) {
           const sessData = await sessRes.json();
           if (active && sessData.authenticated) {
+            hasSessionRef.current = true;
             setIsAuthenticated(true);
             const isGuest = typeof sessData.user?.email === "string" && sessData.user.email.endsWith("@onboarding.aitathastu.internal");
             if (!isGuest) {
@@ -148,7 +158,7 @@ export function ExactScreensContainer({
           }
         }
 
-        if (draftRes.ok) {
+        {
           const draftData = await draftRes.json();
           if (active && draftData.draft) {
             const d = draftData.draft;
@@ -180,6 +190,11 @@ export function ExactScreensContainer({
               setSkills(candidateNames(d.skills));
             }
             if (Array.isArray(d.resumeReviewed)) setResumeReviewed(d.resumeReviewed);
+            if (typeof d.resumeDocumentId === "string") {
+              const reviewedThisDoc = Array.isArray(d.resumeReviewed) && d.resumeReviewed.some((c: ReviewedResumeClaim) => c.documentId === d.resumeDocumentId);
+              if (reviewedThisDoc && d.resumeFileName) setResumeFileName(d.resumeFileName);
+              setPendingResumeDocumentId(d.resumeDocumentId);
+            }
             if (d.projects?.length > 0) {
               setProjects(
                 d.projects.map((p: ProjectEntry) => ({
@@ -219,10 +234,13 @@ export function ExactScreensContainer({
             }
           }
         }
-      } catch {
-        // Fallback gracefully to local state
-      } finally {
-        if (active) setDraftLoaded(true);
+        if (active) {
+          draftLoadedRef.current = true;
+          setDraftLoadState("ready");
+        }
+      } catch (error) {
+        console.error("[onboarding] could not load saved progress", error);
+        if (active) setDraftLoadState("error");
       }
     }
 
@@ -233,12 +251,13 @@ export function ExactScreensContainer({
     return () => {
       active = false;
     };
-  }, [isGalleryMode]);
+  }, [isGalleryMode, draftLoadAttempt]);
 
   // Persist draft to server
   const persistDraft = useCallback(
     (patch: Record<string, unknown>) => {
       if (isGalleryMode) return Promise.resolve(true);
+      if (!draftLoadedRef.current) return Promise.resolve(false);
       const payload = { version: 2, ...patch };
       const save = async () => {
       try {
@@ -247,6 +266,7 @@ export function ExactScreensContainer({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (response.ok) hasSessionRef.current = true;
         return response.ok;
       } catch {
         return false;
@@ -263,6 +283,16 @@ export function ExactScreensContainer({
     if (!draftLoaded || isGalleryMode || currentScreen < 2 || currentScreen > 11) return;
     void persistDraft({ currentScreen }).then((saved) => setDraftSaveError(!saved));
   }, [currentScreen, draftLoaded, isGalleryMode, persistDraft]);
+
+  /**
+   * Resolves once a session cookie exists. Writes go through the serialized
+   * draft queue, so the first PUT creates the guest and later requests reuse
+   * its cookie instead of racing to create guests of their own.
+   */
+  const ensureSession = useCallback(async () => {
+    if (isGalleryMode || hasSessionRef.current) return true;
+    return persistDraft({});
+  }, [isGalleryMode, persistDraft]);
 
   const handleAcademicSave = async (data: AcademicDetailsData) => {
     setAcademic(data);
@@ -308,7 +338,6 @@ export function ExactScreensContainer({
   };
 
   const handleFinishOnboarding = async () => {
-    if (isGalleryMode) { setCurrentScreen(12); return; }
 
     setIsSubmitting(true);
 
@@ -356,7 +385,6 @@ export function ExactScreensContainer({
   };
 
   const handleFacultyFinish = async (details: FacultyDetails) => {
-    if (isGalleryMode) { setCurrentScreen(12); return; }
     setIsSubmitting(true);
     setFacultyError("");
     try {
@@ -387,21 +415,18 @@ export function ExactScreensContainer({
 
   return (
     <div className="exact-screen-root" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {draftSaveError && <div role="alert" style={{ padding: "10px 20px", background: "#FEF2F2", color: "#991B1B", textAlign: "center" }}>Your onboarding progress could not be saved. Check your connection and try this step again.</div>}
-      {/* Top sticky screen switcher toolbar for development/gallery review */}
-      {isGalleryMode && (
-        <ScreenNavigator
-          currentScreen={currentScreen}
-          onSelectScreen={(num) => setCurrentScreen(num)}
-        />
+      {draftLoadState === "error" && (
+        <div role="alert" style={{ padding: "10px 20px", background: "#FEF2F2", color: "#991B1B", textAlign: "center" }}>
+          We couldn&apos;t load your saved onboarding progress, so nothing will be saved until it loads.{" "}
+          <button type="button" onClick={() => { setDraftLoadState("loading"); setDraftLoadAttempt((n) => n + 1); }} style={{ textDecoration: "underline", background: "none", border: 0, color: "inherit", cursor: "pointer", fontWeight: 700 }}>
+            Retry
+          </button>
+        </div>
       )}
+      {draftSaveError && <div role="alert" style={{ padding: "10px 20px", background: "#FEF2F2", color: "#991B1B", textAlign: "center" }}>Your onboarding progress could not be saved. Check your connection and try this step again.</div>}
 
       {/* Screen Views */}
       <div style={{ flex: 1 }}>
-        {currentScreen === 0 && (
-          <ScreensGallery onSelectScreen={(num) => setCurrentScreen(num)} />
-        )}
-
         {currentScreen === 1 && (
           <Screen1Landing onStartJourney={() => {
             if (isGalleryMode) setCurrentScreen(2);
@@ -508,6 +533,12 @@ export function ExactScreensContainer({
         {currentScreen === 5 && (
           <Screen5ResumeUpload
             initialFileName={resumeFileName}
+            initialDocumentId={pendingResumeDocumentId}
+            ensureSession={ensureSession}
+            onDocumentStored={(documentId, storedName) => {
+              setPendingResumeDocumentId(documentId);
+              void persistDraft({ resumeDocumentId: documentId, resumeFileName: storedName });
+            }}
             stepNumber={4}
             totalSteps={10}
             onExtractionReady={() => {
@@ -1175,40 +1206,6 @@ export function ExactScreensContainer({
         )}
 
         {/* Main Dashboard */}
-        {currentScreen === 12 && (
-          <Screen12StudentDashboard
-            data={
-              isGalleryMode
-                ? undefined
-                : {
-                    studentName: name || "Student",
-                    institution: academic.institution,
-                    degree: academic.degree || "B.Tech",
-                    activeGoal: goal,
-                    targetRole: targetRole,
-                    primaryPriority: primaryPriority || priorities?.[0],
-                    secondaryPriorities: priorities?.filter((p) => p !== (primaryPriority || priorities?.[0])),
-                    skillsCount: skills.length,
-                    projectsCount: projects.filter((p) => p.status === "confirmed").length,
-                    evidenceCount: skills.length + projects.length + 1,
-                    readinessPct: null,
-                    primaryActions: [],
-                    recentActivity: [
-                      {
-                        id: "1",
-                        title: "Onboarding completed",
-                        description: `Targeting ${targetRole} · ${goal}`,
-                        timestamp: "Just now",
-                      },
-                    ],
-                    eoraInsight: `Welcome, ${name || "Student"}. You want to become a ${targetRole} and you're focusing on "${goal}". Tathastu has calibrated your initial roadmap and recommendations.`,
-                    isDemo: false,
-                  }
-            }
-            isDemo={isGalleryMode}
-            onBackToOnboarding={() => setCurrentScreen(11)}
-          />
-        )}
       </div>
 
       {isSubmitting && (

@@ -146,6 +146,16 @@ export function auditProductionSecrets(
     warnings.push("No LLM provider keys configured; system operates in deterministic offline mode.");
   }
 
+  // OCR extractor — advisory: text PDFs/DOCX still work without it, scanned PDFs do not.
+  if (!env.RESUME_EXTRACTOR_URL?.trim()) {
+    warnings.push("RESUME_EXTRACTOR_URL not configured — scanned PDFs will fail with OCR_SERVICE_NOT_CONFIGURED.");
+  } else if (!env.EXTRACTOR_API_TOKEN?.trim()) {
+    warnings.push("RESUME_EXTRACTOR_URL is set but EXTRACTOR_API_TOKEN is missing — extractor calls will be rejected.");
+  }
+  if (env.NEXT_PUBLIC_RENDER_EXTRACTOR_URL && !env.RESUME_EXTRACTOR_URL?.trim()) {
+    warnings.push("NEXT_PUBLIC_RENDER_EXTRACTOR_URL is no longer read; move its value to RESUME_EXTRACTOR_URL.");
+  }
+
   const valid = missingRequired.length === 0 && insecureDefaults.length === 0;
 
   return {

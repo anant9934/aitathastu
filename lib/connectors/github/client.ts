@@ -282,37 +282,21 @@ export async function fetchRepositoryManifestsAndReadme(
   const noteError = (err: unknown) => failures.add(err instanceof Error && err.name === "TimeoutError" ? "timeout" : "network");
 
   const headers = buildHeaders(token);
-
-  // Check language breakdown
-  let languages: Record<string, number> = {};
-  try {
-    const langRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/languages`, {
-      headers,
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    });
-    note(langRes);
-    if (langRes.ok) {
-      languages = (await langRes.json()) as Record<string, number>;
+  const rawHeaders = { ...headers, Accept: "application/vnd.github.v3.raw" };
+  const get = async (path: string, h: Record<string, string>): Promise<Response | null> => {
+    try {
+      const res = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/${path}`, {
+        headers: h,
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+      note(res);
+      return res;
+    } catch (err) {
+      noteError(err);
+      return null;
     }
-  } catch (err) { noteError(err); }
+  };
 
-  // Check README
-  let readme = "";
-  try {
-    const readmeRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/readme`, {
-      headers: { ...headers, Accept: "application/vnd.github.v3.raw" },
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    });
-    note(readmeRes);
-    if (readmeRes.ok) {
-      const text = await readmeRes.text();
-      // Prompt injection defense: sanitize raw markdown and truncate
-      readme = sanitizeTextForPrompt(text).slice(0, MAX_README_CHARS);
-      observedFiles.push("README.md");
-    }
-  } catch (err) { noteError(err); }
-
-  // Check manifest files
   const candidateManifests = [
     "package.json",
     "requirements.txt",
@@ -324,19 +308,35 @@ export async function fetchRepositoryManifestsAndReadme(
     "Cargo.toml",
   ];
 
-  for (const mf of candidateManifests) {
+  // All requests for one repo run concurrently: done serially, a 6-repo sync
+  // was ~60 round-trips and could outlive a serverless request (the OAuth
+  // callback awaits the whole sync).
+  const [langRes, readmeRes, ...mfResults] = await Promise.all([
+    get("languages", headers),
+    get("readme", rawHeaders),
+    ...candidateManifests.map((mf) => get(`contents/${mf}`, rawHeaders)),
+  ]);
+
+  let languages: Record<string, number> = {};
+  if (langRes?.ok) {
+    try { languages = (await langRes.json()) as Record<string, number>; } catch (err) { noteError(err); }
+  }
+
+  let readme = "";
+  if (readmeRes?.ok) {
     try {
-      const mfRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${mf}`, {
-        headers: { ...headers, Accept: "application/vnd.github.v3.raw" },
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-      });
-      note(mfRes);
-      if (mfRes.ok) {
-        const content = await mfRes.text();
-        manifests[mf] = content.slice(0, 8000); // Bounded snapshot
-        observedFiles.push(mf);
-      }
-      if (failures.has("rate_limited")) break; // no point burning more of the budget
+      // Prompt injection defense: sanitize raw markdown and truncate
+      readme = sanitizeTextForPrompt(await readmeRes.text()).slice(0, MAX_README_CHARS);
+      observedFiles.push("README.md");
+    } catch (err) { noteError(err); }
+  }
+
+  for (let i = 0; i < candidateManifests.length; i++) {
+    const res = mfResults[i];
+    if (!res?.ok) continue;
+    try {
+      manifests[candidateManifests[i]] = (await res.text()).slice(0, 8000); // Bounded snapshot
+      observedFiles.push(candidateManifests[i]);
     } catch (err) { noteError(err); }
   }
 

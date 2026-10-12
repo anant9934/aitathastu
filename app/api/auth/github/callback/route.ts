@@ -4,6 +4,9 @@ import { connectGitHubAccount, syncGitHubConnection } from "@/lib/services/githu
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 export async function GET(req: Request) {
   if (!coreIngestionReady()) return NextResponse.json({ error: "GitHub connection is unavailable until credential rotation is complete." }, { status: 503 });
   const url = new URL(req.url);
@@ -107,11 +110,23 @@ export async function GET(req: Request) {
         : (userRes.headers.get("x-oauth-scopes") || "").split(/[\s,]+/).filter(Boolean),
     });
 
-    void syncGitHubConnection(auth.person.id, accessToken).catch((syncErr) => {
-      console.error("[GitHub Sync Background Error]", syncErr);
-    });
+    // Awaited, never fire-and-forget: on Netlify a detached promise is frozen or
+    // killed once the response is sent, silently dropping the sync. The sync
+    // records its own sync_runs row; a failure here still leaves the account
+    // connected, and the student can retry from the Sync button.
+    let syncFailed = false;
+    try {
+      const sync = await syncGitHubConnection(auth.person.id, accessToken);
+      syncFailed = !sync.success;
+      if (!sync.success) console.error("[GitHub OAuth Sync Failed]", sync.error);
+    } catch (syncErr) {
+      syncFailed = true;
+      console.error("[GitHub OAuth Sync Error]", syncErr);
+    }
 
-    const response = NextResponse.redirect(new URL(`${returnPath}?success=github_connected`, baseUrl));
+    const response = NextResponse.redirect(
+      new URL(`${returnPath}?success=github_connected${syncFailed ? "&sync=failed" : ""}`, baseUrl)
+    );
     response.cookies.delete("tathastu_gh_oauth_state");
     return response;
   } catch (err: unknown) {

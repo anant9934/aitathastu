@@ -21,6 +21,9 @@ services:
         value: production
       - key: EXTRACTOR_API_TOKEN
         generateValue: true
+      # Must equal EXTRACTOR_VERIFIER_TOKEN on the Next app; leave unset to disable verifier calls.
+      - key: EXTRACTOR_VERIFIER_TOKEN
+        sync: false
       - key: ALLOWED_ORIGIN
         sync: false
       - key: MAX_UPLOAD_MB

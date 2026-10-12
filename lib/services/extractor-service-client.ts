@@ -127,7 +127,14 @@ export class ExtractorServiceClient {
   }
 
   private static getApiToken(): string {
-    return (process.env.EXTRACTOR_API_TOKEN || "").trim() || "development-only-change-me";
+    const token = (process.env.EXTRACTOR_API_TOKEN || "").trim();
+    if (token) return token;
+    // Fail closed: the extractor rejects the dev default in production anyway,
+    // and a clear error here beats an opaque 401 from the service.
+    if (process.env.NODE_ENV === "production") {
+      throw new ExtractorServiceError("EXTRACTOR_API_TOKEN is not configured.", "auth");
+    }
+    return "development-only-change-me";
   }
 
   private static getVerifierToken(): string | null {

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
             or len(self.extractor_api_token) < 32
         ):
             raise ValueError('Production requires a strong EXTRACTOR_API_TOKEN (32+ chars).')
+        if self.extractor_verifier_token and self.extractor_verifier_token == self.extractor_api_token:
+            raise ValueError('EXTRACTOR_VERIFIER_TOKEN must differ from EXTRACTOR_API_TOKEN.')
+        if self.environment.lower() == 'production' and self.extractor_verifier_token and len(self.extractor_verifier_token) < 32:
+            raise ValueError('Production requires a strong EXTRACTOR_VERIFIER_TOKEN (32+ chars) when set.')
         return self
 
 settings = Settings()

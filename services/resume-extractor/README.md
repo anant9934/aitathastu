@@ -33,7 +33,7 @@ Authoritative deterministic resume extraction engine for AI Tathastu. Deployed a
 
 | Method | Path | Auth Scope | Description |
 |---|---|---|---|
-| `GET` | `/health` | Public | Service health & Tesseract version |
+| `GET` | `/health` | Public | Service health, Tesseract version, and deployed Git revision |
 | `POST` | `/api/resumes/upload` | `upload` | Secure document upload |
 | `POST` | `/api/resumes/extract` | `extract` | Asynchronous extraction job |
 | `GET` | `/api/resumes/{id}/status` | `status` | Extraction progress & warnings |

@@ -1,6 +1,6 @@
 """AI Tathastu Universal Resume Extractor API. Production multi-user scoped authorization and document isolation."""
 from __future__ import annotations
-import json, secrets, time, uuid
+import json, os, secrets, time, uuid
 from datetime import datetime, timezone
 from dataclasses import asdict
 from typing import Annotated
@@ -80,7 +80,8 @@ def health():
         'status': 'ok',
         'schema_version': '2.0',
         'python_version': sys.version.split()[0],
-        'tesseract_version': ocr_ver
+        'tesseract_version': ocr_ver,
+        'git_commit': os.environ.get('RENDER_GIT_COMMIT', 'unknown')[:12]
     }
 
 @app.post('/api/resumes/upload', response_model=UploadResponse, status_code=201)

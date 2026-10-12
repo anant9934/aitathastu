@@ -17,8 +17,11 @@ def run(client,auth,docid):
     assert d.json()['profile'] is not None, d.text
     return ResumeProfile.model_validate(d.json()['profile'])
 
-def test_health_and_auth(client,pdf):
-    assert client.get('/health').status_code==200
+def test_health_and_auth(client,pdf,monkeypatch):
+    monkeypatch.setenv('RENDER_GIT_COMMIT', 'a' * 40)
+    health=client.get('/health')
+    assert health.status_code==200
+    assert health.json()['git_commit']=='a' * 12
     assert client.post('/api/resumes/upload',files={'file':('a.pdf',pdf)}).status_code==401
     assert client.post('/api/resumes/upload',files={'file':('a.pdf',pdf)},headers={'Authorization':'Bearer invalid'}).status_code==401
 

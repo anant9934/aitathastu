@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function OnboardingPage() {
-  return <ExactScreensContainer initialScreen={2} isGalleryMode={false} />;
+  return <ExactScreensContainer initialScreen={2} />;
 }

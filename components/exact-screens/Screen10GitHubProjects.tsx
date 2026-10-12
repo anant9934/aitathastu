@@ -47,146 +47,7 @@ interface Screen10GitHubProjectsProps {
   onNext: () => void;
   onBack: () => void;
   onJumpToStep?: (step: number) => void;
-  isGalleryMode?: boolean;
 }
-
-const defaultRichProjects: ProjectEntry[] = [
-  {
-    id: "proj_1",
-    title: "CoRXGB",
-    description: "Hybrid CNN + Bi-LSTM + XGBoost ensemble architecture for agile story point classification and effort estimation.",
-    technologies: ["Python", "PyTorch", "XGBoost", "FastAPI"],
-    sources: ["github"],
-    status: "confirmed",
-    contribution: ["Lead ML Architect", "Neural Architecture Search"],
-    contributionNote: "Designed dual-stream CNN-LSTM encoder feeding gradient boosted tree ensembles.",
-    stars: 42,
-    forks: 8,
-    impactScore: 94,
-    commitsCount: 168,
-    codeSnippet: `class CoRXGBEnsemble(nn.Module):
-  def __init__(self, vocab_sz, emb_dim):
-    super().__init__()
-    self.cnn = TextCNN(vocab_sz, emb_dim)
-    self.lstm = BiLSTM(emb_dim, hidden=128)
-  def forward(self, x):
-    feat = torch.cat([self.cnn(x), self.lstm(x)], 1)
-    return self.xgb_head.predict_proba(feat)`,
-    architecture: ["TextCNN Feature Extractor", "Bi-LSTM Sequence Memory", "XGBoost Stacking Head"],
-    highlights: ["Published in IEEE workshop", "92.4% F1-score on benchmark", "Sub-15ms inference latency"],
-  },
-  {
-    id: "proj_2",
-    title: "Medical Image Classification",
-    description: "Multi-modal vision transformer and U-Net pipeline for automated pathology segmentation and early tumor detection.",
-    technologies: ["Python", "TensorFlow", "Vision Transformers", "OpenCV"],
-    sources: ["github"],
-    status: "confirmed",
-    contribution: ["Computer Vision Lead", "REST Inference API"],
-    contributionNote: "Trained hybrid ViT models with attention heatmaps and integrated DICOM medical format parsing.",
-    stars: 28,
-    forks: 6,
-    impactScore: 88,
-    commitsCount: 94,
-    codeSnippet: `def compute_attention_rollout(vit_model, dicom_tensor):
-  attn_weights = vit_model.get_attn_layers(dicom_tensor)
-  rollout = torch.eye(attn_weights.size(-1))
-  for attn in attn_weights:
-    rollout = torch.matmul(attn, rollout)
-  return heatmap_overlay(rollout)`,
-    architecture: ["Vision Transformer (ViT-B/16)", "Grad-CAM Explainability", "FastAPI Serving"],
-    highlights: ["AUROC 0.963 on NIH ChestX-ray", "Heatmap visual explainability", "Real-time DICOM processor"],
-  },
-  {
-    id: "proj_3",
-    title: "GRAcEmo ViRa",
-    description: "AI-driven cognitive robotics platform with real-time gesture control, sensory SLAM mapping, and kinematics.",
-    technologies: ["Python", "ROS 2", "MediaPipe", "C++"],
-    sources: ["github"],
-    status: "confirmed",
-    contribution: ["Perception Stack", "Trajectory Optimization"],
-    contributionNote: "Engineered 3D spatial coordinate solver using computer vision gesture streams on embedded hardware.",
-    stars: 31,
-    forks: 9,
-    impactScore: 84,
-    commitsCount: 112,
-    codeSnippet: `void GestureController::processFrame(const cv::Mat& frame) {
-  auto landmarks = pose_detector->Infer(frame);
-  geometry_msgs::Twist cmd;
-  cmd.linear.x = kinematics::ComputeVelocity(landmarks);
-  pub_cmd_vel->publish(cmd);
-}`,
-    architecture: ["ROS 2 Humble Node", "MediaPipe Hands 3D", "PID Kinematics Solver"],
-    highlights: ["Smart India Hackathon Finalist", "60 FPS embedded latency", "Closed-loop feedback control"],
-  },
-  {
-    id: "proj_4",
-    title: "Agentic RAG Search Engine",
-    description: "Self-correcting retrieval augmented generation system with iterative query planning and reranking.",
-    technologies: ["Python", "LangChain", "Qdrant", "HuggingFace"],
-    sources: ["github"],
-    status: "confirmed",
-    contribution: ["Full-Stack AI Developer"],
-    contributionNote: "Engineered multi-stage vector search with BM25 hybrid ranking and hallucination grading.",
-    stars: 19,
-    forks: 4,
-    impactScore: 91,
-    commitsCount: 78,
-    codeSnippet: `async def generate_grounded_answer(query: str):
-  docs = await hybrid_retriever.get_relevant_documents(query)
-  grade = await grader_chain.ainvoke({"docs": docs, "query": query})
-  if grade.score < 0.7:
-    return await fallback_web_search(query)
-  return await answer_chain.ainvoke(docs)`,
-    architecture: ["Hybrid Sparse/Dense Retriever", "Hallucination Grader LLM", "Async Streaming Server"],
-    highlights: ["85% reduction in hallucination", "Sub-200ms document recall", "Semantic cache integration"],
-  },
-  {
-    id: "proj_5",
-    title: "Microservices LLM Gateway",
-    description: "High-throughput token streaming proxy with semantic caching, budget limits, and Prometheus observability.",
-    technologies: ["Go", "Docker", "Redis", "Prometheus"],
-    sources: ["github"],
-    status: "confirmed",
-    contribution: ["Backend Systems Architect"],
-    contributionNote: "Built ultra-low latency token routing proxy supporting OpenAI, Anthropic, and local Ollama.",
-    stars: 24,
-    forks: 5,
-    impactScore: 86,
-    commitsCount: 65,
-    codeSnippet: `func (g *Gateway) StreamHandler(c *gin.Context) {
-  cached, hit := g.semanticCache.Get(c.Request.Context(), prompt)
-  if hit {
-    c.Data(200, "text/event-stream", cached)
-    return
-  }
-  g.upstreamProxy.Stream(c.Writer, prompt)
-}`,
-    architecture: ["Gin Go Web Framework", "Redis Vector Semantic Cache", "Prometheus Metrics"],
-    highlights: ["Handles 10,000 req/min", "99.9% uptime in stress tests", "35% API token cost savings"],
-  },
-  {
-    id: "proj_6",
-    title: "Neural Audio Denoising DSP",
-    description: "Deep recurrent spectral mask estimator for ultra-low latency speech enhancement in noisy teleconferences.",
-    technologies: ["Python", "PyTorch", "NumPy", "ONNX"],
-    sources: ["github"],
-    status: "confirmed",
-    contribution: ["Audio DSP Researcher"],
-    contributionNote: "Designed lightweight GRU spectral filtering pipeline compiled to ONNX Runtime.",
-    stars: 15,
-    forks: 3,
-    impactScore: 82,
-    commitsCount: 54,
-    codeSnippet: `def stft_denoise_block(audio_waveform, onnx_session):
-  specs = torch.stft(audio_waveform, n_fft=512, hop_length=128)
-  mask = onnx_session.run(None, {"spec": specs.numpy()})[0]
-  cleaned = specs * torch.from_numpy(mask)
-  return torch.istft(cleaned, n_fft=512, hop_length=128)`,
-    architecture: ["STFT Spectral Analyzer", "Bidirectional GRU Mask", "ONNX Mobile Runtime"],
-    highlights: ["12dB SNR improvement", "4ms real-time audio chunking", "Quantized model < 3MB"],
-  },
-];
 
 export function Screen10GitHubProjects({
   discoveredProjects = [],
@@ -194,18 +55,12 @@ export function Screen10GitHubProjects({
   onNext,
   onBack,
   onJumpToStep,
-  isGalleryMode = false,
 }: Screen10GitHubProjectsProps) {
-  const [projects, setProjects] = useState<ProjectEntry[]>(
-    isGalleryMode ? defaultRichProjects : discoveredProjects
-  );
+  const [projects, setProjects] = useState<ProjectEntry[]>(discoveredProjects);
   useEffect(() => {
-    if (isGalleryMode) return;
     setProjects((current) => [...current, ...discoveredProjects.filter((incoming) => !current.some((existing) => existing.id === incoming.id || (incoming.url && existing.url === incoming.url)))]);
-  }, [discoveredProjects, isGalleryMode]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(
-    isGalleryMode ? defaultRichProjects[0].id : (discoveredProjects[0]?.id || "")
-  );
+  }, [discoveredProjects]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(discoveredProjects[0]?.id || "");
   useEffect(() => {
     if (projects.length && !projects.some((project) => project.id === selectedProjectId)) setSelectedProjectId(projects[0].id);
   }, [projects, selectedProjectId]);
@@ -637,7 +492,7 @@ export function Screen10GitHubProjects({
                 </span>
 
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#10B981", display: "flex", alignItems: "center", gap: 4 }}>
-                  <CheckCircle2 size={15} /> {isGalleryMode ? "Demo codebase" : activeProject.status === "confirmed" ? "Student confirmed" : "Needs review"}
+                  <CheckCircle2 size={15} /> {activeProject.status === "confirmed" ? "Student confirmed" : "Needs review"}
                 </span>
               </div>
 
@@ -647,7 +502,7 @@ export function Screen10GitHubProjects({
               <p style={{ fontSize: 13, color: "#64748B", lineHeight: 1.45, margin: 0 }}>
                 {activeProject.description}
               </p>
-              {!isGalleryMode && activeProject.id !== "empty" && <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+              {activeProject.id !== "empty" && <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                 {activeProject.url && <a href={activeProject.url} target="_blank" rel="noopener noreferrer" style={{ color: "#5642EF", fontSize: 12 }}>Open repository</a>}
                 {activeProject.sources.includes("github") && <>
                   <label style={{ display: "flex", gap: 7, alignItems: "flex-start", fontSize: 12, color: "#475569" }}><input type="checkbox" checked={aiConsent} onChange={(event) => setAiConsent(event.target.checked)} /> I agree to send this repository&apos;s README and metadata to an approved AI provider for interpretation.</label>
@@ -664,27 +519,12 @@ export function Screen10GitHubProjects({
             <div style={{ background: "#F8FAFC", borderRadius: 14, border: "1px solid #E2E8F0", padding: 14 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#334155", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                  {isGalleryMode ? "Demo score" : "Assessment"}
+                  Assessment
                 </span>
                 <span style={{ fontSize: 16, fontWeight: 850, color: "#5642EF" }}>
                   {activeProject.impactScore == null ? "Not assessed" : `${activeProject.impactScore} / 100`}
                 </span>
               </div>
-
-              {isGalleryMode && <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, textAlign: "center" }}>
-                <div style={{ background: "#FFFFFF", padding: "8px 4px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#10B981" }}>96%</div>
-                  <div style={{ fontSize: 9.5, color: "#64748B", fontWeight: 600 }}>Code Quality</div>
-                </div>
-                <div style={{ background: "#FFFFFF", padding: "8px 4px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#5642EF" }}>92%</div>
-                  <div style={{ fontSize: 9.5, color: "#64748B", fontWeight: 600 }}>Architecture</div>
-                </div>
-                <div style={{ background: "#FFFFFF", padding: "8px 4px", borderRadius: 8, border: "1px solid #E2E8F0" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#0284C7" }}>88%</div>
-                  <div style={{ fontSize: 9.5, color: "#64748B", fontWeight: 600 }}>Testing</div>
-                </div>
-              </div>}
             </div>
 
             {/* Code Snippet Viewer */}

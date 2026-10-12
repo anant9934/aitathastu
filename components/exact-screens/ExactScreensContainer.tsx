@@ -21,20 +21,18 @@ import { candidateNames } from "@/lib/onboarding-import-candidates";
 
 interface ExactScreensContainerProps {
   initialScreen?: number;
-  isGalleryMode?: boolean;
 }
 
 export function ExactScreensContainer({
   initialScreen = 1,
-  isGalleryMode = false,
 }: ExactScreensContainerProps) {
   const [currentScreen, setCurrentScreen] = useState<number>(initialScreen);
   // "ready" only after the draft fetch succeeded (a 200 with draft:null counts as
   // "no draft yet"). Nothing is persisted before that: a failed fetch used to
   // fall through to the auto-save, which PUT default state over real progress.
-  const [draftLoadState, setDraftLoadState] = useState<"loading" | "ready" | "error">(isGalleryMode ? "ready" : "loading");
+  const [draftLoadState, setDraftLoadState] = useState<"loading" | "ready" | "error">("loading");
   const draftLoaded = draftLoadState === "ready";
-  const draftLoadedRef = React.useRef(isGalleryMode);
+  const draftLoadedRef = React.useRef(false);
   // True once this browser holds a session cookie (guest or real), so requests
   // that require a session are not fired before the first draft write made one.
   const hasSessionRef = React.useRef(false);
@@ -55,38 +53,36 @@ export function ExactScreensContainer({
   }, [currentScreen, eora]);
 
   React.useLayoutEffect(() => {
-    if (!isGalleryMode) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [currentScreen, isGalleryMode]);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [currentScreen]);
 
   useEffect(() => {
     setCurrentScreen(initialScreen);
   }, [initialScreen]);
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [name, setName] = useState<string>(isGalleryMode ? "Rahul Sharma" : "");
+  const [name, setName] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [facultyError, setFacultyError] = useState("");
-  const [targetRole, setTargetRole] = useState<string>(isGalleryMode ? "Generative AI Engineer" : "");
-  const [targetRoleId, setTargetRoleId] = useState<string>(isGalleryMode ? "genai_engineer" : "");
-  const [goal, setGoal] = useState<string>(isGalleryMode ? "Get an AI/ML internship" : "");
-  const [targetTimeline, setTargetTimeline] = useState<string>(isGalleryMode ? "Within 6 months" : "");
+  const [targetRole, setTargetRole] = useState<string>("");
+  const [targetRoleId, setTargetRoleId] = useState<string>("");
+  const [goal, setGoal] = useState<string>("");
+  const [targetTimeline, setTargetTimeline] = useState<string>("");
   const [customGoalText, setCustomGoalText] = useState<string>("");
 
   const [academic, setAcademic] = useState<AcademicDetailsData>({
-    fullName: isGalleryMode ? "Rahul Sharma" : "",
-    email: isGalleryMode ? "rahul.sharma@lpu.in" : "",
-    mobile: isGalleryMode ? "+91 98765 43210" : "",
+    fullName: "",
+    email: "",
+    mobile: "",
     role: "Student",
-    institution: isGalleryMode ? "Lovely Professional University (LPU)" : "",
-    department: isGalleryMode ? "Computer Science and Engineering" : "",
-    degree: isGalleryMode ? "B.Tech" : "",
-    currentYear: isGalleryMode ? "3rd Year" : "",
-    expectedGraduationYear: isGalleryMode ? 2026 : undefined,
+    institution: "",
+    department: "",
+    degree: "",
+    currentYear: "",
+    expectedGraduationYear: undefined,
   });
 
-  const [resumeFileName, setResumeFileName] = useState<string | null>(
-    isGalleryMode ? "Rahul_Sharma_Resume.pdf" : null
-  );
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null);
   const [resumeReviewed, setResumeReviewed] = useState<ReviewedResumeClaim[]>([]);
   // CV uploaded in this onboarding whose review may still be open (restored from the draft).
   const [pendingResumeDocumentId, setPendingResumeDocumentId] = useState<string | null>(null);
@@ -94,26 +90,12 @@ export function ExactScreensContainer({
   const [visitedAcademicScreen, setVisitedAcademicScreen] = useState<boolean>(false);
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>({});
   const [discoveredResumeProfiles, setDiscoveredResumeProfiles] = useState<Partial<Record<string, string>>>({});
-  const [skills, setSkills] = useState<string[]>(isGalleryMode ? ["Python", "Machine Learning", "Data Analysis", "DSA"] : []);
+  const [skills, setSkills] = useState<string[]>([]);
   const [projects, setProjects] = useState<ProjectEntry[]>([]);
   const [priorities, setPriorities] = useState<string[]>([]);
   const [primaryPriority, setPrimaryPriority] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [educationEntries, setEducationEntries] = useState<Screen8EducationEntry[]>(
-    isGalleryMode
-      ? [
-          {
-            institution: "Lovely Professional University (LPU)",
-            degree: "B.Tech Computer Science and Engineering",
-            fieldOfStudy: "Computer Science",
-            graduationYear: "2026",
-            gpa: "8.8 CGPA",
-            academicLevel: "undergraduate",
-            status: "confirmed",
-          },
-        ]
-      : []
-  );
+  const [educationEntries, setEducationEntries] = useState<Screen8EducationEntry[]>([]);
   const [techCandidates, setTechCandidates] = useState<
     Array<{
       name: string;
@@ -244,19 +226,16 @@ export function ExactScreensContainer({
       }
     }
 
-    if (!isGalleryMode) {
-      loadDraftAndSession();
-    }
+    loadDraftAndSession();
 
     return () => {
       active = false;
     };
-  }, [isGalleryMode, draftLoadAttempt]);
+  }, [draftLoadAttempt]);
 
   // Persist draft to server
   const persistDraft = useCallback(
     (patch: Record<string, unknown>) => {
-      if (isGalleryMode) return Promise.resolve(true);
       if (!draftLoadedRef.current) return Promise.resolve(false);
       const payload = { version: 2, ...patch };
       const save = async () => {
@@ -276,13 +255,13 @@ export function ExactScreensContainer({
       draftWriteQueueRef.current = result.then(() => undefined);
       return result;
     },
-    [isGalleryMode]
+    []
   );
 
   useEffect(() => {
-    if (!draftLoaded || isGalleryMode || currentScreen < 2 || currentScreen > 11) return;
+    if (!draftLoaded || currentScreen < 2 || currentScreen > 11) return;
     void persistDraft({ currentScreen }).then((saved) => setDraftSaveError(!saved));
-  }, [currentScreen, draftLoaded, isGalleryMode, persistDraft]);
+  }, [currentScreen, draftLoaded, persistDraft]);
 
   /**
    * Resolves once a session cookie exists. Writes go through the serialized
@@ -290,9 +269,9 @@ export function ExactScreensContainer({
    * its cookie instead of racing to create guests of their own.
    */
   const ensureSession = useCallback(async () => {
-    if (isGalleryMode || hasSessionRef.current) return true;
+    if (hasSessionRef.current) return true;
     return persistDraft({});
-  }, [isGalleryMode, persistDraft]);
+  }, [persistDraft]);
 
   const handleAcademicSave = async (data: AcademicDetailsData) => {
     setAcademic(data);
@@ -428,10 +407,7 @@ export function ExactScreensContainer({
       {/* Screen Views */}
       <div style={{ flex: 1 }}>
         {currentScreen === 1 && (
-          <Screen1Landing onStartJourney={() => {
-            if (isGalleryMode) setCurrentScreen(2);
-            else window.location.assign("/onboarding");
-          }} />
+          <Screen1Landing onStartJourney={() => window.location.assign("/onboarding")} />
         )}
 
         {currentScreen === 2 && (
@@ -915,7 +891,7 @@ export function ExactScreensContainer({
         {/* STEP 8: Profile Insights */}
         {currentScreen === 8 && (
           <Screen8ProfileInsights
-            studentName={name || academic.fullName || (isGalleryMode ? "Rahul Sharma" : "Student")}
+            studentName={name || academic.fullName || "Student"}
             degree={academic.degree}
             specialization={academic.department}
             institution={academic.institution || educationEntries[0]?.institution}
@@ -1152,7 +1128,6 @@ export function ExactScreensContainer({
                 return next;
               });
             }}
-            isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(9)}
             onBack={() => setCurrentScreen(7)}
             onJumpToStep={handleJumpToStep}
@@ -1172,7 +1147,6 @@ export function ExactScreensContainer({
             resumeFileName={resumeFileName}
             resumeReviewed={resumeReviewed}
             goal={goal}
-            isGalleryMode={isGalleryMode}
             onNext={() => setCurrentScreen(10)}
             onBack={() => setCurrentScreen(8)}
             onJumpToStep={handleJumpToStep}
@@ -1183,7 +1157,6 @@ export function ExactScreensContainer({
         {currentScreen === 10 && (
           <Screen10GitHubProjects
             discoveredProjects={projects}
-            isGalleryMode={isGalleryMode}
             onProjectsChange={(p) => {
               setProjects(p);
               persistDraft({ projects: p });
@@ -1197,7 +1170,7 @@ export function ExactScreensContainer({
         {/* STEP 10: Onboarding Complete */}
         {currentScreen === 11 && (
           <Screen11OnboardingComplete
-            studentName={name || academic.fullName || (isGalleryMode ? "Rahul Sharma" : "Student")}
+            studentName={name || academic.fullName || "Student"}
             onGoToDashboard={handleFinishOnboarding}
             onExploreOpportunities={handleFinishOnboarding}
             onBack={() => setCurrentScreen(10)}

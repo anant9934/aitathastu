@@ -109,7 +109,6 @@ export interface Screen8ProfileInsightsProps {
   discoveredResumeProfiles?: Partial<Record<string, string>>;
   isFresher?: boolean;
   hasResumeExtraction?: boolean;
-  isGalleryMode?: boolean;
   onNext: () => void;
   onBack: () => void;
   onEdit?: () => void;
@@ -197,7 +196,6 @@ export function Screen8ProfileInsights({
   discoveredResumeProfiles = {},
   isFresher = false,
   hasResumeExtraction = false,
-  isGalleryMode = false,
   onNext,
   onBack,
   onEdit,
@@ -281,20 +279,7 @@ export function Screen8ProfileInsights({
   const firstName = studentName.trim().split(" ")[0] || "Student";
   const initial = studentName.trim().charAt(0).toUpperCase() || "S";
 
-  const defaultSkills = [
-    "Python",
-    "Deep Learning",
-    "PyTorch",
-    "NLP",
-    "Computer Vision",
-    "DSA",
-    "Transformers",
-    "FastAPI",
-    "Docker",
-    "XGBoost",
-  ];
-
-  const displayedSkills = candidateNames(isGalleryMode && skills.length === 0 ? defaultSkills : skills);
+  const displayedSkills = candidateNames(skills);
 
   // Digital footprints count & list
   const connectedFootprints = Object.entries(profiles)

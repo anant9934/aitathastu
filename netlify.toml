@@ -9,11 +9,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_FLAGS = "--prefer-offline"
+  NPM_FLAGS = "--include=dev"
   # Disable Next.js telemetry
   NEXT_TELEMETRY_DISABLED = "1"
-  # Ensure production mode during build
-  NODE_ENV = "production"
   # Disable auto-migration at runtime — run migrations via npm run db:migrate
   DATABASE_AUTO_MIGRATE = "false"
 

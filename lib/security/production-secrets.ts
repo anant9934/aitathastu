@@ -82,8 +82,15 @@ export function auditProductionSecrets(
 ): ProductionSecretAuditResult {
   const nodeEnv = env.NODE_ENV || "development";
   const isProd = nodeEnv === "production";
-  const isStaging = env.APP_ENV === "staging" || env.VERCEL_ENV === "preview";
+  // Netlify sets NETLIFY_CONTEXT to "production", "deploy-preview", or "branch-deploy"
+  // Vercel sets VERCEL_ENV to "production", "preview", or "development"
+  const isStaging =
+    env.APP_ENV === "staging" ||
+    env.VERCEL_ENV === "preview" ||
+    env.NETLIFY_CONTEXT === "deploy-preview" ||
+    env.NETLIFY_CONTEXT === "branch-deploy";
   const environment = isProd ? "production" : isStaging ? "staging" : "development";
+
 
   const missingRequired: string[] = [];
   const insecureDefaults: string[] = [];

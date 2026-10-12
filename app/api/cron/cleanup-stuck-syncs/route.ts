@@ -1,11 +1,12 @@
 /**
  * AI TATHASTU — CRON JOB: Cleanup Stuck Sync Runs
  *
- * Replaces the Render background worker.
- * Runs on schedule (see vercel.json crons).
- * Marks sync runs stuck > 15 minutes as timed out.
+ * On Vercel: triggered by vercel.json crons (protected by Authorization header).
+ * On Netlify: triggered by the Netlify Scheduled Function in netlify/functions/cleanup-stuck-syncs.mts
+ *             (which calls this route internally, or runs the logic directly).
  *
- * Protected by Authorization header — only Vercel cron scheduler can call this.
+ * Marks sync runs stuck > 15 minutes as timed out.
+ * Also accepts direct HTTP GET with CRON_SECRET for manual/Netlify invocation.
  */
 
 import { NextRequest, NextResponse } from "next/server";

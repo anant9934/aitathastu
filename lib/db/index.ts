@@ -112,16 +112,20 @@ export async function getDb(): Promise<TathastuDb> {
       }
     } else {
       // 3. Embedded Local PostgreSQL Engine via PGlite (Development, Test & Pilot Sandbox Only)
-      if (isProd) {
+      if (isProd || process.env.NETLIFY) {
         throw new Error("Embedded PGlite engine cannot be used in production.");
       }
 
-      const { PGlite } = await import("@electric-sql/pglite");
-      const { drizzle } = await import("drizzle-orm/pglite");
+      // Dynamic import to prevent NFT (Node File Trace) from bundling PGlite into production serverless bundles
+      const pglitePkg = "@electric-sql/pglite";
+      const { PGlite } = await import(/* webpackIgnore: true */ pglitePkg);
+      const drizzlePglitePkg = "drizzle-orm/pglite";
+      const { drizzle } = await import(/* webpackIgnore: true */ drizzlePglitePkg);
 
       const isTest = process.env.NODE_ENV === "test";
       const isMemory = process.env.PGLITE_IN_MEMORY === "true";
-      const dbPath = isTest || isMemory ? undefined : path.resolve(process.env.PGLITE_DATA_DIR || path.join(process.cwd(), ".pgdata"));
+      const defaultDataDir = path.join(process.cwd(), Buffer.from("LnBnZGF0YQ==", "base64").toString("utf-8"));
+      const dbPath = isTest || isMemory ? undefined : path.resolve(process.env.PGLITE_DATA_DIR || defaultDataDir);
       if (dbPath) fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
       if (dbPath && fs.existsSync(dbPath)) {

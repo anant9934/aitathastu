@@ -27,13 +27,21 @@
 [functions]
   # Node.js 20 for all functions
   node_bundler = "nft"
-  # Include binary assets needed by the OCR engine
+  # Include specific binary assets needed by the OCR engine (keep total bundle well below 250 MB AWS Lambda limit)
   included_files = [
     "eng.traineddata",
-    "public/eng.traineddata",
-    "node_modules/tesseract.js-core/**",
+    "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",
+    "node_modules/tesseract.js-core/tesseract-core-simd-lstm.js",
+    "node_modules/tesseract.js-core/tesseract-core-lstm.wasm",
+    "node_modules/tesseract.js-core/tesseract-core-lstm.js",
     "node_modules/pdfjs-dist/cmaps/**",
     "node_modules/pdfjs-dist/standard_fonts/**"
+  ]
+  # Exclude local database cache, static images, and preview databases from serverless functions
+  excluded_files = [
+    ".pgdata/**",
+    "public/assets/**",
+    "previews/**"
   ]
 
 # ==============================================================================

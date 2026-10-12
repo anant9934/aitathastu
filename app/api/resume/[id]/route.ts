@@ -1,96 +1,59 @@
-import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
-import { getDb, resumeDocuments } from "@/lib/db";
-import { ExtractorServiceClient } from "@/lib/services/extractor-service-client";
+import { getServerAuthContext } from "@/lib/auth/server-session";
+import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
+import { ExtractorServiceClient, type ExtractorProfileV2 } from "@/lib/services/extractor-service-client";
 import { EoraResumeAdvisor } from "@/lib/services/eora-resume-advisor";
 import { ObjectStorageService } from "@/lib/storage/object-storage";
+import { docMeta, jsonNoStore, loadOwnedResumeDocument, unauthorized } from "@/lib/api/resume-route-helpers";
 
 export const runtime = "nodejs";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// resume_documents is the source of truth for every document. The Python
+// extractor only ever sees scanned PDFs, as a worker, so it is not consulted here.
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: documentId } = await params;
+  const auth = await getServerAuthContext();
+  if (!auth) return unauthorized();
 
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
-      return NextResponse.json({ ok: false, error: "Unauthorized session." }, { status: 401 });
-    }
-    const personId = authRes.auth.person.id;
-
-    // Fetch from Extractor Backend first
-    let docView: any = null;
-    try {
-      docView = await ExtractorServiceClient.getDocument(documentId, personId);
-    } catch {
-      // Check Neon DB snapshot fallback
-      const db = await getDb();
-      const records = await db
-        .select()
-        .from(resumeDocuments)
-        .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
-
-      if (records && records.length > 0) {
-        const rec = records[0];
-        docView = {
-          profile: rec.extractedProfile,
-          status: {
-            document_id: documentId,
-            status: rec.status,
-            warnings: rec.warnings || [],
-          },
-        };
-      }
-    }
-
-    if (!docView) {
-      return NextResponse.json({ ok: false, error: "Document not found." }, { status: 404 });
-    }
-
-    // Generate EORA guidance if profile exists
-    const eoraGuidance = docView.profile
-      ? EoraResumeAdvisor.analyzeProfile(docView.profile)
-      : null;
-
-    return NextResponse.json({
+    const doc = await loadOwnedResumeDocument(documentId, auth.person.id);
+    if (!doc) return jsonNoStore({ ok: false, error: "Document not found." }, 404);
+    const profile = doc.extractedProfile as ExtractorProfileV2 | null;
+    return jsonNoStore({
       ok: true,
       documentId,
-      ...docView,
-      eoraGuidance,
+      profile,
+      status: { document_id: documentId, status: doc.status, warnings: doc.warnings || [] },
+      eoraGuidance: profile ? EoraResumeAdvisor.analyzeProfile(profile) : null,
     });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: "Failed to fetch document." }, { status: 500 });
+    console.error("[resume-get] failed", { documentId, error: err instanceof Error ? err.message : err });
+    return jsonNoStore({ ok: false, error: "Failed to fetch document." }, 500);
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: documentId } = await params;
+  const auth = await getServerAuthContext();
+  if (!auth) return unauthorized();
+  const personId = auth.person.id;
 
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
-      return NextResponse.json({ ok: false, error: "Unauthorized session." }, { status: 401 });
-    }
-    const personId = authRes.auth.person.id;
-
-    // 1. Delete from object storage & DB
+    const doc = await loadOwnedResumeDocument(documentId, personId);
+    if (!doc) return jsonNoStore({ ok: false, error: "Document not found." }, 404);
     await ObjectStorageService.deleteDocument(documentId, personId);
 
-    // 2. Delete from Extractor Backend
-    try {
-      await ExtractorServiceClient.deleteDocument(documentId, personId);
-    } catch (backendErr) {
-      console.warn("Backend deletion note:", backendErr);
+    const extractorDocumentId = docMeta(doc).extractorDocumentId;
+    if (typeof extractorDocumentId === "string" && ExtractorServiceClient.isConfigured()) {
+      try {
+        await ExtractorServiceClient.deleteDocument(extractorDocumentId, await resolveExtractorIdentity(personId));
+      } catch (err) {
+        // The extractor also expires files after its retention window.
+        console.warn("[resume-delete] extractor copy not deleted", { documentId, error: err instanceof Error ? err.message : err });
+      }
     }
-
     return new Response(null, { status: 204 });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: "Failed to delete document." }, { status: 500 });
+    console.error("[resume-delete] failed", { documentId, error: err instanceof Error ? err.message : err });
+    return jsonNoStore({ ok: false, error: "Failed to delete document." }, 500);
   }
 }

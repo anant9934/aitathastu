@@ -1,49 +1,61 @@
-import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
-import { getDb, resumeDocuments } from "@/lib/db";
-import { ExtractorServiceClient } from "@/lib/services/extractor-service-client";
+/**
+ * GET /api/resume/[id]/status   ([id] = documentId; optional ?jobId=)
+ *
+ * Advances the document's current processing job by one step (see
+ * resume-ingestion-service) and returns the job's real stored state:
+ *   queued | processing | review_ready | completed | failed | timed_out | cancelled
+ * When review_ready/completed, the review payload (candidates, structured data)
+ * is included, which also lets a refreshed page rehydrate the review.
+ *
+ * Requires an existing session. It never creates a guest.
+ */
+
+import { getServerAuthContext } from "@/lib/auth/server-session";
+import { advanceResumeJob, failureInfo } from "@/lib/services/resume-ingestion-service";
+import { docMeta, jsonNoStore, loadOwnedResumeDocument, unauthorized } from "@/lib/api/resume-route-helpers";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: documentId } = await params;
+  const auth = await getServerAuthContext();
+  if (!auth) return unauthorized();
+  const personId = auth.person.id;
 
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
-      return NextResponse.json({ ok: false, error: "Unauthorized session." }, { status: 401 });
-    }
-    const personId = authRes.auth.person.id;
+    const doc = await loadOwnedResumeDocument(documentId, personId);
+    if (!doc) return jsonNoStore({ ok: false, code: "NOT_FOUND", error: "Document not found." }, 404);
 
-    let statusRes: any = null;
-    try {
-      statusRes = await ExtractorServiceClient.getStatus(documentId, personId);
-    } catch {
-      const db = await getDb();
-      const records = await db
-        .select()
-        .from(resumeDocuments)
-        .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
+    const requestedJobId = new URL(request.url).searchParams.get("jobId");
+    const jobId = requestedJobId || (docMeta(doc).jobId as string | undefined);
+    if (!jobId) return jsonNoStore({ ok: false, code: "NO_JOB", error: "This document has no processing job." }, 404);
 
-      if (records && records.length > 0) {
-        statusRes = {
-          document_id: documentId,
-          status: records[0].status,
-          warnings: records[0].warnings || [],
-        };
-      }
+    const job = await advanceResumeJob(jobId, personId);
+    if (!job || job.sourceId !== "resume" || (job.metadata as Record<string, unknown>)?.documentId !== documentId) {
+      return jsonNoStore({ ok: false, code: "NOT_FOUND", error: "Processing job not found." }, 404);
     }
 
-    if (!statusRes) {
-      return NextResponse.json({ ok: false, error: "Document not found." }, { status: 404 });
-    }
+    const ready = job.status === "review_ready" || job.status === "completed";
+    // Re-read after advancing: a step may have just written the review payload.
+    const fresh = ready ? await loadOwnedResumeDocument(documentId, personId) : doc;
+    const failure = failureInfo(job.errorCode);
 
-    return NextResponse.json({ ok: true, ...statusRes });
+    return jsonNoStore({
+      ok: true,
+      documentId,
+      jobId: job.id,
+      filename: doc.filename,
+      status: job.status,
+      stage: job.stage,
+      errorCode: job.errorCode,
+      message: job.errorMessage,
+      retryable: failure ? failure.retryable : Boolean((job.metadata as Record<string, unknown>)?.retryable),
+      result: ready && fresh ? docMeta(fresh).review ?? null : null,
+    });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: "Failed to fetch document status." }, { status: 500 });
+    console.error("[resume-status] lookup failed", { documentId, error: err instanceof Error ? err.message : err });
+    return jsonNoStore({ ok: false, code: "STATUS_FAILED", error: "Failed to fetch document status." }, 500);
   }
 }

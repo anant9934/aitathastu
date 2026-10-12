@@ -1,0 +1,38 @@
+# AI Tathastu: Netlify build & deploy configuration (Next.js app only).
+# The Python resume extractor is a separate service on Render (render.yaml).
+# See docs/DEPLOYMENT.md.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Keep in sync with package.json "engines" and .github/workflows/ci.yml.
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+  # Schema changes are applied by running `npm run db:migrate` as an explicit
+  # deploy step, never as DDL on a cold start.
+  DATABASE_AUTO_MIGRATE = "false"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Daily maintenance (replaces the old Vercel cron): calls
+# /api/cron/cleanup-stuck-syncs with CRON_SECRET. See netlify/functions/cleanup-stuck-syncs.mts.
+[functions."cleanup-stuck-syncs"]
+  schedule = "0 4 * * *"
+
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# pdf.js character maps for CJK-font PDFs. Next's file tracing does not pick
+# up *.bcmap files (verified locally), so they are added to the Next server
+# function explicitly. Only verifiable on a real Netlify deploy.
+[functions."___netlify-server-handler"]
+  included_files = ["node_modules/pdfjs-dist/cmaps/**"]

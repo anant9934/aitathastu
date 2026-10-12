@@ -1,10 +1,14 @@
 /**
  * AI TATHASTU — UNIVERSAL RESUME EXTRACTOR SERVICE CLIENT
  *
- * Communicates with the Render Docker Web Service or local FastAPI extraction engine.
- * - Authenticates using scoped service-to-service headers (`X-User-Id`, `X-User-Role`, `X-Org-Id`).
- * - Generates cryptographically signed short-lived user tokens for secure client-side direct uploads.
- * - Never exposes backend secrets in client bundles.
+ * Server-only client for the Python extraction service (Render, or local FastAPI).
+ *
+ * Authorization model: the extractor derives privilege only from WHICH
+ * credential is presented. Ordinary calls use EXTRACTOR_API_TOKEN and are
+ * always treated as the student identified by X-User-Id. Verifier calls use
+ * the separate EXTRACTOR_VERIFIER_TOKEN, and only after the caller's role was
+ * looked up server-side (see lib/auth/extractor-identity.ts). X-Org-Id is
+ * always sent so the extractor can scope verifier access to one organization.
  */
 
 import crypto from "node:crypto";
@@ -20,6 +24,7 @@ export interface ExtractorStatusResponse {
   document_id: string;
   status: "uploaded" | "queued" | "processing" | "completed" | "partial" | "failed";
   warnings: string[];
+  error_code?: string | null;
 }
 
 export interface ExtractorEvidence {
@@ -85,295 +90,198 @@ export interface ExtractorReviewParams {
   field?: string | null;
   action: "accept" | "correct" | "reject" | "uncertain" | "confirm" | "verify";
   corrected_value?: string | null;
-  reviewer_role?: "student" | "verifier";
+}
+
+/** Who a call is made on behalf of. Always built server-side, never from request input. */
+export interface ExtractorIdentity {
+  personId: string;
+  organizationId: string | null;
+  isVerifier: boolean;
+}
+
+/** Thrown for any non-2xx or network failure, with a classification the job pipeline can map to an error code. */
+export class ExtractorServiceError extends Error {
+  constructor(
+    message: string,
+    public readonly kind: "unreachable" | "timeout" | "auth" | "not_found" | "rejected" | "server",
+    public readonly httpStatus?: number
+  ) {
+    super(message);
+    this.name = "ExtractorServiceError";
+  }
 }
 
 function b64UrlEncode(buffer: Buffer): string {
   return buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-function b64UrlDecode(str: string): Buffer {
-  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (base64.length % 4) {
-    base64 += "=";
-  }
-  return Buffer.from(base64, "base64");
-}
-
 export class ExtractorServiceClient {
+  static isConfigured(): boolean {
+    return Boolean((process.env.RESUME_EXTRACTOR_URL || "").trim());
+  }
+
   private static getBaseUrl(): string {
-    const raw = (
-      process.env.RESUME_EXTRACTOR_URL ||
-      process.env.RESUME_EXTRACTOR_SERVICE_URL ||
-      process.env.NEXT_PUBLIC_RESUME_EXTRACTOR_URL
-    )?.trim();
+    const raw = (process.env.RESUME_EXTRACTOR_URL || "").trim();
     if (raw) return raw.replace(/\/+$/, "");
     return "http://127.0.0.1:8000";
   }
 
   private static getApiToken(): string {
-    return (
-      process.env.EXTRACTOR_API_TOKEN ||
-      process.env.RESUME_EXTRACTOR_SERVICE_API_KEY ||
-      process.env.RESUME_EXTRACTOR_SERVICE_SECRET
-    )?.trim() || "development-only-change-me";
+    return (process.env.EXTRACTOR_API_TOKEN || "").trim() || "development-only-change-me";
+  }
+
+  private static getVerifierToken(): string | null {
+    return (process.env.EXTRACTOR_VERIFIER_TOKEN || "").trim() || null;
   }
 
   /**
-   * Generates a signed short-lived user token for client-side direct uploads.
+   * Generates a signed short-lived student token (used by the integration test script).
    * Never leaks the shared service secret to client JavaScript.
    */
   static generateSignedUserToken(params: {
     personId: string;
-    role?: "student" | "verifier";
     action?: string;
     documentId?: string;
     expiresInSeconds?: number;
   }): string {
-    const { personId, role = "student", action = "*", documentId, expiresInSeconds = 900 } = params;
-    const secret = this.getApiToken();
+    const { personId, action = "*", documentId, expiresInSeconds = 900 } = params;
     const payload = {
       sub: personId,
-      role,
+      role: "student",
       act: action,
       ...(documentId ? { doc: documentId } : {}),
       exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
     };
-
-    const serialized = JSON.stringify(payload);
-    const payloadB64 = b64UrlEncode(Buffer.from(serialized, "utf-8"));
-    const sig = crypto.createHmac("sha256", secret).update(payloadB64).digest();
-    const sigB64 = b64UrlEncode(sig);
-
-    return `u.${payloadB64}.${sigB64}`;
+    const payloadB64 = b64UrlEncode(Buffer.from(JSON.stringify(payload), "utf-8"));
+    const sig = crypto.createHmac("sha256", this.getApiToken()).update(payloadB64).digest();
+    return `u.${payloadB64}.${b64UrlEncode(sig)}`;
   }
 
-  private static makeHeaders(personId: string, role: string = "student", extra?: Record<string, string>): HeadersInit {
+  private static makeHeaders(identity: ExtractorIdentity, extra?: Record<string, string>): Record<string, string> {
+    let token = this.getApiToken();
+    if (identity.isVerifier) {
+      const verifierToken = this.getVerifierToken();
+      if (!verifierToken) {
+        throw new ExtractorServiceError("EXTRACTOR_VERIFIER_TOKEN is not configured.", "auth");
+      }
+      token = verifierToken;
+    }
     return {
-      Authorization: `Bearer ${this.getApiToken()}`,
-      "X-User-Id": personId,
-      "X-User-Role": role,
+      Authorization: `Bearer ${token}`,
+      "X-User-Id": identity.personId,
+      ...(identity.organizationId ? { "X-Org-Id": identity.organizationId } : {}),
       ...extra,
     };
   }
 
-  /**
-   * Checks health and engine version of the resume extraction service.
-   */
-  static async checkHealth(): Promise<{ status: string; schema_version: string; tesseract_version?: string }> {
-    const res = await fetch(`${this.getBaseUrl()}/health`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) {
-      throw new Error(`Resume Extractor service health check failed with status ${res.status}`);
+  private static async request(path: string, init: RequestInit & { timeoutMs: number }): Promise<Response> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.getBaseUrl()}${path}`, { ...init, signal: AbortSignal.timeout(init.timeoutMs) });
+    } catch (err) {
+      const isTimeout = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+      throw new ExtractorServiceError(
+        `Extractor ${isTimeout ? "timed out" : "unreachable"} for ${path}: ${err instanceof Error ? err.message : String(err)}`,
+        isTimeout ? "timeout" : "unreachable"
+      );
     }
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      const kind = res.status === 401 || res.status === 403 ? "auth"
+        : res.status === 404 ? "not_found"
+        : res.status < 500 ? "rejected"
+        : "server";
+      throw new ExtractorServiceError(`Extractor ${path} failed (${res.status}): ${detail}`, kind, res.status);
+    }
+    return res;
+  }
+
+  static async checkHealth(): Promise<{ status: string; schema_version: string; tesseract_version?: string }> {
+    const res = await this.request("/health", { method: "GET", timeoutMs: 5000 });
     return res.json();
   }
 
-  /**
-   * Uploads resume file buffer to the extractor backend.
-   */
+  /** Uploads a stored document to the extractor so it can be OCR'd. */
   static async uploadResume(params: {
     fileBuffer: Buffer;
     filename: string;
     mimeType: string;
-    personId: string;
-    role?: "student" | "verifier";
+    identity: ExtractorIdentity;
   }): Promise<ExtractorUploadResponse> {
-    const { fileBuffer, filename, mimeType, personId, role = "student" } = params;
     const formData = new FormData();
-    const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
-    formData.append("file", blob, filename);
-
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/upload`, {
+    formData.append("file", new Blob([new Uint8Array(params.fileBuffer)], { type: params.mimeType }), params.filename);
+    const res = await this.request("/api/resumes/upload", {
       method: "POST",
-      headers: this.makeHeaders(personId, role),
+      headers: this.makeHeaders(params.identity),
       body: formData,
-      signal: AbortSignal.timeout(30000),
+      // Must finish inside the hosting function's limit (Netlify: 10s default,
+      // 26s max). A sleeping Render instance is woken earlier by
+      // /api/resume/preflight; if it still is not up, the job fails as
+      // OCR_SERVICE_UNREACHABLE (retryable) instead of hanging.
+      timeoutMs: 20000,
     });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Upload failed");
-      throw new Error(`Resume upload failed (${res.status}): ${errorText}`);
-    }
-
     return res.json();
   }
 
-  /**
-   * Synchronous upload + extract in a single Render request.
-   * Returns the full extracted profile without polling.
-   * Used as the OCR fallback when Vercel serverless cannot run Tesseract.
-   */
-  static async uploadAndExtract(params: {
-    fileBuffer: Buffer;
-    filename: string;
-    mimeType: string;
-    personId: string;
-    role?: "student" | "verifier";
-  }): Promise<{
-    ok: boolean;
-    document_id: string;
-    status: string;
-    profile: ExtractorProfileV2;
-    raw_text: string;
-    warnings: string[];
-    ocr_used: boolean;
-    processing_seconds: number;
-  }> {
-    const { fileBuffer, filename, mimeType, personId, role = "student" } = params;
-    const formData = new FormData();
-    const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
-    formData.append("file", blob, filename);
-
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/upload-and-extract`, {
+  /** Queues extraction. The extractor runs it in a background task and returns 202 immediately. */
+  static async startExtraction(documentId: string, identity: ExtractorIdentity): Promise<ExtractorStatusResponse> {
+    const res = await this.request("/api/resumes/extract", {
       method: "POST",
-      headers: this.makeHeaders(personId, role),
-      body: formData,
-      // Leave time for local OCR, persistence, and the API response inside the
-      // route's 60-second function budget.
-      signal: AbortSignal.timeout(35000),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Extraction failed");
-      throw new Error(`Render extraction failed (${res.status}): ${errorText}`);
-    }
-
-    return res.json();
-  }
-
-  /**
-   * Triggers background extraction for an uploaded document.
-   */
-  static async startExtraction(documentId: string, personId: string): Promise<ExtractorStatusResponse> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/extract`, {
-      method: "POST",
-      headers: this.makeHeaders(personId, "student", { "Content-Type": "application/json" }),
+      headers: this.makeHeaders(identity, { "Content-Type": "application/json" }),
       body: JSON.stringify({ document_id: documentId }),
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10000,
     });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Extraction failed");
-      throw new Error(`Starting extraction failed (${res.status}): ${errorText}`);
-    }
-
     return res.json();
   }
 
-  /**
-   * Polls document extraction status.
-   */
-  static async getStatus(documentId: string, personId: string): Promise<ExtractorStatusResponse> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/${documentId}/status`, {
+  static async getStatus(documentId: string, identity: ExtractorIdentity): Promise<ExtractorStatusResponse> {
+    const res = await this.request(`/api/resumes/${encodeURIComponent(documentId)}/status`, {
       method: "GET",
-      headers: this.makeHeaders(personId, "student"),
-      signal: AbortSignal.timeout(8000),
+      headers: this.makeHeaders(identity),
+      timeoutMs: 8000,
     });
-
-    if (!res.ok) {
-      throw new Error(`Status check failed (${res.status})`);
-    }
-
     return res.json();
   }
 
-  /**
-   * Fetches full DocumentView including canonical Schema v2.0 profile.
-   */
-  static async getDocument(
-    documentId: string,
-    personId: string,
-    role: "student" | "verifier" = "student"
-  ): Promise<ExtractorDocumentView> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/${documentId}`, {
+  static async getDocument(documentId: string, identity: ExtractorIdentity): Promise<ExtractorDocumentView> {
+    const res = await this.request(`/api/resumes/${encodeURIComponent(documentId)}`, {
       method: "GET",
-      headers: this.makeHeaders(personId, role),
-      signal: AbortSignal.timeout(15000),
+      headers: this.makeHeaders(identity),
+      timeoutMs: 15000,
     });
-
-    if (!res.ok) {
-      throw new Error(`Fetching document view failed (${res.status})`);
-    }
-
     return res.json();
   }
 
-  /**
-   * Submits a field or record review action.
-   */
+  /** Raw OCR/native text lines, used to run the deterministic Node extractor on OCR output. */
+  static async getRawText(documentId: string, identity: ExtractorIdentity): Promise<{ raw_text: string; ocr_used: boolean }> {
+    const res = await this.request(`/api/resumes/${encodeURIComponent(documentId)}/text`, {
+      method: "GET",
+      headers: this.makeHeaders(identity),
+      timeoutMs: 15000,
+    });
+    return res.json();
+  }
+
   static async reviewField(
     documentId: string,
-    personId: string,
-    params: ExtractorReviewParams,
-    role: "student" | "verifier" = "student"
+    identity: ExtractorIdentity,
+    params: ExtractorReviewParams
   ): Promise<{ ok: boolean; record: ExtractorRecord }> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/${documentId}/review`, {
+    const res = await this.request(`/api/resumes/${encodeURIComponent(documentId)}/review`, {
       method: "POST",
-      headers: this.makeHeaders(personId, role, { "Content-Type": "application/json" }),
+      headers: this.makeHeaders(identity, { "Content-Type": "application/json" }),
       body: JSON.stringify(params),
-      signal: AbortSignal.timeout(10000),
+      timeoutMs: 10000,
     });
-
-    if (!res.ok) {
-      const err = await res.text().catch(() => "Review action failed");
-      throw new Error(`Review failed (${res.status}): ${err}`);
-    }
-
     return res.json();
   }
 
-  /**
-   * Exports document in JSON or Summary TXT format.
-   */
-  static async exportDocument(
-    documentId: string,
-    personId: string,
-    format: "json" | "summary" = "json"
-  ): Promise<string> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/${documentId}/export?format=${format}`, {
-      method: "GET",
-      headers: this.makeHeaders(personId, "student"),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Export failed (${res.status})`);
-    }
-
-    return res.text();
-  }
-
-  /**
-   * Retries an extraction.
-   */
-  static async retryExtraction(documentId: string, personId: string): Promise<ExtractorStatusResponse> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/${documentId}/retry`, {
-      method: "POST",
-      headers: this.makeHeaders(personId, "student"),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Retry failed (${res.status})`);
-    }
-
-    return res.json();
-  }
-
-  /**
-   * Deletes a document from the extractor service.
-   */
-  static async deleteDocument(documentId: string, personId: string): Promise<boolean> {
-    const res = await fetch(`${this.getBaseUrl()}/api/resumes/${documentId}`, {
+  static async deleteDocument(documentId: string, identity: ExtractorIdentity): Promise<boolean> {
+    const res = await this.request(`/api/resumes/${encodeURIComponent(documentId)}`, {
       method: "DELETE",
-      headers: this.makeHeaders(personId, "student"),
-      signal: AbortSignal.timeout(10000),
+      headers: this.makeHeaders(identity),
+      timeoutMs: 10000,
     });
-
     return res.status === 204 || res.status === 200;
   }
 }

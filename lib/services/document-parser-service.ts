@@ -108,6 +108,18 @@ export interface CanonicalDocumentMetadata {
   ocrModelChecksumValid?: boolean;
 }
 
+/**
+ * Absolute directory of a pdfjs-dist asset folder, or undefined if absent.
+ * pdf.js insists on forward slashes and a trailing "/"; path.join yields
+ * backslashes on Windows, which made pdf.js reject the URL and every page
+ * render fail there. The folders are bundled for serverless functions via
+ * outputFileTracingIncludes in next.config.mjs.
+ */
+function pdfjsAssetDir(name: "cmaps" | "standard_fonts"): string | undefined {
+  const dir = path.join(process.cwd(), "node_modules", "pdfjs-dist", name);
+  return fs.existsSync(dir) ? `${dir.replace(/\\/g, "/")}/` : undefined;
+}
+
 export interface ParsedDocumentResult {
   text: string;
   documentType?: DocumentType;
@@ -115,6 +127,8 @@ export interface ParsedDocumentResult {
   isScanned: boolean;
   ocrUsed: boolean;
   ocrFailed?: boolean;
+  /** Present when OCR was needed but the engine itself failed. */
+  ocrErrorCode?: OcrEngineErrorCode;
   requiresManualReview?: boolean;
   pageCount?: number;
   pages?: CanonicalPage[];
@@ -713,13 +727,8 @@ async function extractTextWithPdfJs(bytes: Buffer): Promise<PdfJsExtractionOutpu
   const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
   // Local cmaps and standard fonts
-  let cMapUrl: string | undefined;
-  const cmapDir = path.join(process.cwd(), "node_modules/pdfjs-dist/cmaps/");
-  if (fs.existsSync(cmapDir)) cMapUrl = cmapDir;
-
-  let standardFontDataUrl: string | undefined;
-  const fontDir = path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/");
-  if (fs.existsSync(fontDir)) standardFontDataUrl = fontDir;
+  const cMapUrl = pdfjsAssetDir("cmaps");
+  const standardFontDataUrl = pdfjsAssetDir("standard_fonts");
 
   const loadingTask = getDocument({
     data: new Uint8Array(bytes),
@@ -1017,13 +1026,8 @@ export async function renderPdfPagesWithMetadata(
     const { createCanvas } = await import("@napi-rs/canvas");
     const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-    let cMapUrl: string | undefined;
-    const cmapDir = path.join(process.cwd(), "node_modules/pdfjs-dist/cmaps/");
-    if (fs.existsSync(cmapDir)) cMapUrl = cmapDir;
-
-    let standardFontDataUrl: string | undefined;
-    const fontDir = path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/");
-    if (fs.existsSync(fontDir)) standardFontDataUrl = fontDir;
+    const cMapUrl = pdfjsAssetDir("cmaps");
+    const standardFontDataUrl = pdfjsAssetDir("standard_fonts");
 
     const loadingTask = getDocument({
       data: new Uint8Array(pdfBuffer),
@@ -1056,9 +1060,13 @@ export async function renderPdfPagesWithMetadata(
         if (png && png.length > 1000) {
           images.push({ pageNumber: p, buffer: png, preprocessingApplied: applied });
         }
-      } catch {}
+      } catch (err) {
+        console.error("[OCR] page render failed", { page: p, error: err instanceof Error ? err.message : String(err) });
+      }
     }
-  } catch {
+  } catch (err) {
+    // Typically the @napi-rs/canvas native binary is missing for this platform.
+    console.error("[OCR] PDF renderer unavailable", { error: err instanceof Error ? err.message : String(err) });
   } finally {
     if (doc) {
       try {
@@ -1092,7 +1100,11 @@ export interface OcrResult {
   pageResults: Array<{ pageNumber: number; text: string; confidence: number }>;
   durationMs: number;
   error?: string;
+  /** Set when OCR could not run at all (an engine fault, not an unreadable scan). */
+  errorCode?: OcrEngineErrorCode;
 }
+
+export type OcrEngineErrorCode = "OCR_MODEL_UNAVAILABLE" | "OCR_WORKER_FAILED" | "OCR_TIMEOUT" | "OCR_RENDER_FAILED";
 
 export function resolveLocalTrainedDataPath(): { dir: string; fullPath: string; checksumValid: boolean } {
   const candidateDirs = [
@@ -1133,8 +1145,24 @@ export async function recognizeScannedDocument(
   const pageResults: Array<{ pageNumber: number; text: string; confidence: number }> = [];
   const preprocessingApplied: string[] = [];
 
-  // Check local eng.traineddata asset and verify checksum across search paths
+  // Check local eng.traineddata asset and verify checksum across search paths.
+  // A missing or altered model is an engine fault: report it as such instead
+  // of letting tesseract.js try to download a model or fail silently.
   const { dir: langDir, checksumValid } = resolveLocalTrainedDataPath();
+  if (!checksumValid) {
+    console.error("[OCR] eng.traineddata missing or checksum mismatch; in-process OCR unavailable");
+    return {
+      text: "",
+      success: false,
+      ocrModel: "eng.traineddata",
+      checksumValid,
+      preprocessingApplied: [],
+      pageResults: [],
+      durationMs: Date.now() - startTime,
+      error: "OCR model unavailable",
+      errorCode: "OCR_MODEL_UNAVAILABLE",
+    };
+  }
 
   // Identify target candidate images
   let targetImages: Array<{ pageNumber: number; buffer: Buffer; applied: string[] }> = [];
@@ -1169,6 +1197,7 @@ export async function recognizeScannedDocument(
           pageResults: [],
           durationMs: Date.now() - startTime,
           error: "Document contains neither decodable vector pages nor raster image streams.",
+          errorCode: "OCR_RENDER_FAILED",
         };
       }
     }
@@ -1254,6 +1283,9 @@ export async function recognizeScannedDocument(
       durationMs: Date.now() - startTime,
     };
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const errorCode: OcrEngineErrorCode = /timed out/i.test(message) ? "OCR_TIMEOUT" : "OCR_WORKER_FAILED";
+    console.error("[OCR] in-process OCR failed", { errorCode, message });
     return {
       text: "",
       success: false,
@@ -1262,7 +1294,8 @@ export async function recognizeScannedDocument(
       preprocessingApplied: Array.from(new Set(preprocessingApplied)),
       pageResults,
       durationMs: Date.now() - startTime,
-      error: err instanceof Error ? err.message : String(err),
+      error: message,
+      errorCode,
     };
   } finally {
     if (timeoutTimer) clearTimeout(timeoutTimer);
@@ -1416,6 +1449,7 @@ export async function parseResumeDocument(
   let canonicalPages: CanonicalPage[] = [];
   let ocrPreprocessingApplied: string[] = [];
   let ocrModelChecksumValid = false;
+  let ocrErrorCode: OcrEngineErrorCode | undefined;
 
   // Step 1: Safety and Magic Bytes Validation
   const safety = validateDocumentSafety(bytes, extension);
@@ -1532,6 +1566,7 @@ export async function parseResumeDocument(
 
       ocrPreprocessingApplied = ocrResult.preprocessingApplied;
       ocrModelChecksumValid = ocrResult.checksumValid;
+      ocrErrorCode = ocrResult.errorCode;
 
       if (ocrResult.success && ocrResult.text.replace(/\s/g, "").length >= 20) {
         // Splice OCR text into corresponding pages
@@ -1579,7 +1614,11 @@ export async function parseResumeDocument(
       } else {
         ocrFailed = true;
         requiresManualReview = true;
-        warnings.push("OCR attempted but insufficient text recovered.");
+        warnings.push(
+          ocrErrorCode
+            ? `OCR engine failure (${ocrErrorCode}): ${ocrResult.error ?? "unknown"}`
+            : "OCR attempted but insufficient text recovered."
+        );
       }
     }
 
@@ -1702,6 +1741,7 @@ export async function parseResumeDocument(
     isScanned,
     ocrUsed,
     ocrFailed,
+    ocrErrorCode,
     requiresManualReview,
     pageCount,
     pages: canonicalPages,

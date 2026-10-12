@@ -1,23 +1,24 @@
 /**
- * AI TATHASTU — CRON JOB: Cleanup Stuck Sync Runs
+ * AI TATHASTU — CRON JOB: daily cleanup
  *
- * Replaces the Render background worker.
- * Runs on schedule (see vercel.json crons).
- * Marks sync runs stuck > 15 minutes as timed out.
- *
- * Protected by Authorization header — only Vercel cron scheduler can call this.
+ * Called once a day by the Netlify scheduled function
+ * netlify/functions/cleanup-stuck-syncs.mts (or any external cron) with
+ * "Authorization: Bearer $CRON_SECRET". It:
+ *   - marks sync runs stuck > 15 minutes as timed out,
+ *   - fails processing jobs stuck in an in-flight state > 15 minutes,
+ *   - purges guest accounts older than 7 days that never finished onboarding.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, syncRuns } from "@/lib/db";
 import { and, eq, lt } from "drizzle-orm";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
+import { purgeStaleGuests } from "@/lib/services/guest-cleanup-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // seconds
 
 export async function GET(request: NextRequest) {
-  // Verify this is called by Vercel Cron (not a random user)
   const authHeader = request.headers.get("authorization");
   const cronSecret = (process.env.CRON_SECRET || "").trim();
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
@@ -53,14 +54,16 @@ export async function GET(request: NextRequest) {
     }
 
     const recoveredJobs = await SourceProcessingJobService.recoverStuckJobs(15);
+    const purgedGuests = await purgeStaleGuests();
 
     const duration = Date.now() - startTime;
-    console.log(`[Cron] cleanup-stuck-syncs done in ${duration}ms. Fixed syncRuns: ${fixed}, recoveredJobs: ${recoveredJobs}.`);
+    console.log(`[Cron] cleanup-stuck-syncs done in ${duration}ms. Fixed syncRuns: ${fixed}, recoveredJobs: ${recoveredJobs}, purgedGuests: ${purgedGuests}.`);
 
     return NextResponse.json({
       ok: true,
       fixedSyncRuns: fixed,
       recoveredJobs,
+      purgedGuests,
       duration_ms: duration,
       timestamp: new Date().toISOString(),
     });

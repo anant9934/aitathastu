@@ -8,6 +8,24 @@ import pytesseract
 from PIL import Image, ImageOps
 from docx import Document
 
+class OcrEngineUnavailable(RuntimeError):
+    """Raised when the Tesseract binary or its language data cannot be loaded.
+
+    This is an infrastructure fault, not a property of the document, so it must
+    surface as a distinct failure instead of 'no legible text'.
+    """
+
+def _tesseract(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except pytesseract.TesseractNotFoundError as e:
+        raise OcrEngineUnavailable('Tesseract binary not found') from e
+    except pytesseract.TesseractError as e:
+        # Missing language data is reported by tesseract itself, not as NotFound.
+        if 'traineddata' in str(e) or 'language' in str(e).lower():
+            raise OcrEngineUnavailable('Tesseract language data unavailable') from e
+        raise
+
 @dataclass
 class Line:
     text: str
@@ -71,10 +89,12 @@ def _ocr(im,page,seconds,warnings):
     # Only detect orientation if image is landscape (unusual for portrait resumes)
     if im_gray.width > im_gray.height * 1.2:
         try:
-            orientation = pytesseract.image_to_osd(im_gray,timeout=min(2,seconds))
+            orientation = _tesseract(pytesseract.image_to_osd,im_gray,timeout=min(2,seconds))
             match = re.search(r'Rotate: (\d+)',orientation)
             if match and int(match.group(1)) in (90,180,270):
                 im_gray = im_gray.rotate(-int(match.group(1)),expand=True)
+        except OcrEngineUnavailable:
+            raise
         except Exception:
             pass
 
@@ -82,21 +102,23 @@ def _ocr(im,page,seconds,warnings):
     im_enhanced = ImageOps.autocontrast(im_gray)
     raw = ""
     try:
-        raw = pytesseract.image_to_string(im_enhanced, config='--psm 3', timeout=seconds)
+        raw = _tesseract(pytesseract.image_to_string, im_enhanced, config='--psm 3', timeout=seconds)
+    except OcrEngineUnavailable:
+        raise
     except Exception:
         pass
 
     # Fallback 1: If psm 3 returned empty or very short, try without psm
     if not raw or len(raw.strip()) < 30:
         try:
-            raw = pytesseract.image_to_string(im_enhanced, timeout=seconds)
+            raw = _tesseract(pytesseract.image_to_string, im_enhanced, timeout=seconds)
         except Exception:
             pass
 
     # Fallback 2: Try psm 6 (single uniform block) on raw grayscale if still empty
     if not raw or len(raw.strip()) < 30:
         try:
-            raw = pytesseract.image_to_string(im_gray, config='--psm 6', timeout=seconds)
+            raw = _tesseract(pytesseract.image_to_string, im_gray, config='--psm 6', timeout=seconds)
         except Exception:
             pass
 
@@ -147,6 +169,8 @@ def read_document(data,fmt,settings):
                         existing={l.text.lower().strip() for l in native if len(l.text.strip())>10}
                         fresh=[l for l in ocr if l.text.lower().strip() not in existing]
                         if fresh: lines.extend(fresh); used=True; methods.append('ocr')
+                    except OcrEngineUnavailable:
+                        raise
                     except Exception as e: warnings.append(f'Page {pageno}: OCR setup error ({type(e).__name__}).')
     elif fmt=='docx':
         doc=Document(BytesIO(data))

@@ -27,7 +27,10 @@
 [functions]
   # Node.js 20 for all functions
   node_bundler = "nft"
-  # Include specific binary assets needed by the OCR engine (keep total bundle well below 250 MB AWS Lambda limit)
+
+# Scope heavy OCR binary assets ONLY to the ocr-background function.
+# Applying included_files globally would bloat cleanup-stuck-syncs and the server handler.
+[functions."ocr-background"]
   included_files = [
     "eng.traineddata",
     "node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm",

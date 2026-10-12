@@ -713,12 +713,17 @@ async function extractTextWithPdfJs(bytes: Buffer): Promise<PdfJsExtractionOutpu
   const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
   // Local cmaps and standard fonts
+  // NOTE: Path strings are runtime-constructed to prevent NFT from statically tracing
+  // and bundling the entire pdfjs-dist package. The included_files in netlify.toml
+  // copies these directories explicitly at deploy time.
+  const _pdfCmapSeg = Buffer.from("bm9kZV9tb2R1bGVzL3BkZmpzLWRpc3QvY21hcHMv", "base64").toString();
+  const _pdfFontSeg = Buffer.from("bm9kZV9tb2R1bGVzL3BkZmpzLWRpc3Qvc3RhbmRhcmRfZm9udHMv", "base64").toString();
   let cMapUrl: string | undefined;
-  const cmapDir = path.join(process.cwd(), "node_modules/pdfjs-dist/cmaps/");
+  const cmapDir = path.join(process.cwd(), _pdfCmapSeg);
   if (fs.existsSync(cmapDir)) cMapUrl = cmapDir;
 
   let standardFontDataUrl: string | undefined;
-  const fontDir = path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/");
+  const fontDir = path.join(process.cwd(), _pdfFontSeg);
   if (fs.existsSync(fontDir)) standardFontDataUrl = fontDir;
 
   const loadingTask = getDocument({
@@ -1017,12 +1022,14 @@ export async function renderPdfPagesWithMetadata(
     const { createCanvas } = await import("@napi-rs/canvas");
     const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
+    const _pdfCmapSeg2 = Buffer.from("bm9kZV9tb2R1bGVzL3BkZmpzLWRpc3QvY21hcHMv", "base64").toString();
+    const _pdfFontSeg2 = Buffer.from("bm9kZV9tb2R1bGVzL3BkZmpzLWRpc3Qvc3RhbmRhcmRfZm9udHMv", "base64").toString();
     let cMapUrl: string | undefined;
-    const cmapDir = path.join(process.cwd(), "node_modules/pdfjs-dist/cmaps/");
+    const cmapDir = path.join(process.cwd(), _pdfCmapSeg2);
     if (fs.existsSync(cmapDir)) cMapUrl = cmapDir;
 
     let standardFontDataUrl: string | undefined;
-    const fontDir = path.join(process.cwd(), "node_modules/pdfjs-dist/standard_fonts/");
+    const fontDir = path.join(process.cwd(), _pdfFontSeg2);
     if (fs.existsSync(fontDir)) standardFontDataUrl = fontDir;
 
     const loadingTask = getDocument({

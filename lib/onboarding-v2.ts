@@ -60,6 +60,9 @@ export type OnboardingDraft = {
   semester: string;
   expectedGraduationYear?: number;
   resume: "pending" | "processed" | "skipped" | "unreadable";
+  /** The uploaded CV, so a refresh can rehydrate its review from the server. */
+  resumeDocumentId?: string;
+  resumeFileName?: string;
   resumeSuggestions: { education: string; skills: string; experience: string };
   acceptedResumeSkills: string[];
   resumeReviewed: ReviewedResumeClaim[];
@@ -156,42 +159,15 @@ export const initialDraft: OnboardingDraft = {
   completed: false,
 };
 
-export const stageConfig: Record<
-  StageId,
-  { section: string; optional: boolean; canContinue: (draft: OnboardingDraft) => boolean }
-> = {
-  name: { section: "Meet EORA", optional: false, canContinue: (d) => d.name.trim().length >= 2 },
-  welcome: { section: "Meet EORA", optional: false, canContinue: () => true },
-  role: { section: "Profile", optional: false, canContinue: (d) => d.role === "student" || d.role === "faculty" },
-  direction: { section: "Direction", optional: false, canContinue: (d) => Boolean(d.targetRole && d.goal) },
-  priorities: { section: "Direction", optional: false, canContinue: (d) => Boolean(d.priorities?.length) },
-  academic: {
-    section: "Profile",
-    optional: false,
-    canContinue: (d) => Boolean(d.degree && d.specialization && d.year),
-  },
-  resume: { section: "Profile", optional: true, canContinue: (d) => d.resume !== "pending" },
-  footprints: { section: "Footprints", optional: true, canContinue: () => true },
-  analysis: { section: "Footprints", optional: false, canContinue: () => true },
-  insights: { section: "Footprints", optional: false, canContinue: () => true },
-  python: { section: "Skills", optional: false, canContinue: (d) => Boolean(d.python) },
-  technologies: { section: "Skills", optional: true, canContinue: () => true },
-  certifications: { section: "Skills", optional: true, canContinue: () => true },
-  projects: { section: "Projects", optional: true, canContinue: () => true },
-  contribution: { section: "Projects", optional: true, canContinue: () => true },
-  goal: { section: "Goal", optional: false, canContinue: (d) => Boolean(d.goal.trim()) },
-  reveal: { section: "Goal", optional: false, canContinue: () => true },
-};
-
 export const sections = ["Meet EORA", "Direction", "Profile", "Footprints", "Skills", "Projects", "Goal"];
 
 export function nextStage(stage: StageId): StageId {
   return stageIds[Math.min(stageIds.length - 1, stageIds.indexOf(stage) + 1)];
 }
 
-export function previousStage(stage: StageId): StageId {
-  return stageIds[Math.max(0, stageIds.indexOf(stage) - 1)];
-}
+// Resume document ids: random UUIDs now; 64-hex sha256 ids from before the
+// cross-tenant fix are still accepted so older drafts keep their claims.
+const RESUME_DOCUMENT_ID = /^(?:[a-f0-9]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 export function safeDraft(value: unknown): OnboardingDraft {
   if (!value || typeof value !== "object") return initialDraft;
@@ -238,6 +214,8 @@ export function safeDraft(value: unknown): OnboardingDraft {
     resume: ["pending", "processed", "skipped", "unreadable"].includes(raw.resume || "")
       ? raw.resume!
       : "pending",
+    resumeDocumentId: typeof raw.resumeDocumentId === "string" && RESUME_DOCUMENT_ID.test(raw.resumeDocumentId) ? raw.resumeDocumentId : undefined,
+    resumeFileName: raw.resumeFileName ? str(raw.resumeFileName, 180) : undefined,
     resumeSuggestions: {
       education: str(raw.resumeSuggestions?.education),
       skills: str(raw.resumeSuggestions?.skills),
@@ -247,7 +225,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
     resumeReviewed: Array.isArray(raw.resumeReviewed) ? raw.resumeReviewed.slice(0, 100).filter((claim): claim is ReviewedResumeClaim =>
       Boolean(claim && ["education", "experience", "project", "skill", "certification", "achievement"].includes(claim.category) &&
       typeof claim.value === "string" && typeof claim.sourceSpan === "string" &&
-      typeof claim.documentId === "string" && /^[a-f0-9]{64}$/.test(claim.documentId))
+      typeof claim.documentId === "string" && RESUME_DOCUMENT_ID.test(claim.documentId))
     ).map((claim) => ({ candidateId: str(claim.candidateId, 80) || undefined, category: claim.category, value: str(claim.value, 300), sourceSpan: str(claim.sourceSpan, 300), documentId: claim.documentId, corrected: claim.corrected === true })) : [],
     certificationSuggestions: Array.isArray(raw.certificationSuggestions)
       ? raw.certificationSuggestions
@@ -361,63 +339,4 @@ export function safeDraft(value: unknown): OnboardingDraft {
         : undefined,
     completed: raw.completed === true,
   };
-}
-
-export function startingPicture(draft: OnboardingDraft) {
-  const evidence = [
-    ...(draft.degree && draft.specialization && draft.year
-      ? [
-          createEvidenceItem({
-            category: "education",
-            subject: draft.specialization,
-            value: `${draft.degree} · ${draft.specialization} · ${draft.year}`,
-            source: "self_reported",
-            verificationStatus: "self_reported",
-          }),
-        ]
-      : []),
-    ...(draft.targetRole
-      ? [
-          createEvidenceItem({
-            category: "goal",
-            subject: `Target Role: ${draft.targetRole}`,
-            value: draft.targetRole,
-            source: "self_reported",
-            verificationStatus: "self_reported",
-          }),
-        ]
-      : []),
-    ...(draft.goal
-      ? [
-          createEvidenceItem({
-            category: "goal",
-            subject: `Target Goal: ${draft.goal}`,
-            value: draft.goal,
-            source: "self_reported",
-            verificationStatus: "self_reported",
-          }),
-        ]
-      : []),
-    ...draft.skills.map((skill) =>
-      createEvidenceItem({
-        category: "skill",
-        subject: skill,
-        value: skill,
-        source: "self_reported",
-        verificationStatus: "self_reported",
-      })
-    ),
-    ...draft.projects
-      .filter((project) => project.status === "confirmed")
-      .map((project) =>
-        createEvidenceItem({
-          category: "project",
-          subject: project.title,
-          value: project.title,
-          source: "self_reported",
-          verificationStatus: "self_reported",
-        })
-      ),
-  ];
-  return summarizeEvidence(evidence);
 }

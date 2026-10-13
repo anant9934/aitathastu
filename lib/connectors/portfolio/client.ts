@@ -91,7 +91,12 @@ async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Promise<{ 
     const request = https.get(check.parsed!, {
       headers: { "User-Agent": "AI-Tathastu-PortfolioAuditor/1.0", Accept: "text/html,application/xhtml+xml" },
       timeout: 5000,
-      lookup: (_host, _options, callback) => callback(null, address.address, 4),
+      // Node's automatic address-family selection requests { all: true }.
+      // Preserve DNS pinning in both callback forms; returning a string for
+      // an all-address lookup makes Node read an undefined IP address.
+      lookup: (_host, options, callback) => options.all
+        ? callback(null, [{ address: address.address, family: 4 }])
+        : callback(null, address.address, 4),
     }, (res) => {
       const status = res.statusCode || 0;
       const contentType = String(res.headers["content-type"] || "");

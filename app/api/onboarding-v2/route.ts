@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-import { getServerAuthContext, getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
+import {
+  applySessionCookie,
+  getOrCreateGuestSession,
+  getServerAuthContext,
+  isGuestEmail,
+} from "@/lib/auth/server-session";
+import type { AuthContext } from "@/lib/auth/session";
 import { completeOnboarding, readOnboardingDraft, writeOnboardingDraft } from "@/lib/services/onboarding-v2-service";
 import { findUserByEmail, updateUserCredentials } from "@/lib/repositories/user-repository";
 import { updatePersonProfileData } from "@/lib/repositories/person-repository";
 import { hashPassword } from "@/lib/auth/password";
-import { SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/auth/session";
 
 export async function GET() {
   const auth = await getServerAuthContext();
@@ -12,119 +17,79 @@ export async function GET() {
   return NextResponse.json({ authenticated: true, draft: await readOnboardingDraft(auth.person.id) });
 }
 
+/**
+ * If the body carries an email + password and the session is a guest, upgrade
+ * the guest in place, so the CV snapshots, jobs and draft it already owns keep
+ * the same owner. Returns an error response when the email belongs to someone
+ * else, otherwise null.
+ */
+async function upgradeGuestCredentials(auth: AuthContext, body: Record<string, unknown>): Promise<NextResponse | null> {
+  const { email, password, name } = body;
+  if (typeof email !== "string" || !email || typeof password !== "string" || password.length < 6) return null;
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await findUserByEmail(normalizedEmail);
+  if (existing && existing.id !== auth.user.id) {
+    return NextResponse.json({ error: "This email already has an account. Please sign in first." }, { status: 409 });
+  }
+  if (!existing && isGuestEmail(auth.user.email)) {
+    const displayName = typeof name === "string" ? name.trim() : "";
+    await updateUserCredentials(auth.user.id, { email: normalizedEmail, passwordHash: await hashPassword(password), displayName });
+    if (displayName) await updatePersonProfileData(auth.person.id, { displayName });
+    auth.user.email = normalizedEmail;
+  } else if (!existing && auth.user.email !== normalizedEmail) {
+    return NextResponse.json({ error: "Sign out before creating a different account." }, { status: 409 });
+  }
+  return null;
+}
+
+/**
+ * Draft write. This is the ONLY route that may create a guest session (see
+ * lib/auth/server-session.ts), so a first-time visitor's progress has an owner.
+ */
 export async function PUT(request: Request) {
-  const body = await request.json();
-  let auth = await getServerAuthContext();
-  let sessionToken: string | null = null;
-  let sessionExpires: Date | null = null;
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
-  // Ensure an auth context exists for the onboarding visitor
-  if (!auth) {
-    const guestCtx = await getOrCreateOnboardingAuthContext();
-    auth = guestCtx.auth;
-    if (guestCtx.sessionCookieToSet) {
-      sessionToken = guestCtx.sessionCookieToSet.value;
-      sessionExpires = guestCtx.sessionCookieToSet.options.expires as Date;
-    }
+  const session = await getOrCreateGuestSession(request);
+  if (!session.ok) {
+    return NextResponse.json(
+      { error: "Too many new sessions from this network. Please wait a few minutes and try again." },
+      { status: 429, headers: { "Retry-After": String(session.retryAfterSeconds) } }
+    );
   }
 
-  // Upgrade the current guest in place so resume snapshots and review claims keep the same owner.
-  if (body.email && typeof body.email === "string" && body.password && typeof body.password === "string" && body.password.length >= 6) {
-    const normalizedEmail = body.email.trim().toLowerCase();
-    const existing = await findUserByEmail(normalizedEmail);
-    if (existing && existing.id !== auth.user.id) {
-      return NextResponse.json({ error: "This email already has an account. Please sign in first." }, { status: 409 });
-    }
-    if (!existing && auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
-      const passwordHash = await hashPassword(body.password);
-      await updateUserCredentials(auth.user.id, {
-        email: normalizedEmail,
-        passwordHash,
-        displayName: typeof body.name === "string" ? body.name.trim() : "",
-      });
-      if (typeof body.name === "string" && body.name.trim()) {
-        await updatePersonProfileData(auth.person.id, { displayName: body.name.trim() });
-      }
-      auth.user.email = normalizedEmail;
-    } else if (!existing && auth.user.email !== normalizedEmail) {
-      return NextResponse.json({ error: "Sign out before creating a different account." }, { status: 409 });
-    }
-  }
+  const conflict = await upgradeGuestCredentials(session.auth, body);
+  if (conflict) return applySessionCookie(conflict, session.sessionCookieToSet);
 
   try {
-    const draft = await writeOnboardingDraft(auth.person.id, body);
-    const response = NextResponse.json({ draft });
-    if (sessionToken && sessionExpires) {
-      response.cookies.set({
-        name: SESSION_COOKIE_NAME,
-        value: sessionToken,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: sessionExpires,
-        maxAge: Math.floor(SESSION_DURATION_MS / 1000),
-      });
-    }
-    return response;
+    const draft = await writeOnboardingDraft(session.auth.person.id, body);
+    return applySessionCookie(NextResponse.json({ draft }), session.sessionCookieToSet);
   } catch (error) {
     const message = error instanceof Error ? error.message : "We couldn't save your progress. Please try again.";
-    return NextResponse.json({ error: message }, { status: /role|purpose|choose/i.test(message) ? 400 : 500 });
+    return applySessionCookie(
+      NextResponse.json({ error: message }, { status: /role|purpose|choose/i.test(message) ? 400 : 500 }),
+      session.sessionCookieToSet
+    );
   }
 }
 
+/** Final onboarding save. Requires the session established by earlier draft writes. */
 export async function POST(request: Request) {
-  const body = await request.json();
-  let auth = await getServerAuthContext();
-  let sessionToken: string | null = null;
-  let sessionExpires: Date | null = null;
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
-  // Ensure an auth context exists
+  const auth = await getServerAuthContext();
   if (!auth) {
-    const guestCtx = await getOrCreateOnboardingAuthContext();
-    auth = guestCtx.auth;
-    if (guestCtx.sessionCookieToSet) {
-      sessionToken = guestCtx.sessionCookieToSet.value;
-      sessionExpires = guestCtx.sessionCookieToSet.options.expires as Date;
-    }
+    return NextResponse.json({ error: "Your onboarding session has expired. Refresh the page to continue." }, { status: 401 });
   }
 
-  // Final save must never silently switch owners or create a second person.
-  if (body.email && typeof body.email === "string" && body.password && typeof body.password === "string" && body.password.length >= 6) {
-    const normalizedEmail = body.email.trim().toLowerCase();
-    const existing = await findUserByEmail(normalizedEmail);
-    if (existing && existing.id !== auth.user.id) {
-      return NextResponse.json({ error: "This email already has an account. Please sign in first." }, { status: 409 });
-    }
-    if (!existing && auth.user.email.endsWith("@onboarding.aitathastu.internal")) {
-      const passwordHash = await hashPassword(body.password);
-      await updateUserCredentials(auth.user.id, {
-        email: normalizedEmail,
-        passwordHash,
-        displayName: typeof body.name === "string" ? body.name.trim() : "",
-      });
-      auth.user.email = normalizedEmail;
-    } else if (!existing && auth.user.email !== normalizedEmail) {
-      return NextResponse.json({ error: "Sign out before creating a different account." }, { status: 409 });
-    }
-  }
+  const conflict = await upgradeGuestCredentials(auth, body);
+  if (conflict) return conflict;
 
   try {
     const result = await completeOnboarding(auth.person.id, body);
-    const response = NextResponse.json({ success: true, draft: result });
-    if (sessionToken && sessionExpires) {
-      response.cookies.set({
-        name: SESSION_COOKIE_NAME,
-        value: sessionToken,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: sessionExpires,
-        maxAge: Math.floor(SESSION_DURATION_MS / 1000),
-      });
-    }
-    return response;
+    return NextResponse.json({ success: true, draft: result });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "We couldn't finish setup. Please try again." },

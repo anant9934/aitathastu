@@ -42,7 +42,7 @@ import {
   ALLOWED_EORA_ACTIONS,
   ALLOWED_NAVIGATION_ROUTES,
   type EoraSafeAction
-} from "../lib/eora/actions";
+} from "./lib/eora-actions";
 
 interface TestResult {
   suite: string;

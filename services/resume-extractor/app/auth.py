@@ -88,7 +88,11 @@ def get_current_user(
 
     # Determine user ID: from X-User-Id header (trusted service call), or default to single-tenant owner for tests
     effective_user_id = (x_user_id or '').strip() or settings.extractor_owner_id
-    effective_role = 'verifier' if is_verifier_token else (x_user_role if x_user_role in ('verifier', 'admin') else 'student')
+    # Privilege comes only from which credential was presented, never from a
+    # header. The regular service token is used for every student request, so
+    # honouring X-User-Role here would let any caller who can reach the Next
+    # proxy self-grant verifier rights. X-User-Role is accepted but ignored.
+    effective_role = 'verifier' if is_verifier_token else 'student'
     effective_scope = (x_auth_scope or '*').strip() or '*'
 
     return UserContext(
@@ -110,9 +114,13 @@ def check_document_access(meta: dict, user: UserContext, doc_id: str) -> None:
     if user.scoped_doc_id and user.scoped_doc_id != doc_id:
         raise HTTPException(403, 'Token not authorized for this document')
 
-    # Verifiers and admins can inspect all documents in their scope
+    # Verifiers and admins may inspect other people's documents only inside
+    # their own organization. A missing org on either side denies access
+    # rather than granting a global view.
     if user.role in ('verifier', 'admin'):
-        if user.org_id and meta.get('org_id') and user.org_id != meta.get('org_id'):
+        if meta.get('owner_id') == user.user_id:
+            return
+        if not user.org_id or not meta.get('org_id') or user.org_id != meta.get('org_id'):
             raise HTTPException(404, 'Document not found')
         return
 

@@ -1,16 +1,26 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { FileText, CheckCircle2, FileUp, Sparkles, AlertCircle, ShieldCheck, Layers, BookOpen, Loader2, Hourglass } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
 import { ScreenFooter } from "./ScreenFooter";
-import { ProcessingActivity } from "./ProcessingActivity";
 import { useEoraSafe } from "@/components/eora/eora-provider";
 import { parseSafeJsonResponse } from "@/lib/api/safe-api-response";
+import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 
+/**
+ * Client-side view of the resume pipeline. Every busy state mirrors a real
+ * server job state from GET /api/resume/[id]/status. Nothing here is a
+ * timer-driven "PARSING" label.
+ *   UPLOADING   POST /api/resume/extract in flight
+ *   QUEUED      job stored, not yet picked up
+ *   PROCESSING  server is parsing / OCRing (label comes from the job stage)
+ *   REVIEW_REQUIRED  job is review_ready, candidates shown
+ *   SAVING      POST /api/resume/[id]/apply in flight
+ */
 export type ResumeProcessingState =
   | "IDLE"
   | "UPLOADING"
-  | "PARSING"
-  | "EXTRACTING"
+  | "QUEUED"
+  | "PROCESSING"
   | "REVIEW_REQUIRED"
   | "SAVING"
   | "COMPLETED"
@@ -39,53 +49,81 @@ export type ExtractedProfileData = {
 
 type ResumeCandidate = ReviewedResumeClaim & { id: string; selected: boolean };
 
+type ResumeExtraData = {
+  extractedProfile?: ExtractedProfileData;
+  discoveredProfiles?: Partial<Record<string, string>>;
+  extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
+  extractedEducation?: Array<{
+    institution: string;
+    degree: string;
+    fieldOfStudy?: string;
+    graduationYear?: string;
+    startDate?: string;
+    endDate?: string;
+    gpa?: string;
+    percentage?: string;
+    academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
+  }>;
+  extractedExperience?: Array<{
+    company: string;
+    role: string;
+    type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
+    duration?: string;
+    startDate?: string;
+    endDate?: string;
+    highlights?: string[];
+    technologies?: string[];
+    sourceSpan: string;
+  }>;
+  extractedAchievements?: Array<{
+    title: string;
+    category?: string;
+    subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
+    issuer?: string;
+    date?: string;
+    description?: string;
+    sourceSpan: string;
+  }>;
+};
+
+type JobStatusResponse = {
+  ok: boolean;
+  documentId: string;
+  jobId: string;
+  filename?: string;
+  status: "queued" | "processing" | "review_ready" | "completed" | "failed" | "timed_out" | "cancelled" | "retry";
+  stage?: string;
+  errorCode?: string | null;
+  message?: string | null;
+  retryable?: boolean;
+  result?: Record<string, any> | null;
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  acquire: "Waiting for the reader…",
+  parse: "Reading document text…",
+  extract: "Reading scanned pages with OCR (this can take a minute)…",
+  validate: "Extracting skills, academics & projects…",
+  persist: "Saving suggestions for your review…",
+};
+
+const POLL_INTERVAL_MS = 1500;
+const POLL_DEADLINE_MS = 6 * 60_000;
+
 interface Screen5ResumeUploadProps {
   initialFileName?: string | null;
+  /** Document stored earlier in this onboarding (from the draft). Used to rehydrate after a refresh. */
+  initialDocumentId?: string | null;
   stepNumber?: number;
   totalSteps?: number;
-  onExtractSuccess?: (
-    fileName: string,
-    claims: ReviewedResumeClaim[],
-    extraData?: {
-      extractedProfile?: ExtractedProfileData;
-      discoveredProfiles?: Partial<Record<string, string>>;
-      extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
-      extractedEducation?: Array<{
-        institution: string;
-        degree: string;
-        fieldOfStudy?: string;
-        graduationYear?: string;
-        startDate?: string;
-        endDate?: string;
-        gpa?: string;
-        percentage?: string;
-        academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
-      }>;
-      extractedExperience?: Array<{
-        company: string;
-        role: string;
-        type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
-        duration?: string;
-        startDate?: string;
-        endDate?: string;
-        highlights?: string[];
-        technologies?: string[];
-        sourceSpan: string;
-      }>;
-      extractedAchievements?: Array<{
-        title: string;
-        category?: string;
-        subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
-        issuer?: string;
-        date?: string;
-        description?: string;
-        sourceSpan: string;
-      }>;
-    }
-  ) => Promise<boolean> | boolean;
+  onExtractSuccess?: (fileName: string, claims: ReviewedResumeClaim[], extraData?: ResumeExtraData) => Promise<boolean> | boolean;
   /** Fires immediately after a successful extraction, before the user reviews/saves.
    *  Use this to pre-fill profile fields (e.g. name) without waiting for review submission. */
   onExtractPreview?: (extractedProfile: ExtractedProfileData, discoveredProfiles?: Partial<Record<string, string>>) => void;
+  /** Fires once the server has stored the upload, so the draft can remember which document is in review. */
+  onDocumentStored?: (documentId: string, fileName: string) => void;
+  /** Resolves true once a session cookie exists; uploads require one. */
+  ensureSession?: () => Promise<boolean>;
   onNext: () => void;
   onSkip?: () => void;
   onExtractionReady?: () => void;
@@ -95,10 +133,13 @@ interface Screen5ResumeUploadProps {
 
 export function Screen5ResumeUpload({
   initialFileName,
+  initialDocumentId,
   stepNumber = 4,
   totalSteps = 10,
   onExtractSuccess,
   onExtractPreview,
+  onDocumentStored,
+  ensureSession,
   onNext,
   onSkip,
   onExtractionReady,
@@ -108,101 +149,176 @@ export function Screen5ResumeUpload({
   const eora = useEoraSafe();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedFileRef = useRef<File | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const pollTokenRef = useRef(0);
   const completedDocumentsRef = useRef<Set<string>>(new Set());
   const [fileName, setFileName] = useState<string | null>(initialFileName || null);
   const [isUploaded, setIsUploaded] = useState<boolean>(Boolean(initialFileName));
   const [processingState, setProcessingState] = useState<ResumeProcessingState>(
     initialFileName ? "COMPLETED" : "IDLE"
   );
+  const [stageLabel, setStageLabel] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [aiConsent, setAiConsent] = useState(false);
   const [candidates, setCandidates] = useState<ResumeCandidate[]>([]);
   const [reviewSaved, setReviewSaved] = useState(false);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
+  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(initialDocumentId || null);
+  // Document whose processing failed and can be retried server-side without re-picking the file.
+  const [retryDocumentId, setRetryDocumentId] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [eoraAdvice, setEoraAdvice] = useState<string | null>(null);
-  const [extraData, setExtraData] = useState<{
-    extractedProfile?: ExtractedProfileData;
-    discoveredProfiles?: Partial<Record<string, string>>;
-    extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
-    extractedEducation?: Array<{
-      institution: string;
-      degree: string;
-      fieldOfStudy?: string;
-      graduationYear?: string;
-      startDate?: string;
-      endDate?: string;
-      gpa?: string;
-      percentage?: string;
-      academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
-    }>;
-    extractedExperience?: Array<{
-      company: string;
-      role: string;
-      type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
-      duration?: string;
-      startDate?: string;
-      endDate?: string;
-      highlights?: string[];
-      technologies?: string[];
-      sourceSpan: string;
-    }>;
-    extractedAchievements?: Array<{
-      title: string;
-      category?: string;
-      subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
-      issuer?: string;
-      date?: string;
-      description?: string;
-      sourceSpan: string;
-    }>;
-  }>({});
+  const [extraData, setExtraData] = useState<ResumeExtraData>({});
   // null = probing, true = gate open, false = gate closed
   const [ingestionReady, setIngestionReady] = useState<boolean | null>(null);
-  // Track whether Render OCR service was warm during the preflight call
-  const renderReadyRef = useRef<boolean>(false);
 
-  // Probe server gate status once on mount so UI reflects reality before any interaction.
-  // The preflight also pre-warms the Render OCR service as a side effect.
+  // Probe the server gate once on mount so the UI reflects reality before any interaction.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/resume/preflight", { method: "GET", credentials: "same-origin" })
       .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) {
-          setIngestionReady(Boolean(data?.ready));
-          renderReadyRef.current = Boolean(data?.renderReady);
-        }
-      })
+      .then((data) => { if (!cancelled) setIngestionReady(Boolean(data?.ready)); })
       .catch(() => { if (!cancelled) setIngestionReady(false); });
     return () => {
       cancelled = true;
-      if (abortControllerRef.current) abortControllerRef.current.abort();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- a counter, not a DOM ref: bumping it cancels the live poll loop
+      pollTokenRef.current++;
     };
   }, []);
 
   const isBusy =
     processingState === "UPLOADING" ||
-    processingState === "PARSING" ||
-    processingState === "EXTRACTING" ||
+    processingState === "QUEUED" ||
+    processingState === "PROCESSING" ||
     processingState === "SAVING";
 
   // Upload is possible only when gate is confirmed open
   const uploadBlocked = ingestionReady === false;
 
-  const notifyJobFailed = async (jobId: string, status: "failed" | "timed_out", message: string) => {
-    try {
-      await fetch("/api/student/processing-jobs", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId, status, errorMessage: message }),
-      });
-    } catch {
-      // Safe non-blocking notification
+  const showFailure = useCallback((message: string, code: string | null, retryableDocumentId: string | null) => {
+    setErrorMessage(message);
+    setErrorCode(code);
+    setRetryDocumentId(retryableDocumentId);
+    setProcessingState("FAILED");
+    eora?.speak("I couldn't finish reading this file. You can retry or continue manually.", "REASSURING");
+  }, [eora]);
+
+  /** Replaces the review state, but only once a new extraction has actually succeeded. */
+  const applyResult = useCallback((documentId: string, name: string, result: Record<string, any>, reviewed: boolean) => {
+    const rows: ResumeCandidate[] = Array.isArray(result.reviewCandidates)
+      ? result.reviewCandidates.flatMap((item: Record<string, unknown>) => {
+          const { category, candidateId, value, sourceSpan } = item ?? {};
+          if (
+            !["education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
+            typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string"
+          ) return [];
+          return [{ id: candidateId, candidateId, category: category as ReviewedResumeClaim["category"], value, sourceSpan, documentId, corrected: false, selected: false }];
+        })
+      : [];
+    const structured = result.structured ?? {};
+    setFileName(name);
+    setIsUploaded(true);
+    setActiveDocumentId(documentId);
+    setRetryDocumentId(null);
+    setErrorMessage(null);
+    setErrorCode(null);
+    setCandidates(rows);
+    setReviewSaved(reviewed);
+    setProcessingState(reviewed ? "COMPLETED" : "REVIEW_REQUIRED");
+    setExtraData({
+      extractedProfile: result.extractedProfile ?? undefined,
+      discoveredProfiles: result.discoveredProfiles ?? undefined,
+      extractedProjects: Array.isArray(structured.projects) ? structured.projects : [],
+      extractedEducation: Array.isArray(structured.education) ? structured.education : [],
+      extractedExperience: Array.isArray(structured.experience) ? structured.experience : [],
+      extractedAchievements: Array.isArray(structured.achievements) ? structured.achievements : [],
+    });
+    if (reviewed) return;
+
+    if (result.extractedProfile && onExtractPreview) {
+      onExtractPreview(result.extractedProfile, result.discoveredProfiles ?? {});
     }
-  };
+    fetch(`/api/resume/${documentId}`)
+      .then((res) => res.json())
+      .then((docData) => {
+        if (docData?.eoraGuidance?.primaryMessage) {
+          setEoraAdvice(docData.eoraGuidance.primaryMessage);
+          eora?.speak(docData.eoraGuidance.primaryMessage, docData.eoraGuidance.mood || "CHEERFUL");
+        }
+      })
+      .catch(() => null);
+    const hasAcademic = Boolean(result.extractedProfile?.degree && result.extractedProfile?.institution);
+    eora?.speak(
+      hasAcademic ? "I found some information! Let's review it together." : "I found some details, but we still need a little more information.",
+      hasAcademic ? "HAPPY" : "EXPLAINING"
+    );
+    if (!completedDocumentsRef.current.has(documentId)) {
+      completedDocumentsRef.current.add(documentId);
+      onExtractionReady?.();
+    }
+  }, [eora, onExtractPreview, onExtractionReady]);
+
+  /** Polls the real job state until it is review_ready or terminal. */
+  const pollJob = useCallback(async (documentId: string, jobId: string, name: string) => {
+    const token = ++pollTokenRef.current;
+    const deadline = Date.now() + POLL_DEADLINE_MS;
+    setProcessingState("QUEUED");
+    setStageLabel(STAGE_LABELS.acquire);
+
+    while (token === pollTokenRef.current) {
+      let data: JobStatusResponse | null = null;
+      try {
+        const res = await fetch(`/api/resume/${documentId}/status?jobId=${encodeURIComponent(jobId)}`, { cache: "no-store" });
+        if (res.status === 401) {
+          showFailure("Your session expired. Refresh the page and try again.", "UNAUTHORIZED", null);
+          return;
+        }
+        const safe = await parseSafeJsonResponse<JobStatusResponse>(res, "Could not check processing status.");
+        data = safe.ok ? safe.data ?? null : null;
+      } catch {
+        data = null; // transient network error: keep polling until the deadline
+      }
+      if (token !== pollTokenRef.current) return;
+
+      if (data?.ok) {
+        if (data.status === "review_ready" || data.status === "completed") {
+          if (data.result) applyResult(documentId, data.filename || name, data.result, data.status === "completed");
+          else showFailure("The extraction finished but its results could not be loaded. Please retry.", "RESULT_MISSING", documentId);
+          return;
+        }
+        if (["failed", "timed_out", "cancelled", "retry"].includes(data.status)) {
+          showFailure(data.message || "We could not read this file. You can retry or enter details manually.", data.errorCode ?? null, data.retryable ? documentId : null);
+          return;
+        }
+        setProcessingState(data.status === "queued" ? "QUEUED" : "PROCESSING");
+        setStageLabel(STAGE_LABELS[data.stage || "acquire"] || "Processing…");
+      }
+
+      if (Date.now() > deadline) {
+        showFailure("Processing is taking much longer than expected. You can retry or enter details manually.", "CLIENT_DEADLINE", documentId);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    }
+  }, [applyResult, showFailure]);
+
+  // After a refresh mid-review, rebuild the review from the stored document instead of assuming no CV.
+  useEffect(() => {
+    if (!initialDocumentId) return;
+    let cancelled = false;
+    fetch(`/api/resume/${initialDocumentId}/status`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: JobStatusResponse | null) => {
+        if (cancelled || !data?.ok) return;
+        if ((data.status === "review_ready" || data.status === "completed") && data.result) {
+          applyResult(initialDocumentId, data.filename || initialFileName || "resume", data.result, data.status === "completed");
+        } else if (data.status === "queued" || data.status === "processing") {
+          void pollJob(initialDocumentId, data.jobId, data.filename || initialFileName || "resume");
+        }
+      })
+      .catch(() => null);
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rehydrate once for the document restored from the draft
+  }, [initialDocumentId]);
 
   const processFile = async (file?: File) => {
     if (!file) return;
@@ -217,11 +333,10 @@ export function Screen5ResumeUpload({
       setErrorMessage("Choose a PDF or DOCX resume.");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage("Choose a file under 5 MB, or enter details manually.");
+    if (file.size > RESUME_MAX_UPLOAD_BYTES) {
+      setErrorMessage(`Choose a file under ${RESUME_MAX_UPLOAD_MB} MB, or enter details manually.`);
       return;
     }
-
     if (uploadBlocked) {
       setErrorMessage("Resume upload is temporarily unavailable. Use \"Skip for now\" to enter your details manually.");
       return;
@@ -231,222 +346,55 @@ export function Screen5ResumeUpload({
       return;
     }
 
+    // Previous candidates stay visible until the new extraction succeeds.
     setErrorMessage(null);
+    setErrorCode(null);
     setProcessingState("UPLOADING");
-    setFileName(null);
-    setIsUploaded(false);
-    setReviewSaved(false);
-    setCandidates([]);
-    setExtraData({});
-
-    // Signal EORA extraction started (exact required copy)
-    eora?.speak(
-      "I'm reading your resume and collecting the details we can use.",
-      "WORKING"
-    );
-
-    // Timeout: 120s when Render OCR is available (legitimate OCR work takes up to 90s),
-    // 45s otherwise (native PDF text extraction is fast; timeout indicates a real hang).
-    // If Render was cold during preflight, fire a quick wake-up ping first so the
-    // actual upload lands on a warm instance (~1s cost vs ~30s cold-start cost).
-    const extractionTimeoutMs = 120000;
-    if (!renderReadyRef.current) {
-      // Render was cold — try to warm it up before we send the actual file
-      fetch("/api/resume/preflight", { method: "GET", credentials: "same-origin" })
-        .then((r) => r.json())
-        .then((d) => { renderReadyRef.current = Boolean(d?.renderReady); })
-        .catch(() => null);
-      // Give Render 3s to wake up before the upload starts
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    const timeoutTimer = setTimeout(() => {
-      abortController.abort("CLIENT_TIMEOUT");
-    }, extractionTimeoutMs);
-
-    let currentJobId: string | null = null;
+    eora?.speak("I'm reading your resume and collecting the details we can use.", "WORKING");
 
     try {
-      // 1. Create or verify tracking job
-      const jobResponse = await fetch("/api/student/processing-jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceId: "resume" }),
-        signal: abortController.signal,
-      });
-
-      const safeJob = await parseSafeJsonResponse<{ ok: boolean; jobId?: string; error?: string }>(
-        jobResponse,
-        "Could not start resume import."
-      );
-
-      if (!safeJob.ok || !safeJob.data?.jobId) {
-        throw new Error(safeJob.error?.message || "Could not start resume import.");
+      if (ensureSession && !(await ensureSession())) {
+        showFailure("We could not start a secure session. Check your connection and retry.", "SESSION_UNAVAILABLE", null);
+        return;
       }
-      currentJobId = safeJob.data.jobId;
-      setActiveJobId(currentJobId);
-      setProcessingState("PARSING");
-
-      // 2. Perform zero-LLM structured extraction
       const formData = new FormData();
       formData.append("resume", file);
       formData.append("aiConsent", "true");
-      formData.append("jobId", currentJobId);
-
-      setProcessingState("EXTRACTING");
-      const res = await fetch("/api/resume/extract", {
-        method: "POST",
-        body: formData,
-        signal: abortController.signal,
-      });
-
-      clearTimeout(timeoutTimer);
-
-      const safeExtract = await parseSafeJsonResponse<any>(
+      const res = await fetch("/api/resume/extract", { method: "POST", body: formData });
+      const safe = await parseSafeJsonResponse<{ ok: boolean; jobId?: string; documentId?: string; message?: string; code?: string }>(
         res,
-        "Could not read this file. Please try again or enter details manually."
+        "Could not upload this file. Please try again."
       );
-
-      if (!safeExtract.ok || !safeExtract.data) {
-        const errorMsg = safeExtract.error?.message || "Could not read this file. Please enter details manually.";
-        if (currentJobId) {
-          void notifyJobFailed(currentJobId, "failed", errorMsg);
-        }
-        setErrorMessage(errorMsg);
-        setProcessingState("FAILED");
-        eora?.speak(
-          "I couldn't finish reading this file. You can retry or continue manually.",
-          "REASSURING"
-        );
+      if (!safe.ok || !safe.data?.jobId || !safe.data.documentId) {
+        showFailure(safe.error?.message || "Could not upload this file. Please try again.", safe.data?.code ?? null, null);
         return;
       }
+      onDocumentStored?.(safe.data.documentId, file.name);
+      await pollJob(safe.data.documentId, safe.data.jobId, file.name);
+    } catch {
+      showFailure("Network error while uploading. Check your connection and retry.", "NETWORK", null);
+    }
+  };
 
-      const data = safeExtract.data;
-      const documentId = String(data.documentId || "");
-      const rows: ResumeCandidate[] = Array.isArray(data.reviewCandidates)
-        ? data.reviewCandidates.flatMap((raw: unknown) => {
-            if (!raw || typeof raw !== "object") return [];
-            const item = raw as Record<string, unknown>;
-            const category = item.category;
-            const candidateId = item.candidateId;
-            const value = item.value;
-            const sourceSpan = item.sourceSpan;
-            if (
-              !documentId ||
-              !["education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
-              typeof candidateId !== "string" ||
-              typeof value !== "string" ||
-              typeof sourceSpan !== "string"
-            )
-              return [];
-            return [
-              {
-                id: candidateId,
-                candidateId,
-                category: category as ReviewedResumeClaim["category"],
-                value,
-                sourceSpan,
-                documentId,
-                corrected: false,
-                selected: false,
-              },
-            ];
-          })
-        : [];
-
-      if (data.extractionMeta?.success !== true || rows.length === 0) {
-        const err = "No reviewable claims were returned. Please retry or enter details manually.";
-        if (currentJobId) void notifyJobFailed(currentJobId, "failed", err);
-        setErrorMessage(err);
-        setProcessingState("FAILED");
-        eora?.speak(
-          "I couldn't finish reading this file. You can retry or continue manually.",
-          "REASSURING"
-        );
+  /** Retries the stored document on the server; falls back to re-uploading the picked file. */
+  const retry = async () => {
+    if (!retryDocumentId) {
+      if (selectedFileRef.current) void processFile(selectedFileRef.current);
+      return;
+    }
+    const documentId = retryDocumentId;
+    setErrorMessage(null);
+    setProcessingState("QUEUED");
+    try {
+      const res = await fetch(`/api/resume/${documentId}/retry`, { method: "POST" });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body?.jobId) {
+        showFailure(body?.error || "Retry could not be started. Please try again.", body?.code ?? null, documentId);
         return;
       }
-
-      setFileName(file.name);
-      setIsUploaded(true);
-      setActiveDocumentId(documentId);
-      setProcessingState("REVIEW_REQUIRED");
-      setReviewSaved(false);
-      setExtraData({
-        extractedProfile: data.extractedProfile,
-        discoveredProfiles: data.discoveredProfiles,
-        extractedProjects: Array.isArray(data.structured?.projects) ? data.structured.projects : [],
-        extractedEducation: Array.isArray(data.structured?.education) ? data.structured.education : [],
-        extractedExperience: Array.isArray(data.structured?.experience) ? data.structured.experience : [],
-        extractedAchievements: Array.isArray(data.structured?.achievements) ? data.structured.achievements : [],
-      });
-      // Immediately notify parent of extracted profile so name/contact can be pre-filled
-      // before the user finishes reviewing candidates.
-      if (data.extractedProfile && onExtractPreview) {
-        onExtractPreview(data.extractedProfile, data.discoveredProfiles ?? {});
-      }
-      setCandidates(rows);
-
-      // Fetch EORA contextual review advice from server if available
-      if (documentId) {
-        fetch(`/api/resume/${documentId}`)
-          .then((res) => res.json())
-          .then((docData) => {
-            if (docData?.eoraGuidance?.primaryMessage) {
-              setEoraAdvice(docData.eoraGuidance.primaryMessage);
-              eora?.speak(
-                docData.eoraGuidance.primaryMessage,
-                docData.eoraGuidance.mood || "CHEERFUL"
-              );
-            }
-          })
-          .catch(() => null);
-      }
-
-      // Contextual EORA event guidance based on completeness
-      const hasAcademic = Boolean(data.extractedProfile?.degree && data.extractedProfile?.institution);
-      if (hasAcademic) {
-        eora?.speak(
-          "I found some information! Let's review it together.",
-          "HAPPY"
-        );
-      } else {
-        eora?.speak(
-          "I found some details, but we still need a little more information.",
-          "EXPLAINING"
-        );
-      }
-
-      if (!completedDocumentsRef.current.has(documentId)) {
-        completedDocumentsRef.current.add(documentId);
-        onExtractionReady?.();
-      }
-    } catch (err) {
-      clearTimeout(timeoutTimer);
-      const isTimeout =
-        (err instanceof Error && (err.name === "AbortError" || err.message === "CLIENT_TIMEOUT")) ||
-        abortController.signal.aborted;
-
-      const userMessage = isTimeout
-        ? "Resume extraction took longer than expected. You can retry or enter your details manually."
-        : err instanceof Error
-        ? err.message
-        : "Network error during resume extraction. You can continue manually.";
-
-      if (currentJobId) {
-        void notifyJobFailed(currentJobId, isTimeout ? "timed_out" : "failed", userMessage);
-      }
-
-      setErrorMessage(userMessage);
-      setProcessingState("FAILED");
-      eora?.speak(
-        "I couldn't finish reading this file. You can retry or continue manually.",
-        "REASSURING"
-      );
+      await pollJob(documentId, body.jobId, fileName || selectedFileRef.current?.name || "resume");
+    } catch {
+      showFailure("Network error while retrying. Check your connection and try again.", "NETWORK", documentId);
     }
   };
 
@@ -459,11 +407,6 @@ export function Screen5ResumeUpload({
     if (isBusy) return;
     // If extraction failed or file unreadable, advance explicitly takes manual route
     if (processingState === "FAILED" || !isUploaded) {
-      handleSkip();
-      return;
-    }
-    // If ingestion is blocked and nothing was previously uploaded, force manual route via Skip
-    if (uploadBlocked && !isUploaded) {
       handleSkip();
       return;
     }
@@ -499,32 +442,42 @@ export function Screen5ResumeUpload({
       setErrorMessage("Select at least one accurate CV detail to save, or use Skip for now.");
       return;
     }
+    if (!activeDocumentId) {
+      setErrorMessage("This review is no longer linked to an uploaded document. Upload the file again.");
+      return;
+    }
 
     setProcessingState("SAVING");
+    setErrorMessage(null);
     try {
-      const saved = await onExtractSuccess?.(fileName || "resume", selected, extraData);
-      if (saved === false) throw new Error("Review save failed");
-
-      // Transactionally synchronize approved claims into Person 360
-      if (activeDocumentId) {
-        await fetch(`/api/resume/${activeDocumentId}/apply`, { method: "POST" }).catch(() => null);
+      // Every candidate gets an explicit decision: unchecked means rejected.
+      const decisions = candidates.map((c) => ({
+        candidateId: c.candidateId || c.id,
+        state: c.selected && c.value.trim() ? "confirmed" : "rejected",
+        ...(c.corrected && c.selected ? { correctedValue: c.value.trim() } : {}),
+      }));
+      const applyRes = await fetch(`/api/resume/${activeDocumentId}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decisions }),
+      });
+      const applyBody = await applyRes.json().catch(() => null);
+      if (!applyRes.ok || !applyBody?.ok) {
+        throw new Error(applyBody?.error || "We could not save your reviewed details. Please retry.");
       }
+
+      const saved = await onExtractSuccess?.(fileName || "resume", selected, extraData);
+      if (saved === false) throw new Error("Your review was saved, but your onboarding progress could not be updated. Please retry.");
 
       setReviewSaved(true);
       setProcessingState("COMPLETED");
-      setErrorMessage(null);
-      eora?.speak(
-        "Everything is saved. Let's continue to your digital profiles.",
-        "HAPPY"
-      );
-    } catch {
+      eora?.speak("Everything is saved. Let's continue to your digital profiles.", "HAPPY");
+    } catch (err) {
       setReviewSaved(false);
       setProcessingState("REVIEW_REQUIRED");
-      setErrorMessage("We could not save your review. Please retry before continuing.");
+      setErrorMessage(err instanceof Error ? err.message : "We could not save your review. Please retry before continuing.");
     }
   };
-
-
 
   return (
     <div
@@ -700,7 +653,7 @@ export function Screen5ResumeUpload({
               </div>
 
               <div style={{ fontSize: 12.5, color: "#64748B", marginBottom: 20 }}>
-                Supports PDF and DOCX (up to 5 MB)
+                Supports PDF and DOCX (up to {RESUME_MAX_UPLOAD_MB} MB)
               </div>
 
               <button
@@ -777,15 +730,14 @@ export function Screen5ResumeUpload({
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5642EF", fontWeight: 700, fontSize: 13.5 }}>
                     <Hourglass size={18} className="animate-spin" style={{ animationDuration: "3s" }} />
-                    <span>
+                    <span role="status" aria-live="polite">
                       {processingState === "UPLOADING" && "Uploading document securely..."}
-                      {processingState === "PARSING" && "Parsing document structure & text..."}
-                      {processingState === "EXTRACTING" && "Extracting skills, academics & projects (Zero-LLM)..."}
+                      {(processingState === "QUEUED" || processingState === "PROCESSING") && stageLabel}
                       {processingState === "SAVING" && "Saving reviewed claims to Tathastu Core..."}
                     </span>
                   </div>
                   <span style={{ fontSize: 11.5, color: "#64748B" }}>
-                    Deterministic in-process analysis &bull; Zero generative LLMs
+                    Live status from the server &bull; No generative AI
                   </span>
                 </div>
               )}
@@ -795,12 +747,18 @@ export function Screen5ResumeUpload({
                   <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#EF4444", fontSize: 13 }}>
                     <AlertCircle size={15} style={{ flexShrink: 0 }} /> {errorMessage}
                   </div>
+                  {errorCode && processingState === "FAILED" && (
+                    <small style={{ color: "#94A3B8", fontSize: 11 }}>Error code: {errorCode}</small>
+                  )}
+                  {candidates.length > 0 && processingState === "FAILED" && (
+                    <small style={{ color: "#64748B", fontSize: 11.5 }}>Your earlier extraction is still below and has not been changed.</small>
+                  )}
                   {processingState === "FAILED" && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                      {selectedFileRef.current && (
+                      {(retryDocumentId || selectedFileRef.current) && (
                         <button
                           type="button"
-                          onClick={() => processFile(selectedFileRef.current!)}
+                          onClick={() => void retry()}
                           style={{
                             padding: "6px 12px",
                             borderRadius: 8,
@@ -1018,9 +976,6 @@ export function Screen5ResumeUpload({
                   {reviewSaved && <span style={{ color: "#059669", marginLeft: 8, fontSize: 12, fontWeight: 600 }}>✓ Review saved to Person 360</span>}
                 </div>
               </div>
-            )}
-            {Boolean(activeJobId) && processingState !== "IDLE" && (
-              <ProcessingActivity source="resume" activeJobId={activeJobId} />
             )}
 
             <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, color: "#475569", fontSize: 12.5, lineHeight: 1.45 }}>

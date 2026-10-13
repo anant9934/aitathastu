@@ -1,3 +1,19 @@
+/**
+ * CANONICAL database migrations. This list is the only schema source that
+ * runs: `npm run db:migrate` (scripts/migrate.ts) applies it, and dev PGlite
+ * applies it on startup. Every statement must be idempotent (IF NOT EXISTS /
+ * guarded DO blocks), because the whole list is re-run on every migrate.
+ *
+ * lib/db/schema.ts is the Drizzle *query* model and must be kept in step by
+ * hand: add a column there and append an ALTER TABLE ... ADD COLUMN IF NOT
+ * EXISTS here. (The old drizzle-kit output in lib/db/migrations had drifted
+ * from both and was removed.)
+ *
+ * Known gap: several person_id/user_id columns created below have no FOREIGN
+ * KEY even though schema.ts declares one (see deleteAccountCompletely in
+ * lib/services/guest-cleanup-service.ts). Adding them needs orphan cleanup on
+ * production data first.
+ */
 export const MIGRATION_SQL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS "action_states" (
     "id" text PRIMARY KEY NOT NULL,
@@ -581,7 +597,33 @@ export const MIGRATION_SQL_STATEMENTS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   );`,
   `CREATE INDEX IF NOT EXISTS "idx_resume_review_document" ON "resume_review_history" ("document_id");`,
-  `CREATE INDEX IF NOT EXISTS "idx_resume_review_person" ON "resume_review_history" ("person_id");`
+  `CREATE INDEX IF NOT EXISTS "idx_resume_review_person" ON "resume_review_history" ("person_id");`,
+
+  // Dedupe constraints (audit 2026-10-12). Application code dedupes with an
+  // update -> insert-or-nothing -> update sequence that is correct with or
+  // without these indexes; the indexes close the remaining race. Creating a
+  // unique index fails if duplicates already exist, so each one is created
+  // only when the data is clean, and otherwise skipped with a NOTICE.
+  // scripts/report-duplicate-keys.ts lists the offending rows to resolve.
+  `ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "normalized_title" text;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'uq_evidence_person_import_key') THEN
+      IF EXISTS (SELECT 1 FROM "evidence_items" WHERE "import_key" IS NOT NULL GROUP BY "person_id", "import_key" HAVING count(*) > 1) THEN
+        RAISE NOTICE 'Skipped uq_evidence_person_import_key: duplicate (person_id, import_key) rows exist';
+      ELSE
+        CREATE UNIQUE INDEX "uq_evidence_person_import_key" ON "evidence_items" ("person_id", "import_key");
+      END IF;
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'uq_projects_person_normalized_title') THEN
+      IF EXISTS (SELECT 1 FROM "projects" WHERE "normalized_title" IS NOT NULL GROUP BY "person_id", "normalized_title" HAVING count(*) > 1) THEN
+        RAISE NOTICE 'Skipped uq_projects_person_normalized_title: duplicate (person_id, normalized_title) rows exist';
+      ELSE
+        CREATE UNIQUE INDEX "uq_projects_person_normalized_title" ON "projects" ("person_id", "normalized_title");
+      END IF;
+    END IF;
+  END $$;`
 ];
 
 

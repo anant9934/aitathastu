@@ -4,7 +4,7 @@ import { coreIngestionReady } from "../lib/security/core-ingestion-gate";
 import { safeDraft } from "../lib/onboarding-v2";
 import { ResumeInterpretationSchema } from "../lib/intelligence/schemas";
 import { executeDeterministicFallback } from "../lib/intelligence/deterministic-fallback";
-import { BackgroundJobQueue } from "../lib/jobs/queue";
+import { BackgroundJobQueue } from "./lib/job-queue";
 import { getDb, persons, users } from "../lib/db";
 import { claimMatchesSnapshot, resumeCandidates, saveResumeCandidates, validateReviewedResumeClaims } from "../lib/services/resume-review-service";
 import { getProjectCandidatesForPerson } from "../lib/acquisition/acquisition-service";

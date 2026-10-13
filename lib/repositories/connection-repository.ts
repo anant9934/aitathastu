@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { eq, and, desc } from "drizzle-orm";
 import { getDb, externalConnections, sourceSnapshots, syncRuns } from "../db";
+import { pageBounds, type PageOptions } from "./pagination";
 
 export type SaveConnectionParams = {
   personId: string;
@@ -31,7 +32,12 @@ export type SaveConnectionParams = {
   displayName?: string;
   scopes?: string[];
   metadata?: Record<string, unknown>;
-  status?: "connected" | "syncing" | "needs_attention" | "reference_only" | "disconnected" | "unavailable" | "revoked" | "error";
+  /**
+   * "connected" means ownership was proven through OAuth. "detected" means
+   * public data was read for a username the student typed; that proves nothing
+   * about who owns the account.
+   */
+  status?: "connected" | "detected" | "syncing" | "needs_attention" | "reference_only" | "disconnected" | "unavailable" | "revoked" | "error";
 };
 
 export async function saveExternalConnection(params: SaveConnectionParams) {
@@ -53,8 +59,10 @@ export async function saveExternalConnection(params: SaveConnectionParams) {
   if (existing.length > 0) {
     const nextStatus = params.status || existing[0].status;
     const previousMetadata = (existing[0].metadata || {}) as Record<string, unknown>;
-    const nextMetadata = params.provider === "github" && nextStatus !== "connected"
-      ? {}
+    // Leaving the OAuth-connected state drops the old metadata (it may hold
+    // token material); otherwise metadata is merged.
+    const nextMetadata = params.provider === "github" && existing[0].status === "connected" && nextStatus !== "connected"
+      ? { ...(params.metadata || {}) }
       : { ...previousMetadata, ...(params.metadata || {}) };
     await db
       .update(externalConnections)
@@ -97,12 +105,16 @@ export async function saveExternalConnection(params: SaveConnectionParams) {
   return created;
 }
 
-export async function getExternalConnections(personId: string) {
+export async function getExternalConnections(personId: string, page?: PageOptions) {
   const db = await getDb();
+  const { limit, offset } = pageBounds(page);
   return db
     .select()
     .from(externalConnections)
-    .where(eq(externalConnections.personId, personId));
+    .where(eq(externalConnections.personId, personId))
+    .orderBy(externalConnections.provider, externalConnections.id)
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function getExternalConnectionByProvider(personId: string, provider: string) {
@@ -187,26 +199,16 @@ export async function getLatestSourceSnapshot(
   return rows[0] || null;
 }
 
-export async function getSourceSnapshots(personId: string, source?: string) {
+export async function getSourceSnapshots(personId: string, source?: string, page?: PageOptions) {
   const db = await getDb();
-  if (source) {
-    return db
-      .select()
-      .from(sourceSnapshots)
-      .where(
-        and(
-          eq(sourceSnapshots.personId, personId),
-          eq(sourceSnapshots.source, source)
-        )
-      )
-      .orderBy(desc(sourceSnapshots.createdAt));
-  }
-
+  const { limit, offset } = pageBounds(page);
   return db
     .select()
     .from(sourceSnapshots)
-    .where(eq(sourceSnapshots.personId, personId))
-    .orderBy(desc(sourceSnapshots.createdAt));
+    .where(source ? and(eq(sourceSnapshots.personId, personId), eq(sourceSnapshots.source, source)) : eq(sourceSnapshots.personId, personId))
+    .orderBy(desc(sourceSnapshots.createdAt), desc(sourceSnapshots.id))
+    .limit(limit)
+    .offset(offset);
 }
 
 // Sync runs

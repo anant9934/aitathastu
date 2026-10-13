@@ -3,6 +3,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSession, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/auth/session";
 import { findUserByEmail } from "@/lib/repositories/user-repository";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { mergeGuestOnSignIn } from "@/lib/auth/guest-merge";
 
 export async function POST(req: Request) {
   try {
@@ -39,6 +40,8 @@ export async function POST(req: Request) {
       );
     }
 
+    // Carry over anything the visitor did as a guest before signing in.
+    await mergeGuestOnSignIn({ userId: user.id, personId: user.personId });
     const { token, expiresAt } = await createSession(user.id);
 
     const response = NextResponse.json({

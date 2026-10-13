@@ -1,6 +1,8 @@
 import crypto from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { getDb, projects, projectContributions } from "../db";
+import { normalizeProjectTitle } from "../text/normalize";
+import { pageBounds, type PageOptions } from "./pagination";
 import type {
   ProjectLinkRecord,
   ProjectTimelineRecord,
@@ -41,19 +43,43 @@ export type CreateProjectInput = {
   media?: unknown[];
 };
 
-export async function saveProject(personId: string, input: CreateProjectInput) {
+type ProjectRow = typeof projects.$inferSelect;
+
+const normalizeRepoUrl = (url: string) => url.trim().toLowerCase().replace(/\.git$/, "").replace(/\/+$/, "");
+
+/** Finds this person's project that is the same as `input`: same normalized title, or same repository URL. */
+async function findMatchingProject(personId: string, input: CreateProjectInput): Promise<{ match: ProjectRow | null; all: ProjectRow[] }> {
+  const db = await getDb();
+  const all = await db.select().from(projects).where(eq(projects.personId, personId));
+  const key = normalizeProjectTitle(input.title);
+  const repo = input.repositoryUrl ? normalizeRepoUrl(input.repositoryUrl) : "";
+  const match = all.find((p) =>
+    (p.normalizedTitle ?? normalizeProjectTitle(p.title)) === key ||
+    Boolean(repo && p.repositoryUrl && normalizeRepoUrl(p.repositoryUrl) === repo)
+  ) ?? null;
+  return { match, all };
+}
+
+/**
+ * Creates a project, or merges into the matching one when the same project
+ * arrives again (e.g. "Face Recognition System" from a CV and the
+ * "face-recognition" GitHub repo). Matching is by normalizeProjectTitle or
+ * repository URL. The unique index on (person_id, normalized_title) closes
+ * the race between two concurrent imports; the loser retries as a merge.
+ */
+export async function saveProject(personId: string, input: CreateProjectInput, attempt = 0): Promise<ProjectRow> {
   const db = await getDb();
   const now = new Date();
   const id = `proj_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+  const normalizedTitle = normalizeProjectTitle(input.title);
 
-  // Check for existing project with same title for this person
-  const existing = await db
-    .select()
-    .from(projects)
-    .where(and(eq(projects.personId, personId), eq(projects.title, input.title)))
-    .limit(1);
+  const { match, all } = await findMatchingProject(personId, input);
+  const existing = match ? [match] : [];
 
   if (existing.length > 0) {
+    // Backfill the key on older rows, unless another of this person's rows already claims it.
+    const canClaimKey = !existing[0].normalizedTitle &&
+      !all.some((p) => p.id !== existing[0].id && p.normalizedTitle === normalizedTitle);
     const existingSources = (existing[0].sources as string[]) || [];
     const mergedSources = Array.from(new Set([...existingSources, ...(input.sources || [])]));
     const existingTechs = (existing[0].technologies as string[]) || [];
@@ -80,9 +106,10 @@ export async function saveProject(personId: string, input: CreateProjectInput) {
         aiDetails: input.aiDetails ?? existing[0].aiDetails,
         hardwareDetails: input.hardwareDetails ?? existing[0].hardwareDetails,
         media: input.media ?? existing[0].media,
+        ...(canClaimKey ? { normalizedTitle } : {}),
         updatedAt: now,
       })
-      .where(eq(projects.id, existing[0].id))
+      .where(and(eq(projects.id, existing[0].id), eq(projects.personId, personId)))
       .returning();
 
     return updated;
@@ -94,6 +121,7 @@ export async function saveProject(personId: string, input: CreateProjectInput) {
       id,
       personId,
       title: input.title,
+      normalizedTitle,
       summary: input.summary || "",
       description: input.description || "",
       category: input.category || "Other AI/ML",
@@ -114,17 +142,25 @@ export async function saveProject(personId: string, input: CreateProjectInput) {
       createdAt: now,
       updatedAt: now,
     })
+    .onConflictDoNothing()
     .returning();
 
-  return created;
+  if (created) return created;
+  // A concurrent import inserted the same project first: merge into it instead.
+  if (attempt >= 1) throw new Error(`Project "${input.title}" could not be saved for ${personId}`);
+  return saveProject(personId, input, attempt + 1);
 }
 
-export async function getProjectsByPersonId(personId: string) {
+export async function getProjectsByPersonId(personId: string, page?: PageOptions) {
   const db = await getDb();
+  const { limit, offset } = pageBounds(page);
   return db
     .select()
     .from(projects)
-    .where(eq(projects.personId, personId));
+    .where(eq(projects.personId, personId))
+    .orderBy(desc(projects.updatedAt), desc(projects.id))
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function getProjectById(personId: string, projectId: string) {

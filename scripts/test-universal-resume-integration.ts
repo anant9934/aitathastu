@@ -79,7 +79,6 @@ async function runIntegrationSuite() {
   console.log("[Test 2/7] Testing cryptographically signed user token generation...");
   const token = ExtractorServiceClient.generateSignedUserToken({
     personId: testPersonA,
-    role: "student",
     action: "upload",
     documentId: testDocId,
     expiresInSeconds: 300,

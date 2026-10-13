@@ -8,7 +8,7 @@ export type ProcessingJob = {
   id: string;
   sourceId: string;
   stage: string;
-  status: "queued" | "running" | "completed" | "failed" | "retry" | "timed_out" | "cancelled";
+  status: "queued" | "running" | "processing" | "review_ready" | "completed" | "failed" | "retry" | "timed_out" | "cancelled";
   errorMessage?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -93,7 +93,7 @@ export function ProcessingActivity({
 
   if (visible.length === 0) return null;
 
-  const hasActiveJobs = visible.some((j) => j.status === "queued" || j.status === "running");
+  const hasActiveJobs = visible.some((j) => j.status === "queued" || j.status === "running" || j.status === "processing");
 
   // If no specific activeJobId is tracked, do not show historical terminal jobs when idle
   if (!activeJobId && !hasActiveJobs) {

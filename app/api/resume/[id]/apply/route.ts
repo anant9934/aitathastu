@@ -1,65 +1,82 @@
-import { NextResponse } from "next/server";
+/**
+ * POST /api/resume/[id]/apply
+ *
+ * Body: { decisions: [{ candidateId, state: "confirmed" | "rejected", correctedValue? }] }
+ *
+ * Records the student's decision for every candidate, then imports only the
+ * confirmed records into Person 360 and moves the job review_ready -> completed.
+ * Any failure returns a non-2xx response; the client must not report success
+ * unless this returns ok.
+ */
+
 import { and, eq } from "drizzle-orm";
-import { getOrCreateOnboardingAuthContext } from "@/lib/auth/server-session";
+import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getDb, resumeDocuments } from "@/lib/db";
-import { ExtractorServiceClient } from "@/lib/services/extractor-service-client";
+import type { ExtractorProfileV2 } from "@/lib/services/extractor-service-client";
 import { ResumePerson360Mapper } from "@/lib/services/resume-person360-mapper";
+import { applyReviewDecisions, type ReviewDecision } from "@/lib/services/resume-review-decisions";
+import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
+import type { ResumeReviewPayload } from "@/lib/services/resume-ingestion-service";
+import { docMeta, jsonNoStore, loadOwnedResumeDocument, unauthorized } from "@/lib/api/resume-route-helpers";
 
 export const runtime = "nodejs";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+function parseDecisions(body: unknown): ReviewDecision[] | null {
+  const raw = (body as { decisions?: unknown } | null)?.decisions;
+  if (!Array.isArray(raw)) return null;
+  const out: ReviewDecision[] = [];
+  for (const d of raw) {
+    if (!d || typeof d !== "object") return null;
+    const { candidateId, state, correctedValue } = d as Record<string, unknown>;
+    if (typeof candidateId !== "string" || (state !== "confirmed" && state !== "rejected")) return null;
+    out.push({ candidateId, state, correctedValue: typeof correctedValue === "string" ? correctedValue.slice(0, 500) : undefined });
+  }
+  return out;
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id: documentId } = await params;
+  const auth = await getServerAuthContext();
+  if (!auth) return unauthorized();
+  const personId = auth.person.id;
+
+  const decisions = parseDecisions(await request.json().catch(() => null));
+  if (!decisions) return jsonNoStore({ ok: false, code: "INVALID_DECISIONS", error: "Send a decision for each reviewed suggestion." }, 400);
+
+  const doc = await loadOwnedResumeDocument(documentId, personId);
+  const profile = doc?.extractedProfile as ExtractorProfileV2 | null | undefined;
+  const review = doc ? (docMeta(doc).review as ResumeReviewPayload | undefined) : undefined;
+  if (!doc || !profile || !review) {
+    return jsonNoStore({ ok: false, code: "NOT_READY", error: "This resume has no extraction ready for review." }, 404);
+  }
+
+  const known = new Set(review.reviewCandidates.map((c) => c.candidateId));
+  const applied = applyReviewDecisions(profile, known, decisions);
+  if (applied.unknown.length > 0) {
+    return jsonNoStore({ ok: false, code: "UNKNOWN_CANDIDATES", error: "Some reviewed items no longer match this resume. Reload and review again.", unknown: applied.unknown }, 409);
+  }
 
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
-      return NextResponse.json({ ok: false, error: "Unauthorized session." }, { status: 401 });
-    }
-    const personId = authRes.auth.person.id;
+    const db = await getDb();
+    await db
+      .update(resumeDocuments)
+      .set({ extractedProfile: applied.profile, updatedAt: new Date() })
+      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
 
-    // Fetch latest profile
-    let profile: any = null;
-    try {
-      const docView = await ExtractorServiceClient.getDocument(documentId, personId);
-      profile = docView.profile;
-    } catch {
-      const db = await getDb();
-      const docs = await db
-        .select()
-        .from(resumeDocuments)
-        .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
-      if (docs.length > 0) {
-        profile = docs[0].extractedProfile;
-      }
+    const mappingResult = await ResumePerson360Mapper.applyProfileToPerson360(personId, documentId, applied.profile);
+
+    await db
+      .update(resumeDocuments)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
+    const jobId = docMeta(doc).jobId;
+    if (typeof jobId === "string") {
+      await SourceProcessingJobService.completeJob({ jobId, personId, resultReference: `resume:${documentId}`, metadata: { applied: true } });
     }
 
-    if (!profile) {
-      return NextResponse.json(
-        { ok: false, error: "Extraction profile not ready or document not found." },
-        { status: 404 }
-      );
-    }
-
-    // Apply into Person 360
-    const mappingResult = await ResumePerson360Mapper.applyProfileToPerson360(
-      personId,
-      documentId,
-      profile
-    );
-
-    return NextResponse.json({
-      ok: true,
-      documentId,
-      message: "Successfully synchronized approved resume details into Person 360 profile.",
-      mappingResult,
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to synchronize profile." },
-      { status: 500 }
-    );
+    return jsonNoStore({ ok: true, documentId, confirmed: applied.confirmed, rejected: applied.rejected, mappingResult });
+  } catch (err) {
+    console.error("[resume-apply] failed", { documentId, error: err instanceof Error ? err.message : err });
+    return jsonNoStore({ ok: false, code: "APPLY_FAILED", error: "We could not save your reviewed details. Please retry." }, 500);
   }
 }

@@ -3,7 +3,8 @@ import { getDb, onboardingDrafts, userPreferences } from "@/lib/db";
 import { safeDraft, type OnboardingDraft } from "@/lib/onboarding-v2";
 import { updatePersonProfileData, getPersonProfile } from "@/lib/repositories/person-repository";
 import { setActiveGoal } from "@/lib/repositories/goal-repository";
-import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
+import { writeEvidenceBatch, type EvidenceInsertParams } from "@/lib/repositories/evidence-repository";
+import { slugify } from "@/lib/text/normalize";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
 import { validateReviewedResumeClaims } from "@/lib/services/resume-review-service";
 import { validatePurposes } from "@/lib/domain/adaptive-workspace";
@@ -147,6 +148,11 @@ export async function completeOnboarding(personId: string, input: unknown) {
 
   if (goal) await setActiveGoal(personId, goal, goalDescription, "custom");
 
+  // Evidence writes are independent of each other, so they are collected here
+  // and written concurrently at the end (writeEvidenceBatch) instead of one
+  // round trip at a time. Keys are deterministic, so a retried completion
+  // updates the same rows instead of duplicating them.
+  const pendingEvidence: EvidenceInsertParams[] = [];
   const add = async (
     category: "education" | "skill" | "project" | "goal" | "experience" | "other",
     subject: string,
@@ -155,8 +161,8 @@ export async function completeOnboarding(personId: string, input: unknown) {
     key: string,
     interpretation: string,
     sourceReference?: string
-  ) =>
-    createEvidenceRecord(personId, {
+  ) => {
+    pendingEvidence.push({
       category,
       subject,
       value,
@@ -166,8 +172,9 @@ export async function completeOnboarding(personId: string, input: unknown) {
       whyItMatters:
         "Provides context for your evolving profile and next actions. It is not independently verified.",
       importKey: `ob2_${personId}_${key}`,
-      sourceReference,
+      sourceReference: sourceReference ?? null,
     });
+  };
 
   if (education) await add("education", education, education, "self_reported", "education", "Academic context confirmed during onboarding.");
   if (draft.targetRole) await add(
@@ -206,7 +213,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
       skill,
       skill,
       "self_reported",
-      `skill_${skill.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      `skill_${slugify(skill)}`,
       "Confirmed by you during onboarding; this does not establish proficiency."
     );
   }
@@ -221,7 +228,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
       claim.value,
       claim.value,
       claim.corrected ? "self_reported" : "resume_extracted",
-      `resume_${claim.documentId}_${claim.category}_${claim.value.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      `resume_${claim.documentId}_${claim.category}_${slugify(claim.value)}`,
       claim.corrected ? `Student corrected an extraction candidate. Original source excerpt: ${claim.sourceSpan}` : `Student accepted an extraction candidate. Source excerpt: ${claim.sourceSpan}`,
       `resume:sha256:${claim.documentId}`
     );
@@ -245,7 +252,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
           inst || deg || "Academic Record",
           details,
           "self_reported",
-          `edu_${(inst || deg).toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          `edu_${slugify((inst || deg))}`,
           "Academic qualification confirmed during onboarding."
         );
       }
@@ -270,7 +277,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
           title,
           `${title}${dates ? " (" + dates + ")" : ""}${techs}`,
           "self_reported",
-          `exp_${company.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${role.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          `exp_${slugify(company)}_${slugify(role)}`,
           Array.isArray((exp as any).highlights) && (exp as any).highlights.length > 0
             ? (exp as any).highlights.join("; ")
             : "Experience entry confirmed by student during onboarding."
@@ -292,7 +299,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
           title,
           `${title}${subType}${status}${(ach as any).issuer ? " · " + (ach as any).issuer : ""}${(ach as any).date ? " (" + (ach as any).date + ")" : ""}`,
           "self_reported",
-          `ach_${title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          `ach_${slugify(title)}`,
           (ach as any).description || "Achievement or academic output confirmed by student during onboarding."
         );
       }
@@ -305,7 +312,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
       certification,
       certification,
       "self_reported",
-      `cert_${certification.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      `cert_${slugify(certification)}`,
       "Certification reported by you; it has not been verified."
     );
   }
@@ -372,6 +379,8 @@ export async function completeOnboarding(personId: string, input: unknown) {
       }).catch(() => null);
     }
   }
+
+  await writeEvidenceBatch(personId, pendingEvidence);
 
   await createJourneyEventRecord(personId, {
     type: "onboarding_started",

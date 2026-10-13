@@ -1,34 +1,5 @@
-import { NextResponse } from "next/server";
+/** POST /api/integrations/padho-code/events: Padho Code event ingestion (requires X-Integration-Key). */
 import { processPadhoCodeEvent } from "@/lib/services/integration-processor-service";
+import { integrationEventRoute } from "@/lib/api/integration-event-route";
 
-/**
- * POST /api/integrations/padho-code/events
- * Ingestion endpoint for Padho Code coding practice platform.
- * Requires X-Integration-Key header.
- */
-export async function POST(req: Request) {
-  try {
-    const rawKey =
-      req.headers.get("x-integration-key") ||
-      req.headers.get("X-Integration-Key") ||
-      req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
-      null;
-
-    let payload: unknown;
-    try {
-      payload = await req.json();
-    } catch {
-      return NextResponse.json(
-        { status: "rejected", error: "Malformed JSON body." },
-        { status: 400 }
-      );
-    }
-
-    const result = await processPadhoCodeEvent({ rawKey, payload });
-    return NextResponse.json(result.data, { status: result.status });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error during Padho Code event ingestion.";
-    console.error("[Padho Code Ingestion Error]", message);
-    return NextResponse.json({ status: "failed", error: message }, { status: 500 });
-  }
-}
+export const POST = integrationEventRoute("Padho Code", processPadhoCodeEvent);

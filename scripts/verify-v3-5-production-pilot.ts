@@ -44,7 +44,7 @@ import {
 
 import { auditProductionSecrets } from "../lib/security/production-secrets";
 import { encryptConnectionToken, decryptConnectionToken } from "../lib/security/connection-token";
-import { runFieldLevelBenchmark } from "../lib/services/extraction-benchmark";
+import { runFieldLevelBenchmark } from "./lib/extraction-benchmark";
 import { CrossSourceFusionService } from "../lib/services/cross-source-fusion-service";
 import { getPerson360 } from "../lib/services/person-360-service";
 import { wrapUntrustedContent, buildSafePrompt } from "../lib/intelligence/prompt-defense";

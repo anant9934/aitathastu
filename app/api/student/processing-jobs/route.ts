@@ -8,7 +8,7 @@
 
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { getOrCreateOnboardingAuthContext, getServerAuthContext } from "@/lib/auth/server-session";
+import { getServerAuthContext } from "@/lib/auth/server-session";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 
@@ -53,8 +53,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
+    const auth = await getServerAuthContext();
+    if (!auth) {
       return jsonResponse({
         ok: false,
         code: "UNAUTHORIZED",
@@ -63,7 +63,6 @@ export async function POST(request: Request) {
         requestId,
       }, 401);
     }
-    const auth = authRes.auth;
 
     const body = await request.json().catch(() => ({}));
     const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
@@ -99,22 +98,8 @@ export async function POST(request: Request) {
       stage: "acquire",
     });
 
-    const response = jsonResponse({
-      ok: true,
-      jobId,
-      status: "queued",
-      requestId,
-    });
-
-    if (authRes.sessionCookieToSet) {
-      response.cookies.set(
-        authRes.sessionCookieToSet.name,
-        authRes.sessionCookieToSet.value,
-        authRes.sessionCookieToSet.options as Parameters<typeof response.cookies.set>[2]
-      );
-    }
-
-    return response;
+    // Report the status that was actually stored (legacy sources start as running).
+    return jsonResponse({ ok: true, jobId, status: "running", requestId });
   } catch {
     return jsonResponse({
       ok: false,
@@ -129,11 +114,10 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const requestId = crypto.randomUUID();
   try {
-    const authRes = await getOrCreateOnboardingAuthContext().catch(() => null);
-    if (!authRes || !authRes.auth) {
+    const auth = await getServerAuthContext();
+    if (!auth) {
       return jsonResponse({ ok: false, code: "UNAUTHORIZED", message: "Sign in required.", retryable: false, requestId }, 401);
     }
-    const auth = authRes.auth;
 
     const body = await request.json().catch(() => ({}));
     const jobId = typeof body.jobId === "string" ? body.jobId : "";

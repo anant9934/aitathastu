@@ -166,7 +166,7 @@ export function resolveRouteFromPathname(pathname: string): EoraRoute {
   if (pathname === "/" || pathname === "") return "landing";
   if (pathname.startsWith("/sign-in")) return "sign-in";
   if (pathname.startsWith("/sign-up")) return "sign-up";
-  if (pathname.startsWith("/onboarding") || pathname.startsWith("/screens")) return "onboarding";
+  if (pathname.startsWith("/onboarding")) return "onboarding";
   if (pathname === "/student" || pathname === "/student/") return "student-home";
   if (pathname.startsWith("/student/profile")) return "student-profile";
   if (pathname.startsWith("/student/skills")) return "student-skills";

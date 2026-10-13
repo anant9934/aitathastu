@@ -29,10 +29,10 @@ const CORE_INGESTION_SECRETS = [
  * NOT errors, and cannot block CV upload or the ingestion gate.
  */
 const ECOSYSTEM_INTEGRATION_SECRETS = [
-  "INTEGRATION_STUDY_LPU_SECRET",
-  "INTEGRATION_PADHO_CODE_SECRET",
-  "INTEGRATION_ERIS_SECRET",
-  "INTEGRATION_MENTORMAZE_SECRET",
+  "STUDY_LPU_INTEGRATION_SECRET",
+  "PADHO_CODE_INTEGRATION_SECRET",
+  "ERIS_INTEGRATION_SECRET",
+  "MENTORMAZE_INTEGRATION_SECRET",
 ] as const;
 
 const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
@@ -54,19 +54,19 @@ const KNOWN_INSECURE_DEFAULTS: Record<string, string[]> = {
     "secret",
   ],
   EXTERNAL_TOKEN_ENCRYPTION_KEY: ["change-me", "secret", "replace-with-random-key"],
-  INTEGRATION_STUDY_LPU_SECRET: [
+  STUDY_LPU_INTEGRATION_SECRET: [
     "study_lpu_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  INTEGRATION_PADHO_CODE_SECRET: [
+  PADHO_CODE_INTEGRATION_SECRET: [
     "padho_code_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  INTEGRATION_ERIS_SECRET: [
+  ERIS_INTEGRATION_SECRET: [
     "eris_live_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
-  INTEGRATION_MENTORMAZE_SECRET: [
+  MENTORMAZE_INTEGRATION_SECRET: [
     "mentormaze_sec_key_tathastu_dev_2026",
     "dev_key",
   ],
@@ -82,6 +82,7 @@ export function auditProductionSecrets(
 ): ProductionSecretAuditResult {
   const nodeEnv = env.NODE_ENV || "development";
   const isProd = nodeEnv === "production";
+  // Vercel sets VERCEL_ENV to "preview" for non-production preview deployments.
   const isStaging = env.APP_ENV === "staging" || env.VERCEL_ENV === "preview";
   const environment = isProd ? "production" : isStaging ? "staging" : "development";
 
@@ -143,6 +144,16 @@ export function auditProductionSecrets(
   );
   if (!hasLlmKey) {
     warnings.push("No LLM provider keys configured; system operates in deterministic offline mode.");
+  }
+
+  // OCR extractor — advisory: text PDFs/DOCX still work without it, scanned PDFs do not.
+  if (!env.RESUME_EXTRACTOR_URL?.trim()) {
+    warnings.push("RESUME_EXTRACTOR_URL not configured — scanned PDFs will fail with OCR_SERVICE_NOT_CONFIGURED.");
+  } else if (!env.EXTRACTOR_API_TOKEN?.trim()) {
+    warnings.push("RESUME_EXTRACTOR_URL is set but EXTRACTOR_API_TOKEN is missing — extractor calls will be rejected.");
+  }
+  if (env.NEXT_PUBLIC_RENDER_EXTRACTOR_URL && !env.RESUME_EXTRACTOR_URL?.trim()) {
+    warnings.push("NEXT_PUBLIC_RENDER_EXTRACTOR_URL is no longer read; move its value to RESUME_EXTRACTOR_URL.");
   }
 
   const valid = missingRequired.length === 0 && insecureDefaults.length === 0;

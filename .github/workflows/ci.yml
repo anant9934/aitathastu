@@ -2,9 +2,9 @@ name: CI / Production Release Gate
 
 on:
   push:
-    branches: [main]
+    branches: [main, newmain]
   pull_request:
-    branches: [main]
+    branches: [main, newmain]
 
 jobs:
   verify:
@@ -22,10 +22,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20.x
+      - name: Setup Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22 # keep in sync with package.json engines
           cache: "npm"
 
       - name: Install Dependencies
@@ -53,6 +53,9 @@ jobs:
 
       - name: Automated Acceptance Test Suite (307 Tests)
         run: npm test
+
+      - name: Portfolio DNS Compatibility
+        run: npm run test:portfolio-network
 
       - name: Production Bundle Compilation
         env:

@@ -57,7 +57,6 @@ export interface Screen9SkillsMapProps {
   profiles?: Partial<Record<string, string>>;
   resumeFileName?: string | null;
   resumeReviewed?: Array<{ candidateId?: string; category: string; value: string; status?: string }>;
-  isGalleryMode?: boolean;
   goal?: string;
   onNext: () => void;
   onBack: () => void;
@@ -191,30 +190,12 @@ export function Screen9SkillsMap({
   profiles = {},
   resumeFileName,
   resumeReviewed = [],
-  isGalleryMode = false,
   goal,
   onNext,
   onBack,
   onJumpToStep,
 }: Screen9SkillsMapProps) {
-  // Gallery mode baseline skills if empty
-  const defaultGallerySkills = [
-    "Machine Learning",
-    "Python",
-    "JavaScript",
-    "React",
-    "Git",
-    "GitHub",
-    "PostgreSQL",
-    "SQL",
-    "NLP",
-    "Data Structures",
-    "Mathematics",
-    "Artificial Intelligence",
-  ];
-
-  const rawSkills = skills.length > 0 ? skills : isGalleryMode ? defaultGallerySkills : [];
-  const safeSkills = candidateNames(rawSkills);
+  const safeSkills = candidateNames(skills);
   const safeSuggested = candidateNames(suggestedSkills);
 
   const confirmedSet = new Set(safeSkills.map((s) => s.toLowerCase().trim()));

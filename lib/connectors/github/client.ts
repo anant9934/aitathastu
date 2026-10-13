@@ -17,7 +17,7 @@ import {
   type TechnologyFinding,
   type AiMlProjectCategory,
 } from "./tech-detector";
-import { wrapUntrustedContent, sanitizeTextForPrompt } from "@/lib/intelligence/prompt-defense";
+import { sanitizeTextForPrompt } from "@/lib/intelligence/prompt-defense";
 
 export type GitHubConnectionState =
   | "PROFILE_DISCOVERED"
@@ -110,7 +110,16 @@ export interface FetchGitHubIntelligenceResult {
   rateLimitResetAt?: number;
   error?: string;
   source: "api" | "fallback";
+  /** Repos whose README/manifests could not be read (rate limit, timeout, HTTP error). Their tech lists are incomplete. */
+  failedRepos: Array<{ repo: string; reason: string }>;
+  /** True when the account has more public repos than were listed (MAX_REPO_PAGES cap). */
+  truncated: boolean;
+  rateLimited: boolean;
 }
+
+/** Bounded so one import cannot exhaust the shared 5000/h (token) or 60/h (anonymous) budget. */
+const MAX_REPO_PAGES = 3;
+const REPOS_PER_PAGE = 100;
 
 const GITHUB_API_BASE = "https://api.github.com";
 const USER_AGENT = "AI-Tathastu-LiveIntelligence/4.3";
@@ -207,11 +216,13 @@ export async function fetchGitHubUserRepos(
   options: { token?: string; maxRepos?: number } = {}
 ): Promise<{ success: boolean; repos: RawGitHubRepo[]; error?: string; rateLimited?: boolean }> {
   const clean = cleanGitHubUsername(username);
-  const maxRepos = options.maxRepos ?? 100;
+  const maxRepos = options.maxRepos ?? MAX_REPO_PAGES * REPOS_PER_PAGE;
   const token = options.token;
   const repos: RawGitHubRepo[] = [];
   let page = 1;
-  const perPage = Math.min(maxRepos, 100);
+  // Always request full pages. Sizing the page to maxRepos (e.g. 60) used to
+  // make the first page look "full" and silently stop after it.
+  const perPage = REPOS_PER_PAGE;
 
   try {
     while (repos.length < maxRepos) {
@@ -234,13 +245,13 @@ export async function fetchGitHubUserRepos(
       if (!Array.isArray(pageRepos) || pageRepos.length === 0) break;
 
       repos.push(...pageRepos);
-      if (pageRepos.length < perPage) break;
+      if (pageRepos.length < perPage || repos.length >= maxRepos) break;
       page++;
-      if (page > 3) break; // Maximum 3 pages (up to 300 repos) to protect execution budget
+      if (page > MAX_REPO_PAGES) break;
     }
 
-    return { success: true, repos };
-  } catch (err) {
+    return { success: true, repos: repos.slice(0, maxRepos) };
+  } catch {
     return { success: false, repos, error: "Could not fetch repositories from GitHub." };
   }
 }
@@ -257,40 +268,35 @@ export async function fetchRepositoryManifestsAndReadme(
   languages?: Record<string, number>;
   manifests?: Record<string, string>;
   observedFiles?: string[];
+  /** Set when any request for this repo failed for a reason other than "file does not exist". */
+  failure?: string;
 }> {
   const manifests: Record<string, string> = {};
   const observedFiles: string[] = [];
+  const failures = new Set<string>();
+  // 404 just means the file is absent; anything else means data is missing.
+  const note = (res: Response) => {
+    if (res.ok || res.status === 404) return;
+    failures.add(res.status === 403 || res.status === 429 ? "rate_limited" : `http_${res.status}`);
+  };
+  const noteError = (err: unknown) => failures.add(err instanceof Error && err.name === "TimeoutError" ? "timeout" : "network");
 
   const headers = buildHeaders(token);
-
-  // Check language breakdown
-  let languages: Record<string, number> = {};
-  try {
-    const langRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/languages`, {
-      headers,
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    });
-    if (langRes.ok) {
-      languages = (await langRes.json()) as Record<string, number>;
+  const rawHeaders = { ...headers, Accept: "application/vnd.github.v3.raw" };
+  const get = async (path: string, h: Record<string, string>): Promise<Response | null> => {
+    try {
+      const res = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/${path}`, {
+        headers: h,
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+      note(res);
+      return res;
+    } catch (err) {
+      noteError(err);
+      return null;
     }
-  } catch {}
+  };
 
-  // Check README
-  let readme = "";
-  try {
-    const readmeRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/readme`, {
-      headers: { ...headers, Accept: "application/vnd.github.v3.raw" },
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    });
-    if (readmeRes.ok) {
-      const text = await readmeRes.text();
-      // Prompt injection defense: sanitize raw markdown and truncate
-      readme = sanitizeTextForPrompt(text).slice(0, MAX_README_CHARS);
-      observedFiles.push("README.md");
-    }
-  } catch {}
-
-  // Check manifest files
   const candidateManifests = [
     "package.json",
     "requirements.txt",
@@ -302,21 +308,39 @@ export async function fetchRepositoryManifestsAndReadme(
     "Cargo.toml",
   ];
 
-  for (const mf of candidateManifests) {
-    try {
-      const mfRes = await fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/contents/${mf}`, {
-        headers: { ...headers, Accept: "application/vnd.github.v3.raw" },
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-      });
-      if (mfRes.ok) {
-        const content = await mfRes.text();
-        manifests[mf] = content.slice(0, 8000); // Bounded snapshot
-        observedFiles.push(mf);
-      }
-    } catch {}
+  // All requests for one repo run concurrently: done serially, a 6-repo sync
+  // was ~60 round-trips and could outlive a serverless request (the OAuth
+  // callback awaits the whole sync).
+  const [langRes, readmeRes, ...mfResults] = await Promise.all([
+    get("languages", headers),
+    get("readme", rawHeaders),
+    ...candidateManifests.map((mf) => get(`contents/${mf}`, rawHeaders)),
+  ]);
+
+  let languages: Record<string, number> = {};
+  if (langRes?.ok) {
+    try { languages = (await langRes.json()) as Record<string, number>; } catch (err) { noteError(err); }
   }
 
-  return { readme, languages, manifests, observedFiles };
+  let readme = "";
+  if (readmeRes?.ok) {
+    try {
+      // Prompt injection defense: sanitize raw markdown and truncate
+      readme = sanitizeTextForPrompt(await readmeRes.text()).slice(0, MAX_README_CHARS);
+      observedFiles.push("README.md");
+    } catch (err) { noteError(err); }
+  }
+
+  for (let i = 0; i < candidateManifests.length; i++) {
+    const res = mfResults[i];
+    if (!res?.ok) continue;
+    try {
+      manifests[candidateManifests[i]] = (await res.text()).slice(0, 8000); // Bounded snapshot
+      observedFiles.push(candidateManifests[i]);
+    } catch (err) { noteError(err); }
+  }
+
+  return { readme, languages, manifests, observedFiles, failure: failures.size ? [...failures].join(",") : undefined };
 }
 
 export function calculateProjectChecksum(repo: RawGitHubRepo, techNames: string[]): string {
@@ -425,6 +449,9 @@ export async function fetchGitHubIntelligence(
       allDetectedTechnologies: [],
       error: profileRes.error || "GitHub profile not found.",
       source: "api",
+      failedRepos: [],
+      truncated: false,
+      rateLimited: false,
     };
   }
 
@@ -433,7 +460,7 @@ export async function fetchGitHubIntelligence(
   // Step 2: Repository Discovery
   const reposRes = await fetchGitHubUserRepos(clean, {
     token,
-    maxRepos: options.maxReposToDiscover ?? 60,
+    maxRepos: options.maxReposToDiscover,
   });
 
   if (!reposRes.success) {
@@ -450,6 +477,9 @@ export async function fetchGitHubIntelligence(
       allDetectedTechnologies: [],
       error: reposRes.error || "Could not list repositories.",
       source: "api",
+      failedRepos: [],
+      truncated: false,
+      rateLimited: Boolean(reposRes.rateLimited),
     };
   }
 
@@ -472,9 +502,11 @@ export async function fetchGitHubIntelligence(
   const projects: DiscoveredGitHubProject[] = [];
   const allFindingsMap = new Map<string, TechnologyFinding>();
 
+  const failedRepos: Array<{ repo: string; reason: string }> = [];
   for (const repo of reposToInspect) {
     const [owner, name] = repo.full_name ? repo.full_name.split("/") : [clean, repo.name];
     const deepData = await fetchRepositoryManifestsAndReadme(owner, name, token);
+    if (deepData.failure) failedRepos.push({ repo: repo.name, reason: deepData.failure });
     const mapped = mapRawRepoToProject(repo, deepData);
     projects.push(mapped);
     for (const f of mapped.technologyFindings) {
@@ -505,6 +537,9 @@ export async function fetchGitHubIntelligence(
     projects,
     allDetectedTechnologies: Array.from(allFindingsMap.values()),
     source: "api",
+    failedRepos,
+    truncated: allRepos.length < profile.public_repos,
+    rateLimited: failedRepos.some((f) => f.reason.includes("rate_limited")),
   };
 }
 

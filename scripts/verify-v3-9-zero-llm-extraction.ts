@@ -713,7 +713,7 @@ Lovely Professional University`;
   // ACCURACY BENCHMARK ON 20-CASE FROZEN DATASET (ZERO-LLM ENGINE)
   // ---------------------------------------------------------------------------
   console.log("\n--- DETERMINISTIC EXTRACTION BENCHMARK EVALUATION (20 CASES) ---");
-  const { FROZEN_HOLDOUT_DATASET } = await import("../lib/services/frozen-evaluation-benchmark");
+  const { FROZEN_HOLDOUT_DATASET } = await import("./lib/frozen-evaluation-benchmark");
 
   let totalPrecision = 0;
   let totalRecall = 0;

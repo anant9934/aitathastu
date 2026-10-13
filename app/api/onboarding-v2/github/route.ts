@@ -5,11 +5,13 @@ import { getServerAuthContext } from "@/lib/auth/server-session";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
 import { saveProject } from "@/lib/repositories/project-repository";
-import { createEvidenceRecord } from "@/lib/repositories/evidence-repository";
+import { writeEvidenceBatch, type EvidenceInsertParams } from "@/lib/repositories/evidence-repository";
+import { slugify } from "@/lib/text/normalize";
 import {
   saveExternalConnection,
   saveSourceSnapshot,
   getLatestSourceSnapshot,
+  getExternalConnectionByProvider,
 } from "@/lib/repositories/connection-repository";
 
 export const runtime = "nodejs";
@@ -93,7 +95,12 @@ export async function POST(request: Request) {
     // Stage 3: Persist
     await SourceProcessingJobService.updateStage(jobId, auth.person.id, "persist");
 
-    // 1. Persist External Connection record with provenance metadata
+    // 1. Persist External Connection record with provenance metadata.
+    // A typed username proves nothing about ownership, so this is "detected".
+    // Only the OAuth flow (/api/auth/github/*) may mark GitHub "connected";
+    // never downgrade an account that already completed OAuth.
+    const existingGithub = await getExternalConnectionByProvider(auth.person.id, "github");
+    const prior = existingGithub?.status === "connected" ? existingGithub : null;
     await saveExternalConnection({
       personId: auth.person.id,
       provider: "github",
@@ -101,10 +108,12 @@ export async function POST(request: Request) {
       externalUsername: result.username,
       displayName: result.profile?.name || result.username,
       profileUrl: result.profile?.html_url || `https://github.com/${result.username}`,
-      status: "connected",
+      status: prior && prior.externalUsername.toLowerCase() === result.username.toLowerCase() ? "connected" : "detected",
       metadata: {
         connectionState: "PUBLIC_DATA_IMPORTED",
-        ownershipVerified: false,
+        ownershipVerified: Boolean(prior && prior.externalUsername.toLowerCase() === result.username.toLowerCase()),
+        failedRepos: result.failedRepos,
+        truncated: result.truncated,
         totalPublicRepos: result.totalPublicRepos,
         fetchedReposCount: result.fetchedReposCount,
         analyzedReposCount: result.analyzedReposCount,
@@ -115,9 +124,16 @@ export async function POST(request: Request) {
       },
     });
 
-    // 2. Persist Discovered Projects and Evidence Items
-    for (const project of result.projects) {
-      const snapshot = await getLatestSourceSnapshot(auth.person.id, "github", project.repositoryUrl);
+    // 2. Persist Discovered Projects and Evidence Items.
+    // Snapshot lookups are independent, so they run in parallel; projects stay
+    // sequential because saveProject dedupes against earlier rows; evidence is
+    // collected and written in one bounded-concurrency batch at the end.
+    const snapshots = await Promise.all(
+      result.projects.map((p) => getLatestSourceSnapshot(auth.person.id, "github", p.repositoryUrl))
+    );
+    const evidence: EvidenceInsertParams[] = [];
+    for (const [index, project] of result.projects.entries()) {
+      const snapshot = snapshots[index];
       if (!snapshot || snapshot.checksum !== project.checksum) {
         await saveSourceSnapshot(
           auth.person.id,
@@ -161,7 +177,7 @@ export async function POST(request: Request) {
           ? `${project.repositoryUrl}#${finding.sourceFile}`
           : project.repositoryUrl;
 
-        await createEvidenceRecord(auth.person.id, {
+        evidence.push({
           category: "skill",
           subject: finding.name,
           value: finding.name,
@@ -170,10 +186,11 @@ export async function POST(request: Request) {
           sourceReference: sourceRef,
           interpretation: `Observed in ${project.title} (${finding.provenance.toLowerCase().replace(/_/g, " ")}${finding.sourceFile ? ` in ${finding.sourceFile}` : ""}). Evidence confidence: ${finding.confidence}. Personal proficiency requires review.`,
           whyItMatters: "Repository manifest and source code evidence indicates candidate familiarity with technology.",
-          importKey: `github_skill_${project.id}_${finding.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+          importKey: `github_skill_${project.id}_${slugify(finding.name)}`,
         });
       }
     }
+    await writeEvidenceBatch(auth.person.id, evidence);
 
     // Complete processing job
     await SourceProcessingJobService.completeJob({
@@ -192,6 +209,14 @@ export async function POST(request: Request) {
       ok: true,
       jobId,
       connectionState: "PUBLIC_DATA_IMPORTED",
+      // "detected": public data read for a typed username; "connected": verified via GitHub OAuth.
+      connectionStatus: prior && prior.externalUsername.toLowerCase() === result.username.toLowerCase() ? "connected" : "detected",
+      // Partial-data reporting: never claim a complete import when it was not.
+      partial: result.failedRepos.length > 0 || result.truncated,
+      failedRepos: result.failedRepos,
+      truncated: result.truncated,
+      rateLimited: result.rateLimited,
+      fetchedReposCount: result.fetchedReposCount,
       username: result.username,
       profile: result.profile,
       totalPublicRepos: result.totalPublicRepos,

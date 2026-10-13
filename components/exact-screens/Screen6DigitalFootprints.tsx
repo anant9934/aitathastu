@@ -84,6 +84,8 @@ export type FootprintHonestStatus =
   | "Profile Linked"
   | "Connected"
   | "Public Data Imported"
+  // Public data read for a typed username; ownership not proven (GitHub OAuth upgrades it to "Connected").
+  | "Detected · Not Verified"
   | "Importing"
   | "Import Completed"
   | "Review Required"
@@ -537,6 +539,8 @@ export function Screen6DigitalFootprints({
   const [autoLinkedKeys] = useState<Set<string>>(() => new Set(Object.keys(discoveredResumeProfiles).filter((k) => Boolean(discoveredResumeProfiles[k]))));
   const [lastSyncedTimes, setLastSyncedTimes] = useState<Record<string, string>>({});
   const [syncSummaries, setSyncSummaries] = useState<Record<string, string>>({});
+  // Providers whose last import was incomplete (rate limits, failed repos, truncated list).
+  const [partialImports, setPartialImports] = useState<Record<string, boolean>>({});
 
   // Silently register auto-discovered resume profiles with the backend on first mount.
   // No user confirmation needed — they can edit or remove at any time.
@@ -578,6 +582,7 @@ export function Screen6DigitalFootprints({
         const nextStatuses: Partial<Record<string, FootprintHonestStatus>> = {};
         const nextSyncTimes: Record<string, string> = {};
         const nextSummaries: Record<string, string> = {};
+        const nextPartial: Record<string, boolean> = {};
 
         for (const connection of data.connectors) {
           if (
@@ -590,7 +595,12 @@ export function Screen6DigitalFootprints({
           found[connection.provider] = connection.profileUrl;
           nextStatuses[connection.provider] = connection.status === "reference_only"
             ? "Profile Linked"
+            : connection.status === "detected"
+            ? "Detected · Not Verified"
             : connection.lastSyncedAt ? "Public Data Imported" : "Connected";
+          if (connection.metadata?.failedRepos?.length || connection.metadata?.truncated) {
+            nextPartial[connection.provider] = true;
+          }
           if (connection.lastSyncedAt) {
             const date = new Date(connection.lastSyncedAt);
             nextSyncTimes[connection.provider] = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -606,6 +616,7 @@ export function Screen6DigitalFootprints({
           setStatuses((prev) => ({ ...nextStatuses, ...prev }));
           setLastSyncedTimes((prev) => ({ ...nextSyncTimes, ...prev }));
           setSyncSummaries((prev) => ({ ...nextSummaries, ...prev }));
+          setPartialImports((prev) => ({ ...nextPartial, ...prev }));
         }
       })
       .catch(() => null);
@@ -736,7 +747,11 @@ export function Screen6DigitalFootprints({
       // 3. Update status & UI summaries
       const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       const imported = data.acquisitionStatus !== "MANUAL_PROFILE_REFERENCE" && Number(data.candidateCount) > 0;
-      setStatuses((prev) => ({ ...prev, [platformId]: imported ? "Public Data Imported" : "Profile Linked" }));
+      setStatuses((prev) => ({
+        ...prev,
+        [platformId]: !imported ? "Profile Linked" : data.connectionStatus === "detected" ? "Detected · Not Verified" : "Public Data Imported",
+      }));
+      setPartialImports((prev) => ({ ...prev, [platformId]: Boolean(data.partial) }));
       setLastSyncedTimes((prev) => ({ ...prev, [platformId]: nowTime }));
       setSyncSummaries((prev) => ({
         ...prev,
@@ -780,13 +795,14 @@ export function Screen6DigitalFootprints({
     ([_, s]) => s === "Connected"
   ).length;
   const importedSources = Object.entries(statuses).filter(
-    ([_, s]) => s === "Import Completed" || s === "Review Required" || s === "Public Data Imported"
+    ([_, s]) => s === "Import Completed" || s === "Review Required" || s === "Public Data Imported" || s === "Detected · Not Verified"
   ).length;
   const linkedProfiles = Object.entries(statuses).filter(
     ([k, s]) =>
       Boolean(profiles[k]) &&
       s !== "Connected" &&
       s !== "Public Data Imported" &&
+      s !== "Detected · Not Verified" &&
       s !== "Import Completed" &&
       s !== "Review Required"
   ).length;
@@ -1030,6 +1046,7 @@ export function Screen6DigitalFootprints({
                 isConnected ||
                 currentStatus === "Import Completed" ||
                 currentStatus === "Public Data Imported" ||
+                currentStatus === "Detected · Not Verified" ||
                 currentStatus === "Connected"
               ) {
                 actionLabel = "Refresh";
@@ -1288,9 +1305,17 @@ export function Screen6DigitalFootprints({
                       </span>
                     </div>
                     {syncSummaries[activePlatform.id] && (
-                      <p style={{ fontSize: 12.5, color: "#059669", fontWeight: 600, margin: "2px 0 0" }}>
-                        ✓ {syncSummaries[activePlatform.id]}
+                      <p style={{ fontSize: 12.5, color: partialImports[activePlatform.id] ? "#B45309" : "#059669", fontWeight: 600, margin: "2px 0 0" }}>
+                        {partialImports[activePlatform.id] ? "⚠" : "✓"} {syncSummaries[activePlatform.id]}
                         {lastSyncedTimes[activePlatform.id] ? ` · Last synced at ${lastSyncedTimes[activePlatform.id]}` : ""}
+                      </p>
+                    )}
+                    {activePlatform.id === "github" && statuses.github !== "Connected" && (
+                      <p style={{ fontSize: 12, color: "#475569", margin: "6px 0 0" }}>
+                        {statuses.github === "Detected · Not Verified" ? "We read this account's public repositories, but haven't verified it's yours. " : ""}
+                        <a href="/api/auth/github/start?returnTo=/onboarding" style={{ color: "#4338CA", fontWeight: 700 }}>
+                          Connect with GitHub to verify ownership →
+                        </a>
                       </p>
                     )}
                   </div>

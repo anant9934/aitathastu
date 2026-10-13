@@ -5,6 +5,7 @@ import { createSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { saveExternalConnection } from "@/lib/repositories/connection-repository";
 import { getDb, journeyEvents } from "@/lib/db";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
+import { mergeGuestOnSignIn } from "@/lib/auth/guest-merge";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -138,6 +139,7 @@ export async function GET(req: Request) {
       }
     }
 
+    await mergeGuestOnSignIn({ userId, personId });
     const { token, expiresAt } = await createSession(userId);
 
     const requested = parsedState?.from;

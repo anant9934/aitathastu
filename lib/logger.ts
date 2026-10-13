@@ -53,13 +53,6 @@ export function redactSensitiveData(data: unknown): unknown {
   return result;
 }
 
-/**
- * Generates an opaque, traceable request correlation ID.
- */
-export function generateCorrelationId(): string {
-  return `req_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-}
-
 export class Logger {
   private service: string;
 

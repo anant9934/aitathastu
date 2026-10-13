@@ -1,19 +1,22 @@
 /**
- * AI TATHASTU — CORE INTELLIGENCE V3: SOURCE PROCESSING JOB SERVICE
+ * AI TATHASTU — SOURCE PROCESSING JOB SERVICE
  *
- * Implements the lifecycle tracking for:
- * ACQUIRE -> PARSE -> EXTRACT -> VALIDATE -> NORMALIZE -> MATCH -> MERGE -> REVIEW -> PERSIST -> INTERPRET -> PLAN -> DISPLAY -> REFRESH
+ * Lifecycle tracking for import jobs (resume, GitHub, coding profiles, ...).
  *
- * Enforces:
- * - Stable job ID
- * - Person isolation
- * - Stage progression & audit logging
- * - Safe metadata storage (never logs raw personally identifiable documents)
- * - Error classification and retry tracking
+ * Resume jobs use an explicit state machine:
+ *   queued -> processing -> review_ready -> completed
+ *                 \-> failed | timed_out | cancelled
+ * Other sources still use the legacy running -> completed | failed flow.
+ *
+ * Every status write is guarded with `WHERE status IN (...)`. Several actors
+ * can touch the same job (status polls, a client-side timeout PATCH, the
+ * cleanup cron), so a late writer must never move a job out of a terminal
+ * state. Metadata writes are merged (jsonb `||`), never replaced, so one
+ * writer cannot erase what another recorded.
  */
 
 import crypto from "node:crypto";
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, desc, lt, inArray, sql } from "drizzle-orm";
 import { getDb, sourceProcessingJobs } from "@/lib/db";
 
 export type ProcessingStage =
@@ -28,12 +31,27 @@ export type ProcessingStage =
   | "interpret"
   | "plan";
 
-export type JobStatus = "queued" | "running" | "completed" | "failed" | "retry" | "cancelled" | "timed_out";
+export type JobStatus =
+  | "queued"
+  | "running"
+  | "processing"
+  | "review_ready"
+  | "completed"
+  | "failed"
+  | "retry"
+  | "cancelled"
+  | "timed_out";
+
+/** Statuses from which no further transition is allowed. */
+export const TERMINAL_JOB_STATUSES: JobStatus[] = ["completed", "failed", "retry", "cancelled", "timed_out"];
+/** Statuses in which work may still be running. A failure may only land on these. */
+export const IN_FLIGHT_JOB_STATUSES: JobStatus[] = ["queued", "running", "processing"];
 
 export interface CreateJobParams {
   personId: string;
   sourceId: string; // 'resume' | 'github' | 'portfolio' | 'manual' | 'linkedin'
   stage: ProcessingStage;
+  status?: Extract<JobStatus, "queued" | "running">;
   modelVersion?: string;
   metadata?: Record<string, unknown>;
 }
@@ -52,6 +70,13 @@ export interface FailJobParams {
   errorMessage: string;
   canRetry?: boolean;
   status?: "failed" | "retry" | "timed_out" | "cancelled";
+  metadata?: Record<string, unknown>;
+}
+
+export type SourceProcessingJob = typeof sourceProcessingJobs.$inferSelect;
+
+function mergeMetadata(patch: Record<string, unknown>) {
+  return sql`coalesce(${sourceProcessingJobs.metadata}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb`;
 }
 
 export class SourceProcessingJobService {
@@ -67,7 +92,7 @@ export class SourceProcessingJobService {
       personId: params.personId,
       sourceId: params.sourceId,
       stage: params.stage,
-      status: "running",
+      status: params.status ?? "running",
       modelVersion: params.modelVersion ?? null,
       metadata: params.metadata ?? {},
       retryCount: 0,
@@ -78,7 +103,7 @@ export class SourceProcessingJobService {
   }
 
   /**
-   * Updates the processing stage of a job.
+   * Updates the processing stage of a non-terminal job. Metadata is merged.
    */
   static async updateStage(
     jobId: string,
@@ -91,63 +116,102 @@ export class SourceProcessingJobService {
       .update(sourceProcessingJobs)
       .set({
         stage,
-        ...(metadata ? { metadata } : {}),
+        ...(metadata ? { metadata: mergeMetadata(metadata) } : {}),
       })
       .where(
         and(
           eq(sourceProcessingJobs.id, jobId),
-          eq(sourceProcessingJobs.personId, personId)
+          eq(sourceProcessingJobs.personId, personId),
+          inArray(sourceProcessingJobs.status, [...IN_FLIGHT_JOB_STATUSES, "review_ready"])
         )
       );
   }
 
   /**
-   * Advances job to next stage or marks as completed.
+   * Atomically moves a job from one of `from` to `to`. Returns the updated row,
+   * or null when another writer got there first (or the job is not owned by
+   * `personId`). The resume pipeline claims work only through this, so two
+   * concurrent status polls can never both process the same job.
    */
-  static async completeJob(params: CompleteJobParams): Promise<void> {
+  static async transition(params: {
+    jobId: string;
+    personId: string;
+    from: JobStatus[];
+    to: JobStatus;
+    fromStage?: ProcessingStage;
+    stage?: ProcessingStage;
+    metadata?: Record<string, unknown>;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+    resultReference?: string;
+    incrementRetry?: boolean;
+  }): Promise<SourceProcessingJob | null> {
     const db = await getDb();
-    await db
+    const terminal = TERMINAL_JOB_STATUSES.includes(params.to);
+    const rows = await db
       .update(sourceProcessingJobs)
       .set({
-        status: "completed",
-        completedAt: new Date(),
-        resultReference: params.resultReference ?? null,
-        metadata: params.metadata ?? {},
+        status: params.to,
+        ...(params.stage ? { stage: params.stage } : {}),
+        ...(params.metadata ? { metadata: mergeMetadata(params.metadata) } : {}),
+        ...(params.errorCode !== undefined ? { errorCode: params.errorCode } : {}),
+        ...(params.errorMessage !== undefined
+          ? { errorMessage: params.errorMessage ? params.errorMessage.slice(0, 500) : null }
+          : {}),
+        ...(params.resultReference ? { resultReference: params.resultReference } : {}),
+        ...(params.incrementRetry ? { retryCount: sql`${sourceProcessingJobs.retryCount} + 1` } : {}),
+        ...(terminal ? { completedAt: new Date() } : {}),
       })
       .where(
         and(
           eq(sourceProcessingJobs.id, params.jobId),
-          eq(sourceProcessingJobs.personId, params.personId)
+          eq(sourceProcessingJobs.personId, params.personId),
+          inArray(sourceProcessingJobs.status, params.from),
+          ...(params.fromStage ? [eq(sourceProcessingJobs.stage, params.fromStage)] : [])
         )
-      );
+      )
+      .returning();
+    return rows[0] ?? null;
   }
 
   /**
-   * Marks a job as failed with error classification.
+   * Marks a job completed. Ignored if the job already reached a terminal state.
    */
-  static async failJob(params: FailJobParams): Promise<void> {
-    const db = await getDb();
+  static async completeJob(params: CompleteJobParams): Promise<boolean> {
+    const row = await this.transition({
+      jobId: params.jobId,
+      personId: params.personId,
+      from: [...IN_FLIGHT_JOB_STATUSES, "review_ready"],
+      to: "completed",
+      resultReference: params.resultReference,
+      metadata: params.metadata ?? {},
+    });
+    return Boolean(row);
+  }
+
+  /**
+   * Marks an in-flight job as failed. Ignored if the job is already terminal or
+   * has reached review_ready (a finished extraction must not be flipped to
+   * failed by a late client-side timeout).
+   */
+  static async failJob(params: FailJobParams): Promise<boolean> {
     const finalStatus = params.status ?? (params.canRetry ? "retry" : "failed");
-    await db
-      .update(sourceProcessingJobs)
-      .set({
-        status: finalStatus,
-        completedAt: new Date(),
-        errorCode: params.errorCode,
-        errorMessage: params.errorMessage.slice(0, 500),
-      })
-      .where(
-        and(
-          eq(sourceProcessingJobs.id, params.jobId),
-          eq(sourceProcessingJobs.personId, params.personId)
-        )
-      );
+    const row = await this.transition({
+      jobId: params.jobId,
+      personId: params.personId,
+      from: IN_FLIGHT_JOB_STATUSES,
+      to: finalStatus,
+      errorCode: params.errorCode,
+      errorMessage: params.errorMessage,
+      metadata: { ...(params.metadata ?? {}), retryable: Boolean(params.canRetry) },
+    });
+    return Boolean(row);
   }
 
   /**
    * Explicitly marks a job as timed out.
    */
-  static async timeoutJob(params: { jobId: string; personId: string; errorMessage?: string }): Promise<void> {
+  static async timeoutJob(params: { jobId: string; personId: string; errorMessage?: string }): Promise<boolean> {
     return this.failJob({
       jobId: params.jobId,
       personId: params.personId,
@@ -161,7 +225,7 @@ export class SourceProcessingJobService {
   /**
    * Explicitly marks a job as cancelled by the user.
    */
-  static async cancelJob(params: { jobId: string; personId: string; errorMessage?: string }): Promise<void> {
+  static async cancelJob(params: { jobId: string; personId: string; errorMessage?: string }): Promise<boolean> {
     return this.failJob({
       jobId: params.jobId,
       personId: params.personId,
@@ -185,7 +249,7 @@ export class SourceProcessingJobService {
       .limit(limit);
   }
 
-  static async getJobForPerson(jobId: string, personId: string) {
+  static async getJobForPerson(jobId: string, personId: string): Promise<SourceProcessingJob | null> {
     const db = await getDb();
     const [job] = await db.select().from(sourceProcessingJobs).where(and(
       eq(sourceProcessingJobs.id, jobId), eq(sourceProcessingJobs.personId, personId)
@@ -194,35 +258,26 @@ export class SourceProcessingJobService {
   }
 
   /**
-   * Recovers stuck processing jobs that have exceeded threshold runtime.
+   * Recovers jobs stuck in an in-flight state past the threshold runtime.
    */
   static async recoverStuckJobs(thresholdMinutes = 15): Promise<number> {
     const db = await getDb();
     const cutoff = new Date(Date.now() - thresholdMinutes * 60 * 1000);
-    const stuck = await db
-      .select({ id: sourceProcessingJobs.id, personId: sourceProcessingJobs.personId })
-      .from(sourceProcessingJobs)
+    const recovered = await db
+      .update(sourceProcessingJobs)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        errorCode: "TIMEOUT",
+        errorMessage: `Processing job timed out after ${thresholdMinutes} minutes and was recovered.`,
+      })
       .where(
         and(
-          eq(sourceProcessingJobs.status, "running"),
+          inArray(sourceProcessingJobs.status, IN_FLIGHT_JOB_STATUSES),
           lt(sourceProcessingJobs.startedAt, cutoff)
         )
       )
-      .limit(50);
-
-    let recovered = 0;
-    for (const job of stuck) {
-      await db
-        .update(sourceProcessingJobs)
-        .set({
-          status: "failed",
-          completedAt: new Date(),
-          errorCode: "TIMEOUT",
-          errorMessage: `Processing job timed out after ${thresholdMinutes} minutes and was recovered.`,
-        })
-        .where(eq(sourceProcessingJobs.id, job.id));
-      recovered++;
-    }
-    return recovered;
+      .returning();
+    return recovered.length;
   }
 }

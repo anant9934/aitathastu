@@ -17,7 +17,7 @@ export type ProjectCandidate = {
   ambiguousDuplicate?: boolean;
 };
 
-export function deduplicateProjects(
+function deduplicateProjects(
   githubProjects: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string }>,
   resumeProjects: Array<{ title: string; description?: string; technologies?: string[] }>
 ): ProjectCandidate[] {
@@ -136,32 +136,6 @@ export async function getProjectCandidatesForPerson(personId: string): Promise<P
     const key = c.title.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
     return !confirmedTitles.has(key);
   });
-}
-
-export async function acquireGitHubDataForPerson(personId: string, username: string) {
-  const result = await fetchGitHubProjects(username);
-
-  if (result.success && result.projects.length > 0) {
-    // Save external connection record
-    await saveExternalConnection({
-      personId,
-      provider: "github",
-      externalUsername: result.username,
-      profileUrl: `https://github.com/${result.username}`,
-      status: "reference_only",
-      metadata: { repositoryCount: result.projects.length },
-    });
-
-    // Save snapshot of fetched metadata
-    await saveSourceSnapshot(
-      personId,
-      "github",
-      `https://github.com/${result.username}`,
-      { repositoryCount: result.projects.length, timestamp: new Date().toISOString() }
-    );
-  }
-
-  return result;
 }
 
 export async function confirmDiscoveredProject(

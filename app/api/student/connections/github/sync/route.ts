@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { syncGitHubConnection } from "@/lib/services/github-sync-service";
 
+export const maxDuration = 30;
+
 export async function POST() {
   try {
     const auth = await getServerAuthContext();

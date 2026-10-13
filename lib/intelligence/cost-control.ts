@@ -31,13 +31,6 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * Estimates cost based on provider/model tier (average ~$0.50 / 1M tokens for fast models).
- */
-export function estimateCostUsd(totalTokens: number, ratePerMillion = 0.50): number {
-  return Number(((totalTokens / 1_000_000) * ratePerMillion).toFixed(6));
-}
-
-/**
  * Checks whether a user is within their daily AI quota.
  */
 export function checkAiQuota(personId: string): { allowed: boolean; remainingTokens: number; reason?: string } {
@@ -88,11 +81,4 @@ export function recordAiUsage(personId: string, tokens: number): void {
 
   usage.totalTokens += tokens;
   usage.requestCount += 1;
-}
-
-/**
- * Reset quota (useful for testing).
- */
-export function resetAiUsage(): void {
-  userDailyUsage.clear();
 }

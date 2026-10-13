@@ -129,19 +129,6 @@ export async function getVerificationRequestsByRequester(
   return rows as VerificationRequestRecord[];
 }
 
-export async function getVerificationRequestsForEvidence(
-  evidenceId: string
-): Promise<VerificationRequestRecord[]> {
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(verificationRequests)
-    .where(eq(verificationRequests.evidenceId, evidenceId))
-    .orderBy(desc(verificationRequests.requestedAt));
-
-  return rows as VerificationRequestRecord[];
-}
-
 /**
  * Returns verification queue for authorized verifiers within an organization.
  * Privacy-protecting: returns only evidence details and student display name.

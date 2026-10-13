@@ -133,24 +133,6 @@ export async function findUserByEmail(email: string) {
   return rows.length > 0 ? rows[0] : null;
 }
 
-export async function findUserById(id: string) {
-  const db = await getDb();
-  const rows = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      createdAt: users.createdAt,
-      personId: persons.id,
-      displayName: persons.displayName,
-    })
-    .from(users)
-    .leftJoin(persons, eq(persons.primaryUserId, users.id))
-    .where(eq(users.id, id))
-    .limit(1);
-
-  return rows.length > 0 ? rows[0] : null;
-}
-
 export async function updateUserCredentials(
   userId: string,
   params: { email?: string; passwordHash?: string; displayName?: string }

@@ -7,6 +7,7 @@
 services:
   - type: web
     name: aitathastu-resume-extractor
+    branch: newmain
     runtime: docker
     rootDir: services/resume-extractor
     dockerfilePath: Dockerfile
@@ -21,10 +22,13 @@ services:
         value: production
       - key: EXTRACTOR_API_TOKEN
         generateValue: true
+      # Must equal EXTRACTOR_VERIFIER_TOKEN on the Next app; leave unset to disable verifier calls.
+      - key: EXTRACTOR_VERIFIER_TOKEN
+        sync: false
       - key: ALLOWED_ORIGIN
         sync: false
       - key: MAX_UPLOAD_MB
-        value: "25"
+        value: "4" # keep in sync with lib/config/upload-limits.ts
       - key: MAX_PAGES
         value: "20"
       - key: MAX_OCR_SECONDS

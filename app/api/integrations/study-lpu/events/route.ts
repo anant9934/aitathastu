@@ -1,34 +1,5 @@
-import { NextResponse } from "next/server";
+/** POST /api/integrations/study-lpu/events: Study LPU event ingestion (requires X-Integration-Key). */
 import { processStudyLpuEvent } from "@/lib/services/integration-processor-service";
+import { integrationEventRoute } from "@/lib/api/integration-event-route";
 
-/**
- * POST /api/integrations/study-lpu/events
- * Ingestion endpoint for Study LPU academic learning platform.
- * Requires X-Integration-Key header.
- */
-export async function POST(req: Request) {
-  try {
-    const rawKey =
-      req.headers.get("x-integration-key") ||
-      req.headers.get("X-Integration-Key") ||
-      req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
-      null;
-
-    let payload: unknown;
-    try {
-      payload = await req.json();
-    } catch {
-      return NextResponse.json(
-        { status: "rejected", error: "Malformed JSON body." },
-        { status: 400 }
-      );
-    }
-
-    const result = await processStudyLpuEvent({ rawKey, payload });
-    return NextResponse.json(result.data, { status: result.status });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal server error during Study LPU event ingestion.";
-    console.error("[Study LPU Ingestion Error]", message);
-    return NextResponse.json({ status: "failed", error: message }, { status: 500 });
-  }
-}
+export const POST = integrationEventRoute("Study LPU", processStudyLpuEvent);

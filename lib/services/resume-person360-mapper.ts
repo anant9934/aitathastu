@@ -13,16 +13,22 @@
  */
 
 import crypto from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   getDb,
   evidenceItems,
   personProfiles,
-  projects,
   sourceConflicts,
   journeyEvents,
 } from "@/lib/db";
 import type { ExtractorProfileV2, ExtractorRecord } from "./extractor-service-client";
+import { saveProject } from "@/lib/repositories/project-repository";
+
+// Only records the student explicitly confirmed (or a verifier verified) are
+// imported. Anything still "extracted" was never reviewed and must not leak in.
+const IMPORTABLE_STATES = new Set(["student_confirmed", "reviewed", "independently_verified"]);
+const isImportable = (r: ExtractorRecord) => IMPORTABLE_STATES.has(r.record_state);
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export interface Person360MappingResult {
   success: boolean;
@@ -80,9 +86,7 @@ export class ResumePerson360Mapper {
     }
 
     // 3. Education Mapping
-    const eduRecords = (profile.groups.education || []).filter(
-      (r) => r.record_state !== "rejected"
-    );
+    const eduRecords = (profile.groups.education || []).filter(isImportable);
     if (eduRecords.length > 0) {
       const primaryEdu = eduRecords[0];
       const inst = primaryEdu.fields.institution?.value;
@@ -96,7 +100,7 @@ export class ResumePerson360Mapper {
       const degVerified = verifiedCategories.has("education:degree");
 
       if (inst && !instVerified) {
-        if (currentProfile?.institution && currentProfile.institution !== inst) {
+        if (currentProfile?.institution && !sameText(currentProfile.institution, inst)) {
           // Log conflict
           await this.logConflict(db, personId, "education.institution", currentProfile.institution, inst);
           result.conflictsDetected++;
@@ -109,8 +113,14 @@ export class ResumePerson360Mapper {
       }
 
       if (deg && !degVerified) {
-        profileUpdates.degree = deg;
-        result.fieldsUpdated.push("degree");
+        // Same rule as institution: never silently replace a value the student already has.
+        if (currentProfile?.degree && !sameText(currentProfile.degree, deg)) {
+          await this.logConflict(db, personId, "education.degree", currentProfile.degree, deg);
+          result.conflictsDetected++;
+        } else {
+          profileUpdates.degree = deg;
+          result.fieldsUpdated.push("degree");
+        }
       } else if (degVerified) {
         result.skippedVerifiedFields.push("degree");
       }
@@ -155,9 +165,7 @@ export class ResumePerson360Mapper {
     }
 
     // 4. Skills Evidence Mapping
-    const skillRecords = (profile.groups.skills || []).filter(
-      (r) => r.record_state !== "rejected"
-    );
+    const skillRecords = (profile.groups.skills || []).filter(isImportable);
     for (const rec of skillRecords) {
       const skillName = rec.fields.canonical_name?.value || rec.fields.original_wording?.value;
       if (!skillName) continue;
@@ -168,10 +176,6 @@ export class ResumePerson360Mapper {
         continue;
       }
 
-      const snippet =
-        rec.fields.canonical_name?.evidence[0]?.snippet ||
-        rec.fields.original_wording?.evidence[0]?.snippet ||
-        `Skill extracted from resume: ${skillName}`;
 
       const id = `ev_res_${crypto.createHash("sha256").update(`${personId}:skill:${skillName}:${documentId}`).digest("hex").slice(0, 24)}`;
 
@@ -196,9 +200,7 @@ export class ResumePerson360Mapper {
     }
 
     // 5. Projects Mapping (Candidate Status)
-    const projectRecords = (profile.groups.projects || []).filter(
-      (r) => r.record_state !== "rejected"
-    );
+    const projectRecords = (profile.groups.projects || []).filter(isImportable);
     for (const rec of projectRecords) {
       const title = rec.fields.title?.value;
       if (!title) continue;
@@ -208,22 +210,17 @@ export class ResumePerson360Mapper {
       const techList = techRaw ? techRaw.split(/[,;|]/).map((t) => t.trim()).filter(Boolean) : [];
       const repoUrl = rec.fields.github_url?.value || rec.fields.evidence_url?.value || "";
 
-      const projId = `proj_res_${crypto.createHash("sha256").update(`${personId}:${title}:${documentId}`).digest("hex").slice(0, 24)}`;
-
-      await db
-        .insert(projects)
-        .values({
-          id: projId,
-          personId,
-          title,
-          summary: description ? description.slice(0, 200) : "",
-          description,
-          technologies: techList,
-          sources: ["resume"],
-          status: "candidate", // Never automatically confirmed without user approval
-          repositoryUrl: repoUrl || undefined,
-        })
-        .onConflictDoNothing({ target: projects.id });
+      // saveProject merges into an existing project with the same normalized
+      // title or repo URL (e.g. the GitHub import of the same work).
+      await saveProject(personId, {
+        title,
+        summary: description ? description.slice(0, 200) : "",
+        description,
+        technologies: techList,
+        sources: ["resume"],
+        status: "candidate", // Never automatically confirmed without user approval
+        repositoryUrl: repoUrl || undefined,
+      });
 
       result.projectsCreated++;
     }

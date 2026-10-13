@@ -124,6 +124,9 @@ class StatusResponse(BaseModel):
     document_id: str
     status: Literal['uploaded','queued','processing','completed','partial','failed']
     warnings: list[str] = Field(default_factory=list)
+    # Machine-readable failure reason, set only when status == 'failed'.
+    # OCR_ENGINE_UNAVAILABLE is an infrastructure fault; EXTRACTION_ERROR is anything else.
+    error_code: str | None = None
 
 class SectionPreview(BaseModel):
     section: str

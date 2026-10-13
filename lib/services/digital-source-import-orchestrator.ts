@@ -128,6 +128,10 @@ export interface ImportExecutionResult {
   lastSyncedAt: string;
   jobId: string;
   error?: string;
+  /** GitHub only: "detected" for a typed username, "connected" only after OAuth. */
+  connectionStatus?: "connected" | "detected";
+  /** True when some data could not be fetched (rate limits, truncated repo list). */
+  partial?: boolean;
 }
 
 export interface SourceStatusSummary {
@@ -592,6 +596,8 @@ export class DigitalSourceImportOrchestrator {
 
     let summary = "";
     let acquisitionMode: AcquisitionMode = "PERMITTED_PUBLIC_METADATA";
+    let connectionStatus: ImportExecutionResult["connectionStatus"];
+    let partial = false;
     let externalUsername = identifier.trim();
     let profileUrl = identifier.trim();
     let rawSnapshotPayload: Record<string, unknown> = {};
@@ -616,7 +622,13 @@ export class DigitalSourceImportOrchestrator {
 
           acquisitionMode = "OFFICIAL_PUBLIC_API";
 
-          // Save external connection
+          // A typed username is only "detected"; "connected" requires OAuth
+          // (/api/auth/github/*). Keep an existing OAuth connection for the same account.
+          const priorGithub = await getExternalConnectionByProvider(personId, "github");
+          connectionStatus = priorGithub?.status === "connected" &&
+            priorGithub.externalUsername.toLowerCase() === ghResult.username.toLowerCase() ? "connected" : "detected";
+          partial = ghResult.failedRepos.length > 0 || ghResult.truncated;
+
           await saveExternalConnection({
             personId,
             provider: "github",
@@ -624,8 +636,11 @@ export class DigitalSourceImportOrchestrator {
             externalUsername: ghResult.username,
             displayName: ghResult.profile?.name || ghResult.username,
             profileUrl: ghResult.profile?.html_url || `https://github.com/${ghResult.username}`,
-            status: "connected",
+            status: connectionStatus,
             metadata: {
+              ownershipVerified: connectionStatus === "connected",
+              failedRepos: ghResult.failedRepos,
+              truncated: ghResult.truncated,
               connectionState: "PUBLIC_DATA_IMPORTED",
               totalPublicRepos: ghResult.totalPublicRepos,
               fetchedReposCount: ghResult.fetchedReposCount,
@@ -661,6 +676,12 @@ export class DigitalSourceImportOrchestrator {
 
           rawSnapshotPayload = ghResult as unknown as Record<string, unknown>;
           summary = `Discovered ${ghResult.projects.length} GitHub repository candidates for '${ghResult.username}', pending your review.`;
+          if (ghResult.failedRepos.length > 0) {
+            summary += ` Partial data: ${ghResult.failedRepos.length} repo(s) couldn't be analyzed${ghResult.rateLimited ? " (GitHub rate limit reached; try again later)" : ""}, so their technologies may be missing.`;
+          }
+          if (ghResult.truncated) {
+            summary += ` Only the ${ghResult.fetchedReposCount} most recently updated of ${ghResult.totalPublicRepos} public repos were listed.`;
+          }
           break;
         }
 
@@ -1211,6 +1232,8 @@ export class DigitalSourceImportOrchestrator {
         candidates,
         lastSyncedAt: new Date().toISOString(),
         jobId,
+        connectionStatus,
+        partial,
       };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Source import failed.";

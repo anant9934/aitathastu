@@ -55,7 +55,8 @@ export async function POST(req: Request) {
 
     // V4.0 Footprint Intelligence Context
     const connectedAccounts = connections.filter((c: any) => c.status === "connected").map((c: any) => c.provider);
-    const linkedProfiles = connections.filter((c: any) => c.status === "reference_only").map((c: any) => c.provider);
+    // "detected" = public data read for a typed username, ownership unverified: describe it as linked, never as connected.
+    const linkedProfiles = connections.filter((c: any) => c.status === "reference_only" || c.status === "detected").map((c: any) => c.provider);
     const hfModels = (person360.evidence || [])
       .filter((e) => e.sourceReference && e.sourceReference.includes("huggingface.co"))
       .map((e) => e.subject);

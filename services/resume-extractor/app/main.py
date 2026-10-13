@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .schema import (ResumeProfile, UploadResponse, ExtractionRequest, ReviewRequest, ReviewState, ReviewEvent, StatusResponse, SectionPreview, DocumentView, GROUP_FIELDS)
 from .ingest import validate_upload, IngestionError
-from .document import read_document
+from .document import read_document, OcrEngineUnavailable
 from .extraction.pipeline import extract_profile
 from .store import LocalStore
 from .auth import UserContext, get_current_user, authorize_action, check_document_access
@@ -53,7 +53,7 @@ def processing(docid: str):
         meta = store.get_meta(docid)
         if meta['status'] not in ('queued', 'uploaded'):
             return
-        store.update_meta(docid, {'status': 'processing'})
+        store.update_meta(docid, {'status': 'processing', 'error_code': None})
         began = time.perf_counter()
         payload = store.document_path(docid).read_bytes()
         content = read_document(payload, meta['format'], settings)
@@ -61,10 +61,19 @@ def processing(docid: str):
         store.save_json(docid, 'sections.json', [asdict(l) for l in content.lines])
         store.save_json(docid, 'profile.json', profile.model_dump(mode='json'))
         store.update_meta(docid, {'status': profile.metadata.status, 'warnings': profile.metadata.warnings})
-    except Exception as e:
-        # Exclude document contents and filesystem paths from logs/API responses.
+    except OcrEngineUnavailable as e:
+        print(f'[extractor] OCR engine unavailable for {docid}: {e}', flush=True)
         store.update_meta(docid, {
             'status': 'failed',
+            'error_code': 'OCR_ENGINE_UNAVAILABLE',
+            'warnings': ['The OCR engine is unavailable on the extraction service.']
+        })
+    except Exception as e:
+        # Exclude document contents and filesystem paths from logs/API responses.
+        print(f'[extractor] extraction failed for {docid}: {type(e).__name__}', flush=True)
+        store.update_meta(docid, {
+            'status': 'failed',
+            'error_code': 'EXTRACTION_ERROR',
             'warnings': [f'Processing error: {type(e).__name__}. Please retry or use another file.']
         })
 
@@ -220,7 +229,22 @@ def status(
     user: UserContext = Depends(authorize_action('status'))
 ):
     m = meta_for(document_id, user)
-    return StatusResponse(document_id=document_id, status=m['status'], warnings=m.get('warnings', []))
+    return StatusResponse(document_id=document_id, status=m['status'], warnings=m.get('warnings', []), error_code=m.get('error_code'))
+
+@app.get('/api/resumes/{document_id}/text')
+def text(
+    document_id: str,
+    user: UserContext = Depends(authorize_action('view'))
+):
+    """Raw extracted lines and hyperlinks, so the caller can run its own
+    deterministic extraction over OCR output without a second OCR pass."""
+    meta_for(document_id, user)
+    try:
+        lines = store.read_json(document_id, 'sections.json')
+    except KeyError:
+        raise HTTPException(409, 'Not processed') from None
+    raw = '\n'.join(l['text'] for l in lines if (l.get('text') or '').strip())
+    return {'document_id': document_id, 'raw_text': raw[:50000], 'ocr_used': any(l.get('method') == 'ocr' for l in lines)}
 
 @app.get('/api/resumes/{document_id}', response_model=DocumentView)
 def get_document(

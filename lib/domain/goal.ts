@@ -14,7 +14,7 @@ export type Goal = {
   updatedAt: string;
 };
 
-export function isPresetGoal(title: string): boolean {
+function isPresetGoal(title: string): boolean {
   const norm = title.trim().toLowerCase();
   return PRESET_GOALS.some((p) => p.toLowerCase() === norm);
 }
@@ -31,18 +31,6 @@ export function createGoal(title: string, options?: { description?: string; sour
     status: "active",
     source,
     createdAt: now,
-    updatedAt: now,
-  };
-}
-
-export function updateGoal(current: Goal, newTitle: string, description?: string): Goal {
-  const trimmed = newTitle.trim();
-  const now = new Date().toISOString();
-  return {
-    ...current,
-    title: trimmed || current.title,
-    description: description !== undefined ? description.trim() : current.description,
-    source: isPresetGoal(trimmed) ? "preset" : "custom",
     updatedAt: now,
   };
 }

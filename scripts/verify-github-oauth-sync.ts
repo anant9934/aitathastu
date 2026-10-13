@@ -18,7 +18,7 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   if (!ok) failures++;
 };
 
-const LATENCY_MS = 200; // realistic Netlify (us-east) -> api.github.com round-trip
+const LATENCY_MS = 200; // realistic serverless (us-east) -> api.github.com round-trip
 const REPO_COUNT = 12;
 const repos = Array.from({ length: REPO_COUNT }, (_, i) => ({
   id: i, name: `repo-${i}`, full_name: `octo/repo-${i}`, html_url: `https://github.com/octo/repo-${i}`,
@@ -73,7 +73,7 @@ async function main() {
   console.log(`      sync: ${elapsed} ms, ${calls} GitHub calls, max ${maxInFlight} in flight (serial would be ~${serialEstimate} ms)`);
 
   check("sync succeeds", result.success === true, result.error);
-  // Netlify's synchronous function limit is 10 s by default; the callback also
+  // Serverless synchronous function limit is typically 10-15 s; the callback also
   // spends ~2 round-trips on token exchange + /user before this.
   check(`6-repo sync completes well inside 10 s at ${LATENCY_MS} ms/request`, elapsed < 5000, elapsed);
   check("concurrency stays bounded (<= 10 requests in flight)", maxInFlight <= 10, maxInFlight);

@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # keep in sync with package.json engines and netlify.toml
+          node-version: 22 # keep in sync with package.json engines
           cache: "npm"
 
       - name: Install Dependencies

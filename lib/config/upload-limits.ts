@@ -1,7 +1,7 @@
 /**
  * Canonical resume upload limit, shared by the browser and every server route.
  *
- * Why 4 MB: Netlify synchronous functions reject request payloads over 6 MB,
+ * Why 4 MB: Serverless functions (e.g. Vercel) limit request payloads (4.5 MB),
  * and binary bodies are base64-encoded on the way in (about +33%). 4 MB of
  * file plus multipart overhead stays under that ceiling. The Python
  * extractor is configured with the same value (MAX_UPLOAD_MB in render.yaml

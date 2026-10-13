@@ -110,9 +110,9 @@ export async function GET(req: Request) {
         : (userRes.headers.get("x-oauth-scopes") || "").split(/[\s,]+/).filter(Boolean),
     });
 
-    // Awaited, never fire-and-forget: on Netlify a detached promise is frozen or
-    // killed once the response is sent, silently dropping the sync. The sync
-    // records its own sync_runs row; a failure here still leaves the account
+    // Awaited, never fire-and-forget: on serverless platforms (e.g. Vercel) a detached
+    // promise is frozen or killed once the response is sent, silently dropping the sync.
+    // The sync records its own sync_runs row; a failure here still leaves the account
     // connected, and the student can retry from the Sync button.
     let syncFailed = false;
     try {

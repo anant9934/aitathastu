@@ -91,6 +91,6 @@ local resume files that aren't in the repo.
 ## Maintenance
 
 - `scripts/purge-stale-guests.ts`: deletes guest accounts older than 7 days that never finished onboarding (dry run unless `--apply`). Also runs daily from the cron route.
-- `/api/cron/cleanup-stuck-syncs`: daily cleanup, triggered by the Netlify scheduled function `netlify/functions/cleanup-stuck-syncs.mts`.
+- `/api/cron/cleanup-stuck-syncs`: daily cleanup, triggered by Vercel Cron (configured in `vercel.json`).
 
 Older certification reports are kept in [docs/archive/](docs/archive/). They predate the 2026-10-12 audit and are not current.

@@ -221,8 +221,8 @@ export class ExtractorServiceClient {
       method: "POST",
       headers: this.makeHeaders(params.identity),
       body: formData,
-      // Must finish inside the hosting function's limit (Netlify: 10s default,
-      // 26s max). A sleeping Render instance is woken earlier by
+      // Must finish inside the hosting function's limit (Vercel: 15s-60s maxDuration).
+      // A sleeping Render instance is woken earlier by
       // /api/resume/preflight; if it still is not up, the job fails as
       // OCR_SERVICE_UNREACHABLE (retryable) instead of hanging.
       timeoutMs: 20000,

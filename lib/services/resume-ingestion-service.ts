@@ -6,8 +6,8 @@
  *   POST /api/resume/extract      validate + store blob + create job (queued) -> 202
  *   GET  /api/resume/[id]/status  advance the job one step, return its real state
  *
- * Why poll-driven instead of a background worker: on Netlify a request may
- * not outlive its response, and fire-and-forget work is silently killed. So
+ * Why poll-driven instead of a background worker: on serverless platforms (e.g. Vercel)
+ * a request may not outlive its response, and fire-and-forget work is silently killed. So
  * every unit of work here runs inside an awaited status request and is short:
  *   - text-layer PDF / DOCX parsing runs in-process (pdf.js text only, no
  *     canvas, no tesseract) and normally finishes in well under a second;

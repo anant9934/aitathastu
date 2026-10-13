@@ -3,7 +3,7 @@
 ## Components
 
 ```
-Browser ──> Next.js app (Netlify functions) ──> Postgres (Neon)
+Browser ──> Next.js app (Vercel) ──> Postgres (Neon)
                     │
                     └──> Resume extractor (FastAPI on Render): scanned-PDF OCR only
 ```
@@ -12,7 +12,7 @@ Browser ──> Next.js app (Netlify functions) ──> Postgres (Neon)
   business logic in `lib/services`, data access in `lib/repositories`, schema in `lib/db`.
 - **Resume extractor** (`services/resume-extractor/`): Python service with PyMuPDF and Tesseract.
   It's separate because OCR needs a native Tesseract binary, a 5 MB language model and tens of
-  seconds of CPU, and none of that fits a serverless function (Netlify: 10 s default, 26 s max).
+  seconds of CPU, and none of that fits a serverless function (10-15 s limit).
   It is a worker: Postgres stays the source of truth for every document.
 
 ### Code layout
@@ -28,7 +28,7 @@ Browser ──> Next.js app (Netlify functions) ──> Postgres (Neon)
 | `lib/intelligence` | LLM router and providers, prompt defense, cost control |
 | `lib/db/migration-sql.ts` | Canonical DDL (the only migrations that run) |
 | `middleware.ts` | CSRF origin check for state-changing `/api` requests |
-| `netlify/functions` | Scheduled daily maintenance |
+| `vercel.json` | Vercel build and cron configuration |
 
 ## Database (high level)
 
@@ -66,8 +66,8 @@ clears those tables explicitly (`deleteAccountCompletely`).
 ## CV pipeline
 
 ```
- Browser                      Next.js (Netlify)                              Extractor (Render)
- ───────                      ─────────────────                              ──────────────────
+ Browser                      Next.js (Vercel)                               Extractor (Render)
+ ───────                      ────────────────                               ──────────────────
  POST /api/resume/extract ──> validate type/size(4 MB)/magic bytes
                               store blob, resume_documents row (random UUID id)
                               job: queued ─────────────────────────────┐

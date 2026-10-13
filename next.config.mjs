@@ -32,9 +32,10 @@ const nextConfig = {
   // tracing still picks those files up because the shared parser module
   // references them for the benchmark scripts, but no route executes that code.
   outputFileTracingIncludes: {
-    // cmaps (*.bcmap) are not picked up by this mechanism in local builds;
-    // they are added for Netlify via included_files in netlify.toml.
-    "/api/resume/**": ["./node_modules/pdfjs-dist/standard_fonts/*"],
+    "/api/resume/**": [
+      "./node_modules/pdfjs-dist/standard_fonts/**",
+      "./node_modules/pdfjs-dist/cmaps/**",
+    ],
   },
   // Lint gates the production build (npm run build fails on lint errors).
   eslint: {

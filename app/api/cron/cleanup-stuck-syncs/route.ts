@@ -1,8 +1,7 @@
 /**
  * AI TATHASTU — CRON JOB: daily cleanup
  *
- * Called once a day by the Netlify scheduled function
- * netlify/functions/cleanup-stuck-syncs.mts (or any external cron) with
+ * Called once a day by Vercel Cron (vercel.json) or an external cron with
  * "Authorization: Bearer $CRON_SECRET". It:
  *   - marks sync runs stuck > 15 minutes as timed out,
  *   - fails processing jobs stuck in an in-flight state > 15 minutes,

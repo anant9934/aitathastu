@@ -2,9 +2,9 @@ name: CI / Production Release Gate
 
 on:
   push:
-    branches: [main]
+    branches: [main, newmain]
   pull_request:
-    branches: [main]
+    branches: [main, newmain]
 
 jobs:
   verify:
@@ -53,6 +53,9 @@ jobs:
 
       - name: Automated Acceptance Test Suite (307 Tests)
         run: npm test
+
+      - name: Portfolio DNS Compatibility
+        run: npm run test:portfolio-network
 
       - name: Production Bundle Compilation
         env:

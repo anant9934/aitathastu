@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx scripts/test-core-v3.ts",
+    "test:portfolio-network": "node --import tsx --test scripts/verify-portfolio-network.test.mjs",
     "test:pdf-engine": "node --import tsx scripts/verify-pdf-engine-fixes.ts",
     "test:v5-0-1-audit": "node --import tsx scripts/verify-v5-0-1-dataset-audit.ts",
     "test:v5-0-3-parser": "node --import tsx scripts/verify-v5-0-3-universal-parser.ts",

@@ -13,6 +13,9 @@
   # Schema changes are applied by running `npm run db:migrate` as an explicit
   # deploy step, never as DDL on a cold start.
   DATABASE_AUTO_MIGRATE = "false"
+  # These values are public configuration or numeric settings. Netlify's
+  # secrets scan matches their common values in source and build output.
+  SECRETS_SCAN_OMIT_KEYS = "NODE_ENV,CLOUD_AI_PROVIDER_ORDER,APP_BASE_URL,CLOUD_AI_MAX_TOKENS_PER_REQUEST"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

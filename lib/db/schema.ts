@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, jsonb, uniqueIndex, index, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, jsonb, uniqueIndex, index, integer, doublePrecision } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -111,6 +111,12 @@ export const evidenceItems = pgTable("evidence_items", {
   interpretation: text("interpretation").notNull(),
   whyItMatters: text("why_it_matters").notNull(),
   importKey: text("import_key"),
+  /** Platform the evidence came from: resume | github | linkedin | leetcode | hackerrank | kaggle | scholar | manual (Task 1.2.2). */
+  originSource: text("origin_source"),
+  /** 0..1 confidence in the evidence itself (not the skill); null until scored (Task 1.3.1). */
+  confidenceScore: doublePrecision("confidence_score"),
+  /** False for evidence the student may not edit (faculty-verified, assessment results). */
+  editable: boolean("editable").default(true).notNull(),
   verifiedByPersonId: text("verified_by_person_id").references(() => persons.id, { onDelete: "set null" }),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   verificationMethod: text("verification_method"),
@@ -762,3 +768,44 @@ export const resumeReviewHistory = pgTable(
   ]
 );
 
+/**
+ * One row per sync attempt chain for one (person, source): the idempotency,
+ * correlation and dead-letter ledger behind every scraper (Tasks 1.9.1-1.9.4).
+ * States follow lib/sync/state-machine.ts.
+ */
+export const syncOperations = pgTable(
+  "sync_operations",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    correlationId: text("correlation_id").notNull(),
+    trigger: text("trigger").notNull(), // 'user' | 'scheduler'
+    state: text("state").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    maxAttempts: integer("max_attempts").notNull(),
+    lastErrorCode: text("last_error_code"),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    result: jsonb("result").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_sync_operations_idempotency_key").on(table.idempotencyKey),
+    index("idx_sync_operations_person_source").on(table.personId, table.source, table.createdAt),
+  ]
+);
+
+/** Request-level idempotency for non-sync writes, e.g. CV uploads (Task 1.9.1). */
+export const idempotencyKeys = pgTable("idempotency_keys", {
+  key: text("key").primaryKey(),
+  personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+  scope: text("scope").notNull(),
+  response: jsonb("response"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});

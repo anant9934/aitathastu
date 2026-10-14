@@ -627,5 +627,32 @@ export const MIGRATION_SQL_STATEMENTS = [
 
   // Optimistic concurrency for onboarding drafts (Task 1.2.4).
   `ALTER TABLE "onboarding_drafts" ADD COLUMN IF NOT EXISTS "revision" integer DEFAULT 0 NOT NULL;`,
-  `ALTER TABLE "onboarding_drafts" ADD COLUMN IF NOT EXISTS "system_entries" jsonb DEFAULT '{}'::jsonb NOT NULL;`
+  `ALTER TABLE "onboarding_drafts" ADD COLUMN IF NOT EXISTS "system_entries" jsonb DEFAULT '{}'::jsonb NOT NULL;`,
+
+  // Sync operation ledger: idempotency, correlation IDs, dead letters (Tasks 1.9.1-1.9.4).
+  `CREATE TABLE IF NOT EXISTS "sync_operations" ("id" text PRIMARY KEY NOT NULL, "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE, "source" text NOT NULL, "idempotency_key" text NOT NULL, "correlation_id" text NOT NULL, "trigger" text NOT NULL, "state" text NOT NULL, "attempts" integer DEFAULT 0 NOT NULL, "max_attempts" integer NOT NULL, "last_error_code" text, "last_error" text, "next_attempt_at" timestamp with time zone, "started_at" timestamp with time zone, "finished_at" timestamp with time zone, "result" jsonb DEFAULT '{}'::jsonb NOT NULL, "created_at" timestamp with time zone DEFAULT now() NOT NULL, "updated_at" timestamp with time zone DEFAULT now() NOT NULL);`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "uq_sync_operations_idempotency_key" ON "sync_operations" ("idempotency_key");`,
+  `CREATE INDEX IF NOT EXISTS "idx_sync_operations_person_source" ON "sync_operations" ("person_id", "source", "created_at");`,
+  // At most one in-flight operation per (person, source): a double-clicked "Sync Now"
+  // that straddles an idempotency bucket boundary still cannot start a second run.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "uq_sync_operations_active" ON "sync_operations" ("person_id", "source") WHERE "state" IN ('queued', 'running', 'awaiting_user');`,
+
+  // Per-source provenance on evidence (Task 1.2.2). Backfill derives the
+  // platform from the import-key prefix / source kind; idempotent.
+  `ALTER TABLE "evidence_items" ADD COLUMN IF NOT EXISTS "origin_source" text;`,
+  `ALTER TABLE "evidence_items" ADD COLUMN IF NOT EXISTS "confidence_score" double precision;`,
+  `ALTER TABLE "evidence_items" ADD COLUMN IF NOT EXISTS "editable" boolean DEFAULT true NOT NULL;`,
+  `UPDATE "evidence_items" SET "origin_source" = CASE
+     WHEN "import_key" LIKE 'github\_%' THEN 'github'
+     WHEN "import_key" LIKE 'resume%' OR "source" = 'resume_extracted' THEN 'resume'
+     WHEN "source" = 'institutional' THEN 'institutional'
+     ELSE 'manual' END
+   WHERE "origin_source" IS NULL;`,
+  `UPDATE "evidence_items" SET "source_reference" = coalesce("origin_source", 'manual') || ':' || coalesce("import_key", "id") WHERE "source_reference" IS NULL;`,
+  `UPDATE "evidence_items" SET "editable" = false WHERE "verification_status" = 'verified' AND "editable" = true;`,
+  `CREATE INDEX IF NOT EXISTS "idx_evidence_person_origin" ON "evidence_items" ("person_id", "origin_source");`,
+
+  // Request-level idempotency ledger (Task 1.9.1).
+  `CREATE TABLE IF NOT EXISTS "idempotency_keys" ("key" text PRIMARY KEY NOT NULL, "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE, "scope" text NOT NULL, "response" jsonb, "created_at" timestamp with time zone DEFAULT now() NOT NULL, "completed_at" timestamp with time zone);`,
+  `CREATE INDEX IF NOT EXISTS "idx_idempotency_keys_created" ON "idempotency_keys" ("created_at");`
 ];

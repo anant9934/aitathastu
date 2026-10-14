@@ -24,6 +24,8 @@ export type EvidenceCategory =
   | "project"
   | "assessment"
   | "interview"
+  /** Research paper from a verified ORCID / Semantic Scholar ID (Task 1.6.2). */
+  | "publication"
   | "other";
 
 export type EvidenceItem = {

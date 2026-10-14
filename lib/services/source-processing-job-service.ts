@@ -20,6 +20,8 @@ import { eq, and, desc, lt, inArray, sql } from "drizzle-orm";
 import { getDb, sourceProcessingJobs } from "@/lib/db";
 
 export type ProcessingStage =
+  /** Waiting for a cold OCR extractor (Render free tier) to wake up. */
+  | "awaiting_extractor"
   | "acquire"
   | "parse"
   | "extract"

@@ -1,3 +1,4 @@
+import { connectorFetch, isServeFromCacheError } from "@/lib/connectors/rate-limiter";
 /**
  * AI TATHASTU — V3.2 CODING PLATFORMS CONNECTOR
  *
@@ -20,11 +21,13 @@ export interface CodingPlatformProfile {
   profileUrl: string;
   displayName?: string | null;
   badges?: Array<{ badge: string; stars?: number }>;
+  /** HackerRank /scores_elo practice scores per domain (Task 1.6.5). */
+  domainScores?: Array<{ domain: string; practiceScore: number; rank: number | null }>;
   rating?: number | null;
   problemsSolved?: number | null;
   globalRank?: number | null;
   studentReported?: boolean;
-  status: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "UNAVAILABLE";
+  status: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "UNAVAILABLE" | "RATE_LIMITED";
   retrievedAt: string;
   notes?: string;
 }
@@ -53,7 +56,8 @@ export function normalizeCodingHandle(input: string, platform: "codechef" | "hac
  */
 export async function fetchHackerRankProfile(
   rawInput: string,
-  manualMetrics?: { rating?: number; problemsSolved?: number }
+  manualMetrics?: { rating?: number; problemsSolved?: number },
+  opts: { correlationId?: string } = {}
 ): Promise<CodingPlatformProfile> {
   const username = normalizeCodingHandle(rawInput, "hackerrank");
   const profileUrl = `https://www.hackerrank.com/${username}`;
@@ -71,12 +75,13 @@ export async function fetchHackerRankProfile(
   }
 
   try {
-    const res = await fetch(`https://www.hackerrank.com/rest/hackers/${encodeURIComponent(username)}/badges`, {
+    // Rate window, circuit breaker and 5 s timeout: lib/connectors/rate-limiter.ts.
+    const res = await connectorFetch("hackerrank", `https://www.hackerrank.com/rest/hackers/${encodeURIComponent(username)}/badges`, {
+      correlationId: opts.correlationId,
       headers: {
         Accept: "application/json",
         "User-Agent": "AI-Tathastu-ProfileAuditor/1.0",
       },
-      signal: AbortSignal.timeout(5000),
     });
 
     if (res.ok) {
@@ -93,23 +98,49 @@ export async function fetchHackerRankProfile(
         }
       }
 
+      // Domain practice scores: optional enrichment; a failure here never drops the badges.
+      let domainScores: NonNullable<CodingPlatformProfile["domainScores"]> = [];
+      try {
+        const sr = await connectorFetch("hackerrank", `https://www.hackerrank.com/rest/hackers/${encodeURIComponent(username)}/scores_elo`, {
+          correlationId: opts.correlationId,
+          headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-ProfileAuditor/1.0" },
+        });
+        if (sr.ok) {
+          const rows = await sr.json();
+          if (Array.isArray(rows)) {
+            domainScores = rows
+              .filter((r) => r && typeof r.name === "string" && Number(r.practice?.score) > 0)
+              .map((r) => ({ domain: String(r.name), practiceScore: Math.round(Number(r.practice.score)), rank: Number.isFinite(Number(r.practice?.rank)) ? Number(r.practice.rank) : null }))
+              .slice(0, 20);
+          }
+        }
+      } catch {
+        // breaker open / timeout / malformed: badges alone are still valid data
+      }
+
       return {
         platform: "hackerrank",
         username,
         profileUrl,
         badges,
+        domainScores,
         rating: manualMetrics?.rating ?? null,
         problemsSolved: manualMetrics?.problemsSolved ?? null,
         studentReported: Boolean(manualMetrics),
-        status: badges.length > 0 ? "LIVE_VERIFIED" : "PROFILE_LINK_ONLY",
+        // The profile answered: that is verified live data even with zero badges.
+        // PROFILE_LINK_ONLY now means only "the live fetch did not happen".
+        status: "LIVE_VERIFIED",
         retrievedAt: now,
         notes: badges.length > 0
           ? `Discovered ${badges.length} public skill badges.`
           : "Profile verified. No public skill badges found.",
       };
     }
-  } catch {
-    // Network or rate limit fallback
+  } catch (error) {
+    if (isServeFromCacheError(error)) {
+      return { platform: "hackerrank", username, profileUrl, status: "RATE_LIMITED", retrievedAt: now, notes: (error as Error).message };
+    }
+    // Network or timeout: link-only fallback below
   }
 
   return {

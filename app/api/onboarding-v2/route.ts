@@ -6,7 +6,7 @@ import {
   isGuestEmail,
 } from "@/lib/auth/server-session";
 import type { AuthContext } from "@/lib/auth/session";
-import { completeOnboarding, readOnboardingDraft, writeOnboardingDraft } from "@/lib/services/onboarding-v2-service";
+import { completeOnboarding, readOnboardingDraft, readOnboardingDraftRevision, writeOnboardingDraft } from "@/lib/services/onboarding-v2-service";
 import { findUserByEmail, updateUserCredentials } from "@/lib/repositories/user-repository";
 import { updatePersonProfileData } from "@/lib/repositories/person-repository";
 import { hashPassword } from "@/lib/auth/password";
@@ -14,7 +14,8 @@ import { hashPassword } from "@/lib/auth/password";
 export async function GET() {
   const auth = await getServerAuthContext();
   if (!auth) return NextResponse.json({ authenticated: false, draft: null });
-  return NextResponse.json({ authenticated: true, draft: await readOnboardingDraft(auth.person.id) });
+  const [draft, revision] = await Promise.all([readOnboardingDraft(auth.person.id), readOnboardingDraftRevision(auth.person.id)]);
+  return NextResponse.json({ authenticated: true, draft, revision });
 }
 
 /**
@@ -63,8 +64,13 @@ export async function PUT(request: Request) {
   if (conflict) return applySessionCookie(conflict, session.sessionCookieToSet);
 
   try {
-    const draft = await writeOnboardingDraft(session.auth.person.id, body);
-    return applySessionCookie(NextResponse.json({ draft }), session.sessionCookieToSet);
+    const { baseRevision, ...patch } = body as Record<string, unknown>;
+    const draft = await writeOnboardingDraft(session.auth.person.id, patch, {
+      origin: "user",
+      baseRevision: typeof baseRevision === "number" && Number.isInteger(baseRevision) ? baseRevision : undefined,
+    });
+    const revision = await readOnboardingDraftRevision(session.auth.person.id);
+    return applySessionCookie(NextResponse.json({ draft, revision }), session.sessionCookieToSet);
   } catch (error) {
     const message = error instanceof Error ? error.message : "We couldn't save your progress. Please try again.";
     return applySessionCookie(

@@ -61,3 +61,7 @@ universal-resume-extractor/
 
 services/resume-extractor/data/private/
 .neon
+.agents/
+.claude/
+.codex/
+scratch/

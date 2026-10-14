@@ -1,4 +1,5 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import { mergeDraftPatch, type DraftWriteOrigin, type SystemEntryLedger } from "@/lib/onboarding-draft-merge";
 import { getDb, onboardingDrafts, userPreferences } from "@/lib/db";
 import { safeDraft, type OnboardingDraft } from "@/lib/onboarding-v2";
 import { updatePersonProfileData, getPersonProfile } from "@/lib/repositories/person-repository";
@@ -15,7 +16,7 @@ export async function readOnboardingDraft(personId: string) {
   return row ? safeDraft(row.draft) : null;
 }
 
-export async function writeOnboardingDraft(personId: string, input: unknown) {
+export async function writeOnboardingDraft(personId: string, input: unknown, options: DraftWriteOptions = {}) {
   const raw = input && typeof input === "object" && !Array.isArray(input)
     ? input as Record<string, unknown>
     : {};
@@ -35,19 +36,70 @@ export async function writeOnboardingDraft(personId: string, input: unknown) {
       patch[key] = value === undefined && raw[key] === null ? null : value;
     }
   }
-  const draft = safeDraft(patch);
-  const db = await getDb();
-  await db
-    .insert(onboardingDrafts)
-    .values({ personId, draft, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: onboardingDrafts.personId,
-      set: {
-        draft: sql`${onboardingDrafts.draft} || ${JSON.stringify(patch)}::jsonb`,
-        updatedAt: new Date(),
-      },
-    });
+  await mutateOnboardingDraft(personId, patch, options);
   return await readOnboardingDraft(personId);
+}
+
+export type DraftWriteOptions = {
+  origin?: DraftWriteOrigin;
+  /** The draft revision the client last read; see lib/onboarding-draft-merge.ts. */
+  baseRevision?: number;
+};
+
+const DRAFT_CAS_ATTEMPTS = 12;
+
+/**
+ * Applies a patch with optimistic concurrency: read (draft, revision), merge
+ * in memory, then `UPDATE ... WHERE revision = <read>`. A writer that loses
+ * the race re-reads and merges again, so no concurrent patch is dropped.
+ * Every statement is single-shot, so this works on the Neon HTTP driver,
+ * which has no interactive transactions (and so no SELECT ... FOR UPDATE).
+ */
+export async function mutateOnboardingDraft(personId: string, patch: Record<string, unknown>, options: DraftWriteOptions = {}) {
+  const origin = options.origin ?? "user";
+  const db = await getDb();
+  for (let attempt = 0; attempt < DRAFT_CAS_ATTEMPTS; attempt++) {
+    const [row] = await db
+      .select({ draft: onboardingDrafts.draft, revision: onboardingDrafts.revision, systemEntries: onboardingDrafts.systemEntries })
+      .from(onboardingDrafts)
+      .where(eq(onboardingDrafts.personId, personId))
+      .limit(1);
+    const revision = row?.revision ?? 0;
+    const merged = mergeDraftPatch({
+      current: row ? (row.draft as Record<string, unknown>) : {},
+      patch,
+      origin,
+      systemEntries: (row?.systemEntries as SystemEntryLedger) || {},
+      nextRevision: revision + 1,
+      baseRevision: options.baseRevision,
+    });
+
+    if (!row) {
+      const [created] = await db
+        .insert(onboardingDrafts)
+        .values({ personId, draft: safeDraft(merged.draft), revision: 1, systemEntries: merged.systemEntries, updatedAt: new Date() })
+        .onConflictDoNothing()
+        .returning();
+      if (created) return created.revision;
+    } else {
+      if (!merged.changed) return revision;
+      const [updated] = await db
+        .update(onboardingDrafts)
+        .set({ draft: safeDraft(merged.draft), revision: revision + 1, systemEntries: merged.systemEntries, updatedAt: new Date() })
+        .where(and(eq(onboardingDrafts.personId, personId), eq(onboardingDrafts.revision, revision)))
+        .returning();
+      if (updated) return updated.revision;
+    }
+    // Lost the race; back off with jitter before re-reading.
+    await new Promise((resolve) => setTimeout(resolve, Math.random() * 15 * (attempt + 1)));
+  }
+  throw new Error(`Onboarding draft for ${personId} is under heavy concurrent modification; please retry.`);
+}
+
+export async function readOnboardingDraftRevision(personId: string) {
+  const db = await getDb();
+  const [row] = await db.select({ revision: onboardingDrafts.revision }).from(onboardingDrafts).where(eq(onboardingDrafts.personId, personId)).limit(1);
+  return row?.revision ?? 0;
 }
 
 function allowedProfileUrl(source: string, value: string) {

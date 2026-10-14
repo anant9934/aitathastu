@@ -48,6 +48,9 @@ export function ExactScreensContainer({
   const resumeSignalFiredRef = React.useRef(false);
   const githubSignalFiredRef = React.useRef(false);
   const draftWriteQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+  // Server draft revision this client last saw; lets the server keep entries a
+  // scraper added that this screen has not displayed yet (Task 1.2.4).
+  const draftRevisionRef = React.useRef<number | undefined>(undefined);
 
   // Notify EORA whenever the onboarding screen changes
   useEffect(() => {
@@ -148,6 +151,7 @@ export function ExactScreensContainer({
 
         {
           const draftData = await draftRes.json();
+          if (typeof draftData.revision === "number") draftRevisionRef.current = draftData.revision;
           if (active && draftData.draft) {
             const d = draftData.draft;
             if (d.completed) {
@@ -244,15 +248,19 @@ export function ExactScreensContainer({
   const persistDraft = useCallback(
     (patch: Record<string, unknown>) => {
       if (!draftLoadedRef.current) return Promise.resolve(false);
-      const payload = { version: 2, ...patch };
       const save = async () => {
       try {
+        const payload = { version: 2, ...patch, baseRevision: draftRevisionRef.current };
         const response = await fetch("/api/onboarding-v2", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (response.ok) hasSessionRef.current = true;
+        if (response.ok) {
+          hasSessionRef.current = true;
+          const saved = await response.clone().json().catch(() => null);
+          if (typeof saved?.revision === "number") draftRevisionRef.current = saved.revision;
+        }
         return response.ok;
       } catch {
         return false;

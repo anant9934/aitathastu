@@ -623,7 +623,9 @@ export const MIGRATION_SQL_STATEMENTS = [
         CREATE UNIQUE INDEX "uq_projects_person_normalized_title" ON "projects" ("person_id", "normalized_title");
       END IF;
     END IF;
-  END $$;`
+  END $$;`,
+
+  // Optimistic concurrency for onboarding drafts (Task 1.2.4).
+  `ALTER TABLE "onboarding_drafts" ADD COLUMN IF NOT EXISTS "revision" integer DEFAULT 0 NOT NULL;`,
+  `ALTER TABLE "onboarding_drafts" ADD COLUMN IF NOT EXISTS "system_entries" jsonb DEFAULT '{}'::jsonb NOT NULL;`
 ];
-
-

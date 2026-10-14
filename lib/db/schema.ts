@@ -344,6 +344,10 @@ export const interviewDimensionResults = pgTable(
 export const onboardingDrafts = pgTable("onboarding_drafts", {
   personId: text("person_id").primaryKey().references(() => persons.id, { onDelete: "cascade" }),
   draft: jsonb("draft").notNull(),
+  /** Bumped on every write; writers compare-and-swap on it (Task 1.2.4). */
+  revision: integer("revision").default(0).notNull(),
+  /** Per array field, entry keys added by system writers and the revision they landed in. */
+  systemEntries: jsonb("system_entries").default({}).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

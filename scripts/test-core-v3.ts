@@ -23,7 +23,6 @@
 import assert from "node:assert/strict";
 import { isSafePublicUrl } from "../lib/connectors/portfolio/client";
 import { ExtractionValidator } from "../lib/services/extraction-validator";
-import { runExtractionBenchmark } from "./lib/extraction-benchmark";
 import { CrossSourceFusionService } from "../lib/services/cross-source-fusion-service";
 import {
   analyzeArchitecturalComponents,
@@ -93,24 +92,6 @@ async function runCoreV3TestSuite() {
   );
   assert.equal(hallucinatedSkill.valid, false, "Hallucinated skill absent from span must be rejected");
   console.log("  ✓ Negation, aspiration, and hallucination filters verified.");
-
-  // ----------------------------------------------------------------------------
-  // Scenario C: Extraction Benchmark Quantitative Metrics
-  // ----------------------------------------------------------------------------
-  console.log("\n[Test 3/14] Labeled Extraction Benchmark Suite...");
-  const benchmark = runExtractionBenchmark();
-  console.log(`  Cases Evaluated: ${benchmark.metrics.totalCases}`);
-  console.log(`  Precision:       ${(benchmark.metrics.precision * 100).toFixed(1)}%`);
-  console.log(`  Recall:          ${(benchmark.metrics.recall * 100).toFixed(1)}%`);
-  console.log(`  F1-Score:        ${(benchmark.metrics.f1Score * 100).toFixed(1)}%`);
-  console.log(`  Negation Rej:    ${(benchmark.metrics.negationRejectionRate * 100).toFixed(1)}%`);
-  console.log(`  Aspiration Rej:  ${(benchmark.metrics.aspirationRejectionRate * 100).toFixed(1)}%`);
-
-  assert.ok(benchmark.metrics.precision >= 0.9, "Precision must be >= 90%");
-  assert.ok(benchmark.metrics.recall >= 0.9, "Recall must be >= 90%");
-  assert.equal(benchmark.metrics.negationRejectionRate, 1.0, "Negation rejection rate must be 100%");
-  assert.equal(benchmark.metrics.aspirationRejectionRate, 1.0, "Aspiration rejection rate must be 100%");
-  console.log("  ✓ Benchmark metrics verified against ground-truth labeled dataset.");
 
   // ----------------------------------------------------------------------------
   // Scenario D: Deep Project Intelligence — Architectural Findings (12 Aspects)

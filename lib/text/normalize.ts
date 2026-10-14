@@ -30,3 +30,13 @@ export function normalizeProjectTitle(title: string): string {
   const meaningful = words.filter((w) => !GENERIC_PROJECT_WORDS.has(w));
   return (meaningful.length ? meaningful : words).join("");
 }
+
+/**
+ * The project's name without a trailing subtitle: "Pathified (AI Career App)",
+ * "Pathified - AI career app", "Pathified: career paths" all -> "pathified".
+ * Used only to match a title against another title's full key (Task 1.2.3).
+ */
+export function baseProjectTitle(title: string): string {
+  const head = title.replace(/\s*[([{].*$/, "").split(/\s+[-–—|:]\s+|:\s/)[0] || title;
+  return normalizeProjectTitle(head);
+}

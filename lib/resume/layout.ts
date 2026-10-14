@@ -181,11 +181,28 @@ function orderRegion(segs: Segment[], x0: number, x1: number, depth: number): Ro
 
   // Rows that cross the gutter are full-width (banner, headings spanning the
   // page). They cut the page into bands; each band is read left column first.
-  const crossing = segs.filter((s) => s.x0 < gutter && s.x1 > gutter);
+  const mid = (s: Segment) => (s.y0 + s.y1) / 2;
+  let crossing = segs.filter((s) => s.x0 < gutter && s.x1 > gutter);
+  let remaining = segs.filter((s) => !(s.x0 < gutter && s.x1 > gutter));
   const out: Row[] = [];
+
+  // Header zone: everything above the point where BOTH columns have started
+  // (a centred name and contact line usually sit over one column without
+  // crossing the gutter). It is read first, top to bottom, whatever its side.
+  const leftTop = Math.min(...remaining.filter((s) => s.x1 <= gutter).map((s) => s.y0));
+  const rightTop = Math.min(...remaining.filter((s) => s.x0 >= gutter).map((s) => s.y0));
+  const headerCut = Math.max(leftTop, rightTop);
+  if (Number.isFinite(headerCut)) {
+    const isHeader = (s: Segment) => mid(s) < headerCut - 1;
+    const header = segs.filter(isHeader);
+    if (header.length) {
+      out.push(...toRows(header));
+      crossing = crossing.filter((s) => !isHeader(s));
+      remaining = remaining.filter((s) => !isHeader(s));
+    }
+  }
   const cuts = toRows(crossing);
   let cursor = -Infinity;
-  const remaining = segs.filter((s) => !(s.x0 < gutter && s.x1 > gutter));
   const flushBand = (until: number) => {
     const band = remaining.filter((s) => (s.y0 + s.y1) / 2 > cursor && (s.y0 + s.y1) / 2 <= until);
     const left = band.filter((s) => s.x1 <= gutter);
@@ -207,7 +224,10 @@ function isHeading(row: Row, bodyHeight: number): boolean {
   if (text.length < 3 || text.length > 40 || /[.,;@]$/.test(text) || /\d{3,}/.test(text)) return false;
   const letters = text.replace(/[^A-Za-z]/g, "");
   const allCaps = letters.length >= 3 && letters === letters.toUpperCase();
-  return allCaps || row.height >= bodyHeight * 1.2;
+  // Short all-caps rows at body size are skills/acronyms (SQL, AWS, HTML), not
+  // section titles; real headings are longer (SKILLS, AWARDS) or set larger.
+  const larger = row.height >= bodyHeight * 1.15;
+  return (allCaps && (letters.length >= 5 || larger)) || row.height >= bodyHeight * 1.2;
 }
 
 /**

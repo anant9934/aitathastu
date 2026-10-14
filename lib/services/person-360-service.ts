@@ -76,6 +76,9 @@ export type Person360Result = {
     observedAt: string;
     interpretation: string;
     whyItMatters: string;
+    /** Platform (Task 1.2.2) and the dedupe key; skill scoring needs both. */
+    originSource?: string | null;
+    importKey?: string | null;
   }>;
   verificationRequests?: Array<{
     id: string;
@@ -249,6 +252,8 @@ export async function getPerson360(
       observedAt: e.observedAt.toISOString(),
       interpretation: e.interpretation,
       whyItMatters: e.whyItMatters,
+      originSource: e.originSource ?? null,
+      importKey: e.importKey ?? null,
     })),
     verificationRequests: (await getStudentVerificationRequests(personId)).map((vr) => ({
       id: vr.id,

@@ -27,11 +27,12 @@
 
 import crypto from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { getDb, resumeDocuments } from "@/lib/db";
+import { getDb, resumeDocuments, sourceProcessingJobs } from "@/lib/db";
 import { ObjectStorageService } from "@/lib/storage/object-storage";
 import { SourceProcessingJobService, type SourceProcessingJob } from "./source-processing-job-service";
 import { readDocumentText } from "@/lib/resume/document-text";
 import { reconstructReadingOrder } from "@/lib/resume/layout";
+import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
 import { extractResumeStructured, type ResumeExtractionResult } from "./resume-extraction-service";
 import { resumeCandidates, saveResumeCandidates } from "./resume-review-service";
 import { buildProfileV2 } from "./resume-profile-v2";
@@ -51,6 +52,7 @@ export type ResumeFailureCode =
   | "OCR_NO_TEXT"
   | "OCR_TIMEOUT"
   | "EXTRACTION_FAILED"
+  | "AI_QUOTA_EXCEEDED"
   | "NO_CLAIMS_FOUND"
   | "PERSIST_FAILED"
   | "PROCESSING_STALLED";
@@ -67,6 +69,7 @@ const FAILURES: Record<ResumeFailureCode, { message: string; retryable: boolean 
   OCR_EXTRACTION_ERROR: { message: "Our scanned-document reader hit an internal error on this file. Please retry, or enter details manually.", retryable: true },
   OCR_NO_TEXT: { message: "We could not read the scanned pages clearly. Try a sharper scan or enter details manually.", retryable: false },
   OCR_TIMEOUT: { message: "Reading this scanned document took too long. Please retry, or enter details manually.", retryable: true },
+  AI_QUOTA_EXCEEDED: { message: "You've reached today's limit for automatic CV reading. It resets at 00:00 UTC; until then you can enter your details manually.", retryable: true },
   EXTRACTION_FAILED: { message: "We could not extract reviewable details. Please retry or enter details manually.", retryable: true },
   NO_CLAIMS_FOUND: { message: "No supported details were found for review. Please enter details manually.", retryable: false },
   PERSIST_FAILED: { message: "We could not save the extraction for review. Please retry.", retryable: true },
@@ -77,6 +80,14 @@ const FAILURES: Record<ResumeFailureCode, { message: string; retryable: boolean 
 const MIN_TEXT_CHARS = 40;
 /** A claimed in-process step older than this is assumed to have died with its request. */
 const STALE_CLAIM_MS = 90_000;
+/**
+ * A sleeping Render extractor took 53 s to answer /health (measured
+ * 2026-10-14), longer than one 20 s upload attempt. An unreachable extractor
+ * is therefore retried on later polls for this long before the job fails.
+ */
+const EXTRACTOR_WARMUP_BUDGET_MS = 120_000;
+/** Minimum gap between handoff retries while waiting for the extractor. */
+const EXTRACTOR_RETRY_GAP_MS = 3_000;
 /** Total budget for an extractor OCR job before we give up. */
 const OCR_DEADLINE_MS = 5 * 60_000;
 
@@ -221,6 +232,10 @@ export async function advanceResumeJob(jobId: string, personId: string): Promise
       const m = meta(job);
       if (job.stage === "extract" && typeof m.extractorDocumentId === "string") {
         await pollExtractor(job, m.extractorDocumentId);
+      } else if (job.stage === "awaiting_extractor") {
+        if (typeof m.claimedAt === "number" && Date.now() - m.claimedAt >= EXTRACTOR_RETRY_GAP_MS && (await reclaimAwaitingJob(job, m.claimedAt))) {
+          await runInProcessStep(job);
+        }
       } else if (typeof m.claimedAt === "number" && Date.now() - m.claimedAt > STALE_CLAIM_MS) {
         await fail(job, "PROCESSING_STALLED", `stage ${job.stage} claimed ${Date.now() - m.claimedAt}ms ago`);
       }
@@ -294,7 +309,19 @@ async function runInProcessStep(job: SourceProcessingJob) {
       })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, job.personId)));
   } catch (err) {
-    throw new PipelineFailure(classifyExtractorError(err), err);
+    const code = classifyExtractorError(err);
+    const since = typeof meta(job).extractorWaitSince === "number" ? (meta(job).extractorWaitSince as number) : Date.now();
+    if (code === "OCR_SERVICE_UNREACHABLE" && Date.now() - since < EXTRACTOR_WARMUP_BUDGET_MS) {
+      // Probably a cold start: the request above is what wakes the service.
+      // Park the job; the next status poll retries the handoff.
+      await SourceProcessingJobService.updateStage(job.id, job.personId, "awaiting_extractor", {
+        extractorWaitSince: since,
+        claimedAt: Date.now(),
+        extractorAttempts: Number(meta(job).extractorAttempts || 0) + 1,
+      });
+      return;
+    }
+    throw new PipelineFailure(code, err);
   }
 }
 
@@ -401,7 +428,9 @@ async function finalize(
   await SourceProcessingJobService.updateStage(job.id, personId, "validate");
 
   const extraction = await extractResumeStructured(input.text, personId);
-  if (!extraction.success || !extraction.extracted) throw new PipelineFailure("EXTRACTION_FAILED", extraction.error);
+  if (!extraction.success || !extraction.extracted) {
+    throw new PipelineFailure(extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED", extraction.error);
+  }
 
   // Record candidate IDs are `${category}_${index}` and index into the stored
   // profile's record arrays (apply maps decisions back by that index).
@@ -462,8 +491,64 @@ async function finalize(
     resultReference: `resume:${documentId}`,
     metadata: { candidates: reviewCandidates.length, via: input.via },
   });
+
+  await seedDraftFromResume(personId, documentId, extraction.extracted);
+}
+
+/**
+ * Seeds the onboarding draft with the CV's candidates (Task 1.1.5), as a
+ * "system" write: entries are unioned by key and scalars only fill empty
+ * fields, so it never overwrites what the student already typed, even when
+ * it lands mid-autosave (Task 1.2.4). Everything is a candidate until the
+ * student confirms it on the review screen. Best-effort: the review payload is
+ * already persisted, so a failure here is logged, not surfaced.
+ */
+async function seedDraftFromResume(personId: string, documentId: string, x: ResumeInterpretationOutput) {
+  try {
+    const { writeOnboardingDraft } = await import("./onboarding-v2-service");
+    const firstEdu = x.education[0];
+    await writeOnboardingDraft(personId, {
+      resumeDocumentId: documentId,
+      institution: firstEdu?.institution || "",
+      degree: firstEdu?.degree || "",
+      education: x.education.map((e) => ({
+        institution: e.institution, degree: e.degree || undefined, fieldOfStudy: e.fieldOfStudy, graduationYear: e.graduationYear,
+        startDate: e.startDate, endDate: e.endDate, gpa: e.gpa, percentage: e.percentage, academicLevel: e.academicLevel,
+        status: "candidate", source: "resume",
+      })),
+      experiences: x.experience.map((e) => ({
+        company: e.company, role: e.role, type: e.type, startDate: e.startDate, endDate: e.endDate, duration: e.duration,
+        highlights: e.highlights, status: "candidate", source: "resume",
+      })),
+      projects: x.projects.map((p) => ({
+        id: `resume_${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 60)}`,
+        title: p.title, description: p.description || "", technologies: p.technologies || [], sources: ["resume"],
+        status: "candidate", url: p.repositoryUrl || "",
+      })),
+      techCandidates: x.skills.map((s) => ({ name: s.name, source: "resume", provenance: "resume_extracted" })),
+    }, { origin: "system" });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "resume.draft_seed_failed", documentId, error: error instanceof Error ? error.message : String(error) }));
+  }
 }
 
 export function failureInfo(code: string | null | undefined) {
   return code && code in FAILURES ? FAILURES[code as ResumeFailureCode] : null;
+}
+
+/** Compare-and-swap on claimedAt so two concurrent polls never both re-upload. */
+async function reclaimAwaitingJob(job: SourceProcessingJob, claimedAt: number): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .update(sourceProcessingJobs)
+    .set({ metadata: sql`${sourceProcessingJobs.metadata} || ${JSON.stringify({ claimedAt: Date.now() })}::jsonb` })
+    .where(and(
+      eq(sourceProcessingJobs.id, job.id),
+      eq(sourceProcessingJobs.personId, job.personId),
+      eq(sourceProcessingJobs.stage, "awaiting_extractor"),
+      sql`(${sourceProcessingJobs.metadata}->>'claimedAt')::bigint = ${claimedAt}`
+    ))
+    .returning();
+  if (rows.length === 1) job.metadata = rows[0].metadata;
+  return rows.length === 1;
 }

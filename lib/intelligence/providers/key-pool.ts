@@ -15,6 +15,10 @@ export class KeyPool {
     }
   }
 
+  size(): number {
+    return this.keys.length;
+  }
+
   hasKeys(): boolean {
     return this.keys.length > 0;
   }
@@ -27,6 +31,12 @@ export class KeyPool {
   }
 
   markKeyFailed(key: string): void {
-    this.keys = this.keys.filter((k) => k !== key);
+    const at = this.keys.indexOf(key);
+    if (at < 0) return;
+    // Keep the cursor on the key that followed the removed one; without this
+    // the key after a revoked one was silently skipped.
+    const cursor = this.keys.length ? this.index % this.keys.length : 0;
+    this.keys.splice(at, 1);
+    this.index = at < cursor ? cursor - 1 : cursor;
   }
 }

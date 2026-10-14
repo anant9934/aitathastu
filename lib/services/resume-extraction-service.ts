@@ -13,7 +13,7 @@
 
 import { ResumeInterpretationSchema, type ResumeInterpretationOutput } from "../intelligence/schemas";
 import { LINK_TYPES, type ResumeExtraction } from "@/lib/resume/schema";
-import { structureResumeText, RESUME_PROMPT_VERSION } from "@/lib/resume/structure";
+import { structureResumeText, RESUME_PROMPT_VERSION, ResumeStructuringError } from "@/lib/resume/structure";
 
 export type ResumeLink = { type: (typeof LINK_TYPES)[number]; url: string };
 
@@ -43,6 +43,8 @@ export interface ResumeExtractionResult {
   latencyMs: number;
   truncated: boolean;
   error?: string;
+  /** Why structuring failed, when it did: "quota" lets ingestion say so plainly. */
+  errorKind?: "not_configured" | "quota" | "provider" | "invalid_output";
 }
 
 const GLYPHS = /[-�​-‍﻿•●○◦▪▫■□◆◇►▶▸▹➢➤✓✔☐☑]/gu;
@@ -173,7 +175,11 @@ function evidenceLine(lines: string[], ...needles: Array<string | null | undefin
     if (!n) continue;
     // Short names ("C", "R", "Go") must match as a whole token, not a substring.
     const token = n.length < 3 ? new RegExp(`(^|[^a-z0-9+#])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9+#]|$)`) : null;
-    const line = lines.find((l) => (token ? token.test(l.toLowerCase()) : l.toLowerCase().includes(n)));
+    const nn = normalizeForGrounding(n).trim();
+    const line =
+      lines.find((l) => (token ? token.test(l.toLowerCase()) : l.toLowerCase().includes(n))) ??
+      // OCR spacing / punctuation differences: same normalisation as isGrounded.
+      (nn.length >= 3 ? lines.find((l) => normalizeForGrounding(l).includes(nn)) : undefined);
     if (line) {
       const t = line.trim();
       if (t.length <= 300) return t.length >= 3 ? t : null;
@@ -184,19 +190,40 @@ function evidenceLine(lines: string[], ...needles: Array<string | null | undefin
   return null;
 }
 
+/**
+ * Fuzzy containment for grounding (Task 1.1.3): case, punctuation and spacing
+ * differences (OCR "Anna  University," vs "Anna University") do not matter;
+ * "+" and "#" are kept so C++ / C# stay distinct. Short values (< 3 chars)
+ * must match a whole token.
+ */
+export function normalizeForGrounding(text: string): string {
+  return ` ${text.toLowerCase().replace(/https?:\/\/(www\.)?/g, "").replace(/[^a-z0-9+#]+/g, " ").trim()} `;
+}
+export function isGrounded(normalizedSource: string, value: string | null | undefined): boolean {
+  const v = normalizeForGrounding(value || "").trim();
+  if (!v) return false;
+  return normalizedSource.includes(` ${v} `) || (v.length >= 3 && normalizedSource.includes(v));
+}
+
 const year = (s: string | null) => s?.match(/\b(19|20)\d{2}\b/g)?.pop();
 
 export function toInterpretation(r: ResumeExtraction, sourceText: string): ResumeInterpretationOutput {
   const lines = sourceText.split("\n");
+  const norm = normalizeForGrounding(sourceText);
+  const grounded = (v: string | null | undefined) => isGrounded(norm, v);
   const out: ResumeInterpretationOutput = { education: [], experience: [], projects: [], skills: [], certifications: [], achievements: [] };
 
   for (const e of r.education) {
+    // The institution must be in the document; a degree or field that is not is dropped, not trusted.
+    if (!grounded(e.institution)) continue;
     const span = evidenceLine(lines, e.institution, e.degree);
     if (!span) continue;
+    const degree = grounded(e.degree) ? e.degree : null;
+    const field = grounded(e.field_of_study) ? e.field_of_study : null;
     out.education.push({
       institution: e.institution,
-      degree: e.degree || e.field_of_study || "",
-      fieldOfStudy: e.field_of_study || undefined,
+      degree: degree || field || "",
+      fieldOfStudy: field || undefined,
       startDate: e.start_date || undefined,
       endDate: e.end_date || undefined,
       graduationYear: year(e.end_date),
@@ -207,6 +234,7 @@ export function toInterpretation(r: ResumeExtraction, sourceText: string): Resum
     });
   }
   for (const e of r.experience) {
+    if (!grounded(e.company)) continue;
     const span = evidenceLine(lines, e.company, e.role);
     if (!span) continue;
     out.experience.push({
@@ -222,11 +250,15 @@ export function toInterpretation(r: ResumeExtraction, sourceText: string): Resum
     });
   }
   for (const p of r.projects) {
+    if (!grounded(p.name)) continue;
     const span = evidenceLine(lines, p.name);
     if (!span) continue;
-    out.projects.push({ title: p.name, description: p.description, technologies: p.tech_stack, repositoryUrl: p.repository || p.link || undefined, sourceSpan: span });
+    // A repository or tech the document never mentions is a fabrication: drop it.
+    const repositoryUrl = [p.repository, p.link].find((u) => grounded(u)) || undefined;
+    out.projects.push({ title: p.name, description: p.description, technologies: p.tech_stack.filter(grounded), repositoryUrl, sourceSpan: span });
   }
   for (const s of r.skills) {
+    if (!grounded(s)) continue;
     const span = evidenceLine(lines, s);
     if (span) out.skills.push({ name: s, category: "other", proficiencyHint: "unknown", sourceSpan: span });
   }
@@ -268,9 +300,10 @@ export function toExtractedProfile(r: ResumeExtraction): ExtractedProfile {
 /** Primary entry point: reading-order text in, structured + validated resume out. */
 export async function extractResumeStructured(resumeText: string, personId?: string): Promise<ResumeExtractionResult> {
   const startTime = Date.now();
-  const base = { provider: "groq", promptVersion: RESUME_PROMPT_VERSION, truncated: false };
+  let base = { provider: "unknown", promptVersion: RESUME_PROMPT_VERSION, truncated: false };
   try {
-    const { data, model, truncated } = await structureResumeText(resumeText, personId);
+    const { data, model, provider, truncated } = await structureResumeText(resumeText, personId);
+    base = { ...base, provider };
     const { resume, links } = sanitizeResumeExtraction(data);
     const validated = ResumeInterpretationSchema.safeParse(toInterpretation(resume, resumeText));
     if (!validated.success) {
@@ -296,6 +329,7 @@ export async function extractResumeStructured(resumeText: string, personId?: str
       modelUsed: "",
       latencyMs: Date.now() - startTime,
       error: err instanceof Error ? err.message : "Structured extraction could not be completed.",
+      errorKind: err instanceof ResumeStructuringError ? err.kind : undefined,
     };
   }
 }

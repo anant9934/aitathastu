@@ -22,6 +22,9 @@ export type EvidenceRecord = {
   interpretation: string;
   whyItMatters: string;
   importKey?: string | null;
+  originSource?: string | null;
+  confidenceScore?: number | null;
+  editable?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -43,7 +46,21 @@ export type EvidenceInsertParams = {
   interpretation: string;
   whyItMatters: string;
   importKey?: string;
+  /** Platform; derived from importKey/source when omitted (deriveOriginSource). */
+  originSource?: string;
+  confidenceScore?: number | null;
+  editable?: boolean;
 };
+
+/** Platform an evidence row came from, for per-source show/hide/delete (Task 1.2.2). */
+export function deriveOriginSource(item: Pick<EvidenceInsertParams, "originSource" | "importKey" | "source">): string {
+  if (item.originSource) return item.originSource;
+  const key = item.importKey || "";
+  if (key.startsWith("github_")) return "github";
+  if (key.startsWith("resume") || item.source === "resume_extracted") return "resume";
+  if (item.source === "institutional") return "institutional";
+  return "manual";
+}
 
 export async function getEvidenceByPersonId(personId: string, page?: PageOptions): Promise<EvidenceRecord[]> {
   const db = await getDb();
@@ -95,6 +112,8 @@ export async function createEvidenceRecord(
         source: item.source,
         verificationStatus: item.verificationStatus,
         sourceReference: item.sourceReference ?? existing.sourceReference,
+        originSource: deriveOriginSource(item),
+        ...(item.confidenceScore !== undefined ? { confidenceScore: item.confidenceScore } : {}),
         observedAt: observed,
         interpretation: item.interpretation.trim(),
         whyItMatters: item.whyItMatters.trim(),
@@ -118,7 +137,11 @@ export async function createEvidenceRecord(
       value: item.value.trim(),
       source: item.source,
       verificationStatus: item.verificationStatus,
-      sourceReference: item.sourceReference || null,
+      // Every row is traceable: without a reference, point at its own import key.
+      sourceReference: item.sourceReference || `${deriveOriginSource(item)}:${importKey}`,
+      originSource: deriveOriginSource(item),
+      confidenceScore: item.confidenceScore ?? null,
+      editable: item.editable ?? item.verificationStatus !== "verified",
       verifiedByPersonId: item.verifiedByPersonId || null,
       verifiedAt: verifiedDate,
       verificationMethod: item.verificationMethod || null,
@@ -155,3 +178,27 @@ export async function writeEvidenceBatch(personId: string, items: EvidenceInsert
   }
   return out;
 }
+
+/**
+ * Deletes one platform's evidence for a person and nothing else (Task 1.2.2).
+ * Verified / non-editable rows are kept: a disconnect must not erase a
+ * faculty verification.
+ */
+export async function deleteEvidenceBySource(personId: string, originSource: string): Promise<number> {
+  const db = await getDb();
+  const removed = await db
+    .delete(evidenceItems)
+    .where(and(eq(evidenceItems.personId, personId), eq(evidenceItems.originSource, originSource), eq(evidenceItems.editable, true)))
+    .returning();
+  return removed.length;
+}
+
+/** Per-source counts for the "where did this come from" view. */
+export async function countEvidenceBySource(personId: string): Promise<Record<string, number>> {
+  const db = await getDb();
+  const rows = await db.select({ origin: evidenceItems.originSource }).from(evidenceItems).where(eq(evidenceItems.personId, personId));
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.origin ?? "unknown"] = (out[r.origin ?? "unknown"] ?? 0) + 1;
+  return out;
+}
+

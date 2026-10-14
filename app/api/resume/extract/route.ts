@@ -15,6 +15,7 @@ import { validateDocumentSafety } from "@/lib/resume/document-safety";
 import { queueResumeUpload } from "@/lib/services/resume-ingestion-service";
 import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { jsonNoStore } from "@/lib/api/resume-route-helpers";
+import { contentIdempotencyKey, requestIdempotencyKey, withIdempotency } from "@/lib/sync/idempotency";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -81,7 +82,16 @@ export async function POST(request: Request) {
 
     let queued;
     try {
-      queued = await queueResumeUpload({ personId, filename: file.name, mimeType: MIME_BY_EXTENSION[extension], bytes });
+      // The same file (or the same client Idempotency-Key) within 10 minutes
+      // returns the first upload's document and job instead of a duplicate.
+      const clientKey = request.headers.get("idempotency-key")?.trim().slice(0, 120);
+      const key = clientKey ? requestIdempotencyKey(personId, "resume_upload", clientKey) : contentIdempotencyKey(personId, "resume_upload", bytes);
+      const { response, replayed } = await withIdempotency({ key, personId, scope: "resume_upload" }, async () => {
+        const q = await queueResumeUpload({ personId, filename: file.name, mimeType: MIME_BY_EXTENSION[extension], bytes });
+        return { jobId: q.jobId, documentId: q.documentId };
+      });
+      queued = response;
+      if (replayed) console.info(JSON.stringify({ event: "resume.upload.deduplicated", requestId, documentId: response.documentId }));
     } catch (err) {
       console.error("[resume-extract] storing upload failed", { requestId, error: err instanceof Error ? err.message : err });
       return fail("STORAGE_FAILED", "We could not store your file. Please try again.", 503);

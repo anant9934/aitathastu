@@ -1,5 +1,9 @@
 import crypto from "crypto";
-import { CompletionRequest, CompletionResponse, ModelProvider, ModelProviderName } from "./types";
+import type { ZodType } from "zod";
+import {
+  CompletionRequest, CompletionResponse, ModelProvider, ModelProviderName,
+  ProviderHttpError, type StructuredCompletionRequest,
+} from "./types";
 import {
   GeminiProvider,
   GroqProvider,
@@ -9,7 +13,7 @@ import {
   SambaNovaProvider,
 } from "./providers/adapters";
 import { executeDeterministicFallback } from "./deterministic-fallback";
-import { checkAiQuota, estimateTokens, recordAiUsage } from "./cost-control";
+import { estimateTokens, releaseAiQuota, reserveAiQuota, settleAiQuota, type QuotaReservation } from "./cost-control";
 import { getDb, aiAuditLogs } from "../db";
 import { coreIngestionReady } from "../security/core-ingestion-gate";
 
@@ -94,16 +98,14 @@ export class IntelligenceRouter {
       return finalResponse;
     }
 
-    // Check daily AI token quota per user
-    if (request.personId) {
-      const quota = checkAiQuota(request.personId);
-      if (!quota.allowed) {
-        const fallbackRes = executeDeterministicFallback(request);
-        const latencyMs = Date.now() - startTime;
-        const finalFallbackResponse = { ...fallbackRes, latencyMs };
-        void this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
-        return finalFallbackResponse;
-      }
+    // Distributed per-user and global quota (Task 1.7.1).
+    const quota = await reserveAiQuota(request.personId, estimateTokens(request.userPrompt + request.systemPrompt) + (request.maxTokens ?? 1000));
+    if (!quota.allowed) {
+      const fallbackRes = executeDeterministicFallback(request);
+      const latencyMs = Date.now() - startTime;
+      const finalFallbackResponse = { ...fallbackRes, latencyMs, quotaExceeded: quota.reason };
+      void this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
+      return finalFallbackResponse;
     }
 
     for (const provider of this.providers) {
@@ -112,12 +114,7 @@ export class IntelligenceRouter {
           const res = await provider.complete(request);
           const latencyMs = Date.now() - startTime;
           const finalResponse = { ...res, latencyMs };
-
-          // Record token usage
-          if (request.personId) {
-            const consumed = estimateTokens(request.userPrompt + request.systemPrompt + res.content);
-            recordAiUsage(request.personId, consumed);
-          }
+          await settleAiQuota(quota, estimateTokens(request.userPrompt + request.systemPrompt + res.content));
 
           void this.logAudit(request, finalResponse, latencyMs, "success");
           return finalResponse;
@@ -130,12 +127,106 @@ export class IntelligenceRouter {
     }
 
     // Zero-LLM fallback: deterministic rule engine
+    await releaseAiQuota(quota);
     const fallbackRes = executeDeterministicFallback(request);
     const latencyMs = Date.now() - startTime;
     const finalFallbackResponse = { ...fallbackRes, latencyMs };
 
     void this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
     return finalFallbackResponse;
+  }
+
+  /**
+   * Schema-constrained completion across the provider pool (Task 1.1.2).
+   * Providers with native strict JSON schema decoding are tried first, in
+   * CLOUD_AI_PROVIDER_ORDER; json_object-only providers follow and get one
+   * repair turn when zod rejects their output. 429 / 5xx / timeouts cool a
+   * provider down for 60 s; other 4xx and invalid output just move on.
+   * There is no deterministic fallback here: the caller decides what an
+   * unstructured failure means.
+   */
+  async completeStructured<T>(request: StructuredCompletionRequest, schema: ZodType<T>): Promise<StructuredCompletionResult<T>> {
+    const started = Date.now();
+    const attempts: StructuredAttempt[] = [];
+    if (process.env.CORE_DISABLE_LIVE_LLM === "true" || !coreIngestionReady()) {
+      throw new StructuredCompletionError("Live LLM calls are disabled in this environment.", "not_configured", attempts);
+    }
+    const ordered = [
+      ...this.providers.filter((p) => p.structuredCapability === "strict_json_schema"),
+      ...this.providers.filter((p) => p.structuredCapability === "json_object"),
+    ].filter((p) => p.isAvailable());
+    if (!ordered.length) throw new StructuredCompletionError("No AI provider is configured.", "not_configured", attempts);
+
+    const quota = await reserveAiQuota(request.personId, estimateTokens(request.systemPrompt + request.userPrompt) + (request.maxTokens ?? 6000));
+    if (!quota.allowed) throw new StructuredCompletionError(quota.reason || "AI quota reached.", "quota", attempts, quota);
+
+    for (const provider of ordered) {
+      if (this.isProviderCoolingDown(provider.name)) {
+        attempts.push({ provider: provider.name, outcome: "cooling_down", ms: 0 });
+        continue;
+      }
+      const turns = provider.structuredCapability === "json_object" ? 2 : 1;
+      let repair: StructuredCompletionRequest["repair"];
+      for (let turn = 0; turn < turns; turn++) {
+        const t0 = Date.now();
+        try {
+          const res = await provider.completeStructured({ ...request, repair });
+          let json: unknown;
+          try {
+            json = JSON.parse(res.content);
+          } catch {
+            attempts.push({ provider: provider.name, outcome: "malformed_json", ms: Date.now() - t0 });
+            repair = { previousOutput: res.content, errors: "The output was not valid JSON." };
+            continue;
+          }
+          const parsed = schema.safeParse(json);
+          if (!parsed.success) {
+            const errors = parsed.error.issues.slice(0, 8).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
+            attempts.push({ provider: provider.name, outcome: "schema_violation", ms: Date.now() - t0, detail: errors.slice(0, 300) });
+            repair = { previousOutput: res.content, errors };
+            continue;
+          }
+          attempts.push({ provider: provider.name, outcome: "ok", ms: Date.now() - t0 });
+          await settleAiQuota(quota, res.totalTokens ?? estimateTokens(request.systemPrompt + request.userPrompt + res.content));
+          const response: CompletionResponse = { content: res.content, provider: provider.name, modelUsed: res.modelUsed, fallbackUsed: false, latencyMs: Date.now() - started };
+          void this.logAudit(request, response, Date.now() - started, attempts.length > 1 ? "fallback" : "success");
+          return { data: parsed.data, provider: provider.name, model: res.modelUsed, attempts, latencyMs: Date.now() - started };
+        } catch (error) {
+          const ms = Date.now() - t0;
+          if (error instanceof ProviderHttpError) {
+            const transient = error.status === 429 || error.status >= 500;
+            if (transient) this.setProviderCooldown(provider.name, 60_000);
+            // 402: billing/plan problem on the whole account; don't retry it for an hour.
+            if (error.status === 402) this.setProviderCooldown(provider.name, 60 * 60_000);
+            attempts.push({ provider: provider.name, outcome: transient ? "rate_limited_or_5xx" : "rejected_4xx", status: error.status, ms, detail: error.message.slice(0, 300) });
+          } else {
+            const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+            if (timedOut) this.setProviderCooldown(provider.name, 60_000);
+            attempts.push({ provider: provider.name, outcome: timedOut ? "timeout" : "network_error", ms, detail: error instanceof Error ? error.message.slice(0, 300) : String(error) });
+          }
+          break; // next provider
+        }
+      }
+    }
+    await releaseAiQuota(quota);
+    throw new StructuredCompletionError("Every AI provider failed to return valid structured output.", "provider", attempts);
+  }
+}
+
+export type StructuredAttempt = {
+  provider: ModelProviderName;
+  outcome: "ok" | "cooling_down" | "malformed_json" | "schema_violation" | "rate_limited_or_5xx" | "rejected_4xx" | "timeout" | "network_error";
+  status?: number;
+  ms: number;
+  detail?: string;
+};
+
+export type StructuredCompletionResult<T> = { data: T; provider: ModelProviderName; model: string; attempts: StructuredAttempt[]; latencyMs: number };
+
+export class StructuredCompletionError extends Error {
+  constructor(message: string, readonly kind: "not_configured" | "quota" | "provider", readonly attempts: StructuredAttempt[], readonly quota?: QuotaReservation) {
+    super(message);
+    this.name = "StructuredCompletionError";
   }
 }
 

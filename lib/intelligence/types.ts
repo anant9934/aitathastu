@@ -8,6 +8,7 @@ export type IntelligenceTask =
   | "EORA_CHAT"
   | "ROADMAP_EXPLANATION"
   | "LEARNING_RECOMMENDATIONS"
+  | "RESUME_STRUCTURE"
   // Legacy aliases
   | "resume_interpretation"
   | "project_summarization"
@@ -41,12 +42,41 @@ export type CompletionResponse = {
   modelUsed: string;
   fallbackUsed: boolean;
   latencyMs?: number;
+  /** Set when the deterministic fallback ran because the AI quota refused the call. */
+  quotaExceeded?: string;
 };
+
+/**
+ * How a provider can be made to return schema-shaped JSON (Task 1.1.2).
+ *  - strict_json_schema: the API enforces the schema itself (constrained decoding).
+ *  - json_object: the API only guarantees syntactically valid JSON; the
+ *    router validates with zod and sends at most one repair prompt.
+ */
+export type StructuredCapability = "strict_json_schema" | "json_object";
+
+export type StructuredCompletionRequest = CompletionRequest & {
+  schemaName: string;
+  /** JSON Schema with every key required and additionalProperties: false. */
+  jsonSchema: Record<string, unknown>;
+  timeoutMs?: number;
+  /** Prior bad output + validation errors, for the single json_object repair turn. */
+  repair?: { previousOutput: string; errors: string };
+};
+
+export type StructuredProviderResponse = { content: string; modelUsed: string; totalTokens?: number };
+
+export class ProviderHttpError extends Error {
+  constructor(readonly provider: ModelProviderName, readonly status: number, body: string) {
+    super(`${provider} ${status}: ${body.slice(0, 300)}`);
+  }
+}
 
 export interface ModelProvider {
   name: ModelProviderName;
+  structuredCapability: StructuredCapability;
   isAvailable(): boolean;
   complete(request: CompletionRequest): Promise<CompletionResponse>;
+  completeStructured(request: StructuredCompletionRequest): Promise<StructuredProviderResponse>;
 }
 
 export type JobStatus = "queued" | "processing" | "complete" | "failed";

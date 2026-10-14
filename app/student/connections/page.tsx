@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { SyncStatusPanel } from "@/components/sync/SyncStatusPanel";
+import { LinkedInConnectCard } from "@/components/linkedin/LinkedInConnectCard";
+import { ResearchIdField } from "@/components/research/ResearchIdField";
 import {
   ArrowLeft,
   Github,
@@ -692,6 +695,16 @@ export default function ConnectionsPage() {
             </div>
           )}
         </section>
+
+        {/* Per-source sync state, failures and retry (Task 1.9.4) */}
+        <div style={{ marginBottom: 24 }}>
+          <SyncStatusPanel />
+        </div>
+        {/* Optional sources: LinkedIn (1.6.1/1.6.8) and research ID (1.6.2) */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 380px), 1fr))", gap: 16, marginBottom: 24 }}>
+          <LinkedInConnectCard />
+          <ResearchIdField />
+        </div>
 
         {/* Recent Synchronization History */}
         <section

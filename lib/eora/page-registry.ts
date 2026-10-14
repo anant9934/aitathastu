@@ -371,7 +371,7 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
       "Choose AI/ML direction (GenAI, ML Engineer, AI Researcher, etc.)",
       "Rank priorities (Learn AI/ML, Internships & Jobs, Build Projects)",
       "Enter university, degree, and expected graduation year",
-      "Upload PDF/DOCX resume for zero-LLM claim extraction",
+      "Upload PDF/DOCX resume; extracted details are shown for your review",
       "Review and confirm extracted skills and project claims",
       "Connect GitHub account for verified repository evidence",
       "Submit onboarding and land on personalized student dashboard"
@@ -382,13 +382,13 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
       { sectionId: "ai-direction", label: "AI/ML Direction", description: "Career target selection from 6 AI/ML specializations.", targetId: "eora-ai-direction" },
       { sectionId: "priorities", label: "Priorities & Focus", description: "Primary and secondary goal configuration.", targetId: "eora-priorities" },
       { sectionId: "academic", label: "Academic Details", description: "University, branch, graduation year.", targetId: "eora-academic-form" },
-      { sectionId: "resume", label: "Resume Upload", description: "Deterministic zero-LLM resume extraction.", targetId: "eora-resume-upload" },
+      { sectionId: "resume", label: "Resume Upload", description: "Layout-aware resume extraction, reviewed field by field.", targetId: "eora-resume-upload" },
       { sectionId: "footprints", label: "Digital Footprints", description: "GitHub and developer profile connectivity.", targetId: "eora-digital-footprints" }
     ],
     importantButtons: [
       { buttonId: "btn-next", label: "Next / Continue", action: "Validate and advance to next screen" },
       { buttonId: "btn-back", label: "Back", action: "Return to previous screen" },
-      { buttonId: "btn-save-claims", label: "Save selected claims", action: "Persist reviewed resume claims" }
+      { buttonId: "btn-save-claims", label: "Save accepted details", action: "Persist reviewed resume claims" }
     ],
     importantFormFields: [
       { fieldId: "fullName", label: "Full Name", required: true, ruleDescription: "Must be entered.", nonShamingTip: "Enter your real name so we can address you properly." },
@@ -409,8 +409,8 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
       },
       {
         q: "Is my resume analyzed with ChatGPT or public AI?",
-        a: "No! Resume parsing uses strict deterministic zero-LLM extraction. Your resume is never sent to OpenAI, Gemini, or third-party AI models.",
-        hinglish: "Nahi! Resume extraction zero-LLM deterministic engine se hota hai. Aapka resume kisi bhi public AI ko nahi bheja jaata."
+        a: "After you consent, the text of your resume is sent once to an AI model (via Groq) that organises it into fields. Nothing is saved to your profile until you accept it in the review.",
+        hinglish: "Aapki consent ke baad, resume ka text ek baar AI model (Groq) ko bheja jaata hai jo use fields mein organise karta hai. Review mein accept kiye bina kuch bhi profile mein save nahi hota."
       },
       {
         q: "What if I don't have a GitHub account?",

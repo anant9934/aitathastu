@@ -18,6 +18,10 @@ import { Screen9SkillsMap } from "./Screen9SkillsMap";
 import { Screen10GitHubProjects, type ProjectEntry } from "./Screen10GitHubProjects";
 import { Screen11OnboardingComplete } from "./Screen11OnboardingComplete";
 import { candidateNames } from "@/lib/onboarding-import-candidates";
+import { nextOnboardingScreen, resumeCoveredScreens } from "@/lib/onboarding-resume-coverage";
+
+/** Link types the onboarding draft stores as digital-footprint profiles. */
+const PROFILE_SOURCE_IDS = ["github", "linkedin", "leetcode", "hackerrank", "hackerearth", "codechef", "portfolio", "huggingface", "orcid", "kaggle", "devto", "stackoverflow", "google_scholar"];
 
 interface ExactScreensContainerProps {
   initialScreen?: number;
@@ -87,6 +91,8 @@ export function ExactScreensContainer({
   // CV uploaded in this onboarding whose review may still be open (restored from the draft).
   const [pendingResumeDocumentId, setPendingResumeDocumentId] = useState<string | null>(null);
   const [extractedResumeFields, setExtractedResumeFields] = useState<string[]>([]);
+  // Screens fully covered by accepted resume data (skipped going forward).
+  const [resumeCovered, setResumeCovered] = useState<number[]>([]);
   const [visitedAcademicScreen, setVisitedAcademicScreen] = useState<boolean>(false);
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>({});
   const [discoveredResumeProfiles, setDiscoveredResumeProfiles] = useState<Partial<Record<string, string>>>({});
@@ -197,6 +203,7 @@ export function ExactScreensContainer({
             if (d.goal) setGoal(d.goal);
             if (d.profiles) setProfiles(d.profiles);
             if (d.discoveredResumeProfiles) setDiscoveredResumeProfiles(d.discoveredResumeProfiles);
+            if (Array.isArray(d.resumeCoveredScreens)) setResumeCovered(d.resumeCoveredScreens);
             if (d.priorities) setPriorities(d.priorities);
             if (d.primaryPriority) setPrimaryPriority(d.primaryPriority);
             if (Array.isArray(d.education) && d.education.length > 0) {
@@ -295,20 +302,23 @@ export function ExactScreensContainer({
     return hasName && hasInstitution && hasDegree;
   }, [name, academic]);
 
+  /** Screens to skip: those covered by accepted resume data, plus Academic once it is complete. */
+  const coveredScreens = useCallback(
+    () => (isProfileComplete() ? [...resumeCovered, 4] : resumeCovered),
+    [isProfileComplete, resumeCovered]
+  );
+  const goForwardFrom = (screen: number) => setCurrentScreen(nextOnboardingScreen(screen, coveredScreens()));
+
   const handleResumeNext = () => {
-    if (resumeFileName && isProfileComplete()) {
-      // Case A: Complete CV, skip Screen 4
-      setVisitedAcademicScreen(false);
-      setCurrentScreen(6);
-    } else if (resumeFileName && !isProfileComplete()) {
-      // Case C: Incomplete CV, show Screen 4 for missing fields
+    if (!resumeFileName) {
+      // No CV / skipped: Academic details are entered manually.
       setVisitedAcademicScreen(true);
       setCurrentScreen(4);
-    } else {
-      // Case B: No CV / skipped, show Screen 4
-      setVisitedAcademicScreen(true);
-      setCurrentScreen(4);
+      return;
     }
+    const next = nextOnboardingScreen(5, coveredScreens());
+    setVisitedAcademicScreen(next === 4);
+    setCurrentScreen(next);
   };
 
   const handleResumeSkip = () => {
@@ -498,7 +508,7 @@ export function ExactScreensContainer({
             onSave={handleAcademicSave}
             onNext={() => {
               setVisitedAcademicScreen(true);
-              setCurrentScreen(6);
+              goForwardFrom(4);
             }}
             onBack={() => setCurrentScreen(5)}
             onJumpToStep={handleJumpToStep}
@@ -520,40 +530,26 @@ export function ExactScreensContainer({
             onExtractionReady={() => {
               eora?.signalSuccess("extraction_completed");
             }}
-            onExtractPreview={(ep, discoveredProfiles) => {
-              // Pre-fill name immediately after extraction, before the user saves the review.
-              if (ep.fullName && !name) {
-                setName(ep.fullName);
-              }
-              if (ep.fullName || ep.email || ep.mobile) {
-                setAcademic((prev) => ({
-                  ...prev,
-                  fullName: prev.fullName || ep.fullName || "",
-                  email: prev.email || ep.email || "",
-                  mobile: prev.mobile || ep.mobile || "",
-                }));
-              }
-              // Immediately push discovered profile URLs into digital footprint page.
-              // No user confirmation needed — they appear as "Profile Linked" on Screen 6.
-              if (discoveredProfiles && Object.keys(discoveredProfiles).length > 0) {
-                setDiscoveredResumeProfiles((prev) => ({ ...discoveredProfiles, ...prev }));
-              }
-            }}
             onExtractSuccess={async (fileName, claims, extraData) => {
-              const nextDiscoveredProfiles = {
-                ...discoveredResumeProfiles,
-                ...(extraData?.discoveredProfiles || {}),
-              };
-              const reviewedEducation = claims.some((claim) => claim.category === "education");
+              // Only what the student accepted, field by field, fills onboarding.
+              const ap = extraData?.acceptedProfile || {};
+              const acceptedLinks = Object.fromEntries(
+                Object.entries(extraData?.acceptedLinks || {}).filter(([type, url]) => PROFILE_SOURCE_IDS.includes(type) && url)
+              ) as Partial<Record<string, string>>;
+              const acceptedIndexes = (category: string) =>
+                new Set(claims.filter((c) => c.category === category && c.candidateId).map((c) => Number(c.candidateId!.split("_").pop())));
+
+              const nextDiscoveredProfiles = { ...discoveredResumeProfiles, ...acceptedLinks };
+              const nextProfiles = { ...acceptedLinks, ...profiles };
               const confirmedSkills = claims.filter((claim) => claim.category === "skill").map((claim) => claim.value);
               const nextSkills = Array.from(new Set([...skills, ...confirmedSkills]));
-              // Resume-extracted projects must start as "candidate", not automatically "confirmed"
+              // Accepted in review = confirmed by the student.
               const resumeProjects: ProjectEntry[] = claims.filter((claim) => claim.category === "project").map((claim, index) => {
                 const extracted = extraData?.extractedProjects?.find((project) => project.sourceSpan === claim.sourceSpan);
                 return {
                   id: `resume_${claim.documentId.slice(0, 12)}_${index}`, title: claim.value,
                   description: extracted?.description || "", technologies: extracted?.technologies || [],
-                  sources: ["resume"], status: "candidate", contribution: [], contributionNote: "",
+                  sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "",
                   url: extracted?.repositoryUrl,
                 };
               });
@@ -562,8 +558,8 @@ export function ExactScreensContainer({
                 ...resumeProjects.filter((incoming) => !projects.some((project) => project.status === "confirmed" && project.title.toLowerCase().trim() === incoming.title.toLowerCase().trim())),
               ];
 
-              // Map resume-extracted experience as candidates
-              const extractedExperiences: Screen8ExperienceEntry[] = (extraData?.extractedExperience || []).map((exp) => ({
+              const expIdx = acceptedIndexes("experience");
+              const extractedExperiences: Screen8ExperienceEntry[] = (extraData?.extractedExperience || []).filter((_, i) => expIdx.has(i)).map((exp) => ({
                 company: exp.company || "",
                 role: exp.role || "",
                 type: exp.type,
@@ -572,7 +568,7 @@ export function ExactScreensContainer({
                 endDate: exp.endDate,
                 highlights: exp.highlights,
                 technologies: exp.technologies,
-                status: "candidate" as const,
+                status: "confirmed" as const,
               }));
               const nextExperiences = [
                 ...experienceEntries.filter((entry) => entry.status === "confirmed"),
@@ -580,15 +576,15 @@ export function ExactScreensContainer({
               ];
               setExperienceEntries(nextExperiences);
 
-              // Map resume-extracted achievements (patents, books, publications, awards) as candidates
-              const extractedAchievements: Screen8AchievementEntry[] = (extraData?.extractedAchievements || []).map((ach) => ({
+              const achIdx = acceptedIndexes("achievement");
+              const extractedAchievements: Screen8AchievementEntry[] = (extraData?.extractedAchievements || []).filter((_, i) => achIdx.has(i)).map((ach) => ({
                 title: ach.title,
                 category: ach.category || "academic",
                 subType: ach.subType,
                 issuer: ach.issuer,
                 date: ach.date,
                 description: ach.description,
-                status: "candidate" as const,
+                status: "confirmed" as const,
               }));
               const nextAchievements = [
                 ...achievementEntries.filter((entry) => entry.status === "confirmed"),
@@ -596,44 +592,39 @@ export function ExactScreensContainer({
               ];
               setAchievementEntries(nextAchievements);
 
-              const resolvedInstitution =
-                academic.institution ||
-                (reviewedEducation ? extraData?.extractedProfile?.institution : "") ||
-                (reviewedEducation ? extraData?.extractedEducation?.[0]?.institution : "") ||
-                "";
-
-              const extractedEducation: Screen8EducationEntry[] = Array.isArray(extraData?.extractedEducation) && extraData.extractedEducation.length > 0
-                ? extraData.extractedEducation.map((edu) => ({
-                    institution: edu.institution,
-                    degree: edu.degree,
-                    fieldOfStudy: edu.fieldOfStudy,
-                    graduationYear: edu.graduationYear,
-                    startDate: edu.startDate,
-                    endDate: edu.endDate,
-                    gpa: edu.gpa,
-                    percentage: edu.percentage,
-                    academicLevel: edu.academicLevel,
-                    status: "candidate" as const,
-                  }))
-                : resolvedInstitution || academic.degree
-                ? [
-                    {
-                      institution: resolvedInstitution || "",
-                      degree: academic.degree || (reviewedEducation ? extraData?.extractedProfile?.degree : "") || "",
-                      fieldOfStudy: academic.department || (reviewedEducation ? extraData?.extractedProfile?.specialization : undefined),
-                      graduationYear: (academic.expectedGraduationYear || (reviewedEducation ? extraData?.extractedProfile?.expectedGraduationYear : undefined))?.toString(),
-                      academicLevel: "undergraduate" as const,
-                      status: "candidate" as const,
-                    },
-                  ]
-                : [];
+              const eduIdx = acceptedIndexes("education");
+              const extractedEducation: Screen8EducationEntry[] = (extraData?.extractedEducation || []).filter((_, i) => eduIdx.has(i)).map((edu) => ({
+                institution: edu.institution,
+                degree: edu.degree,
+                fieldOfStudy: edu.fieldOfStudy,
+                graduationYear: edu.graduationYear,
+                startDate: edu.startDate,
+                endDate: edu.endDate,
+                gpa: edu.gpa,
+                percentage: edu.percentage,
+                academicLevel: edu.academicLevel,
+                status: "confirmed" as const,
+              }));
               const nextEducation = [
                 ...educationEntries.filter((entry) => entry.status === "confirmed"),
                 ...extractedEducation.filter((incoming) => !educationEntries.some((entry) => entry.status === "confirmed" && entry.institution.toLowerCase().trim() === incoming.institution.toLowerCase().trim() && (entry.degree || "").toLowerCase().trim() === (incoming.degree || "").toLowerCase().trim())),
               ];
-              if (nextEducation.length > 0) {
-                setEducationEntries(nextEducation);
-              }
+              if (nextEducation.length > 0) setEducationEntries(nextEducation);
+
+              const gradYear = ap.expectedGraduationYear && /^\d{4}$/.test(ap.expectedGraduationYear) ? Number(ap.expectedGraduationYear) : undefined;
+              const nextAcademic: AcademicDetailsData = {
+                ...academic,
+                fullName: ap.fullName || academic.fullName,
+                email: ap.email || academic.email,
+                mobile: ap.mobile || academic.mobile,
+                institution: ap.institution || academic.institution,
+                degree: ap.degree || academic.degree,
+                department: ap.specialization || academic.department,
+                expectedGraduationYear: gradYear || academic.expectedGraduationYear,
+              };
+              const nextName = ap.fullName || name || academic.fullName;
+              const covered = resumeCoveredScreens(extraData?.reviewSummary || {}, ap);
+
               const nextReviewed = [...resumeReviewed];
               for (const claim of claims) {
                 if (!nextReviewed.some((existing) => existing.documentId === claim.documentId && existing.candidateId === claim.candidateId)) nextReviewed.push(claim);
@@ -645,52 +636,26 @@ export function ExactScreensContainer({
                 achievements: nextAchievements,
                 education: nextEducation.length > 0 ? nextEducation : undefined,
                 resumeReviewed: nextReviewed,
+                resume: "processed",
+                profiles: nextProfiles,
                 discoveredResumeProfiles: nextDiscoveredProfiles,
-                ...(extraData?.extractedProfile || resolvedInstitution ? {
-                  name: name || extraData?.extractedProfile?.fullName || academic.fullName,
-                  degree: academic.degree || (reviewedEducation ? extraData?.extractedProfile?.degree : "") || "",
-                  specialization: academic.department || (reviewedEducation ? extraData?.extractedProfile?.specialization : "") || "",
-                  institution: resolvedInstitution,
-                  year: academic.currentYear || (reviewedEducation ? extraData?.extractedProfile?.currentYear : "") || "",
-                  expectedGraduationYear: academic.expectedGraduationYear || (reviewedEducation ? extraData?.extractedProfile?.expectedGraduationYear : undefined),
-                } : {}),
+                resumeCoveredScreens: covered,
+                name: nextName,
+                degree: nextAcademic.degree,
+                specialization: nextAcademic.department,
+                institution: nextAcademic.institution,
+                year: nextAcademic.currentYear,
+                expectedGraduationYear: nextAcademic.expectedGraduationYear,
               });
               if (!saved) return false;
               setResumeFileName(fileName);
               setResumeReviewed(nextReviewed);
-
-              // Auto-fill Name & Academic if not already entered by student
-              if (extraData?.extractedProfile) {
-                const ep = extraData.extractedProfile;
-                const found: string[] = [];
-                if (ep.fullName) {
-                  found.push("fullName");
-                  if (!name) setName(ep.fullName);
-                }
-                if (ep.email) found.push("email");
-                if (ep.mobile) found.push("mobile");
-                if (reviewedEducation && ep.degree) found.push("degree");
-                if (reviewedEducation && ep.institution) found.push("institution");
-                if (reviewedEducation && ep.specialization) found.push("department");
-                if (reviewedEducation && ep.expectedGraduationYear) found.push("expectedGraduationYear");
-                setExtractedResumeFields(found);
-
-                setAcademic((prev) => ({
-                  ...prev,
-                  fullName: prev.fullName || ep.fullName || "",
-                  email: prev.email || ep.email || "",
-                  mobile: prev.mobile || ep.mobile || "",
-                  degree: prev.degree || (reviewedEducation ? ep.degree : "") || "",
-                  department: prev.department || (reviewedEducation ? ep.specialization : "") || "",
-                  institution: prev.institution || (reviewedEducation ? ep.institution : "") || "",
-                  currentYear: prev.currentYear || (reviewedEducation ? ep.currentYear : "") || "",
-                  expectedGraduationYear: prev.expectedGraduationYear || (reviewedEducation ? ep.expectedGraduationYear : undefined),
-                }));
-              }
-
-              // Auto-fill Discovered Footprints for Step 6
+              setResumeCovered(covered);
+              setName(nextName);
+              setAcademic(nextAcademic);
+              setExtractedResumeFields(Object.keys(ap).map((k) => (k === "specialization" ? "department" : k)));
+              setProfiles(nextProfiles);
               setDiscoveredResumeProfiles(nextDiscoveredProfiles);
-
               setSkills(nextSkills);
               setProjects(nextProjects);
               // Signal confirmed backend extraction success to EORA (once per upload)
@@ -860,7 +825,7 @@ export function ExactScreensContainer({
                 achievements: nextAchievements,
               });
             }}
-            onNext={() => setCurrentScreen(7)}
+            onNext={() => goForwardFrom(6)}
             onBack={() => {
               if (visitedAcademicScreen) {
                 setCurrentScreen(4);
@@ -1128,7 +1093,7 @@ export function ExactScreensContainer({
                 return next;
               });
             }}
-            onNext={() => setCurrentScreen(9)}
+            onNext={() => goForwardFrom(8)}
             onBack={() => setCurrentScreen(7)}
             onJumpToStep={handleJumpToStep}
           />
@@ -1147,7 +1112,7 @@ export function ExactScreensContainer({
             resumeFileName={resumeFileName}
             resumeReviewed={resumeReviewed}
             goal={goal}
-            onNext={() => setCurrentScreen(10)}
+            onNext={() => goForwardFrom(9)}
             onBack={() => setCurrentScreen(8)}
             onJumpToStep={handleJumpToStep}
           />

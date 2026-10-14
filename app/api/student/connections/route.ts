@@ -118,8 +118,8 @@ const VALID_PROVIDERS: Record<string, { host: string; title: string; category: s
     host: "",
     title: "Resume / CV",
     category: "Self-Reported Background",
-    description: "Zero-LLM deterministic extraction from PDF/DOCX resume.",
-    connectionMethod: "Document upload & deterministic parser",
+    description: "Layout-aware extraction from PDF/DOCX resume, structured by an AI model after consent.",
+    connectionMethod: "Document upload & layout-aware parser",
     privacyNote: "Extracted claims require student confirmation before becoming verified evidence.",
   },
 };

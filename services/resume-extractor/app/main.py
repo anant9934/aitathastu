@@ -31,6 +31,10 @@ app.add_middleware(
 
 store = LocalStore(settings.storage_dir)
 
+# Optional LinkedIn import worker (Tasks 1.6.1, 1.6.7, 1.6.8).
+from .linkedin import router as linkedin_router  # noqa: E402
+app.include_router(linkedin_router)
+
 def meta_for(docid: str, user: UserContext) -> dict:
     try:
         meta = store.get_meta(docid)

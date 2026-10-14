@@ -1,6 +1,7 @@
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
+    CHROME_BIN=/usr/bin/chromium \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
     WORKERS=2
@@ -8,6 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-eng \
+    chromium \
+    chromium-driver \
     libglib2.0-0 \
     libgl1 \
     curl \

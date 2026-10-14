@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { getDb, externalConnections, sourceSnapshots, syncRuns } from "../db";
 import { pageBounds, type PageOptions } from "./pagination";
 
@@ -273,3 +273,19 @@ export async function getSyncRunsByPerson(personId: string, limit = 10) {
     .orderBy(desc(syncRuns.startedAt))
     .limit(limit);
 }
+
+/**
+ * Deletes keys from a connection's metadata (saveExternalConnection merges,
+ * so omitting a key never removes it). Used to erase stored credentials
+ * (Task 1.6.7): the key is gone from the row, not set to a marker.
+ */
+export async function removeConnectionMetadataKeys(personId: string, provider: string, keys: string[]) {
+  const db = await getDb();
+  let expr = sql`coalesce(${externalConnections.metadata}, '{}'::jsonb)`;
+  for (const k of keys) expr = sql`(${expr}) - ${k}::text`;
+  await db
+    .update(externalConnections)
+    .set({ metadata: expr, updatedAt: new Date() })
+    .where(and(eq(externalConnections.personId, personId), eq(externalConnections.provider, provider)));
+}
+

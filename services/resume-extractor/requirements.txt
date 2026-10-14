@@ -10,3 +10,5 @@ Pillow>=11,<13
 opencv-python-headless>=4.8,<5
 numpy>=2,<3
 jsonschema>=4.20,<5
+selenium>=4.25,<5
+linkedin-scraper>=2.11,<3

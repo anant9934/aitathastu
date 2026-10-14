@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
-import { validateDocumentSafety } from "@/lib/services/document-parser-service";
+import { validateDocumentSafety } from "@/lib/resume/document-safety";
 import { queueResumeUpload } from "@/lib/services/resume-ingestion-service";
 import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { jsonNoStore } from "@/lib/api/resume-route-helpers";

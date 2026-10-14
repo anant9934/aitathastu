@@ -12,6 +12,7 @@
  */
 
 import crypto from "node:crypto";
+import type { LayoutPage } from "@/lib/resume/layout";
 
 export interface ExtractorUploadResponse {
   document_id: string;
@@ -231,11 +232,15 @@ export class ExtractorServiceClient {
   }
 
   /** Queues extraction. The extractor runs it in a background task and returns 202 immediately. */
-  static async startExtraction(documentId: string, identity: ExtractorIdentity): Promise<ExtractorStatusResponse> {
+  static async startExtraction(
+    documentId: string,
+    identity: ExtractorIdentity,
+    options: { forceOcr?: boolean } = {}
+  ): Promise<ExtractorStatusResponse> {
     const res = await this.request("/api/resumes/extract", {
       method: "POST",
       headers: this.makeHeaders(identity, { "Content-Type": "application/json" }),
-      body: JSON.stringify({ document_id: documentId }),
+      body: JSON.stringify({ document_id: documentId, ...(options.forceOcr ? { force_ocr: true } : {}) }),
       timeoutMs: 10000,
     });
     return res.json();
@@ -260,7 +265,8 @@ export class ExtractorServiceClient {
   }
 
   /** Raw OCR/native text lines, used to run the deterministic Node extractor on OCR output. */
-  static async getRawText(documentId: string, identity: ExtractorIdentity): Promise<{ raw_text: string; ocr_used: boolean }> {
+  /** Extracted text plus positioned spans per page (OCR word boxes or native words). */
+  static async getRawText(documentId: string, identity: ExtractorIdentity): Promise<{ raw_text: string; ocr_used: boolean; pages?: LayoutPage[] }> {
     const res = await this.request(`/api/resumes/${encodeURIComponent(documentId)}/text`, {
       method: "GET",
       headers: this.makeHeaders(identity),

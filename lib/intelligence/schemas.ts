@@ -14,7 +14,7 @@ export const ResumeInterpretationSchema = z.object({
   education: z.array(
     z.object({
       institution: z.string().min(1).max(200),
-      degree: z.string().min(1).max(100),
+      degree: z.string().max(100),
       fieldOfStudy: z.string().max(100).optional(),
       startDate: z.string().max(30).optional(),
       endDate: z.string().max(30).optional(),

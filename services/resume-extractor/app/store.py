@@ -57,13 +57,13 @@ class LocalStore:
         return path
 
     def read_json(self, document_id: str, name: str):
-        if name not in ('meta.json','profile.json','sections.json'): raise KeyError('Invalid resource')
+        if name not in ('meta.json','profile.json','sections.json','layout.json'): raise KeyError('Invalid resource')
         path = self._directory(document_id) / name
         if not path.is_file() or path.is_symlink(): raise KeyError('Document not found')
         return json.loads(path.read_text('utf-8'))
 
     def save_json(self, document_id: str, name: str, data):
-        if name not in ('meta.json','profile.json','sections.json'): raise KeyError('Invalid resource')
+        if name not in ('meta.json','profile.json','sections.json','layout.json'): raise KeyError('Invalid resource')
         with self.lock:
             path = self._directory(document_id)/name
             self._atomic(path,json.dumps(data,ensure_ascii=False,default=str).encode('utf-8'))

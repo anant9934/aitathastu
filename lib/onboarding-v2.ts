@@ -81,6 +81,8 @@ export type OnboardingDraft = {
   priorities?: string[];
   primaryPriority?: string;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
+  /** Screens fully covered by accepted resume data; onboarding skips them (lib/onboarding-resume-coverage.ts). */
+  resumeCoveredScreens?: number[];
   completed: boolean;
 };
 
@@ -337,6 +339,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
               .map(([k, v]) => [k, str(v, 300)])
           )
         : undefined,
+    resumeCoveredScreens: Array.isArray(raw.resumeCoveredScreens)
+      ? raw.resumeCoveredScreens.filter((n): n is number => [4, 6, 9, 10].includes(n as number))
+      : undefined,
     completed: raw.completed === true,
   };
 }

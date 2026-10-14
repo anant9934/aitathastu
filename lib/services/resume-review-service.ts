@@ -26,13 +26,6 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         return;
       }
 
-      if (category === "project") {
-        const valRes = ExtractionValidator.validateProjectClaim(trimmedVal, trimmedSpan);
-        if (!valRes.valid) return;
-        candidates.push({ candidateId: `${category}_${index}`, category, value: valRes.normalizedValue, sourceSpan: trimmedSpan });
-        return;
-      }
-
       candidates.push({ candidateId: `${category}_${index}`, category, value: trimmedVal, sourceSpan: trimmedSpan });
     });
   };

@@ -39,6 +39,7 @@ export type ExtractedProfileData = {
   fullName?: string;
   email?: string;
   mobile?: string;
+  location?: string;
   degree?: string;
   specialization?: string;
   institution?: string;
@@ -47,10 +48,45 @@ export type ExtractedProfileData = {
   gpa?: string;
 };
 
-type ResumeCandidate = ReviewedResumeClaim & { id: string; selected: boolean };
+/**
+ * A review row. Record categories (education, skill, ...) are Person 360 claims
+ * saved through /apply. "profile" (one onboarding field, named by `field`) and
+ * "link" (one typed profile URL) only fill the onboarding draft.
+ */
+type ResumeCandidate = Omit<ReviewedResumeClaim, "category"> & {
+  id: string;
+  selected: boolean;
+  category: ReviewedResumeClaim["category"] | "achievement" | "profile" | "link";
+  field?: string;
+};
+
+const RECORD_CANDIDATE_ID = /^[a-z]+_\d+$/;
+
+/** Review sections, one per onboarding step the accepted data fills. */
+const REVIEW_GROUPS: Array<{ id: string; title: string; categories: ResumeCandidate["category"][] }> = [
+  { id: "academic", title: "Academic details", categories: ["profile", "education"] },
+  { id: "links", title: "Links", categories: ["link"] },
+  { id: "skills", title: "Skills", categories: ["skill"] },
+  { id: "projects", title: "Projects", categories: ["project"] },
+  { id: "history", title: "Experience & achievements", categories: ["experience", "certification", "achievement"] },
+];
+
+const FIELD_LABELS: Record<string, string> = {
+  fullName: "Full name", email: "Email", mobile: "Phone", location: "Location",
+  institution: "Institution", degree: "Degree", specialization: "Field of study",
+  expectedGraduationYear: "Graduation year", github: "GitHub", linkedin: "LinkedIn", portfolio: "Portfolio",
+};
+
+export type AcceptedResumeProfile = Partial<Record<keyof ExtractedProfileData, string>>;
 
 type ResumeExtraData = {
   extractedProfile?: ExtractedProfileData;
+  /** Profile fields the student accepted individually. Only these may fill onboarding fields. */
+  acceptedProfile?: AcceptedResumeProfile;
+  /** Typed profile links the student accepted, e.g. { github: "https://github.com/x" }. */
+  acceptedLinks?: Partial<Record<string, string>>;
+  /** Per review section: how many items were offered and how many accepted. */
+  reviewSummary?: Record<string, { total: number; accepted: number }>;
   discoveredProfiles?: Partial<Record<string, string>>;
   extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
   extractedEducation?: Array<{
@@ -165,7 +201,6 @@ export function Screen5ResumeUpload({
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(initialDocumentId || null);
   // Document whose processing failed and can be retried server-side without re-picking the file.
   const [retryDocumentId, setRetryDocumentId] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [eoraAdvice, setEoraAdvice] = useState<string | null>(null);
   const [extraData, setExtraData] = useState<ResumeExtraData>({});
   // null = probing, true = gate open, false = gate closed
@@ -206,12 +241,15 @@ export function Screen5ResumeUpload({
   const applyResult = useCallback((documentId: string, name: string, result: Record<string, any>, reviewed: boolean) => {
     const rows: ResumeCandidate[] = Array.isArray(result.reviewCandidates)
       ? result.reviewCandidates.flatMap((item: Record<string, unknown>) => {
-          const { category, candidateId, value, sourceSpan } = item ?? {};
+          const { category, candidateId, value, sourceSpan, field } = item ?? {};
           if (
-            !["education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
+            !["profile", "link", "education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
             typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string"
           ) return [];
-          return [{ id: candidateId, candidateId, category: category as ReviewedResumeClaim["category"], value, sourceSpan, documentId, corrected: false, selected: false }];
+          return [{
+            id: candidateId, candidateId, category: category as ResumeCandidate["category"], value, sourceSpan, documentId,
+            corrected: false, selected: false, field: typeof field === "string" ? field : undefined,
+          }];
         })
       : [];
     const structured = result.structured ?? {};
@@ -427,18 +465,30 @@ export function Screen5ResumeUpload({
   };
 
   const saveReviewedClaims = async () => {
-    const selected = candidates
-      .filter((candidate) => candidate.selected && candidate.value.trim())
+    const accepted = candidates.filter((candidate) => candidate.selected && candidate.value.trim());
+    const records = candidates.filter((c) => RECORD_CANDIDATE_ID.test(c.candidateId || c.id) && c.category !== "profile" && c.category !== "link");
+    const selected = accepted
+      .filter((c) => records.includes(c))
       .map(({ candidateId, category, value, sourceSpan, documentId, corrected }) => ({
         candidateId,
-        category,
+        category: category as ReviewedResumeClaim["category"],
         value: value.trim(),
         sourceSpan,
         documentId,
         corrected,
       }));
+    const acceptedProfile: AcceptedResumeProfile = {};
+    const acceptedLinks: Partial<Record<string, string>> = {};
+    for (const c of accepted) {
+      if (c.category === "profile" && c.field) acceptedProfile[c.field as keyof AcceptedResumeProfile] = c.value.trim();
+      if (c.category === "link" && c.field) acceptedLinks[c.field] = c.value.trim();
+    }
+    const reviewSummary = Object.fromEntries(REVIEW_GROUPS.map((g) => {
+      const rows = candidates.filter((c) => g.categories.includes(c.category));
+      return [g.id, { total: rows.length, accepted: rows.filter((c) => accepted.includes(c)).length }];
+    }));
 
-    if (selected.length === 0) {
+    if (accepted.length === 0) {
       setErrorMessage("Select at least one accurate CV detail to save, or use Skip for now.");
       return;
     }
@@ -450,8 +500,8 @@ export function Screen5ResumeUpload({
     setProcessingState("SAVING");
     setErrorMessage(null);
     try {
-      // Every candidate gets an explicit decision: unchecked means rejected.
-      const decisions = candidates.map((c) => ({
+      // Every record candidate gets an explicit decision: unchecked means rejected.
+      const decisions = records.map((c) => ({
         candidateId: c.candidateId || c.id,
         state: c.selected && c.value.trim() ? "confirmed" : "rejected",
         ...(c.corrected && c.selected ? { correctedValue: c.value.trim() } : {}),
@@ -466,7 +516,7 @@ export function Screen5ResumeUpload({
         throw new Error(applyBody?.error || "We could not save your reviewed details. Please retry.");
       }
 
-      const saved = await onExtractSuccess?.(fileName || "resume", selected, extraData);
+      const saved = await onExtractSuccess?.(fileName || "resume", selected, { ...extraData, acceptedProfile, acceptedLinks, reviewSummary });
       if (saved === false) throw new Error("Your review was saved, but your onboarding progress could not be updated. Please retry.");
 
       setReviewSaved(true);
@@ -830,93 +880,71 @@ export function Screen5ResumeUpload({
                 )}
 
                 <p style={{ color: "#64748B", fontSize: 12, margin: "4px 0 8px" }}>
-                  Select accurate items to link to your Person 360 profile. You can correct wording before saving. Heuristic confidence is not independent verification.
+                  Accept what is accurate, section by section or field by field. You can correct wording before saving. Onboarding steps fully covered by what you accept are filled in and skipped.
                 </p>
 
-                {/* Category Filters */}
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
-                  {["all", "education", "skill", "project", "experience", "certification", "achievement"].map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategoryFilter(cat)}
-                      style={{
-                        padding: "3px 8px",
-                        borderRadius: 6,
-                        fontSize: 11,
-                        fontWeight: categoryFilter === cat ? 700 : 500,
-                        background: categoryFilter === cat ? "#5642EF" : "#F1F5F9",
-                        color: categoryFilter === cat ? "#FFFFFF" : "#475569",
-                        border: "none",
-                        cursor: "pointer",
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Batch selection */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 10, fontSize: 11.5 }}>
-                  <button
-                    type="button"
-                    onClick={() => setCandidates((current) => current.map((item) => ({ ...item, selected: true })))}
-                    style={{ background: "none", border: "none", color: "#5642EF", cursor: "pointer", fontWeight: 650, padding: 0 }}
-                  >
-                    Select all
-                  </button>
-                  <span style={{ color: "#CBD5E1" }}>&bull;</span>
-                  <button
-                    type="button"
-                    onClick={() => setCandidates((current) => current.map((item) => ({ ...item, selected: false })))}
-                    style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontWeight: 500, padding: 0 }}
-                  >
-                    Clear selection
-                  </button>
-                </div>
-
-                {/* Candidate list filtered */}
-                {candidates
-                  .filter((c) => categoryFilter === "all" || c.category === categoryFilter)
-                  .map((candidate) => {
-                    const originalIndex = candidates.findIndex((c) => c.id === candidate.id);
-                    return (
-                      <div key={candidate.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10, padding: "8px", borderRadius: 8, background: candidate.selected ? "rgba(86, 66, 239, 0.03)" : "transparent", border: "1px solid #F1F5F9" }}>
-                        <input
-                          aria-label={`Select ${candidate.category} ${candidate.value}`}
-                          type="checkbox"
-                          checked={candidate.selected}
-                          onChange={(event) => {
-                            setReviewSaved(false);
-                            setCandidates((current) =>
-                              current.map((item, i) => (i === originalIndex ? { ...item, selected: event.target.checked } : item))
-                            );
-                          }}
-                          style={{ marginTop: 3 }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <span style={{ color: "#5642EF", fontWeight: 750, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                            {candidate.category}
-                          </span>
-                          <input
-                            aria-label={`Edit ${candidate.category}`}
-                            value={candidate.value}
-                            onChange={(event) => {
-                              setReviewSaved(false);
-                              setCandidates((current) =>
-                                current.map((item, i) => (i === originalIndex ? { ...item, value: event.target.value, corrected: true } : item))
-                              );
-                            }}
-                            style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12, marginTop: 2 }}
-                          />
-                          <small style={{ color: "#64748B", display: "block", marginTop: 3, fontSize: 11 }}>
-                            Source: “{candidate.sourceSpan}”
-                          </small>
-                        </div>
+                {/* One section per onboarding step the accepted data fills. Accept or reject a whole section, or tick fields one by one. */}
+                {REVIEW_GROUPS.map((group) => {
+                  const rows = candidates.filter((c) => group.categories.includes(c.category));
+                  if (rows.length === 0) return null;
+                  const setGroup = (selected: boolean) => {
+                    setReviewSaved(false);
+                    setCandidates((current) => current.map((item) => (group.categories.includes(item.category) ? { ...item, selected } : item)));
+                  };
+                  return (
+                    <section key={group.id} aria-label={group.title} style={{ marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 8px", fontSize: 11.5 }}>
+                        <strong style={{ color: "#1E1B4B", fontSize: 12.5 }}>{group.title}</strong>
+                        <span style={{ color: "#64748B" }}>{rows.filter((r) => r.selected).length}/{rows.length}</span>
+                        <button type="button" onClick={() => setGroup(true)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#5642EF", cursor: "pointer", fontWeight: 650, padding: 0 }}>
+                          Accept all
+                        </button>
+                        <span style={{ color: "#CBD5E1" }}>&bull;</span>
+                        <button type="button" onClick={() => setGroup(false)} style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer", fontWeight: 500, padding: 0 }}>
+                          Reject all
+                        </button>
                       </div>
-                    );
-                  })}
+                      {rows.map((candidate) => {
+                        const label = candidate.field ? FIELD_LABELS[candidate.field] || candidate.field : candidate.category;
+                        return (
+                          <div key={candidate.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10, padding: "8px", borderRadius: 8, background: candidate.selected ? "rgba(86, 66, 239, 0.03)" : "transparent", border: "1px solid #F1F5F9" }}>
+                            <input
+                              aria-label={`Accept ${label} ${candidate.value}`}
+                              type="checkbox"
+                              checked={candidate.selected}
+                              onChange={(event) => {
+                                setReviewSaved(false);
+                                setCandidates((current) => current.map((item) => (item.id === candidate.id ? { ...item, selected: event.target.checked } : item)));
+                              }}
+                              style={{ marginTop: 3 }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <span style={{ color: "#5642EF", fontWeight: 750, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                                {label}
+                              </span>
+                              <input
+                                aria-label={`Edit ${label}`}
+                                value={candidate.value}
+                                onChange={(event) => {
+                                  setReviewSaved(false);
+                                  setCandidates((current) =>
+                                    current.map((item) => (item.id === candidate.id ? { ...item, value: event.target.value, corrected: true } : item))
+                                  );
+                                }}
+                                style={{ display: "block", width: "100%", border: "1px solid #CBD5E1", borderRadius: 6, padding: "5px 7px", fontSize: 12, marginTop: 2 }}
+                              />
+                              {candidate.sourceSpan !== candidate.value && (
+                                <small style={{ color: "#64748B", display: "block", marginTop: 3, fontSize: 11 }}>
+                                  Source: “{candidate.sourceSpan}”
+                                </small>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </section>
+                  );
+                })}
 
                 {/* Action controls */}
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid #F1F5F9" }}>
@@ -935,7 +963,7 @@ export function Screen5ResumeUpload({
                       fontWeight: 650,
                     }}
                   >
-                    Save selected claims
+                    Save accepted details
                   </button>
 
                   {activeDocumentId && (

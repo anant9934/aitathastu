@@ -20,6 +20,7 @@ export interface ScreenFooterProps {
 }
 
 import { getOnboardingStepLabels, TOTAL_ONBOARDING_STEPS } from "@/lib/onboarding-step-registry";
+import { useEoraStepEvents } from "@/components/eora/use-eora-step-events";
 
 export function ScreenFooter({
   onBack,
@@ -37,6 +38,12 @@ export function ScreenFooter({
   stepLabels = getOnboardingStepLabels(),
 }: ScreenFooterProps) {
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
+  // EORA's speech-cloud Next/Back drive the same handlers as these buttons (BUG #1).
+  useEoraStepEvents({
+    onNext: showNext ? onNext : undefined,
+    onBack: showBack ? onBack : undefined,
+    enabled: !isNextDisabled,
+  });
 
   const handleStepSelect = onStepClick || onJumpToStep;
 

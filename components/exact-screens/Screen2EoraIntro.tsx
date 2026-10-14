@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { ScreenHeader } from "./ScreenHeader";
+import { useEoraStepEvents } from "@/components/eora/use-eora-step-events";
 
 interface Screen2EoraIntroProps {
   name: string;
@@ -26,11 +27,16 @@ export function Screen2EoraIntro({
     if (name) setVal((current) => current || name);
   }, [name]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitName = () => {
     onNameChange(val);
     onNext();
   };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitName();
+  };
+  // Screen 2 has no footer: EORA's Next must save the name and advance (BUG #1).
+  useEoraStepEvents({ onNext: submitName, onBack });
 
   return (
     <div

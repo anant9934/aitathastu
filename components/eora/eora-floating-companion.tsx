@@ -39,6 +39,9 @@ import { getEoraAsset } from "@/lib/eora/avatar-registry";
 import { EoraMotionAvatar } from "./eora-motion-avatar";
 import { getPageContract } from "@/lib/eora/page-registry";
 import { getPrimaryTaskForRoute } from "@/lib/eora/tasks";
+import { dispatchEoraStep, EORA_ADVANCE, EORA_PREVIOUS } from "@/components/eora/use-eora-step-events";
+import { EoraChatDrawer } from "@/components/eora/EoraChatDrawer";
+import { recognizeIntent } from "@/lib/eora/intent";
 
 type Placement = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
@@ -405,14 +408,26 @@ export function EoraFloatingCompanion() {
     return () => document.removeEventListener("pointerdown", closeOutside);
   }, [eora?.isPanelOpen, eora?.closePanel, eora?.activeTask, eora?.activeTour]);
 
+  // Free-form questions go to the grounded RAG chat; tour / navigation
+  // commands stay on the zero-LLM dialogue engine (Tasks 1.4.1, 1.4.3, BUG #4).
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSeed, setChatSeed] = useState<{ text: string; nonce: number } | null>(null);
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (!inputText.trim() || !eora) return;
-      eora.handleUserMessage(inputText.trim());
+      const text = inputText.trim();
+      if (!text || !eora) return;
+      const { intent } = recognizeIntent(text, pathname, eora.context);
+      if (intent === "UNKNOWN_INTENT" || intent === "UNKNOWN") {
+        setChatSeed({ text, nonce: Date.now() });
+        setChatOpen(true);
+        eora.closePanel(); // the drawer replaces the panel; both open would cover the answer
+      } else {
+        eora.handleUserMessage(text);
+      }
       setInputText("");
     },
-    [inputText, eora]
+    [inputText, eora, pathname]
   );
 
   const handleClarifyChoice = useCallback(
@@ -723,10 +738,8 @@ export function EoraFloatingCompanion() {
                 ? eora.advanceTask
                 : eora.onboardingStep !== "none" && eora.onboardingStep !== "complete"
                 ? () => {
-                    const btn =
-                      document.getElementById("eora-onboarding-next-btn") ||
-                      document.querySelector<HTMLElement>(".btn-purple-next");
-                    if (btn) (btn as HTMLButtonElement).click();
+                    // Event, not a DOM lookup (BUG #1): the mounted screen runs its own submit.
+                    if (!dispatchEoraStep(EORA_ADVANCE)) console.warn("[EORA] No onboarding screen handled advance-step.");
                   }
                 : undefined
             }
@@ -737,10 +750,7 @@ export function EoraFloatingCompanion() {
                 ? eora.rewindTask
                 : eora.onboardingStep !== "none" && eora.onboardingStep !== "welcome"
                 ? () => {
-                    const btn =
-                      document.getElementById("eora-onboarding-back-btn") ||
-                      document.querySelector<HTMLElement>(".stepper-circle-btn");
-                    if (btn) (btn as HTMLButtonElement).click();
+                    if (!dispatchEoraStep(EORA_PREVIOUS)) console.warn("[EORA] No onboarding screen handled previous-step.");
                   }
                 : undefined
             }
@@ -1091,6 +1101,7 @@ export function EoraFloatingCompanion() {
           ✦
         </span>
       )}
+      <EoraChatDrawer open={chatOpen} seed={chatSeed} onClose={() => setChatOpen(false)} />
     </div>
   );
 }

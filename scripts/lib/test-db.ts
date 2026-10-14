@@ -30,7 +30,14 @@ export async function useTestDatabase() {
   // getDb() only migrates an uninitialised database; replay every idempotent
   // statement so columns added since the container was created exist too.
   const { sql } = await import("drizzle-orm");
-  for (const stmt of MIGRATION_SQL_STATEMENTS) await (db as { execute: (q: unknown) => Promise<unknown> }).execute(sql.raw(stmt));
+  // postgres-js prints "already exists, skipping" NOTICEs via console.log.
+  const log = console.log;
+  console.log = (...args: unknown[]) => { if ((args[0] as { severity?: string })?.severity !== "NOTICE") log(...args); };
+  try {
+    for (const stmt of MIGRATION_SQL_STATEMENTS) await (db as { execute: (q: unknown) => Promise<unknown> }).execute(sql.raw(stmt));
+  } finally {
+    console.log = log;
+  }
   return db;
 }
 

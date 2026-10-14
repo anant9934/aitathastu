@@ -35,7 +35,10 @@
     "demo:eris-event": "node --import tsx scripts/demo-eris-event.ts",
     "demo:mentormaze-event": "node --import tsx scripts/demo-mentormaze-event.ts",
     "demo:interview-event": "node --import tsx scripts/demo-interview-event.ts",
-    "test:resume-integration": "node --import tsx scripts/test-universal-resume-integration.ts"
+    "test:resume-integration": "node --import tsx scripts/test-universal-resume-integration.ts",
+    "test:draft-concurrency": "node --import tsx scripts/stress-onboarding-draft-concurrency.ts",
+    "test:backend-contracts": "node --import tsx --test --test-concurrency=1 scripts/verify-phase1-backend.ts scripts/verify-phase1-llm.ts scripts/verify-phase1-connectors.ts scripts/verify-phase1-github.ts scripts/verify-phase1-provenance.ts scripts/verify-phase1-footprints.ts scripts/verify-phase1-skills.ts",
+    "test:linkedin-worker": "node --import tsx --test scripts/verify-phase1-linkedin.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

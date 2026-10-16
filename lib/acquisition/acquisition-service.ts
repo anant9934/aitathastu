@@ -1,5 +1,4 @@
-import { fetchGitHubProjects } from "../connectors/github/client";
-import { saveSourceSnapshot, saveExternalConnection, getSourceSnapshots } from "../repositories/connection-repository";
+import { getSourceSnapshots } from "../repositories/connection-repository";
 import { saveProject, saveProjectContribution, getProjectsByPersonId, type CreateProjectInput } from "../repositories/project-repository";
 import { createEvidenceRecord } from "../repositories/evidence-repository";
 import { CrossSourceFusionService } from "../services/cross-source-fusion-service";

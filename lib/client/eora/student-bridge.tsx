@@ -111,8 +111,10 @@ export function EoraStudentBridge({
 
   // Clear context and cancel retries on unmount (sign-out / nav away)
   useEffect(() => {
+    // Copy the ref object (not .current): retries assign the timeout after mount.
+    const retryTimeout = retryTimeoutRef;
     return () => {
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      if (retryTimeout.current) clearTimeout(retryTimeout.current);
       eora?.clearStudentContext();
       fetchedPersonId.current = null;
     };

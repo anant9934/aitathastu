@@ -6,9 +6,9 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
-before(async () => { await useTestDatabase(); });
+before(async () => { await setupTestDatabase(); });
 after(async () => { const { closeDbForTesting } = await import("../lib/db"); await closeDbForTesting(); });
 
 test("badges: not connected, disconnected, syncing, needs re-auth, reference only, connected", async () => {

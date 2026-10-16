@@ -259,6 +259,8 @@ export async function importGitHubRepositories(params: {
           demoUrl: project.homepageUrl || undefined,
           status: "candidate",
           aiDetails: { categories: project.aiMlCategories || [], observedFiles: project.observedFiles || [], primaryLanguage: project.primaryLanguage || null },
+          // Ledger chips the student can choose to show (Task 2.5.4).
+          metadata: { stars: project.stars, forks: project.forks, isFork: project.isFork, languages: project.languages },
         });
         await writeEvidenceBatch(personId, project.technologyFindings.map((finding) => ({
           category: "skill" as const,

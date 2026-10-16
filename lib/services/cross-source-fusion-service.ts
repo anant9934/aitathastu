@@ -160,7 +160,7 @@ export class CrossSourceFusionService {
    */
   static async recordProfileVersion(
     personId: string,
-    changeType: "onboarding" | "resume_review" | "project_confirmed" | "goal_updated" | "evidence_added",
+    changeType: "onboarding" | "resume_review" | "project_confirmed" | "goal_updated" | "evidence_added" | "profile_edited",
     changeSummary: string,
     snapshot: Record<string, unknown>,
     dbClient?: TathastuDb

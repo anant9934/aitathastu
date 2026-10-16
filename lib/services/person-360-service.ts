@@ -36,6 +36,7 @@ export type Person360Result = {
     education: string;
     experience: string;
     headline: string;
+    bio?: string;
     degree?: string;
     specialization?: string;
     institution?: string;
@@ -210,6 +211,7 @@ export async function getPerson360(
       education: profile?.education || "",
       experience: profile?.experience || "",
       headline: profile?.headline || "",
+      bio: profile?.bio || "",
       degree: profile?.degree || "",
       specialization: profile?.specialization || "",
       institution: profile?.institution || "",

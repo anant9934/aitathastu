@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { roleGoalTitle } from "@/lib/domain/role-goal";
 import { mergeDraftPatch, type DraftWriteOrigin, type SystemEntryLedger } from "@/lib/onboarding-draft-merge";
 import { getDb, onboardingDrafts, userPreferences } from "@/lib/db";
 import { safeDraft, type OnboardingDraft } from "@/lib/onboarding-v2";
@@ -34,6 +35,13 @@ export async function writeOnboardingDraft(personId: string, input: unknown, opt
     if (Object.prototype.hasOwnProperty.call(normalized, key)) {
       const value = normalized[key as keyof OnboardingDraft];
       patch[key] = value === undefined && raw[key] === null ? null : value;
+    }
+  }
+  // A link the student removed arrives as "" (Task 2.1.4). safeDraft drops empty
+  // links, so put the "" back: the merge then clears the stored link.
+  if (raw.profiles && typeof raw.profiles === "object" && patch.profiles && typeof patch.profiles === "object") {
+    for (const [source, url] of Object.entries(raw.profiles as Record<string, unknown>)) {
+      if (url === "" || url === null) (patch.profiles as Record<string, string>)[source] = "";
     }
   }
   await mutateOnboardingDraft(personId, patch, options);
@@ -147,7 +155,6 @@ export async function completeOnboarding(personId: string, input: unknown) {
   const degree = draft.degree?.trim() || existingProfile?.degree || "";
   const specialization = draft.specialization?.trim() || existingProfile?.specialization || "";
   const year = draft.year?.trim() || existingProfile?.currentYear || "";
-  const goal = draft.goal?.trim() || "";
 
   let institution = draft.institution?.trim() || "";
   const confirmedEducation = (draft.education || []).filter((entry) => entry.status === "confirmed");
@@ -194,11 +201,9 @@ export async function completeOnboarding(personId: string, input: unknown) {
     expectedGraduationYear: draft.expectedGraduationYear || existingProfile?.expectedGraduationYear || undefined,
   });
 
-  const goalDescription = `Target Role: ${draft.targetRole || "Not selected"}${
-    draft.targetTimeline ? ` · Timeline: ${draft.targetTimeline}` : ""
-  }${draft.customGoalText ? ` · Note: ${draft.customGoalText}` : ""}`;
-
-  if (goal) await setActiveGoal(personId, goal, goalDescription, "custom");
+  // The target role is the goal: onboarding no longer asks a separate "big goal"
+  // or timeline question (Task 2.1.1). Dashboard and roadmap read this active goal.
+  if (draft.targetRole) await setActiveGoal(personId, roleGoalTitle(draft.targetRole), `Target Role: ${draft.targetRole}`, "custom");
 
   // Evidence writes are independent of each other, so they are collected here
   // and written concurrently at the end (writeEvidenceBatch) instead of one
@@ -237,25 +242,6 @@ export async function completeOnboarding(personId: string, input: unknown) {
     "target_role",
     "Your chosen career direction in AI/ML; it can be edited anytime."
   );
-  if (goal) await add(
-    "goal",
-    `First Goal: ${draft.goal}`,
-    draft.goal,
-    "self_reported",
-    "goal",
-    "Your chosen first outcome in AI/ML; it can be edited anytime."
-  );
-
-  if (draft.targetTimeline) {
-    await add(
-      "goal",
-      `Target Timeline: ${draft.targetTimeline}`,
-      draft.targetTimeline,
-      "self_reported",
-      "target_timeline",
-      "Your self-selected target timeline preference; it is not a binding guarantee."
-    );
-  }
 
   const reviewedResumeSkills = new Set(draft.resumeReviewed.filter((claim) => claim.category === "skill").map((claim) => claim.value.toLowerCase()));
   for (const skill of [...new Set(draft.skills)]) {
@@ -437,7 +423,7 @@ export async function completeOnboarding(personId: string, input: unknown) {
   await createJourneyEventRecord(personId, {
     type: "onboarding_started",
     title: "Starting picture created",
-    description: `EORA onboarding completed with target role ${draft.targetRole}, goal ${draft.goal}, and academic context.`,
+    description: `EORA onboarding completed with target role ${draft.targetRole} and academic context.`,
     importKey: `ob2_completed_${personId}`,
   });
 
@@ -448,8 +434,6 @@ export async function completeOnboarding(personId: string, input: unknown) {
     Object.entries({
       targetRole: draft.targetRole,
       targetRoleId: draft.targetRoleId,
-      targetTimeline: draft.targetTimeline,
-      customGoalText: draft.customGoalText,
     }).filter(([, value]) => typeof value === "string" && value.trim().length > 0)
   );
   directionMetadata.requestedRole = "student";

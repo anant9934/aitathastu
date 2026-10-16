@@ -628,7 +628,10 @@ export class SkillIntelligenceService {
 
     // 4. Construct Explainable Skill Intelligence Records
     const explainableSkills: ExplainableSkillIntelligence[] = [];
-    const allKnownSkills = Array.from(skillObservationsMap.keys());
+    // Skills the student hid (Task 2.2.3) stay in evidence_items but drop out of the map, its counts and readiness.
+    const hiddenRaw = (person360.preferences?.metadata as Record<string, unknown> | undefined)?.hiddenSkills;
+    const hidden = new Set((Array.isArray(hiddenRaw) ? hiddenRaw : []).filter((h): h is string => typeof h === "string").map((h) => normalizeSkillName(h).toLowerCase()));
+    const allKnownSkills = Array.from(skillObservationsMap.keys()).filter((k) => !hidden.has(k.toLowerCase()));
 
     for (const skillName of allKnownSkills) {
       const observations = skillObservationsMap.get(skillName) || [];

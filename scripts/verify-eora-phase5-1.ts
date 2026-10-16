@@ -18,13 +18,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-import {
-  EORA_AVATARS,
-  getEoraAsset,
-} from "../lib/eora/avatar-registry";
-import { getPoseForState, type EoraAnimationState } from "../lib/eora/identity";
-import { checkInputSafety, checkOutputSafety } from "../lib/eora/safety";
-import { recognizeIntent, isIntentConfident } from "../lib/eora/intent";
+import { recognizeIntent } from "../lib/eora/intent";
 import type { EoraContext } from "../lib/eora/context";
 import {
   createDefaultContext,
@@ -36,7 +30,7 @@ import {
   getRouteWelcomeMessage,
 } from "../lib/eora/dialogue";
 import { processUserInput } from "../lib/eora/brain";
-import { TOUR_REGISTRY, getTourById } from "../lib/eora/tours";
+import { TOUR_REGISTRY } from "../lib/eora/tours";
 import {
   createDefaultPreferences,
   loadPreferencesForPerson,
@@ -262,8 +256,8 @@ test("getPersonScopedKey is deterministic for same person", () => {
 
 test("Person A's tour completions do not appear in Person B's preferences", () => {
   // Simulate saving prefs for person A
-  let prefsA = createDefaultPreferences();
-  prefsA = markTourCompleted(prefsA, "student-home");
+  let _prefsA = createDefaultPreferences();
+  _prefsA = markTourCompleted(_prefsA, "student-home");
   // Simulate person B with fresh prefs
   const prefsB = createDefaultPreferences();
   // Person B's prefs must not contain A's tour completions

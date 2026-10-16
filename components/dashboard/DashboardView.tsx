@@ -18,7 +18,14 @@ import { DashboardSectionView } from "./Sections";
 import { FocusEditor } from "./FocusEditor";
 import { DashboardSkeleton } from "./DashboardSkeleton";
 import type { SkillsEvidenceIndex } from "@/lib/client/evidence";
+import { SkillsMap } from "@/components/skills/SkillsMap";
+import { requiredGaps, toMapSkill, type IntelligenceSkill } from "@/lib/client/skills-map-data";
 
+type DashboardSkills = {
+  skills: { name: string; state: string; evidenceCount: number }[];
+  intelligenceSkills?: IntelligenceSkill[];
+  missingGoalSkills?: { name: string; relevance: string; suggestedTask: string }[];
+};
 type Settings = { role: "student" | "faculty"; purposes: string[]; goal: string | null; name: string };
 
 export function DashboardView() {
@@ -27,13 +34,24 @@ export function DashboardView() {
   const [error, setError] = useState<string | null>(null);
   const [focusOpen, setFocusOpen] = useState(false);
   const [skillIndex, setSkillIndex] = useState<SkillsEvidenceIndex | null>(null);
+  const [skillsData, setSkillsData] = useState<DashboardSkills | null>(null);
   // The same skills data the skills page reads, so a skill's evidence count is one number everywhere.
-  useEffect(() => {
-    void requestJson<{ skills: { name: string; state: string; evidenceCount: number }[]; intelligenceSkills?: { name: string; observations: { source: string }[] }[] }>("/api/student/skills", { cache: "no-store" }).then((r) => {
-      if (!r.ok) return;
-      setSkillIndex(Object.fromEntries(r.data.skills.map((s) => [s.name.toLowerCase(), { state: s.state, evidenceCount: s.evidenceCount, sources: (r.data.intelligenceSkills?.find((i) => i.name === s.name)?.observations ?? []).map((o) => o.source) }])));
-    });
+  // Re-read whenever the tab regains focus, so the inline map and counts never show a stale picture.
+  const loadSkills = useCallback(async () => {
+    const r = await requestJson<DashboardSkills>("/api/student/skills", { cache: "no-store" });
+    if (!r.ok) return;
+    setSkillsData(r.data);
+    setSkillIndex(Object.fromEntries(r.data.skills.map((s) => [s.name.toLowerCase(), { state: s.state, evidenceCount: s.evidenceCount, sources: (r.data.intelligenceSkills?.find((i) => i.name === s.name)?.observations ?? []).map((o) => o.source) }])));
   }, []);
+  useEffect(() => {
+    void loadSkills();
+    const onVisible = () => { if (document.visibilityState === "visible") void loadSkills(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => { document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", onVisible); };
+  }, [loadSkills]);
+  const mapSkills = useMemo(() => (skillsData?.intelligenceSkills ?? []).map(toMapSkill), [skillsData]);
+  const mapGaps = useMemo(() => requiredGaps(skillsData?.missingGoalSkills), [skillsData]);
 
   const load = useCallback(async (fresh = false) => {
     setError(null);
@@ -58,7 +76,8 @@ export function DashboardView() {
   };
 
   const layout = model?.layout;
-  const nav = useMemo(() => (layout ? [{ id: "overview", label: "Overview" }, ...layout.sections.map((s) => ({ id: `sec-${s.id}`, label: s.title }))] : []), [layout]);
+  const showMap = mapSkills.length > 0 || mapGaps.length > 0;
+  const nav = useMemo(() => (layout ? [{ id: "overview", label: "Overview" }, ...(showMap ? [{ id: "skills-map", label: "Skills map" }] : []), ...layout.sections.map((s) => ({ id: `sec-${s.id}`, label: s.title }))] : []), [layout, showMap]);
 
   if (error) {
     return (
@@ -96,6 +115,12 @@ export function DashboardView() {
           <NextActions actions={model.nextBestActions} />
         </div>
       </section>
+
+      {showMap && (
+        <div id="skills-map" data-eora-id="eora-dashboard-map" className="mt-10 scroll-mt-28 lg:scroll-mt-16">
+          <SkillsMap mode="compact" goal={model.targetRole} skills={mapSkills} gaps={mapGaps} maxSkills={10} />
+        </div>
+      )}
 
       <div className="mt-10 flex flex-col gap-10">
         {layout.sections.map((s) => <DashboardSectionView key={s.id} section={s} model={model} layout={layout} index={skillIndex} />)}

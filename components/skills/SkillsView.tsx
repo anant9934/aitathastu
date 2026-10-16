@@ -21,16 +21,12 @@ import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Feedback";
 import { cn } from "@/lib/client/cn";
 import { skillStrip } from "@/lib/client/evidence";
-import { SkillsMap, type MapSkill } from "./SkillsMap";
+import { SkillsMap } from "./SkillsMap";
+import { requiredGaps, toMapSkill, type IntelligenceSkill } from "@/lib/client/skills-map-data";
 
 type SkillItem = {
   name: string; category: string; state: string; level?: string; goalRelevance?: string; isGoalPrerequisite?: boolean;
   evidenceCount: number; relatedProjects?: { id: string; title: string }[]; whyTathastuThinksThis?: string; conciseExplanation?: string;
-};
-type IntelligenceSkill = {
-  name: string; category: string; level: string; isGoalPrerequisite: boolean; observations: { source: string }[];
-  dimensions: { demonstratedApplication: { projects: { id: string; title: string }[] } };
-  sevenQuestions: MapSkill["sevenQuestions"] & { whatIsTheVerificationStatus?: { status?: "Pending" | "Corroborated" | "Verified" } };
 };
 type StudentSkill = { name: string; proficiency: "beginner" | "intermediate" | "advanced" | null; evidenceId: string };
 type SkillsData = {
@@ -41,12 +37,6 @@ type SkillsData = {
   stats: { totalSkills?: number; evidencedSkills?: number; demonstratedSkills: number; verifiedSkills: number; totalProjects: number; totalEvidence: number; goalPrerequisitesMet?: number; goalPrerequisitesTotal?: number };
   studentSkills?: StudentSkill[]; hiddenSkills?: string[];
 };
-
-const toMapSkill = (s: IntelligenceSkill): MapSkill => ({
-  name: s.name, category: s.category, level: s.level, isGoalPrerequisite: s.isGoalPrerequisite,
-  verificationStatus: s.sevenQuestions?.whatIsTheVerificationStatus?.status,
-  observations: s.observations ?? [], projects: s.dimensions?.demonstratedApplication?.projects ?? [], sevenQuestions: s.sevenQuestions,
-});
 
 const LEVELS = [["", "Not set"], ["beginner", "Beginner"], ["intermediate", "Intermediate"], ["advanced", "Advanced"]] as const;
 
@@ -92,7 +82,7 @@ export function SkillsView() {
         <SkillsMap
           goal={data.targetRole || data.activeGoal}
           skills={(data.intelligenceSkills ?? []).map(toMapSkill)}
-          gaps={(data.missingGoalSkills ?? []).filter((g) => g.relevance === "required_core").map((g) => ({ name: g.name, suggestedTask: g.suggestedTask }))}
+          gaps={requiredGaps(data.missingGoalSkills)}
         />
       )}
 

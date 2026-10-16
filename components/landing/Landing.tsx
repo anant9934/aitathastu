@@ -14,6 +14,8 @@ import { LinkButton } from "@/components/ui/Button";
 import { EvidenceLegend, EvidenceStrip, type EvidenceSegment } from "@/components/ui/EvidenceStrip";
 import { StatusChip, Tag } from "@/components/ui/StatusChip";
 import { SourceMark } from "@/components/connections/SourceMark";
+import { SkillsMap } from "@/components/skills/SkillsMap";
+import { LANDING_EXAMPLE } from "@/lib/client/skills-map-data";
 
 const EXAMPLE: { skill: string; segments: EvidenceSegment[]; note: string }[] = [
   { skill: "PyTorch", segments: [{ tier: "verified", count: 1, label: "verified by faculty" }, { tier: "corroborated", count: 3, label: "from 2 sources" }], note: "Faculty review · GitHub · CV" },
@@ -89,6 +91,25 @@ export function Landing() {
             </ul>
             <figcaption className="border-t border-line px-4 py-3"><EvidenceLegend /></figcaption>
           </figure>
+        </section>
+
+        {/* The skills map, shown with fixed example data (no account, no API calls). */}
+        <section id="map" aria-labelledby="map-demo-title" data-eora-id="eora-landing-map" className="mx-auto w-full max-w-[1200px] px-4 pb-16 sm:px-6 lg:pb-24">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:items-center lg:gap-12">
+            <div className="min-w-0">
+              <p className="font-mono text-xs uppercase tracking-[0.08em] text-muted">Skills map</p>
+              <h2 id="map-demo-title" className="mt-2 max-w-[18ch] text-3xl font-semibold tracking-[-0.025em]">See how your skills connect to the role you want</h2>
+              <p className="mt-4 max-w-[46ch] text-muted">Your target role sits in the middle. Your skills sit around it, grouped by kind, and each one links out to what backs it: a repository, a paper, an assessment or a faculty review. A gap is drawn as a gap.</p>
+              <p className="mt-4 text-sm text-muted">Hover a skill to see what backs it.</p>
+            </div>
+            <figure className="min-w-0">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <figcaption className="text-sm font-medium">Skills map for {LANDING_EXAMPLE.goal}</figcaption>
+                <Tag>Example profile</Tag>
+              </div>
+              <SkillsMap mode="demo" goal={LANDING_EXAMPLE.goal} skills={LANDING_EXAMPLE.skills} gaps={LANDING_EXAMPLE.gaps} className="shadow-[var(--shadow-raise)]" />
+            </figure>
+          </div>
         </section>
 
         <section id="how" aria-labelledby="how-title" data-eora-id="eora-landing-features" className="border-y border-line bg-surface">

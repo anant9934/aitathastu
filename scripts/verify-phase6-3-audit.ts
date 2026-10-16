@@ -7,7 +7,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { getDb, externalConnections } from "../lib/db";
-import { eq } from "drizzle-orm";
 import {
   encryptConnectionToken,
   decryptConnectionTokenWithMeta,

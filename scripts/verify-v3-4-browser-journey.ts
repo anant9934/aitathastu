@@ -367,11 +367,9 @@ async function runBrowserJourney() {
 
     if (await chatInput.isVisible()) {
       await chatInput.fill("What did you extract from my resume?");
-      const sendBtn = page.locator("button:has(svg)").filter({ hasText: /^$/ }).or(page.locator("button[aria-label*='Send']")).first();
       await chatInput.press("Enter");
       // Wait for assistant reply
       await page.waitForTimeout(4000);
-      const chatMessages = page.locator("div[style*='border-radius']");
       const text = await page.textContent("body");
       if (text && (text.includes("resume") || text.includes("PyTorch") || text.includes("extract"))) {
         eoraAnswered = true;

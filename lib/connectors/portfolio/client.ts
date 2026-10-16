@@ -77,7 +77,7 @@ export function isSafePublicUrl(rawUrl: string): { safe: boolean; reason?: strin
   }
 }
 
-async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Promise<{ url: string; html: string }> {
+export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Promise<{ url: string; html: string }> {
   const check = isSafePublicUrl(rawUrl);
   if (!check.safe || !check.parsed) {
     throw new Error(check.reason || "Invalid portfolio URL");

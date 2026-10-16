@@ -32,7 +32,6 @@ import { usePathname } from "next/navigation";
 
 import type { EoraContext, OnboardingStep, StudentContext } from "@/lib/eora/context";
 import {
-  createDefaultContext,
   createEmptyStudentContext,
   resolveRouteFromPathname,
   shouldEoraBeQuiet,
@@ -71,7 +70,6 @@ import { getPoseForState } from "@/lib/eora/identity";
 import type { EoraActiveTaskSession, EoraTaskDefinition } from "@/lib/eora/tasks";
 import {
   getTaskById,
-  getPrimaryTaskForRoute,
   createInitialTaskSession,
   advanceTaskStep,
   rewindTaskStep,
@@ -989,7 +987,7 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
   }, [activeTask]);
 
   const notifyTaskEvent = useCallback(
-    (eventName: string, data?: unknown) => {
+    (eventName: string, _data?: unknown) => {
       if (!activeTask || !activeTaskDef) return;
       const currentStep = activeTaskDef.steps[activeTask.currentStepIndex];
       if (currentStep && currentStep.expectedEvent === eventName) {
@@ -1153,7 +1151,6 @@ export function EoraProvider({ children }: { children: React.ReactNode }) {
       });
       setHasLiveStudentData(true);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 

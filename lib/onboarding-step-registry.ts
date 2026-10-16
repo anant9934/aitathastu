@@ -1,131 +1,63 @@
 /**
- * Centralized Onboarding Step Registry
- * AI Tathastu Ecosystem — 10 Canonical Steps
- * 
- * Provides unified, consistent logical steps and indicators across all onboarding views.
+ * The one source of onboarding step numbers (P4-13). The page stepper, the
+ * step label in the header and EORA's guide all read this, so they can never
+ * disagree again.
+ *
+ * Screen numbers are the draft's `currentScreen` values (kept for draft
+ * compatibility). Screen 2 is an unnumbered welcome. Steps the CV already
+ * covered are skipped by navigation but keep their number and show as done,
+ * so the count never shifts mid-flow.
  */
 
+export type OnboardingRole = "student" | "faculty";
+
 export interface OnboardingStepDefinition {
-  stepNumber: number; // 1-indexed (1 to 10)
   id: string;
+  /** Draft screen number. */
+  screen: number;
   title: string;
   shortLabel: string;
-  description: string;
-  section: "Identity" | "Direction" | "Profile" | "Footprints" | "Review" | "Launch";
-  screenIndex: number;
 }
 
-// Screen 2 is the welcome prelude. Screen 9 is an unnumbered skills-map view
-// between Steps 8 and 9; neither should shift the ten numbered steps.
-export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
-  {
-    stepNumber: 1,
-    id: "platform_role",
-    title: "Choose Your Platform Role",
-    shortLabel: "Platform Role",
-    description: "Identify whether you are a Student, Faculty, Mentor, or Institution.",
-    section: "Identity",
-    screenIndex: 3,
-  },
-  {
-    stepNumber: 2,
-    id: "aiml_direction",
-    title: "Your AI/ML Direction",
-    shortLabel: "AI/ML Direction",
-    description: "Choose your target AI/ML role, specific goal, and timeline.",
-    section: "Direction",
-    screenIndex: 3.2,
-  },
-  {
-    stepNumber: 3,
-    id: "priorities",
-    title: "What Brings You to AI Tathastu?",
-    shortLabel: "Priorities",
-    description: "Select what you want to focus on first in Tathastu.",
-    section: "Direction",
-    screenIndex: 3.5,
-  },
-  {
-    stepNumber: 4,
-    id: "resume_upload",
-    title: "Resume / CV Upload",
-    shortLabel: "Resume & CV",
-    description: "Upload a PDF or DOCX resume for extraction and review (optional).",
-    section: "Profile",
-    screenIndex: 5,
-  },
-  {
-    stepNumber: 5,
-    id: "academic_details",
-    title: "Basic Academic Details",
-    shortLabel: "Academic Details",
-    description: "Confirm your degree, university, department, and graduation year when needed.",
-    section: "Profile",
-    screenIndex: 4,
-  },
-  {
-    stepNumber: 6,
-    id: "digital_profiles",
-    title: "Connect Digital Profiles",
-    shortLabel: "Digital Profiles",
-    description: "Link your GitHub, LinkedIn, or coding platform profiles.",
-    section: "Footprints",
-    screenIndex: 6,
-  },
-  {
-    stepNumber: 7,
-    id: "ai_analysis",
-    title: "Review & Analyze Information",
-    shortLabel: "AI Analysis",
-    description: "EORA analyzes your starting picture and synthesizes insights.",
-    section: "Review",
-    screenIndex: 7,
-  },
-  {
-    stepNumber: 8,
-    id: "profile_insights",
-    title: "Review Profile & Skills",
-    shortLabel: "Profile & Skills",
-    description: "Verify your confirmed skills and profile highlights.",
-    section: "Review",
-    screenIndex: 8,
-  },
-  {
-    stepNumber: 9,
-    id: "github_projects",
-    title: "Review Projects & Contributions",
-    shortLabel: "Projects",
-    description: "Confirm your self-reported projects and personal contributions.",
-    section: "Review",
-    screenIndex: 10,
-  },
-  {
-    stepNumber: 10,
-    id: "complete_launch",
-    title: "Finalize & Enter Dashboard",
-    shortLabel: "Launch",
-    description: "Complete your onboarding and transition to your live student workspace.",
-    section: "Launch",
-    screenIndex: 11,
-  },
+export const WELCOME_SCREEN = 2;
+
+const STUDENT_STEPS: OnboardingStepDefinition[] = [
+  { id: "platform_role", screen: 3, title: "Your role", shortLabel: "Role" },
+  { id: "aiml_direction", screen: 3.2, title: "Your AI/ML direction", shortLabel: "Direction" },
+  { id: "priorities", screen: 3.5, title: "What matters most", shortLabel: "Priorities" },
+  { id: "resume_upload", screen: 5, title: "Your CV", shortLabel: "CV" },
+  { id: "academic_details", screen: 4, title: "Your details", shortLabel: "Details" },
+  { id: "digital_profiles", screen: 6, title: "Your accounts", shortLabel: "Accounts" },
+  { id: "import", screen: 7, title: "Importing what we found", shortLabel: "Import" },
+  { id: "profile_review", screen: 8, title: "Review your profile", shortLabel: "Review" },
+  { id: "skills_map", screen: 9, title: "Your skills and their evidence", shortLabel: "Skills" },
+  { id: "projects", screen: 10, title: "Your projects", shortLabel: "Projects" },
+  { id: "finish", screen: 11, title: "Finish", shortLabel: "Finish" },
 ];
 
-export const TOTAL_ONBOARDING_STEPS = ONBOARDING_STEPS.length; // 10
+const FACULTY_STEPS: OnboardingStepDefinition[] = [
+  { id: "platform_role", screen: 3, title: "Your role", shortLabel: "Role" },
+  { id: "priorities", screen: 3.5, title: "What matters most", shortLabel: "Priorities" },
+  { id: "faculty_setup", screen: 3.7, title: "Your faculty account", shortLabel: "Account" },
+];
 
-export function getOnboardingStep(stepNumber: number): OnboardingStepDefinition {
-  const found = ONBOARDING_STEPS.find((s) => s.stepNumber === stepNumber);
-  return found || ONBOARDING_STEPS[0];
+export function onboardingSteps(role: OnboardingRole = "student"): OnboardingStepDefinition[] {
+  return role === "faculty" ? FACULTY_STEPS : STUDENT_STEPS;
 }
 
-export function getOnboardingStepLabels(): string[] {
-  return ONBOARDING_STEPS.map((s) => s.shortLabel);
+export type StepPosition = { number: number; total: number; step: OnboardingStepDefinition } | null;
+
+/** "Step n of N" for a screen, or null for the unnumbered welcome. */
+export function stepForScreen(screen: number, role: OnboardingRole = "student"): StepPosition {
+  const steps = onboardingSteps(role);
+  const index = steps.findIndex((s) => s.screen === screen);
+  if (index < 0) return null;
+  return { number: index + 1, total: steps.length, step: steps[index] };
 }
 
-export function getStepByScreenIndex(screenIndex: number): OnboardingStepDefinition | undefined {
-  return ONBOARDING_STEPS.find((s) => s.screenIndex === screenIndex);
+/** Back-compat for callers that only need the labels. */
+export function getOnboardingStepLabels(role: OnboardingRole = "student"): string[] {
+  return onboardingSteps(role).map((s) => s.shortLabel);
 }
 
-export function getScreenIndexByStepNumber(stepNumber: number): number {
-  const step = getOnboardingStep(stepNumber);
-  return step.screenIndex;
-}
+export const TOTAL_ONBOARDING_STEPS = STUDENT_STEPS.length;

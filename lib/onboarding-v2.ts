@@ -16,12 +16,14 @@ export const stageIds = [
   "certifications",
   "projects",
   "contribution",
-  "goal",
+  "goal", // legacy stage id: kept so drafts saved before Task 2.1.1 still parse
   "reveal",
 ] as const;
 export type StageId = (typeof stageIds)[number];
 export type SourceId = "github" | "linkedin" | "leetcode" | "hackerrank" | "hackerearth" | "codechef" | "portfolio" | "huggingface" | "orcid" | "kaggle" | "devto" | "stackoverflow" | "google_scholar";
-export type Project = {
+export type Project = ReviewEditMeta & {
+  stars?: number;
+  isFork?: boolean;
   id: string;
   title: string;
   description?: string;
@@ -51,8 +53,6 @@ export type OnboardingDraft = {
   role: string;
   targetRole: string;
   targetRoleId?: string;
-  targetTimeline?: string;
-  customGoalText?: string;
   degree: string;
   specialization: string;
   institution?: string;
@@ -71,13 +71,12 @@ export type OnboardingDraft = {
   githubConsent: boolean;
   python: "yes" | "not_yet" | "";
   skills: string[];
-  techCandidates?: Array<{ name: string; category?: string; source: string; provenance?: string; sourceFile?: string }>;
+  techCandidates?: Array<ReviewEditMeta & { name: string; category?: string; source: string; provenance?: string; sourceFile?: string; status?: "candidate" | "rejected" }>;
   certifications: string[];
   projects: Project[];
   education?: OnboardingEducationEntry[];
   experiences?: OnboardingExperienceEntry[];
   achievements?: OnboardingAchievementEntry[];
-  goal: string;
   priorities?: string[];
   primaryPriority?: string;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
@@ -86,7 +85,16 @@ export type OnboardingDraft = {
   completed: boolean;
 };
 
-export type OnboardingEducationEntry = {
+/**
+ * Review edits (Task 2.1.4). `originKey` is the entry's merge key from when it
+ * was imported, kept after the student edits the fields the key is built from,
+ * so a late scraper write recognises the entry instead of re-adding the
+ * original. `editedFields` lists what the student changed. A rejected entry
+ * stays in the draft (hidden) for the same reason: so it is not re-imported.
+ */
+export type ReviewEditMeta = { originKey?: string; editedFields?: string[] };
+
+export type OnboardingEducationEntry = ReviewEditMeta & {
   institution: string;
   degree?: string;
   fieldOfStudy?: string;
@@ -96,11 +104,11 @@ export type OnboardingEducationEntry = {
   gpa?: string;
   percentage?: string;
   academicLevel?: "undergraduate" | "postgraduate" | "high_school" | "diploma" | "doctorate";
-  status?: "candidate" | "confirmed";
+  status?: "candidate" | "confirmed" | "rejected";
   source?: string;
 };
 
-export type OnboardingExperienceEntry = {
+export type OnboardingExperienceEntry = ReviewEditMeta & {
   company: string;
   role: string;
   type?: "employment" | "internship" | "freelance" | "founder" | "leadership" | "volunteering" | "other";
@@ -109,11 +117,11 @@ export type OnboardingExperienceEntry = {
   endDate?: string;
   highlights?: string[];
   technologies?: string[];
-  status?: "candidate" | "confirmed";
+  status?: "candidate" | "confirmed" | "rejected";
   source?: string;
 };
 
-export type OnboardingAchievementEntry = {
+export type OnboardingAchievementEntry = ReviewEditMeta & {
   title: string;
   category: "award" | "certification" | "competition" | "publication" | "patent" | "academic" | "other" | "hackathon" | "book";
   subType?: "patent_application" | "patent_granted" | "published_paper" | "manuscript" | "book" | "book_coauthor" | "hackathon" | "honor" | "other";
@@ -133,8 +141,6 @@ export const initialDraft: OnboardingDraft = {
   role: "",
   targetRole: "",
   targetRoleId: "",
-  targetTimeline: "",
-  customGoalText: "",
   degree: "",
   specialization: "",
   institution: "",
@@ -155,7 +161,6 @@ export const initialDraft: OnboardingDraft = {
   education: [],
   experiences: [],
   achievements: [],
-  goal: "",
   priorities: [],
   primaryPriority: undefined,
   completed: false,
@@ -182,13 +187,22 @@ export function safeDraft(value: unknown): OnboardingDraft {
           .slice(0, 80)
           .map((x) => x.slice(0, 120))
       : [];
+  const editMeta = (e: ReviewEditMeta): ReviewEditMeta => ({
+    ...(e.originKey ? { originKey: str(e.originKey, 400) } : {}),
+    ...(Array.isArray(e.editedFields) && e.editedFields.length ? { editedFields: strings(e.editedFields) } : {}),
+  });
   const profiles: OnboardingDraft["profiles"] = {};
   for (const id of ["github", "linkedin", "leetcode", "hackerrank", "hackerearth", "codechef", "portfolio", "huggingface", "orcid", "kaggle", "devto", "stackoverflow", "google_scholar"] as SourceId[]) {
     if (raw.profiles?.[id]) profiles[id] = str(raw.profiles[id], 300);
   }
+  // Graduation year as a number, from a number, a numeric string, or a year
+  // like "2027" typed into the academic-year field (BUG #2, Task 2.1.9).
+  const rawGrad = raw.expectedGraduationYear as unknown;
   const gradYear =
-    typeof raw.expectedGraduationYear === "number" && !isNaN(raw.expectedGraduationYear)
-      ? raw.expectedGraduationYear
+    typeof rawGrad === "number" && !isNaN(rawGrad)
+      ? rawGrad
+      : typeof rawGrad === "string" && /^(19|20)\d{2}$/.test(rawGrad.trim())
+      ? parseInt(rawGrad.trim(), 10)
       : raw.year && /20\d\d/.test(raw.year)
       ? parseInt(raw.year.match(/20\d\d/)![0], 10)
       : undefined;
@@ -205,8 +219,6 @@ export function safeDraft(value: unknown): OnboardingDraft {
     role: raw.role === "student" || raw.role === "faculty" ? raw.role : "",
     targetRole: str(raw.targetRole, 100),
     targetRoleId: raw.targetRoleId ? str(raw.targetRoleId, 60) : undefined,
-    targetTimeline: str(raw.targetTimeline, 80),
-    customGoalText: str(raw.customGoalText, 200),
     degree: str(raw.degree, 100),
     specialization: str(raw.specialization, 100),
     institution: str(raw.institution, 140),
@@ -248,6 +260,8 @@ export function safeDraft(value: unknown): OnboardingDraft {
             name: str(entry.name, 120), category: str(entry.category, 80) || undefined,
             source: str(entry.source, 160), provenance: str(entry.provenance, 80) || undefined,
             sourceFile: str(entry.sourceFile, 160) || undefined,
+            status: entry.status === "rejected" ? "rejected" as const : undefined,
+            ...editMeta(entry),
           }))
       : [],
     certifications: strings(raw.certifications),
@@ -267,6 +281,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
             url: str(p.url, 500),
             aiPurpose: str(p.aiPurpose, 1000),
             uncertaintyNotes: strings(p.uncertaintyNotes),
+            ...(typeof p.stars === "number" ? { stars: p.stars } : {}),
+            ...(p.isFork === true ? { isFork: true } : {}),
+            ...editMeta(p),
           }))
       : [],
     education: Array.isArray(raw.education)
@@ -285,8 +302,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
             academicLevel: ["undergraduate", "postgraduate", "high_school", "diploma", "doctorate"].includes(e.academicLevel || "")
               ? (e.academicLevel as OnboardingEducationEntry["academicLevel"])
               : undefined,
-            status: e.status === "confirmed" ? "confirmed" : "candidate",
+            status: e.status === "confirmed" || e.status === "rejected" ? e.status : "candidate",
             source: e.source ? str(e.source, 60) : undefined,
+            ...editMeta(e),
           }))
       : [],
     experiences: Array.isArray(raw.experiences)
@@ -304,8 +322,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
             endDate: e.endDate ? str(e.endDate, 30) : undefined,
             highlights: Array.isArray(e.highlights) ? strings(e.highlights) : undefined,
             technologies: Array.isArray(e.technologies) ? strings(e.technologies) : undefined,
-            status: e.status === "confirmed" ? "confirmed" : "candidate",
+            status: e.status === "confirmed" || e.status === "rejected" ? e.status : "candidate",
             source: e.source ? str(e.source, 60) : undefined,
+            ...editMeta(e),
           }))
       : [],
     achievements: Array.isArray(raw.achievements)
@@ -326,9 +345,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
             description: a.description ? str(a.description, 400) : undefined,
             candidateId: a.candidateId ? str(a.candidateId, 80) : undefined,
             source: a.source ? str(a.source, 60) : undefined,
+            ...editMeta(a),
           }))
       : [],
-    goal: str(raw.goal, 160),
     priorities,
     primaryPriority,
     discoveredResumeProfiles:

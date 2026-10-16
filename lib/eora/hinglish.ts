@@ -139,7 +139,7 @@ export const HINGLISH_ONBOARDING_GUIDE: Record<
 export function getHinglishIntentResponse(
   intent: string,
   context: EoraContext,
-  params?: Record<string, string>
+  _params?: Record<string, string>
 ): { text: string; animationState: any; actionLabel?: string; actionUrl?: string } {
   const studentFirstName = context.student.displayName
     ? context.student.displayName.split(" ")[0]

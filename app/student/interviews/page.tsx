@@ -1,13 +1,8 @@
-import { WorkspaceProvider } from "@/components/student/student-context";
-import { StudentLayout } from "@/components/student/student-layout";
-import { StudentInterviewsView } from "@/components/student/student-interviews-view";
+import type { Metadata } from "next";
+import { InterviewsView } from "@/components/dashboard/PlanViews";
 
-export default function StudentInterviewsPage() {
-  return (
-    <WorkspaceProvider>
-      <StudentLayout>
-        <StudentInterviewsView />
-      </StudentLayout>
-    </WorkspaceProvider>
-  );
+export const metadata: Metadata = { title: "Interview practice" };
+
+export default function Page() {
+  return <InterviewsView />;
 }

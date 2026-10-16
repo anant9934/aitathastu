@@ -1,13 +1,8 @@
-import { WorkspaceProvider } from "@/components/student/student-context";
-import { StudentLayout } from "@/components/student/student-layout";
-import { StudentAssessmentsView } from "@/components/student/student-assessments-view";
+import type { Metadata } from "next";
+import { AssessmentsView } from "@/components/dashboard/PlanViews";
 
-export default function StudentAssessmentsPage() {
-  return (
-    <WorkspaceProvider>
-      <StudentLayout>
-        <StudentAssessmentsView />
-      </StudentLayout>
-    </WorkspaceProvider>
-  );
+export const metadata: Metadata = { title: "Assessments" };
+
+export default function Page() {
+  return <AssessmentsView />;
 }

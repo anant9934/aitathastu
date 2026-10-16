@@ -1,18 +1,8 @@
-import { WorkspaceProvider } from "@/components/student/student-context";
-import { StudentLayout } from "@/components/student/student-layout";
-import { StudentProjectsView } from "@/components/student/student-projects-view";
+import type { Metadata } from "next";
+import { ProjectLedgerView } from "@/components/projects/ProjectLedgerView";
 
-export const metadata = {
-  title: "My Projects & Evidence | AI Tathastu",
-  description: "View confirmed projects, personal contribution boundaries, detected technologies, and applied artifacts.",
-};
+export const metadata: Metadata = { title: "Projects", description: "Your Project Evidence Ledger." };
 
-export default function StudentProjectsPage() {
-  return (
-    <WorkspaceProvider>
-      <StudentLayout>
-        <StudentProjectsView />
-      </StudentLayout>
-    </WorkspaceProvider>
-  );
+export default function ProjectsPage() {
+  return <ProjectLedgerView />;
 }

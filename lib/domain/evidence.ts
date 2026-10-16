@@ -1,5 +1,7 @@
 export type EvidenceSource =
   | "self_reported"
+  /** Added by the student on the skills page (Task 2.2.3). */
+  | "student_reported"
   | "resume_extracted"
   | "institutional"
   | "imported"

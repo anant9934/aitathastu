@@ -25,8 +25,8 @@ const EDU = [{ institution: "IIT Delhi", degree: "B.Tech", status: "candidate", 
 const CANDS = [{ name: "PyTorch", source: "github" }, { name: "Excel", source: "linkedin" }];
 
 async function main() {
-  const { useTestDatabase } = await import("./lib/test-db");
-  await useTestDatabase();
+  const { setupTestDatabase } = await import("./lib/test-db");
+  await setupTestDatabase();
   const { createUser } = await import("../lib/repositories/user-repository");
   const { hashPassword } = await import("../lib/auth/password");
   const { writeOnboardingDraft, mutateOnboardingDraft, readOnboardingDraft } = await import("../lib/services/onboarding-v2-service");

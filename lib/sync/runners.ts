@@ -89,6 +89,14 @@ const PLAIN_REASONS: Record<string, string> = {
   github_circuit_open: "GitHub is limiting requests right now. We'll retry automatically.",
   timeout: "It took too long to respond.",
   not_runnable: "This source isn't connected any more.",
+  leetcode_not_found: "LeetCode has no user with that username. Check it and save it again.",
+  hackerrank_invalid: "HackerRank didn't recognise that username. Check it and save it again.",
+  kaggle_invalid: "Kaggle didn't recognise that username or key. Check them and save again.",
+  scholar_invalid_id: "That research ID didn't match a profile. Check it and save it again.",
+  linkedin_bad_credentials: "LinkedIn didn't accept the email or password.",
+  linkedin_otp_timeout: "The LinkedIn code wasn't entered in time.",
+  linkedin_session_lost: "LinkedIn ended the sign-in session. Try connecting again.",
+  linkedin_worker_unavailable: "LinkedIn import isn't available right now. Try again later.",
 };
 
 const RECONNECT_CODES = new Set(["github_auth", "not_runnable"]);
@@ -121,11 +129,62 @@ export function describeOperation(op: SyncOperationRow) {
   };
 }
 
+/** One short "what we found" line per source, from the operation's result (Task 2.1.10). */
+export function describeFound(source: string, result: unknown): string | null {
+  const r = (result && typeof result === "object" ? result : {}) as Record<string, unknown>;
+  const n = (k: string) => (typeof r[k] === "number" ? (r[k] as number) : null);
+  const plural = (count: number, word: string) =>
+    `${count} ${count === 1 ? word : word.endsWith("y") ? `${word.slice(0, -1)}ies` : `${word}s`}`;
+  if (r.servedFromCache) return "Showing your last saved import";
+  switch (source) {
+    case "resume": return n("candidates") !== null ? `${plural(n("candidates")!, "item")} found` : null;
+    case "github": return n("recordsFetched") !== null ? `${plural(n("recordsFetched")!, "repository")} read` : null;
+    case "linkedin": return n("experiences") !== null ? `${plural(n("experiences")!, "role")}, ${plural(n("educations") ?? 0, "school")}` : null;
+    case "scholar": return n("papers") !== null ? `${plural(n("papers")!, "paper")} found` : null;
+    case "kaggle": return n("datasets") !== null ? `${plural(n("datasets")!, "dataset")}, ${plural(n("notebooks") ?? 0, "notebook")}` : null;
+    case "leetcode": return n("totalSolved") !== null ? `${n("totalSolved")} problems solved` : null;
+    case "hackerrank": return n("badges") !== null ? plural(n("badges")!, "badge") : null;
+    default: return null;
+  }
+}
+
+const RESUME_JOB_STATE: Record<string, SourceSyncState> = {
+  queued: "queued", running: "running", processing: "running",
+  review_ready: "succeeded", completed: "succeeded",
+  failed: "failed", retry: "failed", timed_out: "timed_out", cancelled: "skipped_optional",
+};
+
+/**
+ * The CV is not on the sync ledger: its progress lives in source_processing_jobs.
+ * Folded into the same shape so one endpoint drives every progress UI (Task 2.1.3).
+ */
+async function describeResumeJob(personId: string) {
+  const { SourceProcessingJobService } = await import("@/lib/services/source-processing-job-service");
+  const job = (await SourceProcessingJobService.getJobsForPerson(personId, 10)).find((j) => j.sourceId === "resume");
+  if (!job) return null;
+  const state = RESUME_JOB_STATE[job.status] ?? "not_started";
+  const meta = (job.metadata ?? {}) as Record<string, unknown>;
+  return {
+    source: "resume" as SyncSource,
+    state,
+    stage: job.stage,
+    lastError: job.errorMessage,
+    reason: state === "failed" || state === "timed_out"
+      ? "We couldn't read your CV. You can upload it again or fill in the details yourself."
+      : job.stage === "awaiting_extractor" ? "Our document reader is waking up; this can take up to a minute." : null,
+    // A CV is re-uploaded, not retried, so there is no Retry button for it.
+    canRetry: false,
+    finishedAt: job.completedAt?.toISOString() ?? null,
+    found: describeFound("resume", meta),
+  };
+}
+
 export async function getSyncStatus(personId: string) {
-  const ops = await latestSyncOperations(personId);
+  const [ops, resume] = await Promise.all([latestSyncOperations(personId), describeResumeJob(personId)]);
   const sources = SYNC_SOURCES.map((source) => {
+    if (source === "resume" && resume) return resume;
     const op = ops.find((o) => o.source === source);
-    return op ? describeOperation(op) : { source, state: "not_started" as SourceSyncState, canRetry: false };
+    return op ? { ...describeOperation(op), found: describeFound(source, op.result) } : { source, state: "not_started" as SourceSyncState, canRetry: false };
   });
   return { sources, aggregate: aggregateOnboardingStatus(sources.map((s) => ({ source: s.source, state: s.state, lastError: "lastError" in s ? s.lastError : null }))) };
 }

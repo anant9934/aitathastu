@@ -22,6 +22,7 @@ import { getDb, syncOperations } from "@/lib/db";
 import { CORRELATION_HEADER, generateCorrelationId, logger, type Logger } from "@/lib/logger";
 import { transition, type SourceSyncState, type SyncSource, type TransitionTrigger } from "./state-machine";
 import { SOURCE_SYNC_POLICY, USER_TRIGGER_DEDUPE_WINDOW_MS, retryBackoffMs } from "./policy";
+import { invalidateStudentCache } from "../cache/response-cache";
 
 export type SyncOperationRow = typeof syncOperations.$inferSelect;
 export type SyncTrigger = Extract<TransitionTrigger, "user" | "scheduler">;
@@ -115,6 +116,8 @@ export async function setOperationResult(operation: SyncOperationRow, patch: Rec
     .where(and(eq(syncOperations.id, operation.id), eq(syncOperations.state, operation.state)))
     .returning();
   if (!row) throw new Error(`Sync operation ${operation.id} changed state concurrently (expected ${operation.state}).`);
+  // The dashboard shows sync state and what was imported (Task 2.6.1).
+  await invalidateStudentCache(row.personId);
   return row;
 }
 
@@ -126,6 +129,8 @@ async function setState(operation: SyncOperationRow, to: SourceSyncState, by: Tr
     .where(and(eq(syncOperations.id, operation.id), eq(syncOperations.state, operation.state)))
     .returning();
   if (!row) throw new Error(`Sync operation ${operation.id} changed state concurrently (expected ${operation.state}).`);
+  // The dashboard shows sync state and what was imported (Task 2.6.1).
+  await invalidateStudentCache(row.personId);
   return row;
 }
 

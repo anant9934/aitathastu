@@ -1,11 +1,11 @@
-import { EcosystemLanding } from "@/components/landing/EcosystemLanding";
 import type { Metadata } from "next";
+import { Landing } from "@/components/landing/Landing";
 
 export const metadata: Metadata = {
-  title: "AI Tathastu — You imagine. AI makes it happen.",
-  description: "Explore the AI Tathastu ecosystem for learning, building, collaboration and growth, with EORA helping you find your next step.",
+  title: { absolute: "AI Tathastu · One honest picture of what you can do in AI and ML" },
+  description: "Turn your CV, GitHub and other profiles into a skills profile where every claim shows its evidence, and see your next step toward the AI/ML role you want.",
 };
 
 export default function Home() {
-  return <EcosystemLanding />;
+  return <Landing />;
 }

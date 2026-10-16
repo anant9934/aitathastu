@@ -6,9 +6,9 @@
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import { and, eq, desc } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
-before(async () => { await useTestDatabase(); });
+before(async () => { await setupTestDatabase(); });
 after(async () => { const { closeDbForTesting } = await import("../lib/db"); await closeDbForTesting(); });
 
 describe("2.2.2 profile edits", () => {

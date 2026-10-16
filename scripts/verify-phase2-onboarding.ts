@@ -8,7 +8,7 @@
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
 const LEGACY = {
   role: "student", name: "Legacy Draft", targetRole: "ML Engineer", targetRoleId: "ml_engineer",
@@ -16,7 +16,7 @@ const LEGACY = {
   priorities: ["learning"], primaryPriority: "learning", resume: "skipped",
 };
 
-before(async () => { await useTestDatabase(); });
+before(async () => { await setupTestDatabase(); });
 after(async () => { const { closeDbForTesting } = await import("../lib/db"); await closeDbForTesting(); });
 
 describe("2.1.1 big goal / timeline removed", () => {

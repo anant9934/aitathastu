@@ -68,7 +68,9 @@ export class IntelligenceRouter {
     latencyMs: number,
     status: "success" | "fallback" | "error"
   ) {
-    if (process.env.NODE_ENV === "test") return;
+    // Awaited by every caller (Task 2.6.2): a detached promise can be frozen when a
+    // serverless invocation ends, dropping the row. Tests opt in to exercise it.
+    if (process.env.NODE_ENV === "test" && process.env.AI_AUDIT_IN_TESTS !== "true") return;
     try {
       const db = await getDb();
       const id = `audit_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
@@ -94,7 +96,7 @@ export class IntelligenceRouter {
     if (process.env.CORE_DISABLE_LIVE_LLM === "true" || !coreIngestionReady()) {
       const fallbackRes = executeDeterministicFallback(request);
       const finalResponse = { ...fallbackRes, latencyMs: Date.now() - startTime };
-      void this.logAudit(request, finalResponse, finalResponse.latencyMs, "fallback");
+      await this.logAudit(request, finalResponse, finalResponse.latencyMs, "fallback");
       return finalResponse;
     }
 
@@ -104,7 +106,7 @@ export class IntelligenceRouter {
       const fallbackRes = executeDeterministicFallback(request);
       const latencyMs = Date.now() - startTime;
       const finalFallbackResponse = { ...fallbackRes, latencyMs, quotaExceeded: quota.reason };
-      void this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
+      await this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
       return finalFallbackResponse;
     }
 
@@ -116,7 +118,7 @@ export class IntelligenceRouter {
           const finalResponse = { ...res, latencyMs };
           await settleAiQuota(quota, estimateTokens(request.userPrompt + request.systemPrompt + res.content));
 
-          void this.logAudit(request, finalResponse, latencyMs, "success");
+          await this.logAudit(request, finalResponse, latencyMs, "success");
           return finalResponse;
         } catch {
           // Provider failure (429 or 5xx) -> set 60s cooldown
@@ -132,7 +134,7 @@ export class IntelligenceRouter {
     const latencyMs = Date.now() - startTime;
     const finalFallbackResponse = { ...fallbackRes, latencyMs };
 
-    void this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
+    await this.logAudit(request, finalFallbackResponse, latencyMs, "fallback");
     return finalFallbackResponse;
   }
 
@@ -189,7 +191,7 @@ export class IntelligenceRouter {
           attempts.push({ provider: provider.name, outcome: "ok", ms: Date.now() - t0 });
           await settleAiQuota(quota, res.totalTokens ?? estimateTokens(request.systemPrompt + request.userPrompt + res.content));
           const response: CompletionResponse = { content: res.content, provider: provider.name, modelUsed: res.modelUsed, fallbackUsed: false, latencyMs: Date.now() - started };
-          void this.logAudit(request, response, Date.now() - started, attempts.length > 1 ? "fallback" : "success");
+          await this.logAudit(request, response, Date.now() - started, attempts.length > 1 ? "fallback" : "success");
           return { data: parsed.data, provider: provider.name, model: res.modelUsed, attempts, latencyMs: Date.now() - started };
         } catch (error) {
           const ms = Date.now() - t0;

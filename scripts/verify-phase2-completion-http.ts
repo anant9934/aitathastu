@@ -18,8 +18,8 @@ const BODY = {
 };
 
 async function main() {
-  const { useTestDatabase } = await import("./lib/test-db");
-  const db = await useTestDatabase();
+  const { setupTestDatabase } = await import("./lib/test-db");
+  const db = await setupTestDatabase();
   const t = await import("../lib/db");
   const { createUser } = await import("../lib/repositories/user-repository");
   const { hashPassword } = await import("../lib/auth/password");

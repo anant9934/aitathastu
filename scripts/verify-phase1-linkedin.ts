@@ -12,7 +12,7 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { and, eq } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
 process.env.RESUME_EXTRACTOR_URL = process.env.TEST_EXTRACTOR_URL || "http://127.0.0.1:18800";
 process.env.EXTRACTOR_API_TOKEN = "local-phase1-extractor-token-0123456789";
@@ -20,14 +20,14 @@ process.env.EXTERNAL_TOKEN_ENCRYPTION_KEY ||= "test-encryption-key-test-encrypti
 delete process.env.UPSTASH_REDIS_REST_URL;
 
 let workerUp = false;
-let db: Awaited<ReturnType<typeof useTestDatabase>>;
+let db: Awaited<ReturnType<typeof setupTestDatabase>>;
 let schema: typeof import("../lib/db");
 let li: typeof import("../lib/services/linkedin-import-service");
 let conn: typeof import("../lib/repositories/connection-repository");
 
 before(async () => {
   workerUp = await fetch(`${process.env.RESUME_EXTRACTOR_URL}/health`).then((r) => r.ok).catch(() => false);
-  db = await useTestDatabase();
+  db = await setupTestDatabase();
   schema = await import("../lib/db");
   li = await import("../lib/services/linkedin-import-service");
   conn = await import("../lib/repositories/connection-repository");

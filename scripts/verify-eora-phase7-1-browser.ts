@@ -22,7 +22,6 @@
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { createSession } from "../lib/auth/session";
 
 const base = process.env.BASE_URL || "http://127.0.0.1:3000";
 const output = path.join(process.cwd(), process.env.EORA_SCREENSHOT_DIR || "docs/screenshots/eora-phase7-1");
@@ -160,7 +159,7 @@ async function main() {
             completedTours: [],
           })
         );
-      } catch (e) {}
+      } catch {}
     });
 
     return { context, page };

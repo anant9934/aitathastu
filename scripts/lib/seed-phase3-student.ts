@@ -5,11 +5,11 @@
  *
  *   node --import tsx scripts/lib/seed-phase3-student.ts [rich|empty]
  */
-import { useTestDatabase } from "./test-db";
+import { setupTestDatabase } from "./test-db";
 
 async function main() {
   const kind = process.argv[2] === "empty" ? "empty" : "rich";
-  await useTestDatabase();
+  await setupTestDatabase();
   const { createUser } = await import("../../lib/repositories/user-repository");
   const { hashPassword } = await import("../../lib/auth/password");
   const { completeOnboarding } = await import("../../lib/services/onboarding-v2-service");

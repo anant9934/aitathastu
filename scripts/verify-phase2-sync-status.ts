@@ -9,10 +9,10 @@ import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import crypto from "crypto";
 import { eq } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
-let db: Awaited<ReturnType<typeof useTestDatabase>>;
-before(async () => { db = await useTestDatabase(); });
+let db: Awaited<ReturnType<typeof setupTestDatabase>>;
+before(async () => { db = await setupTestDatabase(); });
 after(async () => { const { closeDbForTesting } = await import("../lib/db"); await closeDbForTesting(); });
 
 async function addResumeJob(personId: string, status: string, stage: string, metadata: Record<string, unknown> = {}) {

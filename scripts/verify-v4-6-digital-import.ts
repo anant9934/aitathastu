@@ -15,10 +15,8 @@
  * 10. Step 8 Candidate Propagation & Source Badge Ledger Integrity
  */
 
-import crypto from "crypto";
 import { DigitalSourceImportOrchestrator } from "../lib/services/digital-source-import-orchestrator";
 import { isSafePublicUrl } from "../lib/connectors/portfolio/client";
-import { isValidOrcidChecksum } from "../lib/services/digital-footprint-registry";
 import { getDb, evidenceItems, projects, externalConnections } from "../lib/db";
 import { createUser } from "../lib/repositories/user-repository";
 import { eq } from "drizzle-orm";

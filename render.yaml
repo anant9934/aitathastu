@@ -32,8 +32,8 @@ services:
       - key: MAX_PAGES
         value: "20"
       - key: MAX_OCR_SECONDS
-        value: "30"
+        value: "90"
       - key: MAX_PROCESSING_SECONDS
-        value: "120"
+        value: "180"
       - key: WORKERS
         value: "2"

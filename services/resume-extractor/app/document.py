@@ -88,7 +88,7 @@ def _order(blocks,width):
 
 def _words(im,config,seconds):
     """Tesseract word boxes, in its own block/paragraph/line order."""
-    d=_tesseract(pytesseract.image_to_data,im,config=config,timeout=seconds,output_type=pytesseract.Output.DICT)
+    d=_tesseract(pytesseract.image_to_data,im,lang='eng',config=config,timeout=seconds,output_type=pytesseract.Output.DICT)
     out=[]
     for i,t in enumerate(d['text']):
         t=(t or '').strip()
@@ -104,10 +104,17 @@ def _ocr(im,page,seconds,warnings):
     word boxes in layout_page let the caller rebuild multi-column reading order."""
     im_gray = ImageOps.exif_transpose(im).convert('L')
     if min(im_gray.size)<500: warnings.append(f'Page {page}: low resolution, OCR may be unreliable.')
+
+    # Resize overly large scans to speed up OCR and prevent timeouts on low-CPU containers
+    max_dim = max(im_gray.width, im_gray.height)
+    if max_dim > 1500:
+        ratio = 1500.0 / max_dim
+        im_gray = im_gray.resize((int(im_gray.width * ratio), int(im_gray.height * ratio)), Image.Resampling.LANCZOS)
+
     # Only detect orientation if image is landscape (unusual for portrait resumes)
     if im_gray.width > im_gray.height * 1.2:
         try:
-            orientation = _tesseract(pytesseract.image_to_osd,im_gray,timeout=min(2,seconds))
+            orientation = _tesseract(pytesseract.image_to_osd,im_gray,timeout=min(4,seconds))
             match = re.search(r'Rotate: (\d+)',orientation)
             if match and int(match.group(1)) in (90,180,270):
                 im_gray = im_gray.rotate(-int(match.group(1)),expand=True)
@@ -118,15 +125,28 @@ def _ocr(im,page,seconds,warnings):
 
     im_enhanced = ImageOps.autocontrast(im_gray)
     words = []
-    # psm 3 first, then tesseract's default, then psm 6 (single uniform block) on raw grayscale.
-    for img,config in ((im_enhanced,'--psm 3'),(im_enhanced,''),(im_gray,'--psm 6')):
+    # psm 3 first, then psm 6 (single uniform block) on raw grayscale.
+    for img,config in ((im_enhanced,'--psm 3'),(im_gray,'--psm 6')):
         try:
             words = _words(img,config,seconds)
         except OcrEngineUnavailable:
             raise
-        except Exception:
+        except Exception as e:
+            print(f'[_ocr] Tesseract image_to_data error page {page} ({config}): {type(e).__name__}: {e}', flush=True)
             words = []
         if sum(len(w['text']) for w in words) >= 30: break
+
+    # Fallback to direct string extraction if word boxes produced insufficient text
+    if sum(len(w['text']) for w in words) < 30:
+        try:
+            raw_str = _tesseract(pytesseract.image_to_string, im_enhanced, lang='eng', timeout=seconds)
+            if raw_str and len(raw_str.strip()) >= 30:
+                raw_lines = [l.strip() for l in raw_str.splitlines() if l.strip()]
+                words = []
+                for i, text in enumerate(raw_lines):
+                    words.append({'x0': 0.0, 'y0': float(i * 18), 'x1': 100.0, 'y1': float(i * 18 + 14), 'text': text, 'key': (1, 1, i)})
+        except Exception as e:
+            print(f'[_ocr] Tesseract image_to_string fallback error page {page}: {type(e).__name__}: {e}', flush=True)
 
     grouped = {}
     for w in words: grouped.setdefault(w['key'],[]).append(w)

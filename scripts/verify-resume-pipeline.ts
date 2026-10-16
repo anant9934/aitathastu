@@ -115,7 +115,8 @@ test("skip-ahead: only fully accepted sections are skipped", () => {
     { fullName: "K", institution: "LPU", degree: "B.Tech" }
   );
   assert.deepEqual(covered, [4, 6, 10]);
-  assert.equal(nextOnboardingScreen(5, covered), 7, "academic and links skipped");
+  assert.equal(nextOnboardingScreen(5, covered), 5.5, "footprint intelligence follows CV");
+  assert.equal(nextOnboardingScreen(5.5, covered), 7, "academic and links skipped");
   assert.equal(nextOnboardingScreen(8, covered), 9, "skills had a rejection, so it is shown");
   assert.equal(nextOnboardingScreen(9, covered), 11, "projects skipped");
   assert.deepEqual(resumeCoveredScreens({}, { fullName: "K", institution: "LPU" }), [], "degree not accepted");

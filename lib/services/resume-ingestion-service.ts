@@ -39,6 +39,7 @@ import { resumeCandidates, saveResumeCandidates } from "./resume-review-service"
 import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
+import { runLocalOcrFallback } from "@/lib/resume/local-ocr";
 
 export type ResumeFailureCode =
   | "DOCUMENT_RETRIEVAL_FAILED"
@@ -284,7 +285,25 @@ async function runInProcessStep(job: SourceProcessingJob) {
   }
 
   if (extension === "docx") throw new PipelineFailure("NATIVE_TEXT_UNAVAILABLE");
-  if (!ExtractorServiceClient.isConfigured()) throw new PipelineFailure("OCR_SERVICE_NOT_CONFIGURED");
+  if (!ExtractorServiceClient.isConfigured()) {
+    try {
+      const local = await runLocalOcrFallback(doc.buffer, extension);
+      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
+        await finalize(job, documentId, {
+          text: local.text,
+          hyperlinks: local.hyperlinks,
+          fileFormat: extension,
+          pageCount: local.pageCount,
+          ocrUsed: true,
+          via: "local-ocr",
+        });
+        return;
+      }
+    } catch (localErr) {
+      console.warn("[resume-pipeline] local OCR fallback failed:", localErr);
+    }
+    throw new PipelineFailure("OCR_SERVICE_NOT_CONFIGURED");
+  }
 
   // Hand the scan to the extractor. Both calls are short: upload stores the
   // file, startExtraction only queues a background task there.
@@ -322,6 +341,23 @@ async function runInProcessStep(job: SourceProcessingJob) {
       });
       return;
     }
+    // Attempt local OCR rescue before failing the pipeline
+    try {
+      const local = await runLocalOcrFallback(doc.buffer, extension);
+      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
+        await finalize(job, documentId, {
+          text: local.text,
+          hyperlinks: local.hyperlinks,
+          fileFormat: extension,
+          pageCount: local.pageCount,
+          ocrUsed: true,
+          via: "local-ocr-rescue",
+        });
+        return;
+      }
+    } catch (rescueErr) {
+      console.warn("[resume-pipeline] local OCR rescue on upload error failed:", rescueErr);
+    }
     throw new PipelineFailure(code, err);
   }
 }
@@ -347,6 +383,30 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
   }
 
   if (status.status === "failed") {
+    // Before failing, attempt rescue with local OCR
+    try {
+      const doc = await ObjectStorageService.getDocument(meta(job).documentId as string, job.personId);
+      const local = await runLocalOcrFallback(doc.buffer, "pdf");
+      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
+        const claimed = await SourceProcessingJobService.transition({
+          jobId: job.id, personId: job.personId, from: ["processing"], fromStage: "extract",
+          to: "processing", stage: "persist", metadata: { claimedAt: Date.now() },
+        });
+        if (claimed) {
+          await finalize(claimed, meta(claimed).documentId as string, {
+            text: local.text,
+            hyperlinks: local.hyperlinks,
+            fileFormat: "pdf",
+            pageCount: local.pageCount,
+            ocrUsed: true,
+            via: "local-ocr-rescue",
+          });
+          return;
+        }
+      }
+    } catch (rescueErr) {
+      console.warn("[resume-pipeline] local OCR rescue on failed extractor status failed:", rescueErr);
+    }
     const code: ResumeFailureCode = status.error_code === "OCR_ENGINE_UNAVAILABLE" ? "OCR_ENGINE_UNAVAILABLE" : "OCR_EXTRACTION_ERROR";
     throw new PipelineFailure(code, { extractorErrorCode: status.error_code ?? null, warnings: status.warnings });
   }
@@ -367,9 +427,27 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
     // Word boxes -> reading order. Documents processed before the extractor
     // returned positions fall back to its line text.
     text = raw.pages?.length ? reconstructReadingOrder(raw.pages, hyperlinks) : raw.raw_text || "";
+    if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS && raw.raw_text) {
+      text = raw.raw_text;
+    }
     pageCount = raw.pages?.length || 1;
   } catch (err) {
     throw new PipelineFailure(classifyExtractorError(err), err);
+  }
+
+  if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
+    // Rescue local OCR
+    try {
+      const doc = await ObjectStorageService.getDocument(meta(claimed).documentId as string, job.personId);
+      const local = await runLocalOcrFallback(doc.buffer, "pdf");
+      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
+        text = local.text;
+        hyperlinks = [...new Set([...hyperlinks, ...local.hyperlinks])];
+        pageCount = local.pageCount || pageCount;
+      }
+    } catch (rescueErr) {
+      console.warn("[resume-pipeline] local OCR rescue on empty text failed:", rescueErr);
+    }
   }
 
   if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {

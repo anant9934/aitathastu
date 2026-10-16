@@ -8,7 +8,7 @@
  *   node --import tsx scripts/visual-phase2-review.ts <outDir>
  */
 import path from "path";
-import { chromium, type Page } from "playwright";
+import { chromium } from "playwright";
 
 const BASE = process.env.VISUAL_BASE_URL || "http://localhost:3100";
 const out = process.argv[2] || ".";
@@ -19,8 +19,8 @@ const PROJ = { id: "gh_rag", title: "rag-notes", description: "Retrieval over le
 const CANDS = [{ name: "torch", source: "github" }, { name: "jquery", source: "github" }, { name: "Docker", source: "github" }];
 
 async function main() {
-  const { useTestDatabase } = await import("./lib/test-db");
-  await useTestDatabase();
+  const { setupTestDatabase } = await import("./lib/test-db");
+  await setupTestDatabase();
   const { createUser } = await import("../lib/repositories/user-repository");
   const { hashPassword } = await import("../lib/auth/password");
   const { writeOnboardingDraft, mutateOnboardingDraft, readOnboardingDraft } = await import("../lib/services/onboarding-v2-service");

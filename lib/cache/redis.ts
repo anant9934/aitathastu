@@ -26,6 +26,7 @@ export async function redisPipeline(commands: RedisCommand[], timeoutMs = 800): 
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(commands.map((c) => c.map(String))),
       signal: AbortSignal.timeout(timeoutMs),
+      cache: "no-store",
     });
   } catch (error) {
     throw new RedisUnavailableError(`Redis request failed: ${error instanceof Error ? error.message : String(error)}`);

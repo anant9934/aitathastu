@@ -12,11 +12,8 @@
 
 import {
   PAGE_CONTRACTS,
-  getPageContract,
   resolvePageContract,
-  getAllPageContracts,
   getCoverageReport,
-  type EoraPageContract
 } from "../lib/eora/page-registry";
 
 import {
@@ -27,21 +24,17 @@ import {
 import {
   getIntentResponse,
   getRouteWelcomeMessage,
-  type EoraMessage
 } from "../lib/eora/dialogue";
 
 import {
   createDefaultContext,
   type EoraContext,
-  type StudentContext
 } from "../lib/eora/context";
 
 import {
   executeSafeAction,
   isActionSafe,
-  ALLOWED_EORA_ACTIONS,
-  ALLOWED_NAVIGATION_ROUTES,
-  type EoraSafeAction
+  type EoraSafeAction,
 } from "./lib/eora-actions";
 
 interface TestResult {

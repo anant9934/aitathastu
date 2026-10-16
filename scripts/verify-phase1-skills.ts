@@ -1,7 +1,7 @@
 /** Tasks 1.3.1 / 1.3.2: deterministic evidence-based confidence + the 7 explainability answers. */
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 import { scoreSkillConfidence, type ScoringObservation } from "../lib/domain/skill-confidence";
 
 const o = (id: string, source: string, sourceType: string): ScoringObservation => ({ id, source, sourceType });
@@ -57,7 +57,7 @@ describe("1.3.1 scoring tiers", () => {
 
 describe("1.3.1 / 1.3.2 through getSkillsIntelligence (local Postgres)", () => {
   let schema: typeof import("../lib/db");
-  before(async () => { await useTestDatabase(); schema = await import("../lib/db"); });
+  before(async () => { await setupTestDatabase(); schema = await import("../lib/db"); });
   after(async () => { await schema.closeDbForTesting(); });
 
   test("scores come from real evidence; platform scores are not graded assessments; every skill answers all 7 questions with ids", async () => {

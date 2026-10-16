@@ -89,7 +89,7 @@ async function main() {
     };
     const user = async () => {
       const edits: Record<string, unknown>[] = [
-        { institution: "IIT D" }, { degree: "B.Tech CSE" }, { goal: "ML Engineer" }, { targetRole: "MLE" },
+        { institution: "IIT D" }, { degree: "B.Tech CSE" }, { specialization: "Machine Learning" }, { targetRole: "MLE" },
         { year: "3rd" }, { semester: "6" }, { profiles: { linkedin: "https://linkedin.com/in/me" } },
         { institution: "IIT Delhi" }, { name: "Typed Name" },
       ];
@@ -114,7 +114,7 @@ async function main() {
       assert.equal(draft.name, "Typed Name", "user's name must win over the resume fill");
       assert.equal(draft.institution, "IIT Delhi");
       assert.equal(draft.degree, "B.Tech CSE");
-      assert.equal(draft.goal, "ML Engineer");
+      assert.equal(draft.specialization, "Machine Learning");
       assert.equal(draft.targetRole, "MLE");
       assert.equal(draft.year, "3rd");
       assert.equal(draft.semester, "6");

@@ -1,8 +1,8 @@
 /** Local-only fixture for visually checking the sync-status panel (Task 1.9.4). */
-import { useTestDatabase } from "./test-db";
+import { setupTestDatabase } from "./test-db";
 
 async function main() {
-  const db = await useTestDatabase();
+  const db = await setupTestDatabase();
   const { syncOperations } = await import("../../lib/db");
   const { createUser } = await import("../../lib/repositories/user-repository");
   const { hashPassword } = await import("../../lib/auth/password");

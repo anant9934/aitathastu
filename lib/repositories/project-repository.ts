@@ -16,6 +16,7 @@ import type {
   ProjectVisibility,
   ProjectType,
 } from "../domain/project-taxonomy";
+import { importMetadata, sanitizeLedgerMetadata, EDITABLE_PROJECT_FIELDS, type EditableProjectField, type ProjectLedgerMetadata } from "../domain/project-ledger";
 
 export type CreateProjectInput = {
   title: string;
@@ -41,6 +42,8 @@ export type CreateProjectInput = {
   aiDetails?: AiMlDetailsRecord;
   hardwareDetails?: HardwareDetailsRecord;
   media?: unknown[];
+  /** Import-owned ledger metadata (stars, forks, isFork, languages); see lib/domain/project-ledger.ts. */
+  metadata?: Partial<ProjectLedgerMetadata>;
 };
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -98,19 +101,24 @@ export async function saveProject(personId: string, input: CreateProjectInput, a
     const unionJsonArray = (column: typeof projects.sources | typeof projects.technologies, values: string[]): SQL =>
       sql`(SELECT coalesce(jsonb_agg(DISTINCT v ORDER BY v), '[]'::jsonb) FROM jsonb_array_elements(coalesce(${column}, '[]'::jsonb) || ${JSON.stringify(values)}::jsonb) AS v)`;
     const targetStatus = existing[0].status === "confirmed" ? "confirmed" : (input.status ?? existing[0].status);
+    // Fields the student edited are theirs: a re-import never overwrites them (Task 2.2.4).
+    const existingMeta = sanitizeLedgerMetadata(existing[0].metadata);
+    const edited = new Set(existingMeta.editedFields ?? []);
+    const keep = <T,>(field: EditableProjectField, incoming: T | undefined, current: T) => (edited.has(field) || incoming === undefined ? current : incoming);
 
     const [updated] = await db
       .update(projects)
       .set({
-        summary: input.summary ?? existing[0].summary,
-        description: input.description ?? existing[0].description,
+        summary: keep("summary", input.summary, existing[0].summary),
+        description: keep("description", input.description, existing[0].description),
         category: input.category ?? existing[0].category,
         purpose: input.purpose ?? existing[0].purpose,
         visibility: input.visibility ?? existing[0].visibility,
         projectType: input.projectType ?? existing[0].projectType,
-        repositoryUrl: input.repositoryUrl !== undefined ? input.repositoryUrl : existing[0].repositoryUrl,
-        demoUrl: input.demoUrl !== undefined ? input.demoUrl : existing[0].demoUrl,
-        technologies: unionJsonArray(projects.technologies, input.technologies || []),
+        repositoryUrl: keep("repositoryUrl", input.repositoryUrl, existing[0].repositoryUrl),
+        demoUrl: keep("demoUrl", input.demoUrl, existing[0].demoUrl),
+        technologies: edited.has("technologies") ? existing[0].technologies : unionJsonArray(projects.technologies, input.technologies || []),
+        metadata: { ...existingMeta, ...importMetadata(input.metadata) },
         sources: unionJsonArray(projects.sources, input.sources || []),
         status: targetStatus,
         links: input.links ?? existing[0].links,
@@ -152,6 +160,8 @@ export async function saveProject(personId: string, input: CreateProjectInput, a
       aiDetails: input.aiDetails || {},
       hardwareDetails: input.hardwareDetails || {},
       media: input.media || [],
+      metadata: importMetadata(input.metadata),
+      portfolioIncluded: (input.status || "confirmed") === "confirmed",
       createdAt: now,
       updatedAt: now,
     })
@@ -205,6 +215,11 @@ export async function updateProject(
   updates: Partial<CreateProjectInput> & {
     contributionRoles?: string[];
     contributionNote?: string;
+    /** Ledger (Task 2.5): portfolio toggle and student-owned metadata (role, highlight, aiSummary, preview). */
+    portfolioIncluded?: boolean;
+    ledgerMetadata?: Partial<ProjectLedgerMetadata>;
+    /** Set when the student edited fields in place, so imports leave them alone. */
+    markEdited?: boolean;
   }
 ) {
   const db = await getDb();
@@ -243,6 +258,20 @@ export async function updateProject(
   if (updates.aiDetails !== undefined) patch.aiDetails = updates.aiDetails;
   if (updates.hardwareDetails !== undefined) patch.hardwareDetails = updates.hardwareDetails;
   if (updates.media !== undefined) patch.media = updates.media;
+  if (updates.portfolioIncluded !== undefined) patch.portfolioIncluded = updates.portfolioIncluded;
+  if (updates.ledgerMetadata !== undefined || updates.markEdited) {
+    const current = sanitizeLedgerMetadata(existing.metadata);
+    const editedNow = updates.markEdited
+      ? EDITABLE_PROJECT_FIELDS.filter((f) => updates[f] !== undefined && JSON.stringify(updates[f]) !== JSON.stringify(existing[f]))
+      : [];
+    // Import-owned keys (stars, forks, ...) are not writable from here.
+    const { stars: _s, forks: _f, isFork: _i, languages: _l, ...studentOwned } = updates.ledgerMetadata ?? {};
+    patch.metadata = sanitizeLedgerMetadata({
+      ...current,
+      ...studentOwned,
+      editedFields: [...new Set([...(current.editedFields ?? []), ...editedNow])],
+    });
+  }
 
   const [updatedProject] = await db
     .update(projects)

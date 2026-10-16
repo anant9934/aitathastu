@@ -14,7 +14,6 @@ import { scoreSkillConfidence, type SkillConfidence } from "@/lib/domain/skill-c
  * 8. Dashboard & PersonGraph Metric Harmonization (tracked, evidenced, demonstrated, assessed, verified)
  */
 
-import crypto from "crypto";
 import { getPerson360 } from "./person-360-service";
 import { getProjectsByPersonId, getProjectContributionsByPersonId, saveProjectContribution } from "../repositories/project-repository";
 import { getExternalConnections } from "../repositories/connection-repository";
@@ -26,7 +25,7 @@ import {
 import { createEvidenceRecord } from "../repositories/evidence-repository";
 import { AIML_ROLE_CATALOG, type AimlRoleDefinition } from "../domain/aiml-role-taxonomy";
 import { AI_ML_TECH_REGISTRY } from "../connectors/github/mapper";
-import { getDb, evidenceItems, projects } from "../db";
+import { getDb, projects } from "../db";
 import { eq, and } from "drizzle-orm";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,10 +428,10 @@ export class SkillIntelligenceService {
       person360,
       projectsList,
       contributionsList,
-      connectionsList,
+      _connectionsList,
       assessmentsList,
       codingList,
-      learningList,
+      _learningList,
     ] = await Promise.all([
       getPerson360(personId, personId),
       getProjectsByPersonId(personId),
@@ -648,7 +647,6 @@ export class SkillIntelligenceService {
       // Evaluate 5 Dimensions
       const resumeObs = observations.filter((o) => o.source === "resume");
       const githubObs = observations.filter((o) => o.source === "github");
-      const projectObs = observations.filter((o) => o.sourceType === "project_applied");
       const contribObs = observations.filter((o) => o.sourceType === "personal_contribution");
       const assessmentObs = observations.filter((o) => o.sourceType === "graded_assessment");
       const verifiedObs = observations.filter((o) => o.sourceType === "faculty_verification");
@@ -1012,7 +1010,7 @@ export class SkillIntelligenceService {
     skillName: string,
     observations: SkillObservation[],
     projects: Array<{ id: string; title: string; repositoryUrl?: string | null; roles: string[]; description?: string }>,
-    personalContrib?: PersonalContributionInfo
+    _personalContrib?: PersonalContributionInfo
   ): SkillEvidenceGraph {
     const nodes: SkillEvidenceGraphNode[] = [];
     const edges: SkillEvidenceGraphEdge[] = [];

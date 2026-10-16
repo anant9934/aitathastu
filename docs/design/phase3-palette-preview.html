@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graphite and Signal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+<script>
+  // Default is dark (D-2). A remembered choice wins; storage may be unavailable.
+  try { const t = localStorage.getItem("tathastu-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<style>
+/* Phase 3 colour system, Direction B (D-2). Planning artifact: not used by the app. */
+:root, [data-theme="dark"] {
+  --canvas:#0D1117; --surface:#161B22; --raised:#1C2330; --ink:#E6EDF3; --muted:#9AA6B2; --line:#2A313C; --line-strong:#6B7685;
+  --signal:#5B9CFF; --signal-hover:#7AB0FF; --on-signal:#0D1117; --highlight:#C3E66E; --on-highlight:#0D1117;
+  --verified:#4CC38A; --verified-bg:#12291E; --corroborated:#5B9CFF; --corroborated-bg:#15233A; --evidenced:#B98CFF; --evidenced-bg:#241A36; --gap:#8B95A1;
+  --warning:#E3B341; --warning-bg:#2D2412; --danger:#FF7B72; --danger-bg:#321717; --focus:#7AB0FF;
+  --shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 8px 24px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+[data-theme="light"] {
+  --canvas:#F3F5F8; --surface:#FFFFFF; --raised:#FFFFFF; --ink:#121820; --muted:#4F5B69; --line:#D5DBE3; --line-strong:#7B8695;
+  --signal:#1F5FCC; --signal-hover:#184DA8; --on-signal:#FFFFFF; --highlight:#C3E66E; --on-highlight:#121820;
+  --verified:#137A4B; --verified-bg:#E5F4EC; --corroborated:#1F5FCC; --corroborated-bg:#E6EEFC; --evidenced:#7239C4; --evidenced-bg:#F1E9FB; --gap:#6B7684;
+  --warning:#8A5A00; --warning-bg:#FBF1DC; --danger:#B8322A; --danger-bg:#FCE9E7; --focus:#1F5FCC;
+  --shadow:0 1px 2px rgba(18,24,32,.06), 0 6px 18px rgba(18,24,32,.06);
+  color-scheme:light;
+}
+* { box-sizing:border-box; }
+html { background:var(--canvas); }
+body { margin:0; background:var(--canvas); color:var(--ink); font:15px/1.55 "Geist", system-ui, sans-serif; transition:background-color 200ms ease, color 200ms ease; }
+::selection { background:var(--signal); color:var(--on-signal); }
+:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.mono { font-family:"Geist Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+.wrap { max-width:1180px; margin:0 auto; padding:24px 16px 64px; display:grid; gap:24px; }
+header.top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+h1 { margin:0; font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+.lede { margin:4px 0 0; color:var(--muted); max-width:70ch; }
+.toggle { display:inline-flex; padding:4px; gap:4px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
+.toggle button { min-height:40px; min-width:84px; padding:0 14px; border-radius:7px; border:0; background:transparent; color:var(--muted); font:inherit; font-weight:600; cursor:pointer; }
+.toggle button[aria-pressed="true"] { background:var(--raised); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line-strong); }
+section h2 { margin:0 0 12px; font-size:16px; font-weight:650; }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow:var(--shadow); }
+.compare { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; }
+.mode { border-radius:12px; padding:16px; border:1px solid; }
+.mode h3 { margin:0 0 10px; font-size:14px; font-weight:650; }
+.mode-dark { background:#0D1117; color:#E6EDF3; border-color:#2A313C; }
+.mode-light { background:#F3F5F8; color:#121820; border-color:#D5DBE3; }
+.sw { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:6px; }
+.sw div { border-radius:8px; overflow:hidden; font-size:11.5px; border:1px solid rgba(127,127,127,.25); }
+.sw i { display:block; height:34px; }
+.sw span { display:block; padding:4px 6px; }
+.sw b { display:block; font-weight:600; }
+.grid2 { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; align-items:start; }
+.row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; align-items:center; padding:12px 0; border-top:1px solid var(--line); }
+.row:first-of-type { border-top:0; }
+.row strong { font-weight:600; }
+.meta { color:var(--muted); font-size:13px; }
+.chip { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:6px; font-size:12px; font-weight:600; }
+.chip svg { width:12px; height:12px; }
+.c-verified { color:var(--verified); background:var(--verified-bg); }
+.c-corroborated { color:var(--corroborated); background:var(--corroborated-bg); }
+.c-evidenced { color:var(--evidenced); background:var(--evidenced-bg); }
+.c-gap { color:var(--gap); background:transparent; outline:1px dashed var(--gap); outline-offset:-1px; }
+.btns { display:flex; flex-wrap:wrap; gap:8px; }
+.btn { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0 16px; border-radius:8px; border:1px solid var(--line-strong); background:var(--raised); color:var(--ink); font:inherit; font-weight:600; cursor:pointer; transition:background-color 150ms ease, border-color 150ms ease, transform 150ms ease; }
+.btn:hover { border-color:var(--signal); }
+.btn:active { transform:scale(0.98); }
+.btn-primary { background:var(--signal); border-color:var(--signal); color:var(--on-signal); }
+.btn-primary:hover { background:var(--signal-hover); border-color:var(--signal-hover); }
+.btn-ghost { background:transparent; border-color:transparent; color:var(--signal); }
+.btn-danger { color:var(--danger); }
+.btn-danger:hover { border-color:var(--danger); background:var(--danger-bg); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.field { display:grid; gap:4px; margin-top:16px; }
+.field label { font-size:13px; font-weight:600; }
+.input { min-height:44px; padding:8px 12px; border-radius:8px; border:1px solid var(--line-strong); background:var(--canvas); color:var(--ink); font:inherit; font-size:16px; }
+.input[aria-invalid="true"] { border-color:var(--danger); }
+.err { color:var(--danger); font-size:13px; font-weight:500; }
+.help { color:var(--muted); font-size:13px; }
+.banner { display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:10px; font-size:14px; }
+.banner svg { flex:none; width:16px; height:16px; margin-top:2px; }
+.b-warning { background:var(--warning-bg); color:var(--warning); }
+.b-danger { background:var(--danger-bg); color:var(--danger); }
+.b-verified { background:var(--verified-bg); color:var(--verified); }
+.highlight { display:inline-block; padding:1px 6px; border-radius:4px; background:var(--highlight); color:var(--on-highlight); font-weight:600; }
+.type-scale p { margin:0 0 8px; }
+.stat { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+.stat > div { padding:14px; border-radius:10px; background:var(--raised); border:1px solid var(--line); }
+.stat b { display:block; font-size:24px; font-weight:650; letter-spacing:-0.02em; }
+.bar { height:8px; border-radius:4px; background:var(--line); overflow:hidden; margin-top:8px; }
+.bar i { display:block; height:100%; background:var(--signal); border-radius:4px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { text-align:left; padding:6px 8px; border-top:1px solid var(--line); }
+th { color:var(--muted); font-weight:600; }
+td.num { text-align:right; }
+.pass { color:var(--verified); font-weight:600; }
+@media (max-width:860px) { .compare, .grid2 { grid-template-columns:minmax(0,1fr); } .stat { grid-template-columns:minmax(0,1fr); } }
+@media (prefers-reduced-motion:reduce) { body, .btn { transition:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Direction B: Graphite and Signal</h1>
+      <p class="lede">Dark by default, with a designed light companion. Same hues and the same blue signal; lightness and contrast retuned for each surface. Every text pair passes WCAG AA (table below).</p>
+    </div>
+    <div class="toggle" role="group" aria-label="Theme">
+      <button type="button" data-set="dark">Dark</button>
+      <button type="button" data-set="light">Light</button>
+    </div>
+  </header>
+
+  <section aria-labelledby="cmp">
+    <h2 id="cmp">Both modes side by side</h2>
+    <div class="compare" id="compare"></div>
+  </section>
+
+  <section aria-labelledby="live">
+    <h2 id="live">Components in the current mode</h2>
+    <div class="grid2">
+      <div class="panel">
+        <h3 style="margin:0 0 4px;font-size:18px;font-weight:650">Python for machine learning</h3>
+        <p class="meta" style="margin:0 0 8px">Target role: Machine Learning Engineer · <span class="mono">4 evidence items</span></p>
+        <div class="row"><div><strong>Fine-tuned BERT classifier</strong><div class="meta">GitHub · <span class="mono">ev_9f21c4</span> · 214 commits</div></div><span class="chip c-verified"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9l5-6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>Verified</span></div>
+        <div class="row"><div><strong>Kaggle: Titanic survival model</strong><div class="meta">Kaggle · <span class="mono">ev_3ab0e7</span> · top 12%</div></div><span class="chip c-corroborated"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="4" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>Corroborated</span></div>
+        <div class="row"><div><strong>"Built ML pipelines" (CV bullet)</strong><div class="meta">CV · <span class="mono">ev_77d102</span></div></div><span class="chip c-evidenced"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="3" fill="currentColor"/></svg>Evidenced</span></div>
+        <div class="row"><div><strong>MLOps deployment</strong><div class="meta">No evidence yet</div></div><span class="chip c-gap"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg>Gap</span></div>
+        <div class="btns" style="margin-top:16px">
+          <button class="btn btn-primary" type="button">Confirm skill</button>
+          <button class="btn" type="button">Edit</button>
+          <button class="btn btn-ghost" type="button">View evidence</button>
+          <button class="btn btn-danger" type="button">Reject</button>
+          <button class="btn" type="button" disabled>Syncing</button>
+        </div>
+        <div class="field">
+          <label for="gh">GitHub link</label>
+          <input id="gh" class="input" value="https://gitlab.com/asha" aria-invalid="true" aria-describedby="gh-err">
+          <span id="gh-err" class="err">This isn't a GitHub address. Expected something like https://github.com/your-handle.</span>
+        </div>
+        <div class="field">
+          <label for="yr">Graduation year</label>
+          <input id="yr" class="input" value="2027" aria-describedby="yr-help">
+          <span id="yr-help" class="help">Four digits.</span>
+        </div>
+      </div>
+
+      <div style="display:grid;gap:16px">
+        <div class="panel">
+          <div class="stat">
+            <div><span class="meta">Readiness</span><b class="mono">68%</b><div class="bar"><i style="width:68%"></i></div></div>
+            <div><span class="meta">Verified skills</span><b class="mono">12</b></div>
+            <div><span class="meta">Open gaps</span><b class="mono">3</b></div>
+          </div>
+        </div>
+        <div class="panel" style="display:grid;gap:10px">
+          <div class="banner b-verified"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>GitHub imported: 6 repositories read.</span></div>
+          <div class="banner b-warning"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 6v4M8 12v.5" stroke="currentColor" stroke-width="1.6"/></svg><span>LinkedIn needs a verification code to continue.</span></div>
+          <div class="banner b-danger"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" stroke-width="1.6"/></svg><span>Kaggle didn't respond. We tried 3 times and stopped. <a href="#" style="color:inherit;font-weight:600">Retry</a></span></div>
+        </div>
+        <div class="panel type-scale">
+          <p style="font-size:24px;font-weight:650;letter-spacing:-0.02em">Heading, Geist 24/650</p>
+          <p style="font-size:16px">Body text at 16 px in the ink colour, with a <a href="#" style="color:var(--signal)">signal link</a> and a <span class="highlight">highlighted gap</span>.</p>
+          <p class="meta">Secondary text in muted, for metadata and help.</p>
+          <p class="mono" style="font-size:13px;color:var(--muted)">ev_9f21c4 · 2026-10-15 · 214 commits</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ctr">
+    <h2 id="ctr">Measured contrast (WCAG 2.1)</h2>
+    <div class="panel" style="overflow-x:auto"><table id="contrast"><thead><tr><th>Pair</th><th>Need</th><th class="num">Dark</th><th class="num">Light</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</div>
+
+<script>
+const TOKENS = {
+  dark: { canvas:"#0D1117", surface:"#161B22", raised:"#1C2330", ink:"#E6EDF3", muted:"#9AA6B2", line:"#2A313C", lineStrong:"#6B7685", signal:"#5B9CFF", signalHover:"#7AB0FF", onSignal:"#0D1117", highlight:"#C3E66E", onHighlight:"#0D1117", verified:"#4CC38A", verifiedBg:"#12291E", corroborated:"#5B9CFF", corroboratedBg:"#15233A", evidenced:"#B98CFF", evidencedBg:"#241A36", gap:"#8B95A1", warning:"#E3B341", warningBg:"#2D2412", danger:"#FF7B72", dangerBg:"#321717", focus:"#7AB0FF" },
+  light: { canvas:"#F3F5F8", surface:"#FFFFFF", raised:"#FFFFFF", ink:"#121820", muted:"#4F5B69", line:"#D5DBE3", lineStrong:"#7B8695", signal:"#1F5FCC", signalHover:"#184DA8", onSignal:"#FFFFFF", highlight:"#C3E66E", onHighlight:"#121820", verified:"#137A4B", verifiedBg:"#E5F4EC", corroborated:"#1F5FCC", corroboratedBg:"#E6EEFC", evidenced:"#7239C4", evidencedBg:"#F1E9FB", gap:"#6B7684", warning:"#8A5A00", warningBg:"#FBF1DC", danger:"#B8322A", dangerBg:"#FCE9E7", focus:"#1F5FCC" },
+};
+const SWATCHES = ["canvas","surface","raised","ink","muted","line","lineStrong","signal","signalHover","highlight","verified","corroborated","evidenced","gap","warning","danger"];
+const PAIRS = [["Ink on canvas","ink","canvas",4.5],["Ink on surface","ink","surface",4.5],["Muted on surface","muted","surface",4.5],["Muted on canvas","muted","canvas",4.5],["Signal text on surface","signal","surface",4.5],["Button text on signal","onSignal","signal",4.5],["Button text on signal hover","onSignal","signalHover",4.5],["Ink on highlight","onHighlight","highlight",4.5],["Verified on its chip","verified","verifiedBg",4.5],["Corroborated on its chip","corroborated","corroboratedBg",4.5],["Evidenced on its chip","evidenced","evidencedBg",4.5],["Gap text on surface","gap","surface",4.5],["Warning on its banner","warning","warningBg",4.5],["Danger on its banner","danger","dangerBg",4.5],["Danger text on surface","danger","surface",4.5],["Input border on surface","lineStrong","surface",3],["Focus ring on surface","focus","surface",3]];
+const lum = (h) => { const c = h.slice(1).match(/../g).map((x) => parseInt(x, 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+
+document.getElementById("compare").innerHTML = ["dark", "light"].map((m) => `
+  <div class="mode mode-${m}"><h3>${m === "dark" ? "Dark (default)" : "Light companion"}</h3>
+    <div class="sw">${SWATCHES.map((k) => `<div><i style="background:${TOKENS[m][k]}"></i><span><b>${k}</b><span class="mono">${TOKENS[m][k]}</span></span></div>`).join("")}</div>
+  </div>`).join("");
+document.querySelector("#contrast tbody").innerHTML = PAIRS.map(([n, a, b, need]) => {
+  const d = ratio(TOKENS.dark[a], TOKENS.dark[b]), l = ratio(TOKENS.light[a], TOKENS.light[b]);
+  const cell = (v) => `<td class="num mono ${v >= need ? "pass" : ""}">${v.toFixed(2)}${v >= need ? " ✓" : " ✗"}</td>`;
+  return `<tr><td>${n}</td><td class="mono">${need}:1</td>${cell(d)}${cell(l)}</tr>`;
+}).join("");
+
+const buttons = document.querySelectorAll(".toggle button");
+const apply = (t) => {
+  document.documentElement.dataset.theme = t;
+  buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.set === t)));
+  try { localStorage.setItem("tathastu-theme", t); } catch (e) {}
+};
+buttons.forEach((b) => b.addEventListener("click", () => apply(b.dataset.set)));
+apply(document.documentElement.dataset.theme || "dark");
+</script>
+</body>
+</html>

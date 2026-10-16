@@ -83,7 +83,6 @@ export async function POST(req: Request) {
     const leetcodeEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("leetcode"));
     const codechefEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("codechef"));
     const hackerrankBadges = (person360.evidence || []).filter((e) => e.subject.toLowerCase().includes("hackerrank"));
-    const hackerearthEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("hackerearth"));
     const kaggleArtifacts = (person360.projects || []).filter((p) => (p.sources || []).includes("kaggle"));
 
     // 1. RAG Knowledge Retrieval over Canonical AI/ML Knowledge Base

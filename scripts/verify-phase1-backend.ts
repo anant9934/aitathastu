@@ -7,7 +7,7 @@
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 import {
   SOURCE_SYNC_STATES, SYNC_TRANSITIONS, canTransition, transition, aggregateOnboardingStatus,
   InvalidSyncTransitionError, fromLegacyStatus, type SourceSnapshot,
@@ -107,11 +107,11 @@ describe("1.2.4 draft merge rules", () => {
 describe("sync operations against local Postgres", () => {
   let personId: string;
   let ops: typeof import("../lib/sync/sync-operation");
-  let db: Awaited<ReturnType<typeof useTestDatabase>>;
+  let db: Awaited<ReturnType<typeof setupTestDatabase>>;
   let schema: typeof import("../lib/db");
 
   before(async () => {
-    db = await useTestDatabase();
+    db = await setupTestDatabase();
     schema = await import("../lib/db");
     ops = await import("../lib/sync/sync-operation");
     personId = await createTestPerson("contracts");

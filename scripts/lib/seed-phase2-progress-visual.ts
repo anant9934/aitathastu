@@ -11,10 +11,10 @@
  */
 import crypto from "crypto";
 import { and, eq } from "drizzle-orm";
-import { useTestDatabase } from "./test-db";
+import { setupTestDatabase } from "./test-db";
 
 async function seed(slow = false) {
-  const db = await useTestDatabase();
+  const db = await setupTestDatabase();
   const { syncOperations, sourceProcessingJobs } = await import("../../lib/db");
   const { createUser } = await import("../../lib/repositories/user-repository");
   const { hashPassword } = await import("../../lib/auth/password");
@@ -39,7 +39,7 @@ async function seed(slow = false) {
 }
 
 async function settle(personId: string) {
-  const db = await useTestDatabase();
+  const db = await setupTestDatabase();
   const { syncOperations, sourceProcessingJobs } = await import("../../lib/db");
   await db.update(sourceProcessingJobs).set({ status: "review_ready", stage: "review", metadata: { candidates: 14 }, completedAt: new Date() })
     .where(and(eq(sourceProcessingJobs.personId, personId), eq(sourceProcessingJobs.sourceId, "resume")));

@@ -2,17 +2,17 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { and, eq, isNull, or } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 import { resolveField } from "../lib/domain/source-precedence";
 
-let db: Awaited<ReturnType<typeof useTestDatabase>>;
+let db: Awaited<ReturnType<typeof setupTestDatabase>>;
 let schema: typeof import("../lib/db");
 let ev: typeof import("../lib/repositories/evidence-repository");
 let pr: typeof import("../lib/repositories/project-repository");
 let fusion: typeof import("../lib/services/cross-source-fusion-service");
 
 before(async () => {
-  db = await useTestDatabase();
+  db = await setupTestDatabase();
   schema = await import("../lib/db");
   ev = await import("../lib/repositories/evidence-repository");
   pr = await import("../lib/repositories/project-repository");

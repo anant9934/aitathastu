@@ -4,7 +4,8 @@ import { verifySameOrigin } from "@/lib/security/csrf";
 /**
  * CSRF protection for the JSON API. The session cookie is SameSite=Lax, which
  * still allows some cross-site requests, so every state-changing /api request
- * from a browser must carry an Origin (or Referer) matching APP_BASE_URL.
+ * from a browser must carry an Origin (or Referer) matching the host it was
+ * sent to or APP_BASE_URL (see lib/security/csrf.ts).
  * Server-to-server endpoints authenticate with HMAC or a bearer secret instead
  * and are exempt.
  */

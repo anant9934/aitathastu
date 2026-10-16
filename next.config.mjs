@@ -32,17 +32,10 @@ const nextConfig = {
   // lib/resume/document-text.ts), which file tracing cannot see, so they are
   // listed explicitly for the resume routes. OCR never runs inside Next
   // functions: scanned PDFs go to the Python extractor.
-  // pdf.js also loads two things the tracer misses, and without them every PDF
-  // fails on Vercel with PARSE_FAILED while working locally:
-  //   - pdf.worker.mjs, via a dynamic import() (the Node "fake worker");
-  //   - @napi-rs/canvas (+ its per-platform binary package), via a computed
-  //     require, for the DOMMatrix polyfill pdf.mjs needs at import time.
   outputFileTracingIncludes: {
     "/api/resume/**": [
       "./node_modules/pdfjs-dist/standard_fonts/**",
       "./node_modules/pdfjs-dist/cmaps/**",
-      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
-      "./node_modules/@napi-rs/canvas*/**",
     ],
   },
   // Lint gates the production build (npm run build fails on lint errors).

@@ -5,19 +5,19 @@
 import { test, describe, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { and, eq } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-let db: Awaited<ReturnType<typeof useTestDatabase>>;
+let db: Awaited<ReturnType<typeof setupTestDatabase>>;
 let schema: typeof import("../lib/db");
 let gh: typeof import("../lib/services/github-sync-service");
 let conn: typeof import("../lib/repositories/connection-repository");
 let rl: typeof import("../lib/connectors/rate-limiter");
 
 before(async () => {
-  db = await useTestDatabase();
+  db = await setupTestDatabase();
   schema = await import("../lib/db");
   gh = await import("../lib/services/github-sync-service");
   conn = await import("../lib/repositories/connection-repository");

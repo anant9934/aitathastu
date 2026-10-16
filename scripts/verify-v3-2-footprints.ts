@@ -45,16 +45,12 @@ process.env.EXTERNAL_TOKEN_ENCRYPTION_KEY =
   process.env.EXTERNAL_TOKEN_ENCRYPTION_KEY || "thirty-two-bytes-secret-encryption-key-for-auth";
 
 import { getDb } from "../lib/db";
-import { sql, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   persons,
   users,
   personProfiles,
-  projects,
-  evidenceItems,
   goals,
-  externalConnections,
-  sourceProcessingJobs,
   organizations,
   organizationMemberships,
   roles,
@@ -62,20 +58,9 @@ import {
 } from "../lib/db/schema";
 
 // Connectors & Services
-import { fetchPortfolioMetadata, isSafePublicUrl } from "../lib/connectors/portfolio/client";
+import { isSafePublicUrl } from "../lib/connectors/portfolio/client";
 import { validateLinkedInUrl, parseLinkedInDataExport } from "../lib/connectors/linkedin/client";
-import { fetchLeetCodeProfileStats, normalizeLeetCodeUsername } from "../lib/connectors/leetcode/client";
-import {
-  fetchHackerRankProfile,
-  fetchCodeChefProfile,
-  fetchHackerEarthProfile,
-} from "../lib/connectors/coding-platforms/client";
-import {
-  fetchHuggingFaceArtifacts,
-  fetchOrcidRecord,
-  fetchDevToArticles,
-  fetchStackOverflowProfile,
-} from "../lib/connectors/research-and-dev/client";
+import { normalizeLeetCodeUsername } from "../lib/connectors/leetcode/client";
 
 import { CrossSourceFusionService } from "../lib/services/cross-source-fusion-service";
 import { SourceProcessingJobService } from "../lib/services/source-processing-job-service";
@@ -83,7 +68,7 @@ import { getPerson360 } from "../lib/services/person-360-service";
 import { getStudentDashboardComposition } from "../lib/services/dashboard-service";
 import { generatePersonalizedRoadmap, persistRoadmapMilestones } from "../lib/domain/roadmap";
 import { CoreIntelligenceOrchestrator } from "./lib/intelligence-orchestrator";
-import { saveProject, getProjectsByPersonId } from "../lib/repositories/project-repository";
+import { saveProject } from "../lib/repositories/project-repository";
 import { createEvidenceRecord, getEvidenceByPersonId } from "../lib/repositories/evidence-repository";
 import { saveExternalConnection, disconnectConnection, getExternalConnections } from "../lib/repositories/connection-repository";
 import { encryptConnectionToken, decryptConnectionToken } from "../lib/security/connection-token";
@@ -315,7 +300,6 @@ async function runV32Certification() {
   // -------------------------------------------------------------
   console.log("\n[Gate C] Testing GitHub Connector & Repository Intelligence...");
   const ghUsername = "ananya-ai";
-  const ghRepoTitle = "multimodal-rag-assistant";
   const ghRepoUrl = "https://github.com/ananya-ai/multimodal-rag-assistant";
 
   await saveExternalConnection({

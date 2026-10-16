@@ -29,7 +29,6 @@ import path from "node:path";
 import {
   EORA_CHARACTER,
   EORA_IDENTITY_VERSION,
-  EORA_POSE_CONTEXTS,
   getPoseForState,
   type EoraAnimationState,
 } from "../lib/eora/identity";
@@ -44,13 +43,11 @@ import {
   checkInputSafety,
   checkOutputSafety,
   isActionAuthorized,
-  type EoraActionType,
 } from "../lib/eora/safety";
 import {
   recognizeIntent,
   isIntentConfident,
   getClarifyingOptions,
-  INTENT_CONFIDENCE_THRESHOLD,
 } from "../lib/eora/intent";
 import type { EoraContext } from "../lib/eora/context";
 import {
@@ -61,7 +58,6 @@ import {
   screenNumberToOnboardingStep,
 } from "../lib/eora/context";
 import {
-  getRouteWelcomeMessage,
   getOnboardingStepMessage,
   getTinyVictoryMessage,
   getFieldErrorMessage,
@@ -81,16 +77,12 @@ import {
 } from "../lib/eora/tours";
 import {
   createDefaultPreferences,
-  loadPreferences,
   markTourCompleted,
   dismissSuggestion,
   snoozeEora,
   isEoraSnoozed,
   canSendProactiveNudge,
   recordNudgeSent,
-  detectReducedMotionPreference,
-  recordInteraction,
-  resetPreferences,
 } from "../lib/eora/engagement";
 
 // ── Test utilities ─────────────────────────────────────────────────────────
@@ -113,10 +105,6 @@ function test(name: string, fn: () => void) {
 // Track LLM call count — must stay zero for routine EORA interactions
 const llmCallCount = 0;
 
-// Monkey-patch fetch to detect any LLM calls from EORA modules
-// (In production, this is enforced architecturally; here we verify no accidental calls)
-const originalFetch = global.fetch;
-// In this test environment we just verify no dynamic import of LLM-calling modules
 
 // ── TEST SUITE ─────────────────────────────────────────────────────────────
 

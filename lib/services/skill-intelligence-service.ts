@@ -1,3 +1,4 @@
+import { scoreSkillConfidence, type SkillConfidence } from "@/lib/domain/skill-confidence";
 /**
  * AI TATHASTU — EXPLAINABLE SKILLS & PROFICIENCY INTELLIGENCE SERVICE V4.7
  *
@@ -13,7 +14,6 @@
  * 8. Dashboard & PersonGraph Metric Harmonization (tracked, evidenced, demonstrated, assessed, verified)
  */
 
-import crypto from "crypto";
 import { getPerson360 } from "./person-360-service";
 import { getProjectsByPersonId, getProjectContributionsByPersonId, saveProjectContribution } from "../repositories/project-repository";
 import { getExternalConnections } from "../repositories/connection-repository";
@@ -25,7 +25,7 @@ import {
 import { createEvidenceRecord } from "../repositories/evidence-repository";
 import { AIML_ROLE_CATALOG, type AimlRoleDefinition } from "../domain/aiml-role-taxonomy";
 import { AI_ML_TECH_REGISTRY } from "../connectors/github/mapper";
-import { getDb, evidenceItems, projects } from "../db";
+import { getDb, projects } from "../db";
 import { eq, and } from "drizzle-orm";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,6 +68,9 @@ export interface SkillObservation {
     | "hackerrank"
     | "stackoverflow"
     | "devto"
+    | "kaggle"
+    | "linkedin"
+    | "scholar"
     | "assessment"
     | "project"
     | "certification"
@@ -131,10 +134,31 @@ export interface SevenQuestionsAnalysis {
   whereWasItObserved: {
     sources: string[];
     observations: Array<{
+      /** evidence_items.id (or project id) this answer rests on. */
+      evidenceId: string;
       source: string;
       sourceReference: string | null;
       details: string;
     }>;
+  };
+  /** Task 1.3.2 answers 3-6 (additive; the original fields stay for existing consumers). */
+  whatIsTheVerificationStatus: {
+    status: "Pending" | "Corroborated" | "Verified";
+    confidenceScore: number | null;
+    tierLabel: string | null;
+    evidenceIds: string[];
+  };
+  howDoesItRelateToGoal: {
+    relevance: GoalRelevance;
+    targetRole: string | null;
+    explanation: string;
+  };
+  whatAreDemonstratedProjects: {
+    projectIds: string[];
+    titles: string[];
+  };
+  whatAreDemonstratedCodeArtifacts: {
+    files: string[];
   };
   howWasItUsed: {
     usageSummary: string;
@@ -159,6 +183,8 @@ export interface SevenQuestionsAnalysis {
     action: string;
     suggestedTask: string;
     assessmentAvailable: boolean;
+    /** Where to act on it: the skill's place in the roadmap. */
+    href: string;
   };
 }
 
@@ -203,6 +229,8 @@ export interface ExplainableSkillIntelligence {
   };
 
   conciseExplanation: string;
+  /** Deterministic evidence-based score with a traceable breakdown (Task 1.3.1). */
+  confidence: SkillConfidence | null;
   sevenQuestions: SevenQuestionsAnalysis;
   graph: SkillEvidenceGraph;
   observations: SkillObservation[];
@@ -400,10 +428,10 @@ export class SkillIntelligenceService {
       person360,
       projectsList,
       contributionsList,
-      connectionsList,
+      _connectionsList,
       assessmentsList,
       codingList,
-      learningList,
+      _learningList,
     ] = await Promise.all([
       getPerson360(personId, personId),
       getProjectsByPersonId(personId),
@@ -469,8 +497,14 @@ export class SkillIntelligenceService {
           src = "resume";
           srcType = "resume_mention";
         } else if (ev.source === "imported") {
-          src = "github";
-          srcType = "manifest_declared";
+          // By platform (evidence_items.origin_source, Task 1.2.2). Previously every
+          // import was labelled GitHub, so a HackerRank badge counted as a manifest.
+          const origin = (ev as { originSource?: string | null }).originSource ?? "github";
+          if (origin === "hackerrank" || origin === "leetcode") { src = origin; srcType = "platform_badge"; }
+          else if (origin === "kaggle") { src = "kaggle"; srcType = "project_applied"; }
+          else if (origin === "linkedin") { src = "linkedin"; srcType = "self_claim"; } // LinkedIn skills are self-declared
+          else if (origin === "scholar") { src = "scholar"; srcType = "project_applied"; }
+          else { src = "github"; srcType = "manifest_declared"; }
         } else if (ev.verificationStatus === "verified") {
           src = "faculty_verified";
           srcType = "faculty_verification";
@@ -489,6 +523,17 @@ export class SkillIntelligenceService {
           sourceReference: ev.sourceReference || (src === "resume" ? "Resume (Skills Section)" : "External Profile"),
           observedAt: ev.observedAt,
           summary: ev.interpretation || `Evidence recorded for ${ev.subject}`,
+        });
+      } else if (ev.category === "assessment" && ["leetcode", "hackerrank"].includes((ev as { originSource?: string | null }).originSource ?? "")) {
+        // Platform scores (contest rating, practice score) corroborate; they are not graded assessments.
+        const origin = (ev as { originSource?: string | null }).originSource as "leetcode" | "hackerrank";
+        registerObservation(ev.subject, {
+          id: ev.id,
+          source: origin,
+          sourceType: "platform_badge",
+          sourceReference: ev.sourceReference || null,
+          observedAt: ev.observedAt,
+          summary: ev.interpretation || ev.value,
         });
       } else if (ev.category === "assessment") {
         registerObservation(ev.subject, {
@@ -582,7 +627,10 @@ export class SkillIntelligenceService {
 
     // 4. Construct Explainable Skill Intelligence Records
     const explainableSkills: ExplainableSkillIntelligence[] = [];
-    const allKnownSkills = Array.from(skillObservationsMap.keys());
+    // Skills the student hid (Task 2.2.3) stay in evidence_items but drop out of the map, its counts and readiness.
+    const hiddenRaw = (person360.preferences?.metadata as Record<string, unknown> | undefined)?.hiddenSkills;
+    const hidden = new Set((Array.isArray(hiddenRaw) ? hiddenRaw : []).filter((h): h is string => typeof h === "string").map((h) => normalizeSkillName(h).toLowerCase()));
+    const allKnownSkills = Array.from(skillObservationsMap.keys()).filter((k) => !hidden.has(k.toLowerCase()));
 
     for (const skillName of allKnownSkills) {
       const observations = skillObservationsMap.get(skillName) || [];
@@ -599,7 +647,6 @@ export class SkillIntelligenceService {
       // Evaluate 5 Dimensions
       const resumeObs = observations.filter((o) => o.source === "resume");
       const githubObs = observations.filter((o) => o.source === "github");
-      const projectObs = observations.filter((o) => o.sourceType === "project_applied");
       const contribObs = observations.filter((o) => o.sourceType === "personal_contribution");
       const assessmentObs = observations.filter((o) => o.sourceType === "graded_assessment");
       const verifiedObs = observations.filter((o) => o.sourceType === "faculty_verification");
@@ -665,6 +712,11 @@ export class SkillIntelligenceService {
         projectTitle: relatedProjects[0]?.title,
       });
 
+      const confidence = scoreSkillConfidence(observations, {
+        projects: relatedProjects.map((p) => ({ id: p.id, repositoryUrl: p.repositoryUrl })),
+        personalContributionConfirmed: Boolean(personalContrib?.confirmed),
+      });
+
       // Answering the 7 Core Questions
       const sevenQuestions: SevenQuestionsAnalysis = {
         whatIsThisSkill: {
@@ -677,6 +729,7 @@ export class SkillIntelligenceService {
         whereWasItObserved: {
           sources: Array.from(new Set(observations.map((o) => o.source))),
           observations: observations.map((o) => ({
+            evidenceId: o.id,
             source: o.source,
             sourceReference: o.sourceReference,
             details: o.summary,
@@ -693,6 +746,32 @@ export class SkillIntelligenceService {
               : `Reported by student during onboarding.`,
           projects: relatedProjects.map((p) => p.title),
           manifestsOrFiles: observations.map((o) => o.sourceReference).filter(Boolean) as string[],
+        },
+        whatIsTheVerificationStatus: {
+          status: confidence?.tier === 1 ? "Verified" : confidence?.tier === 2 ? "Corroborated" : "Pending",
+          confidenceScore: confidence?.score ?? null,
+          tierLabel: confidence?.label ?? null,
+          evidenceIds: confidence ? [...new Set(confidence.breakdown.flatMap((b) => b.evidenceIds))] : [],
+        },
+        howDoesItRelateToGoal: {
+          relevance: goalRelevance,
+          targetRole: targetRole || null,
+          explanation:
+            goalRelevance === "required_core" ? `A core requirement for ${targetRole || "your target role"}.`
+            : goalRelevance === "recommended" ? `Recommended for ${targetRole || "your target role"}.`
+            : goalRelevance === "complementary" ? `A specialization that strengthens a ${targetRole || "target-role"} profile.`
+            : `Not required for ${targetRole || "your target role"}; an elective.`,
+        },
+        whatAreDemonstratedProjects: {
+          projectIds: relatedProjects.map((p) => p.id),
+          titles: relatedProjects.map((p) => p.title),
+        },
+        whatAreDemonstratedCodeArtifacts: {
+          // Files inside repositories (manifest / source references), not bare profile links.
+          files: [...new Set(observations
+            .filter((o) => ["manifest_declared", "source_code", "readme_documented"].includes(o.sourceType))
+            .map((o) => o.sourceReference)
+            .filter((r): r is string => Boolean(r && /^https?:\/\//.test(r))))],
         },
         whatDidStudentPersonallyContribute: {
           hasContribution: Boolean(personalContrib?.confirmed),
@@ -729,6 +808,7 @@ export class SkillIntelligenceService {
               : "Build an end-to-end practical project using this technology",
           suggestedTask: `Complete the ${skillName} verification assessment or submit a production-grade code sample.`,
           assessmentAvailable: true,
+          href: `/student/roadmap#skill-${skillName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
         },
       };
 
@@ -780,6 +860,7 @@ export class SkillIntelligenceService {
           },
         },
         conciseExplanation,
+        confidence,
         sevenQuestions,
         graph,
         observations,
@@ -929,7 +1010,7 @@ export class SkillIntelligenceService {
     skillName: string,
     observations: SkillObservation[],
     projects: Array<{ id: string; title: string; repositoryUrl?: string | null; roles: string[]; description?: string }>,
-    personalContrib?: PersonalContributionInfo
+    _personalContrib?: PersonalContributionInfo
   ): SkillEvidenceGraph {
     const nodes: SkillEvidenceGraphNode[] = [];
     const edges: SkillEvidenceGraphEdge[] = [];

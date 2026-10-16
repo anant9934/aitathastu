@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 /**
  * AI TATHASTU — STUDENT PROCESSING JOBS API V4.2
  *
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
     // A read-only poll must not mint a new guest cookie. It can otherwise race
     // the academic save and make the browser switch owners mid-onboarding.
     const auth = await getServerAuthContext();
-    if (!auth) return jsonResponse({ ok: true, jobs: [], requestId });
+    if (!auth) return jsonResponse({ ok: false, error: "Sign in to see processing jobs.", requestId }, 401);
 
     const jobId = new URL(request.url).searchParams.get("jobId");
     const jobs = jobId
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST_handler(request: Request) {
   const requestId = crypto.randomUUID();
   try {
     const auth = await getServerAuthContext();
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+async function PATCH_handler(request: Request) {
   const requestId = crypto.randomUUID();
   try {
     const auth = await getServerAuthContext();
@@ -148,3 +149,7 @@ export async function PATCH(request: Request) {
     return jsonResponse({ ok: false, code: "JOB_UPDATE_FAILED", message: "Failed to update job status.", retryable: true, requestId }, 500);
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);
+export const PATCH = withStudentCacheInvalidation(PATCH_handler);

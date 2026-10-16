@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import {
@@ -82,7 +83,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function PUT_handler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -200,7 +201,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function DELETE_handler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -229,3 +230,7 @@ export async function DELETE(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const PUT = withStudentCacheInvalidation(PUT_handler);
+export const DELETE = withStudentCacheInvalidation(DELETE_handler);

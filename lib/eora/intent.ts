@@ -719,7 +719,7 @@ const ROUTE_DESTINATIONS: Array<{ match: RegExp; route: string }> = [
 export function recognizeIntent(
   raw: string,
   routeOrPathname?: string,
-  context?: any
+  _context?: any
 ): IntentRecognitionResult {
   const normalized = normalizeInput(raw);
 

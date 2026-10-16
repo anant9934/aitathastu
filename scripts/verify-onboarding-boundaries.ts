@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { initialDraft, safeDraft } from "../lib/onboarding-v2";
 import { candidateNames, normalizeImportCandidates } from "../lib/onboarding-import-candidates";
-import { getScreenIndexByStepNumber, getStepByScreenIndex, TOTAL_ONBOARDING_STEPS } from "../lib/onboarding-step-registry";
+import { onboardingSteps, stepForScreen, TOTAL_ONBOARDING_STEPS } from "../lib/onboarding-step-registry";
 import React from "react";
 import { renderToString } from "react-dom/server";
-import { Screen8ProfileInsights } from "../components/exact-screens/Screen8ProfileInsights";
-import { Screen9SkillsMap } from "../components/exact-screens/Screen9SkillsMap";
+import { SkillReview } from "../components/review/SkillReview";
+import { SkillsStep } from "../components/onboarding/steps/SkillsStep";
+import { EMPTY_ONBOARDING } from "../lib/client/onboarding/types";
 
 const fresh = safeDraft({});
 assert.equal(fresh.name, "");
@@ -17,9 +18,12 @@ assert.deepEqual(fresh.experiences, []);
 assert.deepEqual(fresh.achievements, []);
 assert.deepEqual(fresh.profiles, {});
 assert.deepEqual(initialDraft.skills, []);
-assert.equal(TOTAL_ONBOARDING_STEPS, 10);
-assert.deepEqual(Array.from({ length: 10 }, (_, index) => getScreenIndexByStepNumber(index + 1)), [3, 3.2, 3.5, 5, 4, 6, 7, 8, 10, 11]);
-assert.equal(getStepByScreenIndex(9), undefined, "Skills map remains an unnumbered view");
+// Phase 3 (P4-13): one registry numbers every step for both the stepper and EORA.
+assert.equal(TOTAL_ONBOARDING_STEPS, 11);
+assert.deepEqual(onboardingSteps().map((s) => s.screen), [3, 3.2, 3.5, 5, 4, 6, 7, 8, 9, 10, 11]);
+assert.equal(stepForScreen(2), null, "Welcome is an unnumbered prelude");
+assert.equal(stepForScreen(3.2)?.number, 2);
+assert.equal(stepForScreen(9)?.number, 9);
 
 const names = candidateNames([
   { name: "Python", sourceReference: "https://example.test/project", confidence: 0.93 },
@@ -56,11 +60,11 @@ assert.equal(draft.achievements?.[0].category, "other");
 assert.equal(draft.profiles.orcid, "https://orcid.org/0000-0000-0000-0000");
 
 const legacySkill = [{ name: "Python", sourceReference: "page-1", confidence: 0.93 }] as unknown as string[];
-const reviewHtml = renderToString(React.createElement(Screen8ProfileInsights, {
-  skills: legacySkill, onNext: () => {}, onBack: () => {},
+const reviewHtml = renderToString(React.createElement(SkillReview, {
+  skills: candidateNames(legacySkill), candidates: [], onSkillsChange: () => {}, onCandidatesChange: () => {},
 }));
-const mapHtml = renderToString(React.createElement(Screen9SkillsMap, {
-  skills: legacySkill, onNext: () => {}, onBack: () => {},
+const mapHtml = renderToString(React.createElement(SkillsStep, {
+  data: { ...EMPTY_ONBOARDING, skills: legacySkill }, saving: false, guide: null, onBack: () => {}, onContinue: () => {},
 }));
 assert.match(reviewHtml, /Python/);
 assert.match(mapHtml, /Python/);

@@ -27,6 +27,8 @@ import { generatePersonalizedRoadmap } from "@/lib/domain/roadmap";
 import { normalizeInterest } from "@/lib/domain/personalization-engine";
 import { validPurposeIds } from "@/lib/domain/adaptive-workspace";
 import { can } from "@/lib/auth/rbac";
+import { buildSuggestedHints, type EoraHint } from "@/lib/eora/hints";
+import { latestSyncOperations } from "@/lib/sync/sync-operation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +49,8 @@ export interface EoraContextResponse {
   nextMilestoneTitle: string | null;
   nextMilestoneDescription: string | null;
   isProcessing: boolean;
+  /** Rule-table nudges from database state; zero LLM (Task 1.4.2). */
+  suggestedHints: EoraHint[];
   /** ISO timestamp for cache validation */
   fetchedAt: string;
 }
@@ -61,13 +65,14 @@ export async function GET() {
     const personId = auth.person.id;
 
     // Parallel fetch — all data for this person only
-    const [prefs, activeGoal, evidenceList, allProjects, connections] =
+    const [prefs, activeGoal, evidenceList, allProjects, connections, syncOps] =
       await Promise.all([
         getUserPreferences(personId).catch(() => null),
         getActiveGoal(personId).catch(() => null),
         getEvidenceByPersonId(personId).catch(() => []),
         getProjectsByPersonId(personId).catch(() => []),
         getExternalConnections(personId).catch(() => []),
+        latestSyncOperations(personId).catch(() => []),
       ]);
 
     // ── Skills and evidence counts ─────────────────────────────────────────
@@ -101,6 +106,7 @@ export async function GET() {
     // ── Roadmap: next incomplete milestone ─────────────────────────────────
     let nextMilestoneTitle: string | null = null;
     let nextMilestoneDescription: string | null = null;
+    let nextMilestoneSkills: string[] = [];
 
     if (role === "student" && activeGoal?.title) {
       try {
@@ -127,6 +133,7 @@ export async function GET() {
         );
         if (nextStage) {
           nextMilestoneTitle = nextStage.title;
+          nextMilestoneSkills = nextStage.requiredSkills || [];
           nextMilestoneDescription = nextStage.description ?? null;
         }
       } catch {
@@ -157,6 +164,16 @@ export async function GET() {
       nextMilestoneTitle,
       nextMilestoneDescription,
       isProcessing,
+      suggestedHints: buildSuggestedHints({
+        role,
+        missingSkills: nextMilestoneSkills.filter((sk) => !skills.some((e) => e.subject.toLowerCase() === sk.toLowerCase())),
+        nextMilestoneTitle,
+        connections: connections.map((c) => ({ provider: c.provider, status: c.status, lastSyncedAt: c.lastSyncedAt })),
+        githubCandidateProjects: allProjects.filter((p) => p.status === "candidate" && ((p.sources as string[]) || []).includes("github")).length,
+        skillsCount: skills.length,
+        verifiedEvidenceCount: verifiedCount,
+        failedSyncs: syncOps.filter((o) => o.state === "dead_letter").map((o) => ({ source: o.source, state: o.state })),
+      }),
       fetchedAt: new Date().toISOString(),
     };
 

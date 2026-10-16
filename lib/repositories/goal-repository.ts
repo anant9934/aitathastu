@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { getDb, goals } from "../db";
 
 export type GoalRecord = {
@@ -65,14 +65,14 @@ export async function setActiveGoal(
       };
     }
 
-    // Pause the old goal
+    // Pause the old goal (only if it is still the different one: a concurrent call may have changed it).
     await db
       .update(goals)
       .set({
         status: "paused",
         updatedAt: now,
       })
-      .where(eq(goals.id, currentActive.id));
+      .where(and(eq(goals.id, currentActive.id), eq(goals.status, "active"), ne(goals.title, trimmed)));
   }
 
   // Create new active goal
@@ -80,7 +80,9 @@ export async function setActiveGoal(
   const isPreset = ["ml engineer", "ai researcher", "ai founder"].includes(trimmed.toLowerCase());
   const finalSource = source || (isPreset ? "preset" : "custom");
 
-  await db.insert(goals).values({
+  // uq_goals_one_active makes this the single active goal even under concurrent
+  // calls (Task 2.1.7): a racing insert becomes an update of the same row.
+  const [row] = await db.insert(goals).values({
     id: goalId,
     personId,
     title: trimmed,
@@ -89,16 +91,11 @@ export async function setActiveGoal(
     status: "active",
     createdAt: now,
     updatedAt: now,
-  });
+  }).onConflictDoUpdate({
+    target: goals.personId,
+    targetWhere: sql`${goals.status} = 'active'`,
+    set: { title: trimmed, description: description ? description.trim() : null, source: finalSource, updatedAt: now },
+  }).returning();
 
-  return {
-    id: goalId,
-    personId,
-    title: trimmed,
-    description: description ? description.trim() : null,
-    source: finalSource,
-    status: "active",
-    createdAt: now,
-    updatedAt: now,
-  };
+  return row;
 }

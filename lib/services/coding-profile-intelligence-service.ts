@@ -16,8 +16,6 @@
  */
 
 import crypto from "node:crypto";
-import { getDb, externalConnections, sourceSnapshots, evidenceItems, projects, journeyEvents } from "@/lib/db";
-import { eq, and } from "drizzle-orm";
 import type { CodingProfileSnapshot, CodingProfileMetrics } from "@/lib/connectors/types";
 import { normalizeLeetCodeUsername } from "@/lib/connectors/leetcode/client";
 import { normalizeCodingHandle } from "@/lib/connectors/coding-platforms/client";

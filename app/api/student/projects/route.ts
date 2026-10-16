@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getProjectsByPersonId, getProjectContributions, deleteProject } from "@/lib/repositories/project-repository";
@@ -61,7 +62,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -163,7 +164,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+async function DELETE_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -186,3 +187,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);
+export const DELETE = withStudentCacheInvalidation(DELETE_handler);

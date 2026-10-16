@@ -36,7 +36,7 @@ import {
   externalConnections,
   sourceSnapshots,
 } from "../lib/db/schema";
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { hashPassword } from "../lib/auth/password";
 
 export const PILOT_STUDENT_A = {

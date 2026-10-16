@@ -166,7 +166,6 @@ export interface StudentPersonalizationContext {
   targetRole?: string;
   targetRoleId?: string;
   goal?: string;
-  targetTimeline?: string;
   primaryInterest?: CanonicalInterest | null;
   secondaryInterests?: CanonicalInterest[];
   degree?: string;
@@ -207,6 +206,8 @@ export interface NextBestAction {
 }
 
 export interface ComposedDashboardViewModel {
+  /** Priority-shaped layout: hero widget, section set and weighted footprint (Tasks 2.3.1, 2.3.2). */
+  layout?: import("./dashboard-layout").DashboardLayout;
   engineVersion: string;
   configurationId: string;
   primaryInterest: CanonicalInterest | null;
@@ -224,7 +225,6 @@ export interface ComposedDashboardViewModel {
     targetRoleBadge: string;
     primaryInterestBadge: string;
     goalBadge?: string;
-    timelineBadge?: string;
     focusTags: string[];
     primaryCta: { label: string; url: string };
     secondaryCta?: { label: string; url: string };
@@ -1493,7 +1493,6 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       targetRoleBadge: targetRoleName,
       primaryInterestBadge: primaryDef.title,
       goalBadge: context.goal,
-      timelineBadge: context.targetTimeline,
       focusTags,
       primaryCta,
       secondaryCta,

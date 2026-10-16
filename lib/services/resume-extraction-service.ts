@@ -1,117 +1,335 @@
 /**
- * AI TATHASTU — RESUME EXTRACTION SERVICE V3.9
+ * AI TATHASTU — RESUME EXTRACTION SERVICE
  *
- * CRITICAL ARCHITECTURAL DECISION: STRICT ZERO-LLM RESUME EXTRACTION.
- * Generative LLMs (Gemini, Groq, Cerebras, SambaNova, Mistral, OpenRouter) are strictly FORBIDDEN.
- * This service directly invokes the DeterministicResumeExtractionEngine.
+ * reading-order text (lib/resume/layout.ts)  ->  one schema-constrained LLM call
+ * (lib/resume/structure.ts)  ->  sanity checks  ->  the shapes the rest of the
+ * pipeline consumes (ResumeInterpretationOutput for candidates/Person 360,
+ * extractedProfile + typed links for onboarding).
  *
- * No calls to lib/intelligence/router.ts or model endpoints.
+ * The sanity pass only cleans and checks the model's output (glyphs, URL/email
+ * shape, link typing by domain, de-duplication, grounding in the source text).
+ * It never extracts fields itself.
  */
 
 import { ResumeInterpretationSchema, type ResumeInterpretationOutput } from "../intelligence/schemas";
-import {
-  DeterministicResumeExtractionEngine,
-  type DeterministicExtractionResult,
-} from "./deterministic-resume-extraction-engine";
+import { LINK_TYPES, type ResumeExtraction } from "@/lib/resume/schema";
+import { structureResumeText, RESUME_PROMPT_VERSION, ResumeStructuringError } from "@/lib/resume/structure";
+
+export type ResumeLink = { type: (typeof LINK_TYPES)[number]; url: string };
+
+export interface ExtractedProfile {
+  fullName?: string;
+  email?: string;
+  mobile?: string;
+  location?: string;
+  degree?: string;
+  specialization?: string;
+  institution?: string;
+  expectedGraduationYear?: number;
+  gpa?: string;
+}
 
 export interface ResumeExtractionResult {
   success: boolean;
   extracted: ResumeInterpretationOutput | null;
+  /** Cleaned model output, kept as-is for review and export. */
+  resume?: ResumeExtraction;
+  extractedProfile?: ExtractedProfile;
+  links?: ResumeLink[];
+  discoveredProfiles?: Partial<Record<string, string>>;
   provider: string;
   modelUsed: string;
-  fallbackUsed: boolean;
+  promptVersion: string;
   latencyMs: number;
-  error?: string;
   truncated: boolean;
-  // V3.9 zero-LLM metadata & discovered profiles
-  extractedProfile?: DeterministicExtractionResult["extractedProfile"];
-  discoveredProfiles?: DeterministicExtractionResult["discoveredProfiles"];
-  discoveredRepositories?: DeterministicExtractionResult["discoveredRepositories"];
-  candidates?: DeterministicExtractionResult["candidates"];
+  error?: string;
+  /** Why structuring failed, when it did: "quota" lets ingestion say so plainly. */
+  errorKind?: "not_configured" | "quota" | "provider" | "invalid_output";
+}
+
+const GLYPHS = /[-�​-‍﻿•●○◦▪▫■□◆◇►▶▸▹➢➤✓✔☐☑]/gu;
+
+function tidy(v: string | null | undefined, max = 300): string {
+  return (v ?? "")
+    .replace(GLYPHS, " ")
+    .replace(/^[\s\-–—*·|:]+|[\s|,;:·]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+const DOMAIN_TYPES: Array<[RegExp, ResumeLink["type"]]> = [
+  [/(^|\.)github\.com$/i, "github"],
+  [/(^|\.)linkedin\.com$/i, "linkedin"],
+  [/(^|\.)leetcode\.(com|cn)$/i, "leetcode"],
+  [/(^|\.)kaggle\.com$/i, "kaggle"],
+  [/(^|\.)huggingface\.co$/i, "huggingface"],
+  [/^scholar\.google\./i, "google_scholar"],
+  [/(^|\.)orcid\.org$/i, "orcid"],
+  [/(^|\.)stackoverflow\.com$/i, "stackoverflow"],
+  [/(^|\.)codechef\.com$/i, "codechef"],
+  [/(^|\.)hackerrank\.com$/i, "hackerrank"],
+  [/(^|\.)dev\.to$/i, "devto"],
+];
+
+function normalizeUrl(raw: string | null | undefined): string | null {
+  let u = tidy(raw, 500).replace(/^<|>$/g, "");
+  if (!u || /^mailto:/i.test(u) || /@/.test(u.split("/")[0])) return null;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  try {
+    const url = new URL(u);
+    if (!url.hostname.includes(".")) return null;
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}
+
+function linkType(url: string, claimed: ResumeLink["type"]): ResumeLink["type"] {
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const known = DOMAIN_TYPES.find(([re]) => re.test(host));
+  if (known) return known[1];
+  // A claimed site type whose domain does not match is wrong; personal domains are portfolios.
+  return claimed === "other" || claimed === "portfolio" ? claimed : "portfolio";
+}
+
+/** Cleans and checks model output. Drops entries missing their identifying field. */
+export function sanitizeResumeExtraction(x: ResumeExtraction): { resume: ResumeExtraction; links: ResumeLink[] } {
+  const email = tidy(x.email).replace(/^mailto:/i, "");
+  const phone = tidy(x.phone);
+
+  const projects = x.projects
+    .map((p) => ({
+      name: tidy(p.name, 200),
+      description: tidy(p.description, 1000),
+      link: normalizeUrl(p.link),
+      repository: normalizeUrl(p.repository),
+      tech_stack: dedupe(p.tech_stack.map((t) => tidy(t, 50))),
+    }))
+    .filter((p) => p.name);
+  const projectLinks = new Set(projects.flatMap((p) => [p.link, p.repository]).filter(Boolean));
+
+  const links: ResumeLink[] = [];
+  for (const l of x.links) {
+    const url = normalizeUrl(l.url);
+    if (!url || projectLinks.has(url) || links.some((e) => e.url.toLowerCase() === url.toLowerCase())) continue;
+    links.push({ type: linkType(url, l.type), url });
+  }
+
+  const resume: ResumeExtraction = {
+    name: tidy(x.name, 80) || null,
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null,
+    phone: (phone.match(/\d/g) || []).length >= 7 ? phone : null,
+    location: tidy(x.location, 120) || null,
+    links,
+    education: x.education
+      .map((e) => ({
+        institution: tidy(e.institution, 200),
+        degree: tidy(e.degree, 100) || null,
+        field_of_study: tidy(e.field_of_study, 100) || null,
+        level: e.level,
+        start_date: tidy(e.start_date, 30) || null,
+        end_date: tidy(e.end_date, 30) || null,
+        grade: tidy(e.grade, 30).replace(/^(c?gpa|cpi|sgpa|percentage|grade|score)\s*[:\-]\s*/i, "").slice(0, 20) || null,
+      }))
+      .filter((e) => e.institution),
+    experience: x.experience
+      .map((e) => ({
+        company: tidy(e.company, 150),
+        role: tidy(e.role, 150),
+        type: e.type,
+        location: tidy(e.location, 120) || null,
+        start_date: tidy(e.start_date, 30) || null,
+        end_date: tidy(e.end_date, 30) || null,
+        description: e.description.map((d) => tidy(d, 500)).filter(Boolean),
+      }))
+      .filter((e) => e.company && e.role),
+    projects,
+    skills: dedupe(x.skills.map((s) => tidy(s, 100)).filter((s) => s.length <= 60 && s.split(" ").length <= 6)),
+    certifications: x.certifications
+      .map((c) => ({ name: tidy(c.name, 200), issuer: tidy(c.issuer, 150) || null, date: tidy(c.date, 20) || null }))
+      .filter((c) => c.name),
+    achievements: dedupe(x.achievements.map((a) => tidy(a, 250))),
+  };
+  return { resume, links };
+}
+
+function dedupe(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((v) => {
+    const k = v.toLowerCase();
+    if (!v || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 /**
- * Backward-compatible helper that delegates to DeterministicResumeExtractionEngine.
+ * The source line that contains `needle`, used as the claim's evidence span.
+ * Returns null when the value does not appear in the document: such a claim is
+ * ungrounded and is not offered for review.
  */
-export function buildDeterministicExtraction(
-  resumeText: string,
-  extraHyperlinks?: string[]
-): ResumeInterpretationOutput {
-  const result = DeterministicResumeExtractionEngine.extract(resumeText, { extraHyperlinks });
-  return result.structured;
+function evidenceLine(lines: string[], ...needles: Array<string | null | undefined>): string | null {
+  for (const needle of needles) {
+    const n = needle?.trim().toLowerCase();
+    if (!n) continue;
+    // Short names ("C", "R", "Go") must match as a whole token, not a substring.
+    const token = n.length < 3 ? new RegExp(`(^|[^a-z0-9+#])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9+#]|$)`) : null;
+    const nn = normalizeForGrounding(n).trim();
+    const line =
+      lines.find((l) => (token ? token.test(l.toLowerCase()) : l.toLowerCase().includes(n))) ??
+      // OCR spacing / punctuation differences: same normalisation as isGrounded.
+      (nn.length >= 3 ? lines.find((l) => normalizeForGrounding(l).includes(nn)) : undefined);
+    if (line) {
+      const t = line.trim();
+      if (t.length <= 300) return t.length >= 3 ? t : null;
+      const i = t.toLowerCase().indexOf(n);
+      return t.slice(Math.max(0, i - 100), i + n.length + 100).trim();
+    }
+  }
+  return null;
 }
 
 /**
- * Backward-compatible grounding helper that verifies items exist verbatim in source.
+ * Fuzzy containment for grounding (Task 1.1.3): case, punctuation and spacing
+ * differences (OCR "Anna  University," vs "Anna University") do not matter;
+ * "+" and "#" are kept so C++ / C# stay distinct. Short values (< 3 chars)
+ * must match a whole token.
  */
-export function groundResumeInterpretation(
-  data: ResumeInterpretationOutput,
-  resumeText: string
-): ResumeInterpretationOutput {
-  const lowerSource = resumeText.toLowerCase();
+export function normalizeForGrounding(text: string): string {
+  return ` ${text.toLowerCase().replace(/https?:\/\/(www\.)?/g, "").replace(/[^a-z0-9+#]+/g, " ").trim()} `;
+}
+export function isGrounded(normalizedSource: string, value: string | null | undefined): boolean {
+  const v = normalizeForGrounding(value || "").trim();
+  if (!v) return false;
+  return normalizedSource.includes(` ${v} `) || (v.length >= 3 && normalizedSource.includes(v));
+}
+
+const year = (s: string | null) => s?.match(/\b(19|20)\d{2}\b/g)?.pop();
+
+export function toInterpretation(r: ResumeExtraction, sourceText: string): ResumeInterpretationOutput {
+  const lines = sourceText.split("\n");
+  const norm = normalizeForGrounding(sourceText);
+  const grounded = (v: string | null | undefined) => isGrounded(norm, v);
+  const out: ResumeInterpretationOutput = { education: [], experience: [], projects: [], skills: [], certifications: [], achievements: [] };
+
+  for (const e of r.education) {
+    // The institution must be in the document; a degree or field that is not is dropped, not trusted.
+    if (!grounded(e.institution)) continue;
+    const span = evidenceLine(lines, e.institution, e.degree);
+    if (!span) continue;
+    const degree = grounded(e.degree) ? e.degree : null;
+    const field = grounded(e.field_of_study) ? e.field_of_study : null;
+    out.education.push({
+      institution: e.institution,
+      degree: degree || field || "",
+      fieldOfStudy: field || undefined,
+      startDate: e.start_date || undefined,
+      endDate: e.end_date || undefined,
+      graduationYear: year(e.end_date),
+      gpa: e.grade && !/%/.test(e.grade) ? e.grade : undefined,
+      percentage: e.grade && /%/.test(e.grade) ? e.grade : undefined,
+      academicLevel: e.level,
+      sourceSpan: span,
+    });
+  }
+  for (const e of r.experience) {
+    if (!grounded(e.company)) continue;
+    const span = evidenceLine(lines, e.company, e.role);
+    if (!span) continue;
+    out.experience.push({
+      company: e.company,
+      role: e.role,
+      type: e.type,
+      startDate: e.start_date || undefined,
+      endDate: e.end_date || undefined,
+      duration: [e.start_date, e.end_date].filter(Boolean).join(" – ") || undefined,
+      highlights: e.description,
+      technologies: [],
+      sourceSpan: span,
+    });
+  }
+  for (const p of r.projects) {
+    if (!grounded(p.name)) continue;
+    const span = evidenceLine(lines, p.name);
+    if (!span) continue;
+    // A repository or tech the document never mentions is a fabrication: drop it.
+    const repositoryUrl = [p.repository, p.link].find((u) => grounded(u)) || undefined;
+    out.projects.push({ title: p.name, description: p.description, technologies: p.tech_stack.filter(grounded), repositoryUrl, sourceSpan: span });
+  }
+  for (const s of r.skills) {
+    if (!grounded(s)) continue;
+    const span = evidenceLine(lines, s);
+    if (span) out.skills.push({ name: s, category: "other", proficiencyHint: "unknown", sourceSpan: span });
+  }
+  for (const c of r.certifications) {
+    const span = evidenceLine(lines, c.name);
+    if (span) out.certifications.push({ name: c.name, issuer: c.issuer || undefined, year: year(c.date), sourceSpan: span });
+  }
+  for (const a of r.achievements) {
+    const span = evidenceLine(lines, a, a.slice(0, 40));
+    if (!span) continue;
+    const category = /patent/i.test(a) ? "patent" : /publi|journal|conference|paper/i.test(a) ? "publication" : /hackathon/i.test(a) ? "hackathon" : "award";
+    out.achievements.push({ title: a, category, description: "", sourceSpan: span });
+  }
+  return out;
+}
+
+/** The degree onboarding asks about: the highest non-school entry, else the first. */
+export function primaryEducation(r: ResumeExtraction) {
+  const rank = { doctorate: 4, postgraduate: 3, undergraduate: 2, diploma: 1, other: 0, high_school: -1 } as const;
+  return [...r.education].sort((a, b) => rank[b.level] - rank[a.level])[0];
+}
+
+export function toExtractedProfile(r: ResumeExtraction): ExtractedProfile {
+  const edu = primaryEducation(r);
+  const grad = edu ? year(edu.end_date) : undefined;
   return {
-    education: data.education.filter((e) => lowerSource.includes(e.institution.toLowerCase()) || lowerSource.includes(e.degree.toLowerCase())),
-    skills: data.skills.filter((s) => lowerSource.includes(s.name.toLowerCase())),
-    projects: data.projects.filter((p) => lowerSource.includes(p.title.toLowerCase())),
-    experience: data.experience.filter((ex) => lowerSource.includes(ex.company.toLowerCase()) || lowerSource.includes(ex.role.toLowerCase())),
-    certifications: data.certifications.filter((c) => lowerSource.includes(c.name.toLowerCase())),
-    achievements: (data.achievements || []).filter((a) => lowerSource.includes(a.title.toLowerCase())),
+    fullName: r.name || undefined,
+    email: r.email || undefined,
+    mobile: r.phone || undefined,
+    location: r.location || undefined,
+    institution: edu?.institution,
+    degree: edu?.degree || undefined,
+    specialization: edu?.field_of_study || undefined,
+    expectedGraduationYear: grad ? Number(grad) : undefined,
+    gpa: edu?.grade || undefined,
   };
 }
 
-/**
- * Primary Resume Extraction entrypoint.
- * ZERO-LLM: Fully deterministic execution.
- */
-export async function extractResumeStructured(
-  resumeText: string,
-  _personId?: string,
-  extraHyperlinks?: string[]
-): Promise<ResumeExtractionResult> {
+/** Primary entry point: reading-order text in, structured + validated resume out. */
+export async function extractResumeStructured(resumeText: string, personId?: string): Promise<ResumeExtractionResult> {
   const startTime = Date.now();
-
+  let base = { provider: "unknown", promptVersion: RESUME_PROMPT_VERSION, truncated: false };
   try {
-    const result = DeterministicResumeExtractionEngine.extract(resumeText, {
-      extraHyperlinks,
-    });
-
-    const validated = ResumeInterpretationSchema.safeParse(result.structured);
+    const { data, model, provider, truncated } = await structureResumeText(resumeText, personId);
+    base = { ...base, provider };
+    const { resume, links } = sanitizeResumeExtraction(data);
+    const validated = ResumeInterpretationSchema.safeParse(toInterpretation(resume, resumeText));
     if (!validated.success) {
-      return {
-        success: false,
-        extracted: null,
-        provider: "deterministic-engine",
-        modelUsed: "v3.9-zero-llm",
-        fallbackUsed: false,
-        latencyMs: Date.now() - startTime,
-        truncated: false,
-        error: "Structured extraction did not pass validation.",
-      };
+      return { ...base, success: false, extracted: null, modelUsed: model, latencyMs: Date.now() - startTime, error: validated.error.issues[0]?.message };
     }
-
     return {
+      ...base,
       success: true,
       extracted: validated.data,
-      provider: "deterministic-engine",
-      modelUsed: "v3.9-zero-llm",
-      fallbackUsed: false,
+      resume,
+      extractedProfile: toExtractedProfile(resume),
+      links,
+      discoveredProfiles: Object.fromEntries(links.filter((l) => l.type !== "other").map((l) => [l.type, l.url])),
+      modelUsed: model,
       latencyMs: Date.now() - startTime,
-      truncated: false,
-      extractedProfile: result.extractedProfile,
-      discoveredProfiles: result.discoveredProfiles,
-      discoveredRepositories: result.discoveredRepositories,
-      candidates: result.candidates,
+      truncated,
     };
-  } catch {
+  } catch (err) {
     return {
+      ...base,
       success: false,
       extracted: null,
-      provider: "deterministic-engine",
-      modelUsed: "v3.9-zero-llm",
-      fallbackUsed: false,
+      modelUsed: "",
       latencyMs: Date.now() - startTime,
-      truncated: false,
-      error: "Structured extraction could not be completed.",
+      error: err instanceof Error ? err.message : "Structured extraction could not be completed.",
+      errorKind: err instanceof ResumeStructuringError ? err.kind : undefined,
     };
   }
 }

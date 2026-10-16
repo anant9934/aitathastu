@@ -10,6 +10,8 @@
  * - Never fabricates counts, rankings, or contest ratings.
  */
 
+import { connectorFetch, isServeFromCacheError } from "@/lib/connectors/rate-limiter";
+
 export interface LeetCodeStats {
   username: string;
   profileUrl: string;
@@ -20,6 +22,11 @@ export interface LeetCodeStats {
   globalRanking: number | null;
   reputation: number | null;
   realName: string | null;
+  /** Contest data (Task 1.6.4); null when the user never entered a contest. */
+  contestRating?: number | null;
+  contestGlobalRanking?: number | null;
+  contestsAttended?: number | null;
+  badges?: string[];
   retrievedAt: string;
   acquisitionStatus: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "RATE_LIMITED" | "NOT_FOUND";
   error?: string;
@@ -42,6 +49,14 @@ query getUserProfile($username: String!) {
         count
       }
     }
+    badges {
+      displayName
+    }
+  }
+  userContestRanking(username: $username) {
+    rating
+    globalRanking
+    attendedContestsCount
   }
 }
 `;
@@ -60,7 +75,7 @@ export function normalizeLeetCodeUsername(input: string): string {
 /**
  * Fetches public LeetCode statistics using the permitted public GraphQL API.
  */
-export async function fetchLeetCodeProfileStats(rawInput: string): Promise<LeetCodeStats> {
+export async function fetchLeetCodeProfileStats(rawInput: string, opts: { correlationId?: string } = {}): Promise<LeetCodeStats> {
   const username = normalizeLeetCodeUsername(rawInput);
   const profileUrl = `https://leetcode.com/u/${username}`;
   const now = new Date().toISOString();
@@ -83,7 +98,9 @@ export async function fetchLeetCodeProfileStats(rawInput: string): Promise<LeetC
   }
 
   try {
-    const res = await fetch(LEETCODE_GRAPHQL_ENDPOINT, {
+    // Rate window, circuit breaker and 6 s timeout: lib/connectors/rate-limiter.ts.
+    const res = await connectorFetch("leetcode", LEETCODE_GRAPHQL_ENDPOINT, {
+      correlationId: opts.correlationId,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -94,7 +111,6 @@ export async function fetchLeetCodeProfileStats(rawInput: string): Promise<LeetC
         query: USER_PROFILE_QUERY,
         variables: { username },
       }),
-      signal: AbortSignal.timeout(6000),
     });
 
     if (res.status === 429) {
@@ -174,6 +190,8 @@ export async function fetchLeetCodeProfileStats(rawInput: string): Promise<LeetC
     const ranking = matchedUser.profile?.ranking ? Number(matchedUser.profile.ranking) : null;
     const reputation = matchedUser.profile?.reputation ? Number(matchedUser.profile.reputation) : null;
     const realName = matchedUser.profile?.realName || null;
+    const contest = data?.data?.userContestRanking ?? null;
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
     return {
       username: matchedUser.username || username,
@@ -185,11 +203,23 @@ export async function fetchLeetCodeProfileStats(rawInput: string): Promise<LeetC
       globalRanking: ranking,
       reputation,
       realName,
+      contestRating: contest ? (num(contest.rating) === null ? null : Math.round(num(contest.rating)!)) : null,
+      contestGlobalRanking: contest ? num(contest.globalRanking) : null,
+      contestsAttended: contest ? num(contest.attendedContestsCount) : null,
+      badges: Array.isArray(matchedUser.badges) ? matchedUser.badges.map((b: { displayName?: string }) => String(b.displayName || "")).filter(Boolean).slice(0, 30) : [],
       retrievedAt: now,
       acquisitionStatus: "LIVE_VERIFIED",
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : "Network failure contacting LeetCode.";
+    if (isServeFromCacheError(err)) {
+      // No request was sent; the caller serves the saved snapshot.
+      return {
+        username, profileUrl, totalSolved: 0, easySolved: 0, mediumSolved: 0, hardSolved: 0,
+        globalRanking: null, reputation: null, realName: null, retrievedAt: now,
+        acquisitionStatus: "RATE_LIMITED", error: errorMsg,
+      };
+    }
     return {
       username,
       profileUrl,

@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import {
@@ -118,8 +119,8 @@ const VALID_PROVIDERS: Record<string, { host: string; title: string; category: s
     host: "",
     title: "Resume / CV",
     category: "Self-Reported Background",
-    description: "Zero-LLM deterministic extraction from PDF/DOCX resume.",
-    connectionMethod: "Document upload & deterministic parser",
+    description: "Layout-aware extraction from PDF/DOCX resume, structured by an AI model after consent.",
+    connectionMethod: "Document upload & layout-aware parser",
     privacyNote: "Extracted claims require student confirmation before becoming verified evidence.",
   },
 };
@@ -166,7 +167,7 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -228,7 +229,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+async function DELETE_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -255,3 +256,6 @@ export async function DELETE(req: Request) {
   }
 }
 
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);
+export const DELETE = withStudentCacheInvalidation(DELETE_handler);

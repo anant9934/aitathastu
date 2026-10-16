@@ -32,7 +32,6 @@
 import { chromium, type Page, type BrowserContext } from "playwright";
 import { mkdirSync, existsSync } from "node:fs";
 import path from "node:path";
-import assert from "node:assert";
 
 const base = process.env.BASE_URL || "http://127.0.0.1:3000";
 const output = path.join(process.cwd(), process.env.EORA_SCREENSHOT_DIR || "docs/screenshots/eora-phase8-1");

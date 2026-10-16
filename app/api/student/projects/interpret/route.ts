@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 /**
  * AI TATHASTU — PROJECT INTELLIGENCE API
  *
@@ -7,7 +8,7 @@
  * Fetches README + metadata, calls the LLM Project Intelligence Engine,
  * and returns structured interpretation for student review.
  *
- * Nothing is saved until the student confirms via /api/student/projects/confirm.
+ * Nothing is saved until the student confirms it on the onboarding review screens.
  *
  * Security:
  * - Requires authenticated session
@@ -27,7 +28,7 @@ import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 export const runtime = "nodejs";
 export const maxDuration = 30; // seconds — LLM call can take up to 15s
 
-export async function POST(request: NextRequest) {
+async function POST_handler(request: NextRequest) {
   if (!coreIngestionReady()) return NextResponse.json({ error: "Project interpretation is unavailable until credential rotation is complete." }, { status: 503 });
   // Authentication required
   const auth = await getServerAuthContext();
@@ -116,3 +117,6 @@ export async function POST(request: NextRequest) {
     reviewNote: "AI interpretation is based on repository metadata and README content accessible to your authorized account. Review all claims and describe your own contribution before saving.",
   });
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

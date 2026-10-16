@@ -61,3 +61,14 @@ universal-resume-extractor/
 
 services/resume-extractor/data/private/
 .neon
+.agents/
+.claude/
+.codex/
+scratch/
+My_Resume.pdf
+/.next-test/
+
+backups/
+
+.impeccable/
+.next-prodtest/

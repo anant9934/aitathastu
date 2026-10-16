@@ -9,7 +9,6 @@ import {
 } from "../repositories/integration-repository";
 import type { StudentActivity } from "./integrations";
 import { getUnifiedStudentActivities } from "../services/activity-service";
-import { AI_ML_TECH_REGISTRY } from "../connectors/github/mapper";
 import { SkillIntelligenceService } from "../services/skill-intelligence-service";
 
 export type SkillEvidenceState =
@@ -116,27 +115,6 @@ export type PersonGraphSummary = {
   };
   recentActivities?: StudentActivity[];
 };
-
-function categorizeSkill(skillName: string): "AI & ML" | "GenAI" | "Data" | "Backend" | "Tools" | "Cloud" | "Other" {
-  const norm = skillName.toLowerCase();
-  for (const item of AI_ML_TECH_REGISTRY) {
-    if (item.name.toLowerCase() === norm || item.regexes.some((r) => r.test(skillName))) {
-      if (item.category === "GenAI") return "GenAI";
-      if (item.category === "AI & ML") return "AI & ML";
-      if (item.category === "Data & Databases") return "Data";
-      if (item.category === "Backend & APIs") return "Backend";
-      if (item.category === "DevOps & Cloud") return "Cloud";
-      return "Tools";
-    }
-  }
-  if (norm.includes("rag") || norm.includes("llm") || norm.includes("langchain") || norm.includes("transformer")) return "GenAI";
-  if (norm.includes("ml") || norm.includes("model") || norm.includes("vision") || norm.includes("deep learning")) return "AI & ML";
-  if (norm.includes("sql") || norm.includes("data") || norm.includes("pandas")) return "Data";
-  if (norm.includes("api") || norm.includes("fastapi") || norm.includes("node") || norm.includes("backend")) return "Backend";
-  if (norm.includes("git") || norm.includes("docker") || norm.includes("linux")) return "Tools";
-  if (norm.includes("aws") || norm.includes("cloud") || norm.includes("gcp") || norm.includes("azure")) return "Cloud";
-  return "Other";
-}
 
 export function generateWhyTathastuThinksThis(
   skillName: string,

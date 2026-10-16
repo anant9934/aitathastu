@@ -159,7 +159,7 @@ async function main() {
             completedTours: [],
           })
         );
-      } catch (e) {}
+      } catch {}
     });
 
     return { context, page };
@@ -411,7 +411,7 @@ async function main() {
           })
         );
         return true;
-      } catch (e) {
+      } catch {
         return false;
       }
     });

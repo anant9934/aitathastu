@@ -69,7 +69,7 @@ export async function createJourneyEventRecord(
     }
   }
 
-  await db.insert(journeyEvents).values({
+  const inserted = await db.insert(journeyEvents).values({
     id,
     personId,
     type: event.type,
@@ -80,7 +80,14 @@ export async function createJourneyEventRecord(
     importKey: event.importKey || null,
     timestamp: ts,
     createdAt: now,
-  });
+  }).onConflictDoNothing().returning();
+
+  // A concurrent writer recorded the same import-keyed event first (uq_journey_events_import_key).
+  if (!inserted.length && event.importKey) {
+    const [winner] = await db.select().from(journeyEvents)
+      .where(and(eq(journeyEvents.personId, personId), eq(journeyEvents.importKey, event.importKey))).limit(1);
+    if (winner) return winner as JourneyEventRecord;
+  }
 
   return {
     id,

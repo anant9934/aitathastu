@@ -1,18 +1,8 @@
-import { WorkspaceProvider } from "@/components/student/student-context";
-import { StudentLayout } from "@/components/student/student-layout";
-import { StudentProfileView } from "@/components/student/student-profile-view";
+import type { Metadata } from "next";
+import { ProfileView } from "@/components/profile/ProfileView";
 
-export const metadata = {
-  title: "Person 360 Profile | AI Tathastu",
-  description: "View your verified identity, active goals, honest evidence ledger, and persistent journey milestones.",
-};
+export const metadata: Metadata = { title: "Profile", description: "Your Person 360 profile: identity, evidence ledger and milestones." };
 
 export default function StudentProfilePage() {
-  return (
-    <WorkspaceProvider>
-      <StudentLayout>
-        <StudentProfileView />
-      </StudentLayout>
-    </WorkspaceProvider>
-  );
+  return <ProfileView />;
 }

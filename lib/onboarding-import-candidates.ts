@@ -31,6 +31,8 @@ export function normalizeImportCandidates(input: unknown) {
       source: str(p.source),
       primaryLanguage: str(p.primaryLanguage) || undefined,
       aiMlCategories: candidateNames(p.aiMlCategories),
+      stars: typeof p.stars === "number" ? p.stars : undefined,
+      isFork: p.isFork === true ? true : undefined,
       technologyFindings: rows(p.technologyFindings).filter((finding) => str(finding.name)).map((finding) => ({
         name: str(finding.name), category: str(finding.category) || undefined,
         sourceFile: str(finding.sourceFile) || undefined,

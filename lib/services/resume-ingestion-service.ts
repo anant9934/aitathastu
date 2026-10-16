@@ -9,10 +9,12 @@
  * Why poll-driven instead of a background worker: on serverless platforms (e.g. Vercel)
  * a request may not outlive its response, and fire-and-forget work is silently killed. So
  * every unit of work here runs inside an awaited status request and is short:
- *   - text-layer PDF / DOCX parsing runs in-process (pdf.js text only, no
- *     canvas, no tesseract) and normally finishes in well under a second;
+ *   - text-layer PDF / DOCX: read in-process (pdf.js positions, no canvas, no
+ *     tesseract) and rebuilt in reading order by lib/resume/layout.ts;
  *   - scanned / image-only PDFs are handed to the Python extractor (Render),
- *     which OCRs in its own background task. Later polls just ask it for status.
+ *     which OCRs in its own background task and returns word boxes; those go
+ *     through the same layout reconstruction. Later polls just ask it for status.
+ * Both branches then make the same single structuring call (lib/resume/structure.ts).
  *
  * Concurrency: polls from several tabs may arrive together. Every step claims
  * the job with a conditional status/stage transition, and only the winner does
@@ -25,15 +27,16 @@
 
 import crypto from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { getDb, resumeDocuments } from "@/lib/db";
+import { getDb, resumeDocuments, sourceProcessingJobs } from "@/lib/db";
 import { ObjectStorageService } from "@/lib/storage/object-storage";
 import { SourceProcessingJobService, type SourceProcessingJob } from "./source-processing-job-service";
-import { parseResumeDocument } from "./document-parser-service";
-import { extractResumeStructured } from "./resume-extraction-service";
+import { readDocumentText } from "@/lib/resume/document-text";
+import { reconstructReadingOrder } from "@/lib/resume/layout";
+import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
+import { extractResumeStructured, type ResumeExtractionResult } from "./resume-extraction-service";
 import { resumeCandidates, saveResumeCandidates } from "./resume-review-service";
-import { resumeSuggestions, resumeDiscovery } from "@/lib/resume-suggestions";
 import { buildProfileV2 } from "./resume-profile-v2";
-import { ExtractorServiceClient, ExtractorServiceError, type ExtractorProfileV2 } from "./extractor-service-client";
+import { ExtractorServiceClient, ExtractorServiceError } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
 
 export type ResumeFailureCode =
@@ -49,6 +52,7 @@ export type ResumeFailureCode =
   | "OCR_NO_TEXT"
   | "OCR_TIMEOUT"
   | "EXTRACTION_FAILED"
+  | "AI_QUOTA_EXCEEDED"
   | "NO_CLAIMS_FOUND"
   | "PERSIST_FAILED"
   | "PROCESSING_STALLED";
@@ -65,6 +69,7 @@ const FAILURES: Record<ResumeFailureCode, { message: string; retryable: boolean 
   OCR_EXTRACTION_ERROR: { message: "Our scanned-document reader hit an internal error on this file. Please retry, or enter details manually.", retryable: true },
   OCR_NO_TEXT: { message: "We could not read the scanned pages clearly. Try a sharper scan or enter details manually.", retryable: false },
   OCR_TIMEOUT: { message: "Reading this scanned document took too long. Please retry, or enter details manually.", retryable: true },
+  AI_QUOTA_EXCEEDED: { message: "You've reached today's limit for automatic CV reading. It resets at 00:00 UTC; until then you can enter your details manually.", retryable: true },
   EXTRACTION_FAILED: { message: "We could not extract reviewable details. Please retry or enter details manually.", retryable: true },
   NO_CLAIMS_FOUND: { message: "No supported details were found for review. Please enter details manually.", retryable: false },
   PERSIST_FAILED: { message: "We could not save the extraction for review. Please retry.", retryable: true },
@@ -75,18 +80,34 @@ const FAILURES: Record<ResumeFailureCode, { message: string; retryable: boolean 
 const MIN_TEXT_CHARS = 40;
 /** A claimed in-process step older than this is assumed to have died with its request. */
 const STALE_CLAIM_MS = 90_000;
+/**
+ * A sleeping Render extractor took 53 s to answer /health (measured
+ * 2026-10-14), longer than one 20 s upload attempt. An unreachable extractor
+ * is therefore retried on later polls for this long before the job fails.
+ */
+const EXTRACTOR_WARMUP_BUDGET_MS = 120_000;
+/** Minimum gap between handoff retries while waiting for the extractor. */
+const EXTRACTOR_RETRY_GAP_MS = 3_000;
 /** Total budget for an extractor OCR job before we give up. */
 const OCR_DEADLINE_MS = 5 * 60_000;
 
+export type ResumeReviewCandidate = {
+  candidateId: string;
+  /** profile = one onboarding profile field (see `field`); link = one typed profile URL. */
+  category: string;
+  value: string;
+  sourceSpan: string;
+  field?: string;
+};
+
 export type ResumeReviewPayload = {
-  reviewCandidates: Array<{ candidateId: string; category: string; value: string; sourceSpan: string }>;
+  reviewCandidates: ResumeReviewCandidate[];
   structured: unknown;
   extractedProfile: unknown;
   discoveredProfiles: unknown;
-  discoveredRepositories: unknown;
+  links: unknown;
+  resume: unknown;
   extractionMeta: Record<string, unknown>;
-  suggestions: unknown;
-  discovery: unknown;
 };
 
 class PipelineFailure extends Error {
@@ -211,6 +232,10 @@ export async function advanceResumeJob(jobId: string, personId: string): Promise
       const m = meta(job);
       if (job.stage === "extract" && typeof m.extractorDocumentId === "string") {
         await pollExtractor(job, m.extractorDocumentId);
+      } else if (job.stage === "awaiting_extractor") {
+        if (typeof m.claimedAt === "number" && Date.now() - m.claimedAt >= EXTRACTOR_RETRY_GAP_MS && (await reclaimAwaitingJob(job, m.claimedAt))) {
+          await runInProcessStep(job);
+        }
       } else if (typeof m.claimedAt === "number" && Date.now() - m.claimedAt > STALE_CLAIM_MS) {
         await fail(job, "PROCESSING_STALLED", `stage ${job.stage} claimed ${Date.now() - m.claimedAt}ms ago`);
       }
@@ -233,17 +258,19 @@ async function runInProcessStep(job: SourceProcessingJob) {
   }
   const extension = doc.filename.toLowerCase().endsWith(".docx") ? "docx" : "pdf";
 
+  // Verification switch: send text-layer PDFs through the OCR branch too.
+  const forceOcr = extension === "pdf" && process.env.RESUME_FORCE_OCR === "true";
   let parsed;
   try {
     // Text layer only. OCR never runs inside a serverless request: it needs a
     // native canvas binary, a WASM worker and a 5 MB model, and routinely
     // exceeded the function time limit. Scanned PDFs go to the extractor.
-    parsed = await parseResumeDocument(doc.buffer, extension, { enableOcr: false });
+    parsed = await readDocumentText(doc.buffer, extension);
   } catch (err) {
     throw new PipelineFailure("PARSE_FAILED", err);
   }
 
-  if (parsed.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
+  if (!forceOcr && parsed.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
     await finalize(job, documentId, {
       text: parsed.text,
       hyperlinks: parsed.hyperlinks,
@@ -268,7 +295,7 @@ async function runInProcessStep(job: SourceProcessingJob) {
       mimeType: doc.mimeType || "application/pdf",
       identity,
     });
-    await ExtractorServiceClient.startExtraction(uploaded.document_id, identity);
+    await ExtractorServiceClient.startExtraction(uploaded.document_id, identity, { forceOcr });
     await SourceProcessingJobService.updateStage(job.id, job.personId, "extract", {
       extractorDocumentId: uploaded.document_id,
       submittedAt: Date.now(),
@@ -282,7 +309,19 @@ async function runInProcessStep(job: SourceProcessingJob) {
       })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, job.personId)));
   } catch (err) {
-    throw new PipelineFailure(classifyExtractorError(err), err);
+    const code = classifyExtractorError(err);
+    const since = typeof meta(job).extractorWaitSince === "number" ? (meta(job).extractorWaitSince as number) : Date.now();
+    if (code === "OCR_SERVICE_UNREACHABLE" && Date.now() - since < EXTRACTOR_WARMUP_BUDGET_MS) {
+      // Probably a cold start: the request above is what wakes the service.
+      // Park the job; the next status poll retries the handoff.
+      await SourceProcessingJobService.updateStage(job.id, job.personId, "awaiting_extractor", {
+        extractorWaitSince: since,
+        claimedAt: Date.now(),
+        extractorAttempts: Number(meta(job).extractorAttempts || 0) + 1,
+      });
+      return;
+    }
+    throw new PipelineFailure(code, err);
   }
 }
 
@@ -318,50 +357,58 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
   });
   if (!claimed) return;
 
-  let rawText: string;
-  let profile: ExtractorProfileV2 | null;
+  let text: string;
+  let hyperlinks: string[];
+  let pageCount: number;
   try {
-    const [text, view] = await Promise.all([
-      ExtractorServiceClient.getRawText(extractorDocumentId, identity),
-      ExtractorServiceClient.getDocument(extractorDocumentId, identity),
-    ]);
-    rawText = text.raw_text || "";
-    profile = view.profile;
+    const raw = await ExtractorServiceClient.getRawText(extractorDocumentId, identity);
+    hyperlinks = [...new Set((raw.pages || []).flatMap((p) => (p.links || []).map((l) => l.url)).filter((u) => /^https?:/i.test(u)))];
+    // Word boxes -> reading order. Documents processed before the extractor
+    // returned positions fall back to its line text.
+    text = raw.pages?.length ? reconstructReadingOrder(raw.pages, hyperlinks) : raw.raw_text || "";
+    pageCount = raw.pages?.length || 1;
   } catch (err) {
     throw new PipelineFailure(classifyExtractorError(err), err);
   }
 
-  const hasRecords = Boolean(profile && Object.values(profile.groups).some((rows) => rows.length > 0));
-  if (rawText.replace(/\s/g, "").length < MIN_TEXT_CHARS && !hasRecords) {
+  if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
     throw new PipelineFailure("OCR_NO_TEXT", { warnings: status.warnings });
   }
 
   await finalize(claimed, meta(claimed).documentId as string, {
-    text: rawText,
-    hyperlinks: [],
+    text,
+    hyperlinks,
     fileFormat: "pdf",
-    pageCount: profile?.metadata.page_count || 1,
+    pageCount,
     ocrUsed: true,
     via: "extractor-ocr",
-    extractorProfile: profile,
   });
 }
 
-/** Turns extractor profile records into review candidates when the text-based extractor found none. */
-function candidatesFromExtractorProfile(profile: ExtractorProfileV2) {
-  const out: ResumeReviewPayload["reviewCandidates"] = [];
-  const v = (r: { fields: Record<string, { value: string }> }, ...keys: string[]) =>
-    keys.map((k) => r.fields[k]?.value?.trim()).find(Boolean) || "";
-  const push = (category: string, rows: ExtractorProfileV2["groups"][string] | undefined, pick: (r: ExtractorProfileV2["groups"][string][number]) => string) =>
-    (rows || []).forEach((r, i) => {
-      const value = pick(r);
-      if (value) out.push({ candidateId: `${category}_${i}`, category, value, sourceSpan: value });
-    });
-  push("skill", profile.groups.skills, (r) => v(r, "canonical_name", "original_wording"));
-  push("education", profile.groups.education, (r) => [v(r, "degree_title", "qualification"), v(r, "institution", "university")].filter(Boolean).join(" · "));
-  push("experience", profile.groups.experience, (r) => [v(r, "job_title"), v(r, "organization")].filter(Boolean).join(" · "));
-  push("project", profile.groups.projects, (r) => v(r, "title"));
-  push("certification", profile.groups.certifications, (r) => v(r, "title"));
+/**
+ * Field-level review candidates for onboarding profile fields and typed links.
+ * They are not Person 360 records: accepting one writes to the onboarding
+ * draft only, so they never go through /apply.
+ */
+function profileCandidates(extraction: ResumeExtractionResult, text: string): ResumeReviewCandidate[] {
+  const lines = text.split("\n");
+  const span = (v: string) => lines.find((l) => l.toLowerCase().includes(v.toLowerCase()))?.trim().slice(0, 300) || v;
+  const p = extraction.extractedProfile || {};
+  const out: ResumeReviewCandidate[] = [];
+  const fields: Array<[string, string | number | undefined]> = [
+    ["fullName", p.fullName], ["email", p.email], ["mobile", p.mobile], ["location", p.location],
+    ["institution", p.institution], ["degree", p.degree], ["specialization", p.specialization],
+    ["expectedGraduationYear", p.expectedGraduationYear],
+  ];
+  for (const [field, value] of fields) {
+    if (value === undefined || value === "") continue;
+    out.push({ candidateId: `profile_${field}`, category: "profile", field, value: String(value), sourceSpan: span(String(value)) });
+  }
+  for (const link of extraction.links || []) {
+    const id = `link_${link.type}`;
+    if (out.some((c) => c.candidateId === id)) continue;
+    out.push({ candidateId: id, category: "link", field: link.type, value: link.url, sourceSpan: link.url });
+  }
   return out;
 }
 
@@ -375,33 +422,27 @@ async function finalize(
     pageCount: number;
     ocrUsed: boolean;
     via: string;
-    extractorProfile?: ExtractorProfileV2 | null;
   }
 ) {
   const { personId } = job;
   await SourceProcessingJobService.updateStage(job.id, personId, "validate");
 
-  const extraction = await extractResumeStructured(input.text, personId, input.hyperlinks);
-  if (!extraction.success || !extraction.extracted) throw new PipelineFailure("EXTRACTION_FAILED", extraction.error);
-
-  // Candidate IDs are `${category}_${index}` and must index into the stored
-  // profile's record arrays (apply maps decisions back by that index). So the
-  // profile is always built from the same source the candidates came from.
-  let reviewCandidates: ResumeReviewPayload["reviewCandidates"] = resumeCandidates(extraction.extracted, input.text);
-  let profile: ExtractorProfileV2;
-  if (reviewCandidates.length === 0 && input.extractorProfile) {
-    reviewCandidates = candidatesFromExtractorProfile(input.extractorProfile);
-    profile = input.extractorProfile;
-  } else {
-    profile = buildProfileV2({
-      documentId,
-      extraction,
-      fileFormat: input.fileFormat,
-      pageCount: input.pageCount,
-      ocrUsed: input.ocrUsed,
-    });
+  const extraction = await extractResumeStructured(input.text, personId);
+  if (!extraction.success || !extraction.extracted) {
+    throw new PipelineFailure(extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED", extraction.error);
   }
+
+  // Record candidate IDs are `${category}_${index}` and index into the stored
+  // profile's record arrays (apply maps decisions back by that index).
+  const reviewCandidates = [...profileCandidates(extraction, input.text), ...resumeCandidates(extraction.extracted, input.text)];
   if (reviewCandidates.length === 0) throw new PipelineFailure("NO_CLAIMS_FOUND");
+  const profile = buildProfileV2({
+    documentId,
+    extraction,
+    fileFormat: input.fileFormat,
+    pageCount: input.pageCount,
+    ocrUsed: input.ocrUsed,
+  });
 
   await SourceProcessingJobService.updateStage(job.id, personId, "persist");
 
@@ -410,18 +451,19 @@ async function finalize(
     structured: extraction.extracted,
     extractedProfile: extraction.extractedProfile ?? null,
     discoveredProfiles: extraction.discoveredProfiles ?? {},
-    discoveredRepositories: extraction.discoveredRepositories ?? [],
+    links: extraction.links ?? [],
+    resume: extraction.resume ?? null,
     extractionMeta: {
       success: true,
-      provider: input.via === "extractor-ocr" ? "extractor-tesseract" : extraction.provider,
+      provider: extraction.provider,
       modelUsed: extraction.modelUsed,
-      llmUsed: false,
+      promptVersion: extraction.promptVersion,
+      llmUsed: true,
       ocrUsed: input.ocrUsed,
       latencyMs: extraction.latencyMs,
+      truncated: extraction.truncated,
       via: input.via,
     },
-    suggestions: resumeSuggestions(input.text),
-    discovery: resumeDiscovery(input.text),
   };
 
   try {
@@ -449,8 +491,64 @@ async function finalize(
     resultReference: `resume:${documentId}`,
     metadata: { candidates: reviewCandidates.length, via: input.via },
   });
+
+  await seedDraftFromResume(personId, documentId, extraction.extracted);
+}
+
+/**
+ * Seeds the onboarding draft with the CV's candidates (Task 1.1.5), as a
+ * "system" write: entries are unioned by key and scalars only fill empty
+ * fields, so it never overwrites what the student already typed, even when
+ * it lands mid-autosave (Task 1.2.4). Everything is a candidate until the
+ * student confirms it on the review screen. Best-effort: the review payload is
+ * already persisted, so a failure here is logged, not surfaced.
+ */
+async function seedDraftFromResume(personId: string, documentId: string, x: ResumeInterpretationOutput) {
+  try {
+    const { writeOnboardingDraft } = await import("./onboarding-v2-service");
+    const firstEdu = x.education[0];
+    await writeOnboardingDraft(personId, {
+      resumeDocumentId: documentId,
+      institution: firstEdu?.institution || "",
+      degree: firstEdu?.degree || "",
+      education: x.education.map((e) => ({
+        institution: e.institution, degree: e.degree || undefined, fieldOfStudy: e.fieldOfStudy, graduationYear: e.graduationYear,
+        startDate: e.startDate, endDate: e.endDate, gpa: e.gpa, percentage: e.percentage, academicLevel: e.academicLevel,
+        status: "candidate", source: "resume",
+      })),
+      experiences: x.experience.map((e) => ({
+        company: e.company, role: e.role, type: e.type, startDate: e.startDate, endDate: e.endDate, duration: e.duration,
+        highlights: e.highlights, status: "candidate", source: "resume",
+      })),
+      projects: x.projects.map((p) => ({
+        id: `resume_${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 60)}`,
+        title: p.title, description: p.description || "", technologies: p.technologies || [], sources: ["resume"],
+        status: "candidate", url: p.repositoryUrl || "",
+      })),
+      techCandidates: x.skills.map((s) => ({ name: s.name, source: "resume", provenance: "resume_extracted" })),
+    }, { origin: "system" });
+  } catch (error) {
+    console.error(JSON.stringify({ event: "resume.draft_seed_failed", documentId, error: error instanceof Error ? error.message : String(error) }));
+  }
 }
 
 export function failureInfo(code: string | null | undefined) {
   return code && code in FAILURES ? FAILURES[code as ResumeFailureCode] : null;
+}
+
+/** Compare-and-swap on claimedAt so two concurrent polls never both re-upload. */
+async function reclaimAwaitingJob(job: SourceProcessingJob, claimedAt: number): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .update(sourceProcessingJobs)
+    .set({ metadata: sql`${sourceProcessingJobs.metadata} || ${JSON.stringify({ claimedAt: Date.now() })}::jsonb` })
+    .where(and(
+      eq(sourceProcessingJobs.id, job.id),
+      eq(sourceProcessingJobs.personId, job.personId),
+      eq(sourceProcessingJobs.stage, "awaiting_extractor"),
+      sql`(${sourceProcessingJobs.metadata}->>'claimedAt')::bigint = ${claimedAt}`
+    ))
+    .returning();
+  if (rows.length === 1) job.metadata = rows[0].metadata;
+  return rows.length === 1;
 }

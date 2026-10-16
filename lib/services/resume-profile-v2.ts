@@ -1,7 +1,7 @@
 /**
  * Builds the canonical Schema v2.0 profile (the same shape the Python extractor
- * produces) from the deterministic Node extraction, so every stored resume
- * has one profile format regardless of which engine read it.
+ * produces) from the structured extraction, so every stored resume has one
+ * profile format regardless of which branch (text layer or OCR) read it.
  */
 
 import type { ResumeExtractionResult } from "./resume-extraction-service";
@@ -37,12 +37,11 @@ export function buildProfileV2(params: {
   const x = extraction.extracted!;
   const p = extraction.extractedProfile;
   const m: EvidenceMethod = ocrUsed ? "ocr" : fileFormat === "docx" ? "docx" : "native_pdf";
-  const headline = (p as { headline?: string } | undefined)?.headline;
 
   const groups: Record<string, ExtractorRecord[]> = {
     identity: [record(`id_${documentId.slice(0, 8)}`, {
       full_name: field(p?.fullName, 0.95, "header", p?.fullName, m),
-      professional_headline: field(headline, 0.9, "header", headline, m),
+      location: field(p?.location, 0.9, "header", p?.location, m),
     })],
     contact: [record(`ct_${documentId.slice(0, 8)}`, {
       email: field(p?.email, 0.98, "contact", p?.email, m),
@@ -99,7 +98,7 @@ export function buildProfileV2(params: {
       processing_seconds: (extraction.latencyMs || 0) / 1000,
       extraction_methods: [m],
       parser_version: "2.0.0",
-      model_version: "v3.9-zero-llm",
+      model_version: extraction.modelUsed,
       warnings: [],
       status: "completed",
     },

@@ -31,6 +31,10 @@ app.add_middleware(
 
 store = LocalStore(settings.storage_dir)
 
+# Optional LinkedIn import worker (Tasks 1.6.1, 1.6.7, 1.6.8).
+from .linkedin import router as linkedin_router  # noqa: E402
+app.include_router(linkedin_router)
+
 def meta_for(docid: str, user: UserContext) -> dict:
     try:
         meta = store.get_meta(docid)
@@ -56,9 +60,10 @@ def processing(docid: str):
         store.update_meta(docid, {'status': 'processing', 'error_code': None})
         began = time.perf_counter()
         payload = store.document_path(docid).read_bytes()
-        content = read_document(payload, meta['format'], settings)
+        content = read_document(payload, meta['format'], settings, force_ocr=bool(meta.get('force_ocr')))
         profile = extract_profile(content, docid, began)
         store.save_json(docid, 'sections.json', [asdict(l) for l in content.lines])
+        store.save_json(docid, 'layout.json', content.layout)
         store.save_json(docid, 'profile.json', profile.model_dump(mode='json'))
         store.update_meta(docid, {'status': profile.metadata.status, 'warnings': profile.metadata.warnings})
     except OcrEngineUnavailable as e:
@@ -147,7 +152,7 @@ def extract(
     if meta['status'] in ('completed', 'partial'):
         return StatusResponse(document_id=request.document_id, status=meta['status'], warnings=meta.get('warnings', []))
 
-    store.update_meta(request.document_id, {'status': 'queued', 'warnings': []})
+    store.update_meta(request.document_id, {'status': 'queued', 'warnings': [], 'force_ocr': request.force_ocr})
     tasks.add_task(processing, request.document_id)
     return StatusResponse(document_id=request.document_id, status='queued')
 
@@ -193,6 +198,7 @@ async def upload_and_extract(
         content = read_document(payload, fmt, settings)
         profile = extract_profile(content, docid, began)
         store.save_json(docid, 'sections.json', [asdict(l) for l in content.lines])
+        store.save_json(docid, 'layout.json', content.layout)
         store.save_json(docid, 'profile.json', profile.model_dump(mode='json'))
         store.update_meta(docid, {'status': profile.metadata.status, 'warnings': profile.metadata.warnings})
     except Exception as e:
@@ -236,15 +242,19 @@ def text(
     document_id: str,
     user: UserContext = Depends(authorize_action('view'))
 ):
-    """Raw extracted lines and hyperlinks, so the caller can run its own
-    deterministic extraction over OCR output without a second OCR pass."""
+    """Extracted text plus positioned spans per page, so the caller can rebuild
+    reading order (multi-column layouts) without a second OCR pass."""
     meta_for(document_id, user)
     try:
         lines = store.read_json(document_id, 'sections.json')
     except KeyError:
         raise HTTPException(409, 'Not processed') from None
     raw = '\n'.join(l['text'] for l in lines if (l.get('text') or '').strip())
-    return {'document_id': document_id, 'raw_text': raw[:50000], 'ocr_used': any(l.get('method') == 'ocr' for l in lines)}
+    try:
+        pages = store.read_json(document_id, 'layout.json')
+    except KeyError:
+        pages = []  # processed before layout capture existed
+    return {'document_id': document_id, 'raw_text': raw[:50000], 'ocr_used': any(l.get('method') == 'ocr' for l in lines), 'pages': pages}
 
 @app.get('/api/resumes/{document_id}', response_model=DocumentView)
 def get_document(

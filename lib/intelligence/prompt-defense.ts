@@ -1,6 +1,7 @@
 export function wrapUntrustedContent(tag: string, content: string): string {
-  // Neutralize any tag variants or wrapper breakouts
-  const sanitized = content
+  // Neutralize any tag variants or wrapper breakouts; strip injection phrasing too,
+  // so every caller (GitHub READMEs, LinkedIn text, chat questions) gets both.
+  const sanitized = sanitizeTextForPrompt(content)
     .replace(new RegExp(`</?${tag}[^>]*>`, "gi"), (match) => match.replace("<", "&lt;").replace(">", "&gt;"))
     .replace(new RegExp(`</?${tag}_data_untrusted[^>]*>`, "gi"), (match) => match.replace("<", "&lt;").replace(">", "&gt;"))
     .replace(/<\/?(script|iframe|object|embed)[^>]*>/gi, (match) => match.replace("<", "&lt;").replace(">", "&gt;"));
@@ -11,9 +12,24 @@ ${sanitized}
 }
 
 /** Removes prompt injection attempts and control characters before untrusted document text enters a model prompt. */
+const INJECTION_PATTERNS = [
+  /system\s+override/i,
+  /(?:ignore|disregard|forget|override)\s+(?:all\s+|any\s+|the\s+|your\s+)?(?:previous|prior|above|earlier|preceding)\s+(?:instructions?|rules?|prompts?|messages?)/i,
+  /disregard\s+all\s+prior\s+instructions/i,
+  /grant\s+(?:full\s+)?verified\s+status/i,
+  /(?:mark|set)\s+(?:all\s+)?(?:my\s+)?skills?\s+(?:as\s+)?verified/i,
+  /you\s+are\s+now\s+(?:a|an|in)\b/i,
+  /(?:reveal|print|show|repeat|leak)\s+(?:me\s+)?(?:your|the)\s+(?:system\s+|hidden\s+|initial\s+)?(?:prompt|instructions)/i,
+  /\b(?:developer|god|jailbreak|dan)\s+mode\b/i,
+  /<\/?\s*(?:system|assistant|developer)\s*>/i,
+];
+
 export function sanitizeTextForPrompt(content: string): string {
-  return content
-    .replace(/(?:system\s+override|ignore\s+previous\s+instructions|disregard\s+all\s+prior\s+instructions|grant\s+full\s+verified\s+status)[^\n]*/gi, "[UNTRUSTED_INSTRUCTION_STRIPPED]")
+  let out = content;
+  for (const pattern of INJECTION_PATTERNS) {
+    out = out.replace(new RegExp(`${pattern.source}[^\\n]*`, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`), "[UNTRUSTED_INSTRUCTION_STRIPPED]");
+  }
+  return out
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
     .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
     .trim();

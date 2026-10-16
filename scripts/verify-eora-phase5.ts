@@ -24,18 +24,14 @@ import {
 } from "../lib/eora/identity";
 import {
   checkInputSafety,
-  checkOutputSafety,
 } from "../lib/eora/safety";
 import {
   recognizeIntent,
-  isIntentConfident,
 } from "../lib/eora/intent";
 import type { EoraContext } from "../lib/eora/context";
 import {
   createDefaultContext,
   createEmptyStudentContext,
-  resolveRouteFromPathname,
-  shouldEoraBeQuiet,
   screenNumberToOnboardingStep,
 } from "../lib/eora/context";
 import {
@@ -780,7 +776,7 @@ test("EoraProvider context is a singleton React context (no duplicate exports)",
   // Read the provider file and verify single context instantiation
   const providerPath = path.resolve(
     process.cwd(),
-    "components/eora/eora-provider.tsx"
+    "lib/client/eora/provider.tsx"
   );
   const content = fs.readFileSync(providerPath, "utf-8");
   // Count actual createContext(...) calls (not the import)
@@ -795,7 +791,7 @@ test("EoraProvider context is a singleton React context (no duplicate exports)",
 test("ExactScreensContainer imports useEoraSafe (Phase 5 wiring present)", () => {
   const containerPath = path.resolve(
     process.cwd(),
-    "components/exact-screens/ExactScreensContainer.tsx"
+    "components/onboarding/OnboardingApp.tsx"
   );
   const content = fs.readFileSync(containerPath, "utf-8");
   assert.ok(
@@ -807,7 +803,7 @@ test("ExactScreensContainer imports useEoraSafe (Phase 5 wiring present)", () =>
 test("Screen4AcademicDetails imports useEoraSafe for form validation", () => {
   const screen4Path = path.resolve(
     process.cwd(),
-    "components/exact-screens/Screen4AcademicDetails.tsx"
+    "components/onboarding/steps/DetailsStep.tsx"
   );
   const content = fs.readFileSync(screen4Path, "utf-8");
   assert.ok(
@@ -819,7 +815,7 @@ test("Screen4AcademicDetails imports useEoraSafe for form validation", () => {
 test("StudentLayout imports EoraStudentBridge (workspace wiring present)", () => {
   const layoutPath = path.resolve(
     process.cwd(),
-    "components/student/student-layout.tsx"
+    "app/student/layout.tsx"
   );
   const content = fs.readFileSync(layoutPath, "utf-8");
   assert.ok(
@@ -831,7 +827,7 @@ test("StudentLayout imports EoraStudentBridge (workspace wiring present)", () =>
 test("EoraStudentBridge file exists and exports correctly", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   assert.ok(fs.existsSync(bridgePath), "EoraStudentBridge file must exist");
   const content = fs.readFileSync(bridgePath, "utf-8");
@@ -845,7 +841,7 @@ test("EoraStudentBridge file exists and exports correctly", () => {
 test("EoraProvider clearStudentContext method exists for logout support", () => {
   const providerPath = path.resolve(
     process.cwd(),
-    "components/eora/eora-provider.tsx"
+    "lib/client/eora/provider.tsx"
   );
   const content = fs.readFileSync(providerPath, "utf-8");
   assert.ok(
@@ -857,7 +853,7 @@ test("EoraProvider clearStudentContext method exists for logout support", () => 
 test("EoraProvider never stores raw tokens or passwords in state", () => {
   const providerPath = path.resolve(
     process.cwd(),
-    "components/eora/eora-provider.tsx"
+    "lib/client/eora/provider.tsx"
   );
   const content = fs.readFileSync(providerPath, "utf-8");
   // Check sensitive words are not stored as state

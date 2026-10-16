@@ -18,13 +18,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-import {
-  EORA_AVATARS,
-  getEoraAsset,
-} from "../lib/eora/avatar-registry";
-import { getPoseForState, type EoraAnimationState } from "../lib/eora/identity";
-import { checkInputSafety, checkOutputSafety } from "../lib/eora/safety";
-import { recognizeIntent, isIntentConfident } from "../lib/eora/intent";
+import { recognizeIntent } from "../lib/eora/intent";
 import type { EoraContext } from "../lib/eora/context";
 import {
   createDefaultContext,
@@ -36,7 +30,7 @@ import {
   getRouteWelcomeMessage,
 } from "../lib/eora/dialogue";
 import { processUserInput } from "../lib/eora/brain";
-import { TOUR_REGISTRY, getTourById } from "../lib/eora/tours";
+import { TOUR_REGISTRY } from "../lib/eora/tours";
 import {
   createDefaultPreferences,
   loadPreferencesForPerson,
@@ -153,7 +147,7 @@ console.log("\nGROUP B: EoraStudentBridge v1.2");
 test("EoraStudentBridge fetches from /api/eora/context (no manual nulls)", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(
@@ -168,7 +162,7 @@ test("EoraStudentBridge fetches from /api/eora/context (no manual nulls)", () =>
 test("EoraStudentBridge clears context on 401 response", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(
@@ -180,7 +174,7 @@ test("EoraStudentBridge clears context on 401 response", () => {
 test("EoraStudentBridge re-fetches on tab visibility change", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(
@@ -192,7 +186,7 @@ test("EoraStudentBridge re-fetches on tab visibility change", () => {
 test("EoraStudentBridge clears context on unmount (sign-out protection)", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(
@@ -204,7 +198,7 @@ test("EoraStudentBridge clears context on unmount (sign-out protection)", () => 
 test("EoraStudentBridge never stores passwords or tokens", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(!content.includes("password:"), "Must not store password");
@@ -215,7 +209,7 @@ test("EoraStudentBridge never stores passwords or tokens", () => {
 test("StudentLayout uses simplified EoraStudentBridge (no null props)", () => {
   const layoutPath = path.resolve(
     process.cwd(),
-    "components/student/student-layout.tsx"
+    "app/student/layout.tsx"
   );
   const content = fs.readFileSync(layoutPath, "utf-8");
   assert.ok(content.includes("EoraStudentBridge"), "Must include bridge");
@@ -230,7 +224,8 @@ test("StudentLayout uses simplified EoraStudentBridge (no null props)", () => {
 });
 
 test("StudentPage uses simplified EoraStudentBridge", () => {
-  const pagePath = path.resolve(process.cwd(), "app/student/page.tsx");
+  // Phase 3: the bridge mounts once in the student layout, for every workspace page.
+  const pagePath = path.resolve(process.cwd(), "app/student/layout.tsx");
   const content = fs.readFileSync(pagePath, "utf-8");
   assert.ok(content.includes("EoraStudentBridge"), "Must include bridge");
   // Must NOT parse greeting string for name (fragile)
@@ -261,8 +256,8 @@ test("getPersonScopedKey is deterministic for same person", () => {
 
 test("Person A's tour completions do not appear in Person B's preferences", () => {
   // Simulate saving prefs for person A
-  let prefsA = createDefaultPreferences();
-  prefsA = markTourCompleted(prefsA, "student-home");
+  let _prefsA = createDefaultPreferences();
+  _prefsA = markTourCompleted(_prefsA, "student-home");
   // Simulate person B with fresh prefs
   const prefsB = createDefaultPreferences();
   // Person B's prefs must not contain A's tour completions
@@ -301,7 +296,7 @@ test("clearPreferencesForPerson function exists and accepts personId", () => {
 test("EoraProvider imports person-scoped storage functions", () => {
   const providerPath = path.resolve(
     process.cwd(),
-    "components/eora/eora-provider.tsx"
+    "lib/client/eora/provider.tsx"
   );
   const content = fs.readFileSync(providerPath, "utf-8");
   assert.ok(
@@ -326,7 +321,7 @@ console.log("\nGROUP D: Success Event Deduplication");
 test("ExactScreensContainer uses dedup refs for resume and github signals", () => {
   const containerPath = path.resolve(
     process.cwd(),
-    "components/exact-screens/ExactScreensContainer.tsx"
+    "components/onboarding/OnboardingApp.tsx"
   );
   const content = fs.readFileSync(containerPath, "utf-8");
   assert.ok(
@@ -342,7 +337,7 @@ test("ExactScreensContainer uses dedup refs for resume and github signals", () =
 test("Resume success signal fires only once (dedup guard)", () => {
   const containerPath = path.resolve(
     process.cwd(),
-    "components/exact-screens/ExactScreensContainer.tsx"
+    "components/onboarding/OnboardingApp.tsx"
   );
   const content = fs.readFileSync(containerPath, "utf-8");
   assert.ok(
@@ -355,7 +350,7 @@ test("Resume success signal fires only once (dedup guard)", () => {
 test("GitHub signal fires 'projects_discovered' not 'github_connected'", () => {
   const containerPath = path.resolve(
     process.cwd(),
-    "components/exact-screens/ExactScreensContainer.tsx"
+    "components/onboarding/OnboardingApp.tsx"
   );
   const content = fs.readFileSync(containerPath, "utf-8");
   // projects_discovered is more accurate — github OAuth is a separate flow
@@ -390,21 +385,9 @@ const requiredIds = new Set(
 );
 
 // Source files to search for each ID
-const sourceFiles = [
-  "components/exact-screens/Screen2EoraIntro.tsx",
-  "components/exact-screens/Screen3ChooseRole.tsx",
-  "components/exact-screens/Screen3aPriorities.tsx",
-  "components/exact-screens/Screen3bAiMlDirection.tsx",
-  "components/exact-screens/Screen4AcademicDetails.tsx",
-  "components/exact-screens/Screen5ResumeUpload.tsx",
-  "components/exact-screens/Screen6DigitalFootprints.tsx",
-  "components/exact-screens/Screen12StudentDashboard.tsx",
-  "components/student/student-home-view.tsx",
-  "components/student/student-projects-view.tsx",
-  "components/eora/eora-floating-companion.tsx",
-  "app/student/skills/page.tsx",
-  "app/student/roadmap/page.tsx",
-];
+// Phase 3: tour targets may live in any component or route file.
+const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(dir, e.name)) : /.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : []);
+const sourceFiles = [...walk(path.resolve(process.cwd(), "components")), ...walk(path.resolve(process.cwd(), "app"))];
 
 // Build a combined content string to search for IDs
 const combinedContent = sourceFiles
@@ -432,52 +415,19 @@ for (const id of requiredIds) {
 // ──────────────────────────────────────────────────────────────────────────
 console.log("\nGROUP F: Mobile CSS Coverage");
 
-test("320px breakpoint exists in eora-companion.css", () => {
-  const cssPath = path.resolve(process.cwd(), "app/eora-companion.css");
-  const content = fs.readFileSync(cssPath, "utf-8");
-  assert.ok(
-    content.includes("max-width: 340px") || content.includes("max-width: 320px"),
-    "Must have ≤320px breakpoint"
-  );
+// Phase 3: the companion is Tailwind-styled in components/eora/EoraCompanion.tsx.
+const companion = fs.readFileSync(path.resolve(process.cwd(), "components/eora/EoraCompanion.tsx"), "utf-8");
+test("Guide card width is clamped to the viewport (works at 320px)", () => {
+  assert.ok(companion.includes("calc(100vw-1.5rem)"), "Card must never exceed the viewport");
 });
-
-test("390px mobile viewport is handled (max-width: 480px covers it)", () => {
-  const cssPath = path.resolve(process.cwd(), "app/eora-companion.css");
-  const content = fs.readFileSync(cssPath, "utf-8");
-  assert.ok(content.includes("max-width: 480px"), "Must cover 390px devices");
+test("Guide card height is capped so it never covers a full phone screen", () => {
+  assert.ok(companion.includes("max-h-[min(60dvh"), "Card must cap its height");
 });
-
-test("768px tablet breakpoint exists", () => {
-  const cssPath = path.resolve(process.cwd(), "app/eora-companion.css");
-  const content = fs.readFileSync(cssPath, "utf-8");
-  assert.ok(content.includes("768px"), "Must have tablet breakpoint");
-});
-
-test("Keyboard-open state handled via max-height breakpoint", () => {
-  const cssPath = path.resolve(process.cwd(), "app/eora-companion.css");
-  const content = fs.readFileSync(cssPath, "utf-8");
-  assert.ok(
-    content.includes("max-height: 450px") || content.includes("max-height: 500px"),
-    "Must handle virtual keyboard open state"
-  );
-});
-
-test("Panel max-height set on mobile to prevent full-screen overlap", () => {
-  const cssPath = path.resolve(process.cwd(), "app/eora-companion.css");
-  const content = fs.readFileSync(cssPath, "utf-8");
-  assert.ok(
-    content.includes("max-height:") && content.includes("eora-panel"),
-    "Panel must have max-height on mobile"
-  );
-});
-
 test("safe-area-inset-bottom is used for floating root positioning", () => {
-  const cssPath = path.resolve(process.cwd(), "app/eora-companion.css");
-  const content = fs.readFileSync(cssPath, "utf-8");
-  assert.ok(
-    content.includes("safe-area-inset-bottom"),
-    "Must use safe-area-inset-bottom"
-  );
+  assert.ok(companion.includes("safe-area-inset-bottom"), "Must use safe-area-inset-bottom");
+});
+test("Onboarding renders EORA in the page flow, not floating (P4-13)", () => {
+  assert.ok(companion.includes('pathname.startsWith("/onboarding")'), "Companion must stand down on onboarding");
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -507,7 +457,7 @@ test("EORA context never returns OAuth callback URLs", () => {
 test("EoraProvider clearStudentContext called on 401 (sign-out guard)", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(content.includes("clearStudentContext"), "Must clear on auth failure");
@@ -516,7 +466,7 @@ test("EoraProvider clearStudentContext called on 401 (sign-out guard)", () => {
 test("Cross-user context switch: personId mismatch triggers clearStudentContext", () => {
   const bridgePath = path.resolve(
     process.cwd(),
-    "components/eora/eora-student-bridge.tsx"
+    "lib/client/eora/student-bridge.tsx"
   );
   const content = fs.readFileSync(bridgePath, "utf-8");
   assert.ok(

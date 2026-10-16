@@ -1,10 +1,14 @@
 import crypto from "crypto";
 import { encryptConnectionToken, decryptConnectionToken, decryptConnectionTokenWithMeta } from "../security/connection-token";
 import { coreIngestionReady } from "../security/core-ingestion-gate";
-import { fetchGitHubProjects } from "../connectors/github/client";
+import { mapRawRepoToProject } from "../connectors/github/client";
+import { acquireGitHubViaGraphQL, GitHubGraphQLError } from "../connectors/github/graphql";
+import { isServeFromCacheError } from "../connectors/rate-limiter";
 import { saveProject } from "../repositories/project-repository";
-import { createEvidenceRecord } from "../repositories/evidence-repository";
-import { hasRepoMeaningfullyChanged, DiscoveredGitHubProject } from "../connectors/github/mapper";
+import { writeEvidenceBatch } from "../repositories/evidence-repository";
+import type { DiscoveredGitHubProject } from "../connectors/github/mapper";
+import { runSyncOperation, SyncError, type RunSyncResult, type SyncContext, type SyncTrigger, type SyncWorkResult } from "../sync/sync-operation";
+import type { SourceSyncState } from "../sync/state-machine";
 import {
   saveExternalConnection,
   getExternalConnectionByProvider,
@@ -12,12 +16,19 @@ import {
   createSyncRun,
   completeSyncRun,
   saveSourceSnapshot,
-  getLatestSourceSnapshot,
+  getSourceSnapshots,
 } from "../repositories/connection-repository";
 
 export type GitHubSyncResult = {
   success: boolean;
   syncRunId?: string;
+  /** sync_operations row (Task 1.9.x); absent when the sync never started. */
+  operationId?: string;
+  state?: SourceSyncState;
+  deduplicated?: boolean;
+  correlationId?: string;
+  failedRepos?: { repo: string; reason: string }[];
+  queries?: number;
   recordsFetched: number;
   recordsChanged: number;
   projects: DiscoveredGitHubProject[];
@@ -85,10 +96,26 @@ export async function disconnectGitHubAccount(personId: string) {
   };
 }
 
+export type GitHubWork = (ctx: SyncContext) => Promise<SyncWorkResult>;
+
+/** "Sync Now" / OAuth callback / webhook: start (or join) an operation and run it. */
 export async function syncGitHubConnection(
   personId: string,
-  token?: string
+  token?: string,
+  opts: { trigger?: SyncTrigger; requestId?: string } = {}
 ): Promise<GitHubSyncResult> {
+  const prepared = await prepareGitHubSync(personId, token);
+  if (typeof prepared !== "function") return prepared;
+  const run = await runSyncOperation({ personId, source: "github", trigger: opts.trigger ?? "user", requestId: opts.requestId }, prepared);
+  return toGitHubSyncResult(run);
+}
+
+/**
+ * Resolves the connection and token. Returns the work to run, or a result
+ * explaining why there is nothing to run. Used by syncGitHubConnection and by
+ * the retry runner (lib/sync/runners.ts), which executes an existing operation.
+ */
+export async function prepareGitHubSync(personId: string, token?: string): Promise<GitHubSyncResult | GitHubWork> {
   if (!coreIngestionReady()) return { success: false, recordsFetched: 0, recordsChanged: 0, projects: [], error: "GitHub synchronization is unavailable until credential rotation is complete." };
   const connection = await getExternalConnectionByProvider(personId, "github");
   if (!connection) {
@@ -145,162 +172,151 @@ export async function syncGitHubConnection(
     return { success: false, recordsFetched: 0, recordsChanged: 0, projects: [], error: "Reconnect GitHub to authorize repository sync." };
   }
 
-  // Start SyncRun
-  const syncRun = await createSyncRun(connection.id, personId, "github");
+  return (ctx) => importGitHubRepositories({ personId, connectionId: connection.id, login: connection.externalUsername, token: authorizedToken, metadata, profileUrl: connection.profileUrl, ctx });
+}
 
+export function toGitHubSyncResult(run: RunSyncResult): GitHubSyncResult {
+  const op = run.operation;
+  const result = (op.result || {}) as Partial<GitHubImportSummary>;
+  const settled = op.state === "succeeded" || op.state === "partial";
+  const inFlight = run.deduplicated && (op.state === "queued" || op.state === "running");
+  return {
+    success: settled || inFlight,
+    syncRunId: result.syncRunId,
+    operationId: op.id,
+    state: op.state as SourceSyncState,
+    deduplicated: run.deduplicated,
+    correlationId: op.correlationId,
+    recordsFetched: result.recordsFetched ?? 0,
+    recordsChanged: result.recordsChanged ?? 0,
+    failedRepos: result.failedRepos ?? [],
+    queries: result.queries,
+    projects: [],
+    error: settled || inFlight ? undefined : op.lastError ?? undefined,
+  };
+}
+
+export type GitHubImportSummary = {
+  syncRunId: string;
+  recordsFetched: number;
+  recordsChanged: number;
+  unchanged: number;
+  failedRepos: { repo: string; reason: string }[];
+  queries: number;
+};
+
+/**
+ * One GitHub import attempt (run by the sync framework). Unchanged repos
+ * (same pushedAt as their last snapshot) are not re-parsed or re-written
+ * (1.5.2). A failure inside one repo is recorded and the rest continue; the
+ * attempt is then `partial` (1.5.3). Every write is keyed (repo URL,
+ * evidence import key), so a replay upserts instead of duplicating (1.9.1).
+ */
+export async function importGitHubRepositories(params: {
+  personId: string;
+  connectionId: string;
+  login: string;
+  token: string;
+  metadata: Record<string, unknown>;
+  profileUrl: string;
+  ctx: SyncContext;
+}): Promise<SyncWorkResult> {
+  const { personId, ctx } = params;
+  const syncRun = await createSyncRun(params.connectionId, personId, "github");
   try {
-    const fetchResult = await fetchGitHubProjects(connection.externalUsername, authorizedToken);
-
-    if (!fetchResult.success) {
-      await completeSyncRun(syncRun.id, {
-        status: "failed",
-        recordsFetched: 0,
-        recordsChanged: 0,
-        errorCode: "FETCH_FAILED",
-        errorSummary: fetchResult.error || "Failed to fetch repositories from GitHub.",
-      });
-
-      return {
-        success: false,
-        syncRunId: syncRun.id,
-        recordsFetched: 0,
-        recordsChanged: 0,
-        projects: [],
-        error: fetchResult.error,
-      };
+    const snapshots = await getSourceSnapshots(personId, "github", { limit: 500 });
+    const previousPushedAt = new Map<string, string>();
+    for (const snap of snapshots) {
+      const data = snap.snapshotData as { fullName?: string; pushedAt?: string };
+      if (data?.fullName && data.pushedAt && !previousPushedAt.has(data.fullName)) previousPushedAt.set(data.fullName, data.pushedAt);
     }
+    const acq = await acquireGitHubViaGraphQL({ login: params.login, token: params.token, previousPushedAt, correlationId: ctx.correlationId });
+    ctx.log.info("github.acquired", { metadata: { repos: acq.repos.length, deep: acq.deep.size, unchanged: acq.unchanged.length, queries: acq.queries, rateLimitRemaining: acq.rateLimitRemaining } });
 
+    const unchanged = new Set(acq.unchanged.filter((name) => previousPushedAt.has(name)));
+    const failedRepos: { repo: string; reason: string }[] = [];
     let recordsChanged = 0;
-    const projects = fetchResult.projects;
-
-    for (const project of projects) {
-      const sourceRef = project.repositoryUrl;
-      const priorSnapshot = await getLatestSourceSnapshot(personId, "github", sourceRef);
-
-      const isChanged = hasRepoMeaningfullyChanged(
-        priorSnapshot?.checksum || undefined,
-        project.checksum
-      );
-
-      if (isChanged) {
+    for (const repo of acq.repos) {
+      if (unchanged.has(repo.full_name)) continue;
+      if (ctx.signal.aborted) throw new SyncError("GitHub import ran out of time.", "timeout");
+      const deep = acq.deep.get(repo.full_name);
+      if (deep?.failure) failedRepos.push({ repo: repo.full_name, reason: deep.failure });
+      try {
+        const project = mapRawRepoToProject(repo, deep);
+        await saveSourceSnapshot(personId, "github", project.repositoryUrl, {
+          fullName: repo.full_name, pushedAt: repo.pushed_at, title: project.title, description: project.description,
+          technologies: project.technologies, stars: project.stars, forks: project.forks, isFork: project.isFork,
+          detectedManifests: project.detectedManifests, checksum: project.checksum,
+          correlationId: ctx.correlationId, syncedAt: new Date().toISOString(),
+        }, project.checksum);
+        await saveProject(personId, {
+          title: project.title,
+          summary: project.description || "GitHub repository candidate",
+          description: project.description || "",
+          technologies: project.technologies || [],
+          sources: ["github"],
+          repositoryUrl: project.repositoryUrl,
+          demoUrl: project.homepageUrl || undefined,
+          status: "candidate",
+          aiDetails: { categories: project.aiMlCategories || [], observedFiles: project.observedFiles || [], primaryLanguage: project.primaryLanguage || null },
+          // Ledger chips the student can choose to show (Task 2.5.4).
+          metadata: { stars: project.stars, forks: project.forks, isFork: project.isFork, languages: project.languages },
+        });
+        await writeEvidenceBatch(personId, project.technologyFindings.map((finding) => ({
+          category: "skill" as const,
+          subject: finding.name,
+          value: finding.name,
+          source: "imported" as const,
+          verificationStatus: "unverified" as const,
+          sourceReference: finding.sourceFile ? `${project.repositoryUrl}#${finding.sourceFile}` : project.repositoryUrl,
+          interpretation: `Observed in ${project.title} (${finding.provenance.toLowerCase().replace(/_/g, " ")}${finding.sourceFile ? ` in ${finding.sourceFile}` : ""}). Evidence confidence: ${finding.confidence}. Personal proficiency requires review.`,
+          whyItMatters: "Repository technology metadata can point to a skill for student review.",
+          importKey: `github_skill_${project.id}_${finding.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+        })));
         recordsChanged++;
-        await saveSourceSnapshot(
-          personId,
-          "github",
-          sourceRef,
-          {
-            title: project.title,
-            description: project.description,
-            technologies: project.technologies,
-            stars: project.stars,
-            isFork: project.isFork,
-            isPrivate: project.isPrivate,
-            analysisStage: project.analysisStage,
-            detectedManifests: project.detectedManifests,
-            checksum: project.checksum,
-            syncedAt: new Date().toISOString(),
-          },
-          project.checksum
-        );
-      }
-      await saveProject(personId, {
-        title: project.title,
-        summary: project.description || "GitHub repository candidate",
-        description: project.description || "",
-        technologies: project.technologies || [],
-        sources: ["github"],
-        repositoryUrl: project.repositoryUrl,
-        demoUrl: project.homepageUrl || undefined,
-        status: "candidate",
-        aiDetails: {
-          categories: project.aiMlCategories || [],
-          observedFiles: project.observedFiles || [],
-          primaryLanguage: project.primaryLanguage || null,
-        },
-      });
-
-      if (project.technologyFindings && project.technologyFindings.length > 0) {
-        for (const finding of project.technologyFindings) {
-          const sourceRef = finding.sourceFile
-            ? `${project.repositoryUrl}#${finding.sourceFile}`
-            : project.repositoryUrl;
-          await createEvidenceRecord(personId, {
-            category: "skill",
-            subject: finding.name,
-            value: finding.name,
-            source: "imported",
-            verificationStatus: "unverified",
-            sourceReference: sourceRef,
-            interpretation: `Observed in ${project.title} (${finding.provenance.toLowerCase().replace(/_/g, " ")}${finding.sourceFile ? ` in ${finding.sourceFile}` : ""}). Evidence confidence: ${finding.confidence}. Personal proficiency requires review.`,
-            whyItMatters: "Repository technology metadata can point to a skill for student review.",
-            importKey: `github_skill_${project.id}_${finding.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-          });
-        }
-      } else {
-        for (const skill of project.technologies || []) {
-          await createEvidenceRecord(personId, {
-            category: "skill",
-            subject: skill,
-            value: skill,
-            source: "imported",
-            verificationStatus: "unverified",
-            sourceReference: project.repositoryUrl,
-            interpretation: `Detected in public repository ${project.title}; personal use requires review.`,
-            whyItMatters: "Repository technology metadata can point to a skill for student review.",
-            importKey: `github_skill_${project.id}_${skill.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
-          });
-        }
+      } catch (error) {
+        failedRepos.push({ repo: repo.full_name, reason: `persist:${error instanceof Error ? error.message.slice(0, 120) : "error"}` });
+        ctx.log.warn("github.repo.failed", { error: error instanceof Error ? error.message : String(error), metadata: { repo: repo.full_name } });
       }
     }
 
-    // Update connection metadata
     await saveExternalConnection({
-      personId,
-      provider: "github",
-      externalUsername: connection.externalUsername,
-      profileUrl: connection.profileUrl,
-      status: "connected",
-      metadata: {
-        ...metadata,
-        lastSyncedAt: new Date().toISOString(),
-        repositoryCount: projects.length,
-        recordsChanged,
-      },
+      personId, provider: "github", externalUsername: params.login, profileUrl: params.profileUrl, status: "connected",
+      metadata: { ...params.metadata, lastSyncedAt: new Date().toISOString(), repositoryCount: acq.repos.length, recordsChanged },
     });
-
-    await completeSyncRun(syncRun.id, {
-      status: "completed",
-      recordsFetched: projects.length,
-      recordsChanged,
-    });
-
-    return {
-      success: true,
-      syncRunId: syncRun.id,
-      recordsFetched: projects.length,
-      recordsChanged,
-      projects,
+    const summary: GitHubImportSummary = {
+      syncRunId: syncRun.id, recordsFetched: acq.repos.length, recordsChanged, unchanged: unchanged.size, failedRepos, queries: acq.queries,
     };
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : "Unknown sync error";
     await completeSyncRun(syncRun.id, {
-      status: "failed",
-      recordsFetched: 0,
-      recordsChanged: 0,
-      errorCode: "EXCEPTION",
-      errorSummary: errMsg,
+      status: failedRepos.length ? "partial" : "completed",
+      recordsFetched: acq.repos.length,
+      recordsChanged,
+      ...(failedRepos.length ? { errorCode: "PARTIAL", errorSummary: failedRepos.map((f) => `${f.repo}: ${f.reason}`).join("; ").slice(0, 500) } : {}),
     });
-
-    return {
-      success: false,
-      syncRunId: syncRun.id,
-      recordsFetched: 0,
-      recordsChanged: 0,
-      projects: [],
-      error: errMsg,
-    };
+    return { outcome: failedRepos.length ? "partial" : "succeeded", result: summary };
+  } catch (error) {
+    await completeSyncRun(syncRun.id, {
+      status: "failed", recordsFetched: 0, recordsChanged: 0,
+      errorCode: error instanceof GitHubGraphQLError ? `GRAPHQL_${error.status ?? "ERROR"}` : "EXCEPTION",
+      errorSummary: error instanceof Error ? error.message.slice(0, 500) : String(error),
+    });
+    throw toSyncError(error);
   }
 }
+
+/** Auth / not-found never fix themselves: dead-letter at once. Rate limits and outages retry. */
+function toSyncError(error: unknown): unknown {
+  if (error instanceof SyncError) return error;
+  if (error instanceof GitHubGraphQLError) {
+    if (error.status === 401) return new SyncError(error.message, "github_auth", false);
+    if (error.status === 404) return new SyncError(error.message, "github_not_found", false);
+    if (error.rateLimited) return new SyncError(error.message, "github_rate_limited", true);
+    return new SyncError(error.message, `github_http_${error.status ?? "error"}`, true);
+  }
+  if (isServeFromCacheError(error)) return new SyncError((error as Error).message, "github_circuit_open", true);
+  return error;
+}
+
 
 export function verifyGitHubWebhookSignature(
   rawBody: string,

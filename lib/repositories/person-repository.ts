@@ -30,12 +30,13 @@ export async function updatePersonProfileData(
     education?: string;
     experience?: string;
     headline?: string;
+    bio?: string;
     degree?: string;
     specialization?: string;
     institution?: string;
     currentYear?: string;
     semester?: string;
-    expectedGraduationYear?: number;
+    expectedGraduationYear?: number | null;
     location?: string;
     placementStatus?: string;
     internshipStatus?: string;
@@ -59,12 +60,13 @@ export async function updatePersonProfileData(
     education?: string;
     experience?: string;
     headline?: string;
+    bio?: string;
     degree?: string;
     specialization?: string;
     institution?: string;
     currentYear?: string;
     semester?: string;
-    expectedGraduationYear?: number;
+    expectedGraduationYear?: number | null;
     location?: string;
     placementStatus?: string;
     internshipStatus?: string;
@@ -72,6 +74,7 @@ export async function updatePersonProfileData(
   if (data.education !== undefined) profileUpdates.education = data.education.trim();
   if (data.experience !== undefined) profileUpdates.experience = data.experience.trim();
   if (data.headline !== undefined) profileUpdates.headline = data.headline.trim();
+  if (data.bio !== undefined) profileUpdates.bio = data.bio.trim();
   if (data.degree !== undefined) profileUpdates.degree = data.degree.trim();
   if (data.specialization !== undefined) profileUpdates.specialization = data.specialization.trim();
   if (data.institution !== undefined) profileUpdates.institution = data.institution.trim();

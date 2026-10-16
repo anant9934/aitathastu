@@ -9,7 +9,7 @@
  * - Never hallucinates or fabricates missing information.
  */
 
-import type { ExtractorProfileV2, ExtractorRecord } from "./extractor-service-client";
+import type { ExtractorProfileV2 } from "./extractor-service-client";
 
 export interface EoraReviewGuidance {
   primaryMessage: string;

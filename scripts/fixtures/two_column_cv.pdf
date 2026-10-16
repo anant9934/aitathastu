@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 913 >>
+stream
+BT /F1 22 Tf 230 750 Td (Meera Iyer) Tj ET
+BT /F1 10 Tf 190 728 Td (meera.iyer@example.com  |  Chennai, India) Tj ET
+BT /F1 12 Tf 40 680 Td (SKILLS) Tj ET
+BT /F1 10 Tf 40 662 Td (Python) Tj ET
+BT /F1 10 Tf 40 648 Td (PyTorch) Tj ET
+BT /F1 10 Tf 40 634 Td (SQL) Tj ET
+BT /F1 12 Tf 40 600 Td (EDUCATION) Tj ET
+BT /F1 10 Tf 40 582 Td (Anna University) Tj ET
+BT /F1 10 Tf 40 568 Td (B.E. Computer Science) Tj ET
+BT /F1 10 Tf 40 554 Td (2021 - 2025) Tj ET
+BT /F1 12 Tf 220 680 Td (EXPERIENCE) Tj ET
+BT /F1 11 Tf 220 662 Td (Orbit Robotics) Tj ET
+BT /F1 10 Tf 480 662 Td (May 2024 - Jul 2024) Tj ET
+BT /F1 10 Tf 220 648 Td (Machine Learning Intern) Tj ET
+BT /F1 10 Tf 230 634 Td (- Trained a defect classifier on 40k images) Tj ET
+BT /F1 12 Tf 220 600 Td (PROJECTS) Tj ET
+BT /F1 11 Tf 220 582 Td (Pathfinder) Tj ET
+BT /F1 10 Tf 480 582 Td (2023) Tj ET
+BT /F1 10 Tf 230 568 Td (- Route planner for campus shuttles) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001205 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1302
+%%EOF

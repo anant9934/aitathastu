@@ -1,11 +1,11 @@
-import { ExactScreensContainer } from "@/components/exact-screens/ExactScreensContainer";
 import type { Metadata } from "next";
+import { OnboardingApp } from "@/components/onboarding/OnboardingApp";
 
 export const metadata: Metadata = {
-  title: "AI Tathastu — Onboarding Journey",
-  description: "Personalized onboarding guided by EORA, your AI companion.",
+  title: "Get started",
+  description: "Confirm what we found in your CV and accounts, guided by EORA.",
 };
 
 export default function OnboardingPage() {
-  return <ExactScreensContainer initialScreen={2} />;
+  return <OnboardingApp />;
 }

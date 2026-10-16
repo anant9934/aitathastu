@@ -111,6 +111,8 @@ class UploadResponse(BaseModel):
 
 class ExtractionRequest(BaseModel):
     document_id: str
+    # OCR every page even when a text layer exists (used to verify the OCR path).
+    force_ocr: bool = False
 
 class ReviewRequest(BaseModel):
     group: str

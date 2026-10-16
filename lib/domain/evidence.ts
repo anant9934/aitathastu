@@ -1,5 +1,7 @@
 export type EvidenceSource =
   | "self_reported"
+  /** Added by the student on the skills page (Task 2.2.3). */
+  | "student_reported"
   | "resume_extracted"
   | "institutional"
   | "imported"
@@ -24,6 +26,8 @@ export type EvidenceCategory =
   | "project"
   | "assessment"
   | "interview"
+  /** Research paper from a verified ORCID / Semantic Scholar ID (Task 1.6.2). */
+  | "publication"
   | "other";
 
 export type EvidenceItem = {

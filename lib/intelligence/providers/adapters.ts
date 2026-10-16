@@ -1,8 +1,64 @@
-import { ModelProvider, ModelProviderName, CompletionRequest, CompletionResponse } from "../types";
+import {
+  ModelProvider, ModelProviderName, CompletionRequest, CompletionResponse,
+  ProviderHttpError, type StructuredCapability, type StructuredCompletionRequest, type StructuredProviderResponse,
+} from "../types";
+
+function structuredMessages(request: StructuredCompletionRequest, inlineSchema: boolean) {
+  const system = inlineSchema
+    ? `${request.systemPrompt}
+
+Return ONLY a JSON object matching this JSON Schema exactly (every key present, no extra keys, null where unknown):
+${JSON.stringify(request.jsonSchema)}`
+    : request.systemPrompt;
+  const messages: { role: string; content: string }[] = [
+    { role: "system", content: system },
+    { role: "user", content: request.userPrompt },
+  ];
+  if (request.repair) {
+    messages.push(
+      { role: "assistant", content: request.repair.previousOutput.slice(0, 20_000) },
+      { role: "user", content: `That JSON failed validation:
+${request.repair.errors}
+Return the corrected JSON object only. Do not add information that is not in the resume.` },
+    );
+  }
+  return messages;
+}
+
+/**
+ * Runs `attempt` with successive keys from the pool: a 401/403 drops that key,
+ * a 429 moves to the next key (keys are often separately throttled), up to 3
+ * keys per call. Anything else (incl. 402 billing, which is account-wide)
+ * is thrown to the router at once.
+ */
+async function withKeyRotation<T>(pool: KeyPool, provider: ModelProviderName, attempt: (key: string) => Promise<T>): Promise<T> {
+  const tries = Math.min(3, Math.max(1, pool.size()));
+  let last: unknown = new Error(`No API key available for provider ${provider}`);
+  for (let i = 0; i < tries; i++) {
+    const key = pool.getNextKey();
+    if (!key) break;
+    try {
+      return await attempt(key);
+    } catch (error) {
+      last = error;
+      if (!(error instanceof ProviderHttpError)) throw error;
+      if (error.status === 401 || error.status === 403) { pool.markKeyFailed(key); continue; }
+      if (error.status === 429) continue;
+      throw error;
+    }
+  }
+  throw last;
+}
+
+async function readProviderError(provider: ModelProviderName, res: Response): Promise<never> {
+  throw new ProviderHttpError(provider, res.status, await res.text().catch(() => ""));
+}
 import { KeyPool } from "./key-pool";
 
 abstract class BaseHttpProvider implements ModelProvider {
   abstract name: ModelProviderName;
+  /** Conservative default; providers verified to enforce schemas override it. */
+  structuredCapability: StructuredCapability = "json_object";
   protected keyPool: KeyPool;
   protected defaultModel: string;
   protected endpointUrl: string;
@@ -63,10 +119,96 @@ abstract class BaseHttpProvider implements ModelProvider {
       fallbackUsed: false,
     };
   }
+
+  /** Extra body fields some providers need (e.g. OpenRouter provider routing). */
+  protected structuredExtras(): Record<string, unknown> {
+    return {};
+  }
+
+  completeStructured(request: StructuredCompletionRequest): Promise<StructuredProviderResponse> {
+    return withKeyRotation(this.keyPool, this.name, (key) => this.structuredWithKey(request, key));
+  }
+
+  private async structuredWithKey(request: StructuredCompletionRequest, key: string): Promise<StructuredProviderResponse> {
+    const strict = this.structuredCapability === "strict_json_schema";
+    const model = this.defaultModel;
+    const res = await fetch(this.endpointUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model,
+        temperature: request.temperature ?? 0,
+        max_tokens: request.maxTokens ?? 6000,
+        ...(model.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
+        response_format: strict
+          ? { type: "json_schema", json_schema: { name: request.schemaName, strict: true, schema: request.jsonSchema } }
+          : { type: "json_object" },
+        messages: structuredMessages(request, !strict),
+        ...this.structuredExtras(),
+      }),
+      signal: AbortSignal.timeout(request.timeoutMs ?? 25_000),
+    });
+    if (!res.ok) return readProviderError(this.name, res);
+    const data = await res.json();
+    return { content: data.choices?.[0]?.message?.content ?? "", modelUsed: model, totalTokens: data.usage?.total_tokens };
+  }
+}
+
+/** Gemini's responseJsonSchema does not take type arrays; express "string or null" as anyOf. */
+export function toGeminiJsonSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(toGeminiJsonSchema);
+  if (!schema || typeof schema !== "object") return schema;
+  const node = schema as Record<string, unknown>;
+  if (Array.isArray(node.type)) {
+    const { type, ...rest } = node;
+    return { anyOf: (type as string[]).map((t) => ({ ...(t === "null" ? {} : toGeminiJsonSchema(rest) as object), type: t })) };
+  }
+  return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, toGeminiJsonSchema(v)]));
 }
 
 export class GeminiProvider implements ModelProvider {
   name: ModelProviderName = "gemini";
+  structuredCapability: StructuredCapability = "strict_json_schema";
+
+  completeStructured(request: StructuredCompletionRequest): Promise<StructuredProviderResponse> {
+    return withKeyRotation(this.keyPool, "gemini", (key) => this.structuredWithKey(request, key));
+  }
+
+  private async structuredWithKey(request: StructuredCompletionRequest, key: string): Promise<StructuredProviderResponse> {
+    const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+    const contents = [{ role: "user", parts: [{ text: request.userPrompt }] }];
+    if (request.repair) {
+      contents.push(
+        { role: "model", parts: [{ text: request.repair.previousOutput.slice(0, 20_000) }] },
+        { role: "user", parts: [{ text: `That JSON failed validation:
+${request.repair.errors}
+Return the corrected JSON only.` }] },
+      );
+    }
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      // Key in a header, not the URL, so it never lands in request logs.
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: request.systemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: request.temperature ?? 0,
+          maxOutputTokens: request.maxTokens ?? 6000,
+          responseMimeType: "application/json",
+          responseJsonSchema: toGeminiJsonSchema(request.jsonSchema),
+        },
+      }),
+      signal: AbortSignal.timeout(request.timeoutMs ?? 25_000),
+    });
+    if (!res.ok) return readProviderError("gemini", res);
+    const data = await res.json();
+    return {
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
+      modelUsed: model,
+      totalTokens: data.usageMetadata?.totalTokenCount,
+    };
+  }
   private keyPool = new KeyPool(["GEMINI_API_KEYS", "GEMINI_API_KEY"]);
 
   isAvailable(): boolean {
@@ -113,6 +255,7 @@ export class GeminiProvider implements ModelProvider {
 
 export class GroqProvider extends BaseHttpProvider {
   name: ModelProviderName = "groq";
+  structuredCapability: StructuredCapability = "strict_json_schema";
   constructor() {
     super(
       ["GROQ_API_KEYS", "GROQ_API_KEY"],
@@ -124,10 +267,18 @@ export class GroqProvider extends BaseHttpProvider {
 
 export class OpenRouterProvider extends BaseHttpProvider {
   name: ModelProviderName = "openrouter";
+  structuredCapability: StructuredCapability = "strict_json_schema";
+
+  /** Route only to upstreams that honour response_format; otherwise strict is not guaranteed. */
+  protected structuredExtras() {
+    return { provider: { require_parameters: true } };
+  }
   constructor() {
     super(
       ["OPENROUTER_API_KEYS", "OPENROUTER_API_KEY"],
-      process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct",
+      // gpt-oss-120b: fast upstreams with strict structured outputs; the former
+      // llama-3.3-70b default timed out at 25 s with require_parameters (2026-10-14).
+      process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b",
       "https://openrouter.ai/api/v1/chat/completions"
     );
   }

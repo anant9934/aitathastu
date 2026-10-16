@@ -7,6 +7,11 @@
  */
 
 import { getPerson360 } from "./person-360-service";
+import { eq } from "drizzle-orm";
+import { getDb, projects } from "@/lib/db";
+import { getSyncStatus } from "@/lib/sync/runners";
+import { composeDashboardLayout, type DashboardLayout, type DashboardLayoutInput, type FootprintSource } from "@/lib/domain/dashboard-layout";
+import { roleGoalTitle } from "@/lib/domain/role-goal";
 import {
   composePersonalizedDashboard,
   normalizeInterest,
@@ -25,7 +30,6 @@ export interface DashboardCompositionOptions {
   role?: string;
   roleId?: string;
   goal?: string;
-  timeline?: string;
   name?: string;
 }
 
@@ -65,16 +69,11 @@ export async function getStudentDashboardComposition(
     (rawMetadata.targetRoleId as string) ||
     resolveRoleId(targetRole);
 
+  // The target role is the goal; onboarding no longer asks a separate goal or timeline (Task 2.1.1).
   const goal =
     options?.goal ||
     person360.activeGoal?.title ||
-    (rawMetadata.customGoalText as string) ||
-    "Choose your AI/ML goal";
-
-  const targetTimeline =
-    options?.timeline ||
-    (rawMetadata.targetTimeline as string) ||
-    "";
+    (targetRole ? roleGoalTitle(targetRole) : "Choose your AI/ML direction");
 
   // Priority resolution: explicit query option > saved preference > default "learning"
   const rawPrimary =
@@ -192,7 +191,6 @@ export async function getStudentDashboardComposition(
     targetRole,
     targetRoleId,
     goal,
-    targetTimeline,
     primaryInterest,
     secondaryInterests,
     degree: person360.profile?.degree || "",
@@ -207,113 +205,37 @@ export async function getStudentDashboardComposition(
     isDemo: false,
   };
 
-  return composePersonalizedDashboard(context);
+  const composed = composePersonalizedDashboard(context);
+  composed.layout = await buildDashboardLayout(personId, {
+    primary: primaryInterest, secondary: secondaryInterests, targetRole,
+    readiness: verifiedReadinessScore,
+    skillGaps: composed.skillMap.nodes.filter((n) => n.status === "Gap Target" || n.status === "To Demonstrate").map((n) => n.label),
+    learning: (composed.growthSection?.recommendedLearning ?? []).map((l) => ({ title: l.title })),
+    publications: (person360.evidence || []).filter((e) => e.category === "publication").length,
+  });
+  return composed;
 }
 
-/**
- * Deterministic demo/preview dashboard composition for unauthenticated or gallery mode.
- * Supports testing all 6 primary modes and 96 combinations instantly.
- */
-export function getDemoDashboardComposition(
-  options?: DashboardCompositionOptions
-): ComposedDashboardViewModel {
-  const targetRole = options?.role || "Generative AI Engineer";
-  const targetRoleId = options?.roleId || resolveRoleId(targetRole);
-  const goal = options?.goal || "Get an AI/ML internship";
-  const targetTimeline = options?.timeline || "Within 6 months";
-
-  const primaryInterest: CanonicalInterest = normalizeInterest(options?.primary || "learning");
-  let secondaryInterests: CanonicalInterest[] = [];
-  if (options?.secondary !== undefined) {
-    secondaryInterests = options.secondary
-      .map((s) => normalizeInterest(s))
-      .filter((s) => s !== primaryInterest);
-  } else if (options?.primary !== undefined) {
-    // When primary is explicitly specified without secondary, default to single-interest mode
-    secondaryInterests = [];
-  } else {
-    // Default demo baseline when no parameters given
-    secondaryInterests = ["projects"].filter((s) => s !== primaryInterest) as CanonicalInterest[];
+/** Real per-source state and ledger projects for the priority-shaped layout (Tasks 2.3.1, 2.3.2). */
+async function buildDashboardLayout(
+  personId: string,
+  base: Omit<DashboardLayoutInput, "projects" | "footprints">
+): Promise<DashboardLayout> {
+  const db = await getDb();
+  const [rows, status] = await Promise.all([
+    db.select({ id: projects.id, title: projects.title, portfolioIncluded: projects.portfolioIncluded, updatedAt: projects.updatedAt, sources: projects.sources, status: projects.status })
+      .from(projects).where(eq(projects.personId, personId)),
+    getSyncStatus(personId),
+  ]);
+  const footprints: DashboardLayoutInput["footprints"] = {};
+  for (const s of status.sources) {
+    if (s.source === "resume") continue;
+    footprints[s.source as FootprintSource] = { connected: s.state !== "not_started" && s.state !== "skipped_optional", state: s.state, found: ("found" in s ? (s.found as string | null) : null) ?? null };
   }
-  secondaryInterests = Array.from(new Set(secondaryInterests)).slice(0, 2);
-
-  const demoProjects: ProjectRecord[] = [
-    {
-      id: "demo-p1",
-      title: "RAG Code Knowledge Graph",
-      description: "Local hybrid retrieval with LangChain, ChromaDB, and AST parsing for Python repositories.",
-      technologies: ["Python", "LangChain", "ChromaDB", "FastAPI"],
-      sources: ["github"],
-      status: "Verified",
-    },
-    {
-      id: "demo-p2",
-      title: "Agentic Evaluation Benchmark",
-      description: "Automated test harness comparing Claude, GPT-4, and Gemini 1.5 Flash across tool-calling accuracy.",
-      technologies: ["PyTorch", "Transformers", "Docker"],
-      sources: ["github", "manual"],
-      status: "Confirmed",
-    },
-  ];
-
-  const demoSkills = [
-    { name: "Python", category: "skill", verificationStatus: "verified", source: "padho_code" },
-    { name: "Transformers", category: "skill", verificationStatus: "verified", source: "assessment" },
-    { name: "Vector Databases", category: "skill", verificationStatus: "self_reported", source: "github" },
-    { name: "Prompt Engineering", category: "skill", verificationStatus: "self_reported", source: "manual" },
-    { name: "FastAPI", category: "skill", verificationStatus: "verified", source: "github" },
-  ];
-
-  const demoEvidence: EvidenceItem[] = [
-    {
-      id: "demo-e1",
-      category: "skill",
-      subject: "Python & DSA Mastery",
-      value: "Advanced",
-      verificationStatus: "verified",
-      source: "imported",
-      sourceReference: "PC-98214",
-      observedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      interpretation: "Advanced algorithmic problem-solving in Python.",
-      whyItMatters: "Verified by automated coding evaluation harness.",
-    },
-    {
-      id: "demo-e2",
-      category: "skill",
-      subject: "Transformer Fine-Tuning",
-      value: "Proficient",
-      verificationStatus: "verified",
-      source: "institutional",
-      sourceReference: "ERIS-CERT-88",
-      observedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      interpretation: "Proficient in transformer architectures and fine-tuning.",
-      whyItMatters: "Verified by ERIS institutional assessment.",
-    },
-  ];
-
-  const context: StudentPersonalizationContext = {
-    personId: "demo-user",
-    name: options?.name || "Rahul Sharma",
-    targetRole,
-    targetRoleId,
-    goal,
-    targetTimeline,
-    primaryInterest,
-    secondaryInterests,
-    degree: "B.Tech Computer Science and Engineering",
-    institution: "Lovely Professional University (LPU)",
-    cohort: 2026,
-    skills: demoSkills,
-    projects: demoProjects,
-    evidenceItems: demoEvidence,
-    verifiedReadinessScore: 78,
-    isReadinessAvailable: true,
-    isDemo: true,
-  };
-
-  const model = composePersonalizedDashboard(context);
-  model.sourceFreshness.isDemo = true;
-  return model;
+  return composeDashboardLayout({
+    ...base,
+    projects: rows.filter((p) => p.status !== "archived" && p.status !== "removed").map((p) => ({ id: p.id, title: p.title, portfolioIncluded: p.portfolioIncluded, updatedAt: p.updatedAt.toISOString(), sources: (p.sources as string[]) ?? [] })),
+    footprints,
+  });
 }
+

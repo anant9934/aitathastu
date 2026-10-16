@@ -17,9 +17,7 @@ import crypto from "crypto";
 import {
   detectRepositoryTechnologies,
   classifyRepositoryAiMl,
-  extractManifestPackages,
   type TechnologyFinding,
-  type AiMlProjectCategory,
 } from "../lib/connectors/github/tech-detector";
 import { sanitizeTextForPrompt } from "../lib/intelligence/prompt-defense";
 import {
@@ -188,7 +186,6 @@ A retrieval-augmented generation engine using LangChain and ChromaDB.
   // [Test 7] Python Dependency Detection (requirements.txt)
   // ---------------------------------------------------------------------------
   const reqContent = `torch>=2.1.0\ntransformers==4.35.0\nfastapi>=0.104.0\nuvicorn\nscikit-learn\npandas\n`;
-  const pyDeps = extractManifestPackages("requirements.txt", reqContent);
   const pyFindings = detectRepositoryTechnologies({
     manifests: { "requirements.txt": reqContent },
   });

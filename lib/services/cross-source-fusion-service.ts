@@ -1,3 +1,4 @@
+import { resolveField, type FieldObservation, type ResolvedField } from "@/lib/domain/source-precedence";
 /**
  * AI TATHASTU — CORE INTELLIGENCE V3: CROSS-SOURCE FUSION & CONFLICT SERVICE
  *
@@ -112,7 +113,11 @@ export class CrossSourceFusionService {
         and(
           eq(sourceConflicts.personId, personId),
           eq(sourceConflicts.field, field),
-          eq(sourceConflicts.status, "detected")
+          eq(sourceConflicts.status, "detected"),
+          // One row per disagreeing (source, value), so several conflicts on
+          // one field are all kept and a replayed sync does not duplicate them.
+          eq(sourceConflicts.sourceB, sourceB),
+          eq(sourceConflicts.valueB, valueB)
         )
       )
       .limit(1);
@@ -136,11 +141,26 @@ export class CrossSourceFusionService {
   }
 
   /**
+   * Resolves one profile field across sources by global precedence
+   * (lib/domain/source-precedence.ts) and records every disagreeing value
+   * against the chosen one in source_conflicts (Task 1.2.1).
+   */
+  static async resolveProfileField(personId: string, field: string, observations: FieldObservation[], dbClient?: TathastuDb): Promise<ResolvedField> {
+    const resolved = resolveField(observations);
+    if (resolved.value && resolved.source) {
+      for (const c of resolved.conflicts) {
+        await CrossSourceFusionService.recordConflictIfDifferent(personId, field, resolved.source, resolved.value, c.source, c.value, dbClient);
+      }
+    }
+    return resolved;
+  }
+
+  /**
    * Records a new immutable version in the Person 360 profile version ledger.
    */
   static async recordProfileVersion(
     personId: string,
-    changeType: "onboarding" | "resume_review" | "project_confirmed" | "goal_updated" | "evidence_added",
+    changeType: "onboarding" | "resume_review" | "project_confirmed" | "goal_updated" | "evidence_added" | "profile_edited",
     changeSummary: string,
     snapshot: Record<string, unknown>,
     dbClient?: TathastuDb

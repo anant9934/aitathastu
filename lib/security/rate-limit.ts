@@ -15,6 +15,7 @@ export type RateLimitTier =
   | "guest"       // Anonymous guest-account creation, keyed by client IP: 5 per 10 min
   | "resume"      // Resume file upload & parsing: 5 req/min
   | "ai"          // AI model requests: 15 req/min
+  | "eora_chat"   // EORA chat questions: 10 req/min (Task 1.4.4)
   | "sync"        // Manual or GitHub sync: 5 req/min
   | "webhook"     // Incoming webhooks: 60 req/min
   | "integration" // Partner ecosystem events: 60 req/min
@@ -31,6 +32,7 @@ export const TIER_CONFIGS: Record<RateLimitTier, TierConfig> = {
   guest: { maxRequests: 5, windowMs: 10 * 60_000, isSensitive: true },
   resume: { maxRequests: 5, windowMs: 60_000, isSensitive: true },
   ai: { maxRequests: 15, windowMs: 60_000, isSensitive: true },
+  eora_chat: { maxRequests: 10, windowMs: 60_000, isSensitive: true },
   sync: { maxRequests: 5, windowMs: 60_000, isSensitive: true },
   webhook: { maxRequests: 60, windowMs: 60_000, isSensitive: false },
   integration: { maxRequests: 60, windowMs: 60_000, isSensitive: false },

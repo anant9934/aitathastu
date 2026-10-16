@@ -15,11 +15,20 @@ export type TathastuDb =
 declare global {
   var __tathastu_db__: TathastuDb | undefined;
   var __tathastu_db_promise__: Promise<TathastuDb> | undefined;
+  var __tathastu_db_close__: (() => Promise<void>) | undefined;
 }
 
 export function resetDbForTesting(): void {
   globalThis.__tathastu_db__ = undefined;
   globalThis.__tathastu_db_promise__ = undefined;
+}
+
+/** Ends the TCP pool so test processes can exit; no-op for HTTP/PGlite. */
+export async function closeDbForTesting(): Promise<void> {
+  const close = globalThis.__tathastu_db_close__;
+  globalThis.__tathastu_db_close__ = undefined;
+  resetDbForTesting();
+  if (close) await close();
 }
 
 export async function getDb(): Promise<TathastuDb> {
@@ -92,6 +101,7 @@ export async function getDb(): Promise<TathastuDb> {
 
         const client = postgres(databaseUrl, { max: 10, connect_timeout: 5 });
         const db = drizzle(client, { schema });
+        globalThis.__tathastu_db_close__ = () => client.end({ timeout: 5 });
 
         try {
           if (autoMigrate) await client`CREATE SCHEMA IF NOT EXISTS public`;

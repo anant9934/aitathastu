@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { fetchGitHubIntelligence } from "@/lib/connectors/github/client";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
@@ -16,7 +17,7 @@ import {
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+async function POST_handler(request: Request) {
   if (!coreIngestionReady()) {
     return NextResponse.json(
       { error: "GitHub import is unavailable because production ingestion security setup is incomplete." },
@@ -256,3 +257,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

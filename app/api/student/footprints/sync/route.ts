@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 /**
  * AI TATHASTU — DIGITAL FOOTPRINT INTELLIGENCE V4.6
  * Universal Digital Footprint Acquisition, Normalization & Fusion API
@@ -11,7 +12,7 @@ import { getServerAuthContext } from "@/lib/auth/server-session";
 import { DigitalSourceImportOrchestrator } from "@/lib/services/digital-source-import-orchestrator";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
 
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -78,3 +79,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: errorMsg }, { status: 500 });
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

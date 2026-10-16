@@ -1,5 +1,5 @@
 """Native parsing + selective OCR + evidence-aware section reconstruction."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO
 import re
 import time
@@ -46,6 +46,9 @@ class Content:
     methods: list[str]
     warnings: list[str]
     hyperlinks: list[tuple[str,int]]
+    # Positioned text per page for the caller's layout reconstruction:
+    # {page, width, height, source, spans:[{x0,y0,x1,y1,text}], links:[{url,x0,y0,x1,y1}]}
+    layout: list[dict] = field(default_factory=list)
 
 HEADINGS = {
  'summary':['summary','professional summary','career objective','objective','about me','profile','professional profile'],
@@ -83,7 +86,22 @@ def _order(blocks,width):
         return sorted(top,key=lambda b:(b[1],b[0])) + sorted([b for b in rest if (b[0]+b[2])/2<width*.52],key=lambda b:b[1]) + sorted([b for b in rest if (b[0]+b[2])/2>=width*.52],key=lambda b:b[1])
     return sorted(blocks,key=lambda b:(round(b[1]/8),b[0],b[1]))
 
+def _words(im,config,seconds):
+    """Tesseract word boxes, in its own block/paragraph/line order."""
+    d=_tesseract(pytesseract.image_to_data,im,config=config,timeout=seconds,output_type=pytesseract.Output.DICT)
+    out=[]
+    for i,t in enumerate(d['text']):
+        t=(t or '').strip()
+        try: conf=float(d['conf'][i])
+        except (TypeError,ValueError): conf=-1
+        if not t or conf<0: continue
+        x,y,w,h=d['left'][i],d['top'][i],d['width'][i],d['height'][i]
+        out.append({'x0':x,'y0':y,'x1':x+w,'y1':y+h,'text':t,'key':(d['block_num'][i],d['par_num'][i],d['line_num'][i])})
+    return out
+
 def _ocr(im,page,seconds,warnings):
+    """Returns (lines, layout_page). Lines feed the local profile extractor; the
+    word boxes in layout_page let the caller rebuild multi-column reading order."""
     im_gray = ImageOps.exif_transpose(im).convert('L')
     if min(im_gray.size)<500: warnings.append(f'Page {page}: low resolution, OCR may be unreliable.')
     # Only detect orientation if image is landscape (unusual for portrait resumes)
@@ -98,34 +116,29 @@ def _ocr(im,page,seconds,warnings):
         except Exception:
             pass
 
-    # Try high-speed contrast stretch first
     im_enhanced = ImageOps.autocontrast(im_gray)
-    raw = ""
-    try:
-        raw = _tesseract(pytesseract.image_to_string, im_enhanced, config='--psm 3', timeout=seconds)
-    except OcrEngineUnavailable:
-        raise
-    except Exception:
-        pass
-
-    # Fallback 1: If psm 3 returned empty or very short, try without psm
-    if not raw or len(raw.strip()) < 30:
+    words = []
+    # psm 3 first, then tesseract's default, then psm 6 (single uniform block) on raw grayscale.
+    for img,config in ((im_enhanced,'--psm 3'),(im_enhanced,''),(im_gray,'--psm 6')):
         try:
-            raw = _tesseract(pytesseract.image_to_string, im_enhanced, timeout=seconds)
+            words = _words(img,config,seconds)
+        except OcrEngineUnavailable:
+            raise
         except Exception:
-            pass
+            words = []
+        if sum(len(w['text']) for w in words) >= 30: break
 
-    # Fallback 2: Try psm 6 (single uniform block) on raw grayscale if still empty
-    if not raw or len(raw.strip()) < 30:
-        try:
-            raw = _tesseract(pytesseract.image_to_string, im_gray, config='--psm 6', timeout=seconds)
-        except Exception:
-            pass
-
-    lines = [Line(line.strip(),page,'ocr',f'ocr-{page}-{i}') for i,line in enumerate(raw.splitlines()) if line.strip()]
+    grouped = {}
+    for w in words: grouped.setdefault(w['key'],[]).append(w)
+    lines = []
+    for i,ws in enumerate(grouped.values()):
+        text=' '.join(w['text'] for w in ws).strip()
+        if text: lines.append(Line(text,page,'ocr',f'ocr-{page}-{i}',x=float(ws[0]['x0']),y=float(ws[0]['y0'])))
     if not lines:
         warnings.append(f'Page {page}: OCR returned no legible text.')
-    return lines
+    layout = {'page':page,'width':im_gray.width,'height':im_gray.height,'source':'ocr',
+              'spans':[{k:w[k] for k in ('x0','y0','x1','y1','text')} for w in words],'links':[]}
+    return lines, layout
 
 def _rtf(data):
     s=data.decode('latin1',errors='replace')
@@ -137,8 +150,8 @@ def _rtf(data):
     s=re.sub(r'\\[^a-zA-Z]','',s)
     return s.replace('{','').replace('}','')
 
-def read_document(data,fmt,settings):
-    lines=[]; warnings=[]; methods=[]; links=[]; attempted=False; used=False; pages=1
+def read_document(data,fmt,settings,force_ocr=False):
+    lines=[]; warnings=[]; methods=[]; links=[]; attempted=False; used=False; pages=1; layout=[]
     deadline=time.monotonic()+settings.max_processing_seconds
     if fmt=='pdf':
         with fitz.open(stream=data,filetype='pdf') as doc:
@@ -152,23 +165,37 @@ def read_document(data,fmt,settings):
                 for bi,b in enumerate(_order(page.get_text('blocks'),page.rect.width)):
                     for t in b[4].splitlines():
                         if t.strip(): native.append(Line(t.strip(),pageno,'native_pdf',f'pdf-{pageno}-{bi}',x=float(b[0]),y=float(b[1])))
+                page_links=[]
                 for link in page.get_links():
                     if url:=link.get('uri'):
-                        if url.startswith(('https://','http://','mailto:')): links.append((url,pageno))
-                if native: lines.extend(native); methods.append('native_pdf')
-                if sum(len(x.text) for x in native) < 40 and ocr_pages_processed < 2:
+                        if url.startswith(('https://','http://','mailto:')):
+                            links.append((url,pageno))
+                            r=link.get('from')
+                            if r is not None: page_links.append({'url':url,'x0':r.x0,'y0':r.y0,'x1':r.x1,'y1':r.y1})
+                needs_ocr = force_ocr or sum(len(x.text) for x in native) < 40
+                if native and not force_ocr:
+                    lines.extend(native); methods.append('native_pdf')
+                    layout.append({'page':pageno,'width':page.rect.width,'height':page.rect.height,'source':'native_pdf',
+                                   'spans':[{'x0':w[0],'y0':w[1],'x1':w[2],'y1':w[3],'text':w[4]} for w in page.get_text('words') if w[4].strip()],
+                                   'links':page_links})
+                if needs_ocr and ocr_pages_processed < 2:
                     attempted=True
                     ocr_pages_processed += 1
                     try:
                         if page.rect.width*page.rect.height*4>30_000_000:
                             warnings.append(f'Page {pageno}: rendered OCR image exceeds safe pixel limit.')
                             continue
-                        pix=page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False)
-                        ocr=_ocr(Image.open(BytesIO(pix.tobytes('png'))),pageno,max(1,min(settings.max_ocr_seconds,int(deadline-time.monotonic()))),warnings)
+                        scale=2.0 if force_ocr else 1.5
+                        pix=page.get_pixmap(matrix=fitz.Matrix(scale,scale),alpha=False)
+                        ocr,ocr_layout=_ocr(Image.open(BytesIO(pix.tobytes('png'))),pageno,max(1,min(settings.max_ocr_seconds,int(deadline-time.monotonic()))),warnings)
                         # Only skip OCR lines that are substantial exact duplicates of native lines
-                        existing={l.text.lower().strip() for l in native if len(l.text.strip())>10}
+                        existing=set() if force_ocr else {l.text.lower().strip() for l in native if len(l.text.strip())>10}
                         fresh=[l for l in ocr if l.text.lower().strip() not in existing]
                         if fresh: lines.extend(fresh); used=True; methods.append('ocr')
+                        if ocr_layout['spans']:
+                            # Link rects are in PDF points; the OCR image is scaled.
+                            ocr_layout['links']=[{**l,**{k:l[k]*scale for k in ('x0','y0','x1','y1')}} for l in page_links]
+                            layout=[p for p in layout if p['page']!=pageno]+[ocr_layout]
                     except OcrEngineUnavailable:
                         raise
                     except Exception as e: warnings.append(f'Page {pageno}: OCR setup error ({type(e).__name__}).')
@@ -189,10 +216,11 @@ def read_document(data,fmt,settings):
         methods=[fmt]
     elif fmt in ('png','jpg','jpeg'):
         attempted=True
-        lines=_ocr(Image.open(BytesIO(data)),1,settings.max_ocr_seconds,warnings)
+        lines,ocr_layout=_ocr(Image.open(BytesIO(data)),1,settings.max_ocr_seconds,warnings)
+        layout=[ocr_layout] if ocr_layout['spans'] else []
         used=bool(lines)
         if used: methods=['ocr']
     if used: warnings.append('OCR text must be checked against the source document.')
     if not lines: warnings.append('No reliable text extracted; missing values remain empty.')
     tag_sections(lines)
-    return Content(lines,pages,fmt,attempted,used,list(dict.fromkeys(methods)),warnings,links)
+    return Content(lines,pages,fmt,attempted,used,list(dict.fromkeys(methods)),warnings,links,layout)

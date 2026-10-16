@@ -11,7 +11,7 @@ import crypto from "crypto";
 
 export const DEFAULT_TEST_DATABASE_URL = "postgres://postgres:phase1@127.0.0.1:54399/tathastu_test";
 
-export async function useTestDatabase() {
+export async function setupTestDatabase() {
   const url = process.env.TEST_DATABASE_URL || DEFAULT_TEST_DATABASE_URL;
   const host = new URL(url).hostname;
   if (!["127.0.0.1", "localhost", "::1"].includes(host)) {

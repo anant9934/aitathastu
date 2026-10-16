@@ -17,12 +17,9 @@
  */
 
 import crypto from "node:crypto";
-import { eq, and } from "drizzle-orm";
-import { getDb, externalConnections, sourceSnapshots, evidenceItems, projects } from "@/lib/db";
 import {
   saveExternalConnection,
   saveSourceSnapshot,
-  getLatestSourceSnapshot,
   disconnectConnection,
   getExternalConnectionByProvider,
 } from "@/lib/repositories/connection-repository";
@@ -41,8 +38,6 @@ import {
 import { fetchLeetCodeProfileStats, normalizeLeetCodeUsername } from "@/lib/connectors/leetcode/client";
 import {
   fetchHackerRankProfile,
-  fetchCodeChefProfile,
-  fetchHackerEarthProfile,
   normalizeCodingHandle,
 } from "@/lib/connectors/coding-platforms/client";
 import {
@@ -53,7 +48,6 @@ import {
   fetchKaggleApiData,
   validateGoogleScholarProfile,
 } from "@/lib/connectors/research-and-dev/client";
-import { CodingProfileIntelligenceService } from "@/lib/services/coding-profile-intelligence-service";
 import { isValidOrcidChecksum } from "@/lib/services/digital-footprint-registry";
 
 export interface ProfileValidationResult {
@@ -562,7 +556,7 @@ export class DigitalSourceImportOrchestrator {
     token?: string;
     jobId?: string;
   }): Promise<ImportExecutionResult> {
-    const { personId, provider, identifier = "", exportFilename, exportContent, consent, token, jobId: requestedJobId } = params;
+    const { personId, provider, identifier = "", exportFilename, exportContent, consent, jobId: requestedJobId } = params;
 
     if (!consent) {
       throw new Error(`Student consent is mandatory before importing from ${provider}.`);

@@ -16,13 +16,8 @@
  */
 
 import {
-  SKILL_CATALOG,
-  CANONICAL_KNOWLEDGE_EDGES,
   getSkillCatalogEntry,
   buildSkillGraphEdges,
-  type SkillCategory,
-  type SkillCatalogEntry,
-  type SkillKnowledgeEdge,
 } from "../lib/domain/skills-knowledge-catalog";
 
 let passed = 0;
@@ -119,9 +114,6 @@ async function run() {
     `Edge: ${gitGitHubEdge?.source} <-> ${gitGitHubEdge?.target}`
   );
 
-  const sqlPgEdge = knowledgeEdges.find(
-    (e) => (e.source.toLowerCase() === "sql" && e.target.toLowerCase() === "postgresql") || (e.source.toLowerCase() === "postgresql" && e.target.toLowerCase() === "sql")
-  );
   const cvSkillsWithSql = [...cvSkills, "SQL"];
   const edgesWithSql = buildSkillGraphEdges(cvSkillsWithSql, []);
   const sqlPgFound = edgesWithSql.find(

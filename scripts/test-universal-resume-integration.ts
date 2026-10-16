@@ -12,7 +12,7 @@
  */
 
 import crypto from "node:crypto";
-import { getDb, evidenceItems, personProfiles, sourceConflicts, resumeDocuments, resumeReviewHistory } from "../lib/db";
+import { getDb, evidenceItems, personProfiles, sourceConflicts, resumeDocuments } from "../lib/db";
 import { ObjectStorageService } from "../lib/storage/object-storage";
 import { ExtractorServiceClient, type ExtractorProfileV2 } from "../lib/services/extractor-service-client";
 import { ResumePerson360Mapper } from "../lib/services/resume-person360-mapper";
@@ -299,7 +299,7 @@ async function runIntegrationSuite() {
   // Remove verified status to test conflict logging when non-verified values disagree
   await db.delete(evidenceItems).where(and(eq(evidenceItems.personId, testPersonA), eq(evidenceItems.subject, "institution")));
 
-  const conflictMapping = await ResumePerson360Mapper.applyProfileToPerson360(
+  await ResumePerson360Mapper.applyProfileToPerson360(
     testPersonA,
     testDocId,
     conflictProfile

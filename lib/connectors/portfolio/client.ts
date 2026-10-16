@@ -53,29 +53,8 @@ function isPublicIpv4(address: string): boolean {
   );
 }
 
-export function isSafePublicUrl(rawUrl: string): { safe: boolean; reason?: string; parsed?: URL } {
-  try {
-    const parsed = new URL(rawUrl);
-    if (parsed.protocol !== "https:") {
-      return { safe: false, reason: "Only HTTPS portfolio URLs are supported." };
-    }
-    const hostname = parsed.hostname.toLowerCase();
-    const hostWithoutBrackets = hostname.replace(/^\[/, "").replace(/\]$/, "");
-    if (isIP(hostWithoutBrackets) || hostname === "localhost" || hostname.endsWith(".localhost") ||
-        hostname === "localhost.localdomain" || hostname.endsWith(".localdomain") ||
-        hostname.endsWith(".local") || hostname.endsWith(".internal") ||
-        hostname === "metadata.google.internal") {
-      return { safe: false, reason: "Private, internal, or loopback network addresses are strictly forbidden." };
-    }
-    if (parsed.port && parsed.port !== "443") {
-      return { safe: false, reason: "Non-standard network ports are forbidden." };
-    }
-    if (parsed.username || parsed.password) return { safe: false, reason: "Portfolio URLs cannot contain credentials." };
-    return { safe: true, parsed };
-  } catch {
-    return { safe: false, reason: "Malformed URL provided." };
-  }
-}
+import { isSafePublicUrl } from "./url-check";
+export { isSafePublicUrl };
 
 export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Promise<{ url: string; html: string }> {
   const check = isSafePublicUrl(rawUrl);

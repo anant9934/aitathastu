@@ -68,13 +68,13 @@ export function ProjectDetailView({ id }: { id: string }) {
             <PanelHeader id="ov-title" title="Overview" actions={!editing && <Button size="sm" variant="secondary" icon={<PencilSimple size={16} aria-hidden="true" />} onClick={() => setEditing(true)}>Edit</Button>} />
             {editing ? <EditProject p={p} onDone={async () => { setEditing(false); await load(); }} onCancel={() => setEditing(false)} /> : (
               <>
-                <p className="max-w-[68ch] whitespace-pre-line text-sm text-ink">{p.summary || p.description || "No description yet."}</p>
+                <p className="max-w-[68ch] whitespace-pre-line text-sm text-text-primary">{p.summary || p.description || "No description yet."}</p>
                 <div className="mt-4 flex flex-wrap gap-1.5">{p.technologies.map((t) => <Tag key={t} mono>{t}</Tag>)}</div>
                 {(p.repositoryUrl || p.demoUrl || p.links.length > 0) && (
-                  <ul className="mt-4 flex flex-col gap-1.5 border-t border-line pt-3 text-sm">
+                  <ul className="mt-4 flex flex-col gap-1.5 border-t border-border-medium pt-3 text-sm">
                     {[p.repositoryUrl && { label: "Repository", url: p.repositoryUrl }, p.demoUrl && { label: "Demo", url: p.demoUrl }, ...p.links].filter(Boolean).map((l) => {
                       const link = l as { label?: string; url: string };
-                      return <li key={link.url}><span className="mr-2 text-xs text-muted">{link.label ?? "Link"}</span><a className="link inline-flex items-center gap-1 break-all" href={link.url} target="_blank" rel="noopener noreferrer">{link.url}<ArrowSquareOut size={12} aria-hidden="true" /></a></li>;
+                      return <li key={link.url}><span className="mr-2 text-xs text-text-muted">{link.label ?? "Link"}</span><a className="inline-flex items-center gap-1 break-all text-champagne hover:underline" href={link.url} target="_blank" rel="noopener noreferrer">{link.url}<ArrowSquareOut size={12} aria-hidden="true" /></a></li>;
                     })}
                   </ul>
                 )}
@@ -83,7 +83,7 @@ export function ProjectDetailView({ id }: { id: string }) {
           </Panel>
           <Panel aria-labelledby="mine-title" data-eora-id="eora-project-detail-contribution">
             <PanelHeader id="mine-title" title="What you did" description="Your own statement. It makes the project stronger evidence; it isn't third-party proof." />
-            {p.contributionNote ? <blockquote className="border-l border-line-strong pl-3 text-sm text-ink">{p.contributionNote}</blockquote> : <p className="text-sm text-muted">Not added yet. Use Edit to say which parts you built.</p>}
+            {p.contributionNote ? <blockquote className="border-l-2 border-soft-amber pl-3 text-sm italic text-warm-ivory">{p.contributionNote}</blockquote> : <p className="text-sm text-text-muted">Not added yet. Use Edit to say which parts you built.</p>}
             {p.contributionRoles.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{p.contributionRoles.map((r) => <Tag key={r}>{r}</Tag>)}</div>}
           </Panel>
         </div>
@@ -95,8 +95,8 @@ export function ProjectDetailView({ id }: { id: string }) {
           </Panel>
           <Panel aria-labelledby="pev-title">
             <PanelHeader id="pev-title" title="Evidence records" />
-            {evidence.length === 0 ? <p className="text-sm text-muted">No evidence records yet.</p> : (
-              <ul className="divide-y divide-line">
+            {evidence.length === 0 ? <p className="text-sm text-text-muted">No evidence records yet.</p> : (
+              <ul className="divide-y divide-border-medium">
                 {evidence.map((e) => {
                   const v = VERIFICATION_VIEW[e.verificationStatus] ?? VERIFICATION_VIEW.unverified;
                   return <li key={e.id} className="py-2.5 first:pt-0"><p className="text-sm font-medium">{e.subject}</p><p className="text-xs text-muted">{e.interpretation}</p><StatusChip tone={v.tone} size="sm" className="mt-1.5">{v.label}</StatusChip></li>;

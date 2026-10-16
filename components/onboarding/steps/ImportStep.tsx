@@ -20,7 +20,7 @@ export function ImportStep({ saving, guide, onBack, onContinue }: { saving: bool
         guide={guide}
         eoraId="eora-ai-analysis"
       />
-      <div className="mt-6 rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
+      <div className="mt-6 rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
         <SourceProgress variant="full" onReadyToReview={() => onContinue()} />
       </div>
       <StepFooter onBack={onBack} onNext={onContinue} saving={saving} nextLabel="Review what we found" />

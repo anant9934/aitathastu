@@ -250,13 +250,13 @@ export function useOnboardingFlow() {
     profileComplete(d) ? [...d.resumeCovered, 4] : d.resumeCovered, [profileComplete]);
 
   const nextAfter = useCallback((from: number, d: OnboardingData = dataRef.current) => {
-    if (from === 5 && !d.resumeFileName) return 4;
+    if (from === 5) return 5.5;
     return nextOnboardingScreen(from, coveredScreens(d));
   }, [coveredScreens]);
 
   /** The previous step that was actually shown (covered steps are skipped going back too). */
   const prevBefore = useCallback((from: number, d: OnboardingData = dataRef.current) => {
-    const order = [3, 3.2, 3.5, 5, 4, 6, 7, 8, 9, 10, 11];
+    const order = [3, 3.2, 3.5, 5, 5.5, 4, 6, 7, 8, 9, 10, 11];
     const covered = new Set(coveredScreens(d));
     // Details (4) was shown when there was no CV, even if it is complete now.
     if (!d.resumeFileName) covered.delete(4);

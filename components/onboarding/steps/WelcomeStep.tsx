@@ -40,11 +40,11 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
     <div className="flex flex-1 flex-col justify-center py-8 sm:py-12">
       <div className="grid items-center gap-8 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:gap-12">
         <div className="flex items-center gap-4 md:block">
-          <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface sm:w-28 md:w-full">
+          <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-card border border-border-medium bg-bg-elevated sm:w-28 md:w-full">
             <Image src="/assets/eora/welcome-hand.png" alt="EORA, your guide, waving hello" fill sizes="(min-width: 768px) 240px, 112px" className="object-contain object-bottom" priority />
           </div>
-          <p className="text-sm text-muted md:mt-4">
-            I&apos;m <span className="text-ink">EORA</span>. I&apos;ll walk you through this, and I speak English and Hinglish.
+          <p className="text-sm text-text-muted md:mt-4">
+            I&apos;m <span className="font-semibold text-warm-ivory">EORA</span>. I&apos;ll walk you through this, and I speak English and Hinglish.
           </p>
         </div>
 
@@ -54,8 +54,8 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
           className="flex min-w-0 flex-col gap-5"
         >
           <div>
-            <h1 className="text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">Let&apos;s build one honest picture of what you can do</h1>
-            <p className="mt-3 max-w-[56ch] text-base text-muted">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Let&apos;s build one honest picture of what you can do</h1>
+            <p className="mt-3 max-w-[56ch] text-base text-text-muted">
               We&apos;ll read your CV and the accounts you choose to connect, and show you everything we find. Nothing reaches your profile until you confirm it.
             </p>
           </div>
@@ -75,8 +75,8 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
               Let&apos;s start <ArrowRight size={18} aria-hidden="true" />
             </Button>
           </div>
-          <p className="text-xs text-muted">
-            Already have an account? <a href="/sign-in" className="link">Sign in</a>
+          <p className="text-xs text-text-muted">
+            Already have an account? <a href="/sign-in" className="text-accent-warm hover:text-accent-warm-bright">Sign in</a>
           </p>
         </form>
       </div>

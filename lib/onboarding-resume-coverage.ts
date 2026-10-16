@@ -21,7 +21,7 @@ const SECTION_SCREENS: Array<[section: string, screen: number]> = [
 ];
 
 /** Student onboarding screens after the resume upload, in order. */
-const FLOW_AFTER_RESUME = [5, 4, 6, 7, 8, 9, 10, 11];
+const FLOW_AFTER_RESUME = [5, 5.5, 4, 6, 7, 8, 9, 10, 11];
 
 export function resumeCoveredScreens(
   summary: ResumeReviewSummary,

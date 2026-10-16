@@ -611,6 +611,28 @@ export class DigitalSourceImportOrchestrator {
           await SourceProcessingJobService.updateStage(jobId, personId, "extract");
           const ghResult = await fetchGitHubIntelligence(externalUsername);
           if (!ghResult.success) {
+            if (ghResult.rateLimited) {
+              acquisitionMode = "OFFICIAL_PUBLIC_API";
+              connectionStatus = "detected";
+              partial = true;
+              await saveExternalConnection({
+                personId,
+                provider: "github",
+                externalUsername,
+                displayName: externalUsername,
+                profileUrl,
+                status: connectionStatus,
+                metadata: {
+                  ownershipVerified: false,
+                  connectionState: "PROFILE_DISCOVERED",
+                  rateLimited: true,
+                  note: "GitHub API rate limit reached. Profile linked; live indexing will retry.",
+                  lastSyncedAt: new Date().toISOString(),
+                },
+              });
+              summary = `GitHub profile linked (${externalUsername}). Live indexing paused due to rate limit; profile URL saved for review.`;
+              break;
+            }
             throw new Error(ghResult.error || `Could not fetch GitHub account '${externalUsername}'.`);
           }
 
@@ -872,36 +894,53 @@ export class DigitalSourceImportOrchestrator {
           profileUrl = val.normalizedUrl;
 
           await SourceProcessingJobService.updateStage(jobId, personId, "extract");
-          const meta = await fetchPortfolioMetadata(profileUrl);
-          acquisitionMode = "PERMITTED_PUBLIC_METADATA";
+          try {
+            const meta = await fetchPortfolioMetadata(profileUrl);
+            acquisitionMode = "PERMITTED_PUBLIC_METADATA";
 
-          await saveExternalConnection({
-            personId,
-            provider: "portfolio",
-            externalUsername: meta.url,
-            profileUrl: meta.url,
-            displayName: meta.title || "Personal Portfolio",
-            status: "connected",
-            metadata: {
-              title: meta.title,
-              description: meta.description,
-              outwardLinksCount: meta.detectedLinks.length,
-              lastSyncedAt: new Date().toISOString(),
-            },
-          });
-
-          for (const dp of meta.discoveredProjects) {
-            candidates.projects.push({
-              title: dp.title,
-              description: dp.description,
-              technologies: dp.technologies || [],
-              url: dp.url || meta.url,
-              source: "portfolio",
+            await saveExternalConnection({
+              personId,
+              provider: "portfolio",
+              externalUsername: meta.url,
+              profileUrl: meta.url,
+              displayName: meta.title || "Personal Portfolio",
+              status: "connected",
+              metadata: {
+                title: meta.title,
+                description: meta.description,
+                outwardLinksCount: meta.detectedLinks.length,
+                lastSyncedAt: new Date().toISOString(),
+              },
             });
-          }
 
-          rawSnapshotPayload = meta as unknown as Record<string, unknown>;
-          summary = `Verified portfolio website (${meta.title || meta.url}) with ${meta.discoveredProjects.length} candidate projects.`;
+            for (const dp of meta.discoveredProjects) {
+              candidates.projects.push({
+                title: dp.title,
+                description: dp.description,
+                technologies: dp.technologies || [],
+                url: dp.url || meta.url,
+                source: "portfolio",
+              });
+            }
+
+            rawSnapshotPayload = meta as unknown as Record<string, unknown>;
+            summary = `Verified portfolio website (${meta.title || meta.url}) with ${meta.discoveredProjects.length} candidate projects.`;
+          } catch (err: unknown) {
+            acquisitionMode = "MANUAL_PROFILE_REFERENCE";
+            await saveExternalConnection({
+              personId,
+              provider: "portfolio",
+              externalUsername: profileUrl,
+              profileUrl,
+              displayName: "Personal Portfolio",
+              status: "reference_only",
+              metadata: {
+                note: err instanceof Error ? err.message : "Live metadata unreachable; profile link saved as reference.",
+                lastSyncedAt: new Date().toISOString(),
+              },
+            });
+            summary = `Saved portfolio website reference (${profileUrl}). Live metadata could not be fetched.`;
+          }
           break;
         }
 

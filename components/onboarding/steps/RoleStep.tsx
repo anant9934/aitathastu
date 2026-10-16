@@ -51,20 +51,20 @@ export function RoleStep({ initialRole, saving, guide, onBack, onContinue }: {
                 setRole(r.id);
               }}
               className={cn(
-                "flex min-h-20 cursor-pointer items-start gap-3 rounded-[var(--radius-panel)] border p-4 text-left transition-colors duration-150",
-                checked ? "border-signal bg-signal-tint" : "border-line bg-surface hover:border-line-strong",
-                !r.available && "cursor-not-allowed opacity-70 hover:border-line",
+                "flex min-h-20 cursor-pointer items-start gap-3 rounded-card border p-4 text-left transition-all duration-200",
+                checked ? "border-accent-warm-bright bg-accent-warm-bright/10 text-warm-ivory shadow-[0_0_20px_rgba(244,154,71,0.15)]" : "border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm",
+                !r.available && "cursor-not-allowed opacity-60 hover:border-border-medium",
               )}
             >
-              <span className={cn("grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] border", checked ? "border-signal/50 text-signal" : "border-line text-muted")}>
+              <span className={cn("grid size-9 shrink-0 place-items-center rounded-md border", checked ? "border-accent-warm-bright/50 text-accent-warm-bright bg-accent-warm-bright/10" : "border-border-medium text-text-dim bg-deep-espresso")}>
                 <Glyph size={20} weight={checked ? "fill" : "regular"} aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center gap-2 font-medium text-ink">
+                <span className="flex flex-wrap items-center gap-2 font-display text-base font-semibold text-text-primary">
                   {r.title}
                   {!r.available && <StatusChip tone="neutral" size="sm" icon={null}>Coming later</StatusChip>}
                 </span>
-                <span className="mt-1 block text-sm text-muted">{r.subtitle}</span>
+                <span className="mt-1 block text-sm text-text-muted">{r.subtitle}</span>
               </span>
             </button>
           );

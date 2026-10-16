@@ -15,7 +15,7 @@ export function Panel({
   return (
     <Tag
       className={cn(
-        "min-w-0 rounded-[var(--radius-panel)] border border-line bg-surface",
+        "min-w-0 rounded-card border border-border-medium bg-bg-elevated text-text-primary",
         padded && "p-4 sm:p-5",
         className,
       )}
@@ -45,8 +45,8 @@ export function PanelHeader({
   return (
     <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2", className)}>
       <div className="min-w-0 flex-1 basis-56">
-        <H id={id} className={level === 2 ? "text-lg font-semibold" : "text-base font-semibold"}>{title}</H>
-        {description && <p className="mt-1 max-w-[68ch] text-sm text-muted">{description}</p>}
+        <H id={id} className={cn("font-display font-semibold text-text-primary", level === 2 ? "text-lg" : "text-base")}>{title}</H>
+        {description && <p className="mt-1 max-w-[68ch] text-sm text-text-muted">{description}</p>}
       </div>
       {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -56,7 +56,7 @@ export function PanelHeader({
 /** A divided list inside a panel: rows separated by hairlines, no inner cards. */
 export function DividedList({ className, children, ...rest }: React.HTMLAttributes<HTMLUListElement>) {
   return (
-    <ul className={cn("divide-y divide-line", className)} {...rest}>
+    <ul className={cn("divide-y divide-border-subtle", className)} {...rest}>
       {children}
     </ul>
   );

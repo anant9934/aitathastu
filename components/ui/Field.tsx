@@ -5,9 +5,9 @@ import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { cn } from "@/lib/client/cn";
 
 export const controlClass =
-  "w-full min-h-11 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-base text-ink " +
-  "transition-[border-color,box-shadow] duration-150 ease-[var(--ease-out)] hover:border-ink/70 " +
-  "focus-visible:outline-none focus-visible:border-focus focus-visible:shadow-[0_0_0_3px_color-mix(in_srgb,var(--focus)_30%,transparent)] " +
+  "w-full min-h-11 rounded-[var(--radius-control)] border border-input-border bg-input-background px-3 text-base text-input-foreground placeholder:text-input-placeholder " +
+  "transition-[border-color,box-shadow] duration-150 ease-[var(--ease-soft)] hover:border-focus-ring/80 " +
+  "focus-visible:outline-none focus-visible:border-focus-ring focus-visible:shadow-[0_0_0_3px_var(--focus-ring)] " +
   "disabled:cursor-not-allowed disabled:opacity-55 aria-invalid:border-danger";
 
 type FieldShellProps = {
@@ -35,15 +35,15 @@ export function FieldShell({ label, hint, error, required, className, labelHidde
   return (
     <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <div className={cn("flex items-baseline justify-between gap-3", labelHidden && "sr-only")}>
-        <label htmlFor={id} className="text-sm font-medium text-ink">
+        <label htmlFor={id} className="text-sm font-medium text-text-primary">
           {label}
-          {required && <span className="ml-0.5 text-muted" aria-hidden="true">*</span>}
+          {required && <span className="ml-0.5 text-text-muted" aria-hidden="true">*</span>}
         </label>
         {aside}
       </div>
       {children({ id, describedBy, invalid: Boolean(error) })}
       {hint && !error && (
-        <p id={hintId} className="text-xs text-muted">{hint}</p>
+        <p id={hintId} className="text-xs text-text-muted">{hint}</p>
       )}
       {error && (
         <p id={errorId} role="alert" className="flex items-start gap-1.5 text-sm text-danger">
@@ -139,7 +139,7 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectProps>(func
           >
             {children}
           </select>
-          <svg aria-hidden="true" viewBox="0 0 16 16" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted">
+          <svg aria-hidden="true" viewBox="0 0 16 16" className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-input-placeholder">
             <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
@@ -165,14 +165,14 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(functi
         ref={ref}
         id={id}
         type="checkbox"
-        className="mt-0.5 size-5 shrink-0 cursor-pointer rounded-[4px] border-line-strong accent-signal"
+        className="mt-0.5 size-5 shrink-0 cursor-pointer rounded-[4px] border-border-interactive accent-accent-warm"
         aria-describedby={description ? `${id}-desc` : undefined}
         {...rest}
       />
-      <label htmlFor={id} className="cursor-pointer text-sm leading-snug text-ink">
+      <label htmlFor={id} className="cursor-pointer text-sm leading-snug text-text-primary">
         {label}
         {description && (
-          <span id={`${id}-desc`} className="mt-1 block text-xs text-muted">{description}</span>
+          <span id={`${id}-desc`} className="mt-1 block text-xs text-text-muted">{description}</span>
         )}
       </label>
     </div>

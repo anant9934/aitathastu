@@ -59,11 +59,11 @@ export function LinkReview({ links, discovered, onChange }: {
         <LinkForm platforms={free.map((p) => p.id)} onCancel={() => setAdding(false)} onSave={(platform, url) => { onChange({ ...links, [platform]: url }); setAdding(false); }} />
       )}
       {entries.length === 0 && !adding && (
-        <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong/60 px-4 py-5 text-sm text-muted">
+        <p className="rounded-lg border border-dashed border-border-medium px-4 py-5 text-sm text-text-muted">
           No profile links yet. Add GitHub, LinkedIn or any profile you want counted as evidence.
         </p>
       )}
-      <ul className="divide-y divide-line rounded-[var(--radius-control)] border border-line empty:hidden">
+      <ul className="divide-y divide-border-medium rounded-lg border border-border-medium empty:hidden">
         {entries.map(([platform, url]) => {
           const problem = checkLink(platform, url);
           return (
@@ -73,20 +73,20 @@ export function LinkReview({ links, discovered, onChange }: {
               ) : (
                 <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                   <div className="min-w-0 flex-1 basis-56">
-                    <p className="text-sm font-medium">{label(platform)}</p>
-                    <a className="link inline-flex max-w-full items-center gap-1 break-all text-sm" href={normalise(url)} target="_blank" rel="noopener noreferrer">
+                    <p className="font-display text-sm font-medium text-warm-ivory">{label(platform)}</p>
+                    <a className="inline-flex max-w-full items-center gap-1 break-all text-sm text-champagne hover:underline" href={normalise(url)} target="_blank" rel="noopener noreferrer">
                       {url}<ArrowSquareOut size={14} aria-hidden="true" className="shrink-0" /><span className="sr-only">(opens in a new tab)</span>
                     </a>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {discovered?.[platform] && <Tag>From CV</Tag>}
                       {problem
-                        ? <span className="inline-flex items-center gap-1 text-xs text-warning"><WarningCircle size={14} weight="bold" aria-hidden="true" />{problem}</span>
+                        ? <span className="inline-flex items-center gap-1 text-xs text-soft-amber"><WarningCircle size={14} weight="bold" aria-hidden="true" />{problem}</span>
                         : <span className="inline-flex items-center gap-1 text-xs text-verified"><Check size={14} weight="bold" aria-hidden="true" />Looks right</span>}
                     </div>
                   </div>
                   <span className="flex gap-1">
                     <IconButton label={`Edit ${label(platform)} link`} onClick={() => { setEditing(platform); setAdding(false); }}><PencilSimple size={16} aria-hidden="true" /></IconButton>
-                    <IconButton label={`Remove ${label(platform)} link`} className="text-muted hover:text-danger" onClick={() => onChange({ ...links, [platform]: "" })}><X size={16} aria-hidden="true" /></IconButton>
+                    <IconButton label={`Remove ${label(platform)} link`} className="text-text-muted hover:text-danger" onClick={() => onChange({ ...links, [platform]: "" })}><X size={16} aria-hidden="true" /></IconButton>
                   </span>
                 </div>
               )}
@@ -107,7 +107,7 @@ function LinkForm({ platforms, initial = "", onSave, onCancel }: { platforms: st
   return (
     <form
       noValidate
-      className="grid gap-3 rounded-[var(--radius-control)] border border-signal/50 bg-surface p-3.5 sm:grid-cols-[12rem_1fr]"
+      className="grid gap-3 rounded-card border border-soft-amber/40 bg-bg-elevated p-4 shadow-card sm:grid-cols-[12rem_1fr]"
       onSubmit={(e) => {
         e.preventDefault();
         const problem = checkLink(platform, url);

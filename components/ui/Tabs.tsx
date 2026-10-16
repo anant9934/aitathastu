@@ -62,8 +62,8 @@ export function Tabs({
             onClick={() => onChange(item.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              "relative inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-[6px] px-3 text-sm font-medium transition-colors duration-150 pointer-coarse:min-h-11",
-              active ? "bg-raised text-ink shadow-[inset_0_-2px_0_var(--signal)]" : "text-muted hover:text-ink hover:bg-raised/60",
+              "relative inline-flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors duration-150 pointer-coarse:min-h-11",
+              active ? "bg-deep-espresso text-warm-ivory shadow-[inset_0_-2px_0_var(--soft-amber)] font-semibold" : "text-text-muted hover:text-text-primary hover:bg-deep-espresso/50",
             )}
           >
             {item.label}

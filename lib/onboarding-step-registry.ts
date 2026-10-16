@@ -26,6 +26,7 @@ const STUDENT_STEPS: OnboardingStepDefinition[] = [
   { id: "aiml_direction", screen: 3.2, title: "Your AI/ML direction", shortLabel: "Direction" },
   { id: "priorities", screen: 3.5, title: "What matters most", shortLabel: "Priorities" },
   { id: "resume_upload", screen: 5, title: "Your CV", shortLabel: "CV" },
+  { id: "digital_footprint_intelligence", screen: 5.5, title: "Let's discover what you've built", shortLabel: "Footprint" },
   { id: "academic_details", screen: 4, title: "Your details", shortLabel: "Details" },
   { id: "digital_profiles", screen: 6, title: "Your accounts", shortLabel: "Accounts" },
   { id: "import", screen: 7, title: "Importing what we found", shortLabel: "Import" },

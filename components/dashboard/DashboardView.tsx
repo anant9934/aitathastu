@@ -99,9 +99,9 @@ export function DashboardView() {
       <section id="overview" aria-labelledby="overview-title" data-eora-id="eora-overview" className="scroll-mt-28 pt-6 lg:scroll-mt-16">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div className="min-w-0">
-            <h1 id="overview-title" className="text-2xl font-semibold tracking-[-0.02em]">{first ? `Welcome back, ${first}` : "Your overview"}</h1>
-            <p className="mt-1 text-sm text-muted">
-              Working toward <span className="text-ink">{model.targetRole}</span>
+            <h1 id="overview-title" className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">{first ? `Welcome back, ${first}` : "Your overview"}</h1>
+            <p className="mt-1 text-sm text-text-muted">
+              Working toward <span className="font-medium text-warm-ivory">{model.targetRole}</span>
               {model.institution ? <> · {model.institution}</> : null}
             </p>
           </div>

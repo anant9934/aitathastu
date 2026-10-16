@@ -70,7 +70,7 @@ export function DirectionStep({ initialRole, saving, guide, onBack, onContinue }
                 onClick={() => setCategory(c.id)}
                 className={cn(
                   "min-h-9 shrink-0 cursor-pointer rounded-full border px-3 text-sm transition-colors pointer-coarse:min-h-11",
-                  category === c.id ? "border-signal bg-signal-tint text-ink" : "border-line text-muted hover:text-ink",
+                  category === c.id ? "border-accent-warm-bright bg-accent-warm-bright/10 text-warm-ivory font-medium" : "border-border-medium text-text-muted hover:text-text-primary hover:bg-deep-espresso/50",
                 )}
               >
                 {c.label}
@@ -80,7 +80,7 @@ export function DirectionStep({ initialRole, saving, guide, onBack, onContinue }
         </div>
 
         <div role="radiogroup" aria-label="Target role" className="flex flex-col gap-2">
-          {roles.length === 0 && <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong/60 px-4 py-5 text-sm text-muted">No role matches &ldquo;{query}&rdquo;. Try a skill name, or clear the search.</p>}
+          {roles.length === 0 && <p className="rounded-card border border-dashed border-border-medium bg-bg-elevated px-4 py-5 text-sm text-text-muted">No role matches &ldquo;{query}&rdquo;. Try a skill name, or clear the search.</p>}
           {roles.map((r) => {
             const checked = r.id === selected;
             return (
@@ -91,22 +91,22 @@ export function DirectionStep({ initialRole, saving, guide, onBack, onContinue }
                 aria-checked={checked}
                 onClick={() => { setSelected(r.id); setError(null); }}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-[var(--radius-panel)] border p-4 text-left transition-colors duration-150",
-                  checked ? "border-signal bg-signal-tint" : "border-line bg-surface hover:border-line-strong",
+                  "flex cursor-pointer items-start gap-3 rounded-card border p-4 text-left transition-all duration-200",
+                  checked ? "border-accent-warm-bright bg-accent-warm-bright/10 shadow-[0_0_20px_rgba(244,154,71,0.15)]" : "border-border-medium bg-bg-elevated hover:border-accent-warm",
                 )}
               >
-                <span aria-hidden="true" className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border", checked ? "border-signal bg-signal text-on-signal" : "border-line-strong")}>
+                <span aria-hidden="true" className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border", checked ? "border-accent-warm-bright bg-accent-warm-bright text-obsidian" : "border-border-medium")}>
                   {checked && <Check size={12} weight="bold" />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-medium text-ink">{r.title}</span>
-                    <span className="text-xs text-muted">{r.categoryLabel}</span>
+                    <span className="font-display font-semibold text-text-primary">{r.title}</span>
+                    <span className="text-xs text-text-dim">{r.categoryLabel}</span>
                   </span>
-                  <span className="mt-1 block text-sm text-muted">{r.description}</span>
+                  <span className="mt-1 block text-sm text-text-muted">{r.description}</span>
                   {checked && (
                     <span className="mt-3 flex flex-wrap items-center gap-1.5">
-                      <span className="mr-1 text-xs text-muted">Core skills:</span>
+                      <span className="mr-1 text-xs text-text-muted">Core skills:</span>
                       {r.corePrerequisites.map((p) => <Tag key={p}>{p}</Tag>)}
                     </span>
                   )}

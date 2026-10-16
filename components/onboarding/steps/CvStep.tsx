@@ -86,24 +86,24 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { e.preventDefault(); setDragging(false); if (!blocked) void cv.upload(e.dataTransfer.files?.[0], consent); }}
           className={cn(
-            "flex flex-col items-center gap-3 rounded-[var(--radius-panel)] border border-dashed px-5 py-8 text-center transition-colors duration-150",
-            dragging ? "border-signal bg-signal-tint" : cv.fileName && !failed ? "border-verified/50 bg-surface" : "border-line-strong/70 bg-surface",
+            "flex flex-col items-center gap-3 rounded-card border border-dashed px-5 py-8 text-center transition-all duration-200",
+            dragging ? "border-soft-amber bg-soft-amber/10 shadow-[0_0_24px_rgba(244,154,71,0.15)]" : cv.fileName && !failed ? "border-verified/50 bg-bg-elevated" : "border-border-medium bg-bg-elevated/70 hover:border-champagne/40",
             blocked && "opacity-70",
           )}
         >
           <input ref={fileInput} type="file" accept=".pdf,.docx" className="sr-only" tabIndex={-1} aria-hidden="true"
             onChange={(e) => { void cv.upload(e.target.files?.[0], consent); e.target.value = ""; }} />
-          <span className="grid size-11 place-items-center rounded-full border border-line bg-raised text-muted">
-            {cv.fileName ? <FileText size={22} aria-hidden="true" /> : <FileArrowUp size={22} aria-hidden="true" />}
+          <span className="grid size-12 place-items-center rounded-full border border-border-medium bg-deep-espresso text-champagne shadow-sm">
+            {cv.fileName ? <FileText size={24} aria-hidden="true" /> : <FileArrowUp size={24} aria-hidden="true" />}
           </span>
           <div>
-            <p className="font-medium text-ink">{cv.fileName ?? "Drop your CV here"}</p>
-            <p className="mt-1 text-sm text-muted">PDF or DOCX, up to {RESUME_MAX_UPLOAD_MB} MB</p>
+            <p className="font-display font-medium text-warm-ivory">{cv.fileName ?? "Drop your CV here"}</p>
+            <p className="mt-1 text-sm text-text-muted">PDF or DOCX, up to {RESUME_MAX_UPLOAD_MB} MB</p>
           </div>
           <Button variant={cv.fileName ? "secondary" : "primary"} onClick={pick} disabled={blocked || cv.busy}>
             {cv.fileName ? "Replace file" : "Choose a file"}
           </Button>
-          <p className="text-xs text-muted" aria-live="polite">
+          <p className="text-xs text-text-dim" aria-live="polite">
             {cv.serviceReady === null ? "Checking the upload service…" : blocked ? "CV upload is unavailable right now." : "Upload service ready."}
           </p>
         </div>
@@ -115,12 +115,12 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
         )}
 
         {cv.busy && (
-          <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3 text-sm">
-            <Spinner size={18} className="text-signal" />
-            <span className="text-ink">
+          <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-lg border border-border-medium bg-bg-elevated px-4 py-3 text-sm">
+            <Spinner size={18} className="text-soft-amber" />
+            <span className="text-text-primary">
               {cv.state === "UPLOADING" ? "Uploading securely…" : cv.state === "SAVING" ? "Saving your reviewed details…" : `${cv.stage}…`}
             </span>
-            <span className="ml-auto hidden text-xs text-muted sm:inline">Live status from the server</span>
+            <span className="ml-auto hidden text-xs text-text-muted sm:inline">Live status from the server</span>
           </div>
         )}
 
@@ -138,26 +138,26 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
             ) : undefined}
           >
             {cv.error.message}
-            {cv.error.code && failed && <span className="mt-1 block font-mono text-2xs text-muted">Reference: {cv.error.code}</span>}
+            {cv.error.code && failed && <span className="mt-1 block font-mono text-2xs text-text-muted">Reference: {cv.error.code}</span>}
             {failed && cv.candidates.length > 0 && <span className="mt-1 block">Your earlier results below haven&apos;t changed.</span>}
           </Banner>
         )}
 
         {cv.candidates.length > 0 && (
-          <section aria-labelledby="cv-review-title" className="rounded-[var(--radius-panel)] border border-line bg-surface">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+          <section aria-labelledby="cv-review-title" className="rounded-card border border-border-medium bg-bg-elevated shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-medium px-4 py-3">
               <div>
-                <h2 id="cv-review-title" className="text-base font-semibold">What we found in {cv.fileName}</h2>
-                <p className="text-sm text-muted">Tick what&apos;s right. Fix wording before saving. Unticked items are left out.</p>
+                <h2 id="cv-review-title" className="font-display text-base font-semibold text-text-primary">What we found in {cv.fileName}</h2>
+                <p className="text-sm text-text-muted">Tick what&apos;s right. Fix wording before saving. Unticked items are left out.</p>
               </div>
               <StatusChip tone={cv.reviewSaved ? "verified" : "neutral"} icon={cv.reviewSaved ? undefined : null}>
                 {cv.reviewSaved ? "Saved" : `${selectedCount} of ${cv.candidates.length} ticked`}
               </StatusChip>
             </div>
 
-            {cv.advice && <p className="border-b border-line px-4 py-3 text-sm text-muted"><span className="font-medium text-ink">EORA:</span> {cv.advice}</p>}
+            {cv.advice && <p className="border-b border-border-medium px-4 py-3 text-sm text-text-muted"><span className="font-medium text-warm-ivory">EORA:</span> {cv.advice}</p>}
 
-            <div className="divide-y divide-line">
+            <div className="divide-y divide-border-medium">
               {REVIEW_GROUPS.map((group) => {
                 const rows = cv.candidates.filter((c) => group.categories.includes(c.category));
                 if (!rows.length) return null;
@@ -165,8 +165,8 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
                   <fieldset key={group.id} className="px-4 py-3">
                     <legend className="sr-only">{group.title}</legend>
                     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <p className="text-sm font-semibold" aria-hidden="true">{group.title}</p>
-                      <span className="font-mono text-2xs text-muted tabular">{rows.filter((r) => r.selected).length}/{rows.length}</span>
+                      <p className="font-display text-sm font-semibold text-warm-ivory" aria-hidden="true">{group.title}</p>
+                      <span className="font-mono text-2xs text-text-muted tabular">{rows.filter((r) => r.selected).length}/{rows.length}</span>
                       <span className="ml-auto flex gap-1">
                         <Button size="sm" variant="quiet" onClick={() => cv.setAll(group.categories, true)}>Tick all</Button>
                         <Button size="sm" variant="ghost" onClick={() => cv.setAll(group.categories, false)}>Clear</Button>
@@ -176,24 +176,24 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
                       {rows.map((c) => {
                         const label = c.field ? FIELD_LABELS[c.field] || c.field : c.category;
                         return (
-                          <li key={c.id} className={cn("flex items-start gap-3 rounded-[var(--radius-control)] border px-3 py-2.5", c.selected ? "border-signal/40 bg-signal-tint/40" : "border-line")}>
+                          <li key={c.id} className={cn("flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors", c.selected ? "border-soft-amber/40 bg-soft-amber/10" : "border-border-medium bg-bg-surface/40")}>
                             <input
                               type="checkbox"
                               checked={c.selected}
                               aria-label={`Keep ${label}: ${c.value}`}
                               onChange={(e) => cv.toggle(c.id, e.target.checked)}
-                              className="mt-3 size-5 shrink-0 cursor-pointer accent-signal"
+                              className="mt-3 size-5 shrink-0 cursor-pointer accent-soft-amber"
                             />
                             <div className="min-w-0 flex-1">
-                              <label htmlFor={`cv-${c.id}`} className="text-xs capitalize text-muted">{label}</label>
+                              <label htmlFor={`cv-${c.id}`} className="text-xs capitalize text-text-muted">{label}</label>
                               <input
                                 id={`cv-${c.id}`}
                                 value={c.value}
                                 onChange={(e) => cv.correct(c.id, e.target.value)}
-                                className="mt-0.5 w-full min-w-0 rounded-[6px] border border-transparent bg-transparent px-1.5 py-1 text-base text-ink hover:border-line focus-visible:border-focus focus-visible:outline-none"
+                                className="mt-0.5 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-base text-text-primary hover:border-border-medium focus-visible:border-champagne focus-visible:outline-none"
                               />
                               {c.sourceSpan !== c.value && (
-                                <p className="mt-1 break-words px-1.5 text-xs text-muted">In your CV: &ldquo;{c.sourceSpan}&rdquo;</p>
+                                <p className="mt-1 break-words px-1.5 text-xs text-text-muted">In your CV: &ldquo;{c.sourceSpan}&rdquo;</p>
                               )}
                             </div>
                           </li>
@@ -205,7 +205,7 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-3">
+            <div className="flex flex-wrap items-center gap-2 border-t border-border-medium px-4 py-3">
               <Button variant="primary" onClick={() => void save()} loading={cv.state === "SAVING"} loadingLabel="Saving…" disabled={cv.busy}>
                 Save ticked details
               </Button>

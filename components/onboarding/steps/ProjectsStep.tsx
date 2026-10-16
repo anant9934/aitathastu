@@ -62,15 +62,15 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
       />
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted">
-          <span className="font-mono text-ink tabular">{visible.length - pending}</span> confirmed
-          {pending > 0 && <>, <span className="font-mono text-ink tabular">{pending}</span> waiting for you</>}
+        <p className="text-sm text-text-muted">
+          <span className="font-mono text-warm-ivory tabular">{visible.length - pending}</span> confirmed
+          {pending > 0 && <>, <span className="font-mono text-soft-amber tabular">{pending}</span> waiting for you</>}
         </p>
         <Button size="sm" variant="secondary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setAdding(true)} data-eora-id="eora-add-project-trigger">Add a project</Button>
       </div>
 
       {adding && (
-        <form noValidate onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-3 grid gap-3 rounded-[var(--radius-panel)] border border-signal/50 bg-surface p-4">
+        <form noValidate onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-3 grid gap-3 rounded-card border border-soft-amber/40 bg-bg-elevated p-4 shadow-card">
           <TextField label="Project name" required value={form.title} error={formError} onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(null); }} autoFocus />
           <TextAreaField label="What it does" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <TextField label="Tech stack" hint="Separate with commas." value={form.tech} onChange={(e) => setForm({ ...form, tech: e.target.value })} />
@@ -126,15 +126,15 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
   };
 
   return (
-    <li className={cn("rounded-[var(--radius-panel)] border bg-surface", p.status === "confirmed" ? "border-line" : "border-line-strong/70")}>
+    <li className={cn("rounded-card border bg-bg-elevated transition-colors shadow-card", p.status === "confirmed" ? "border-border-medium" : "border-champagne/40")}>
       <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-medium">{p.title}</span>
+            <span className="font-display font-medium text-warm-ivory">{p.title}</span>
             {p.isFork && <Tag><GitFork size={12} aria-hidden="true" className="mr-1" />Fork</Tag>}
-            {typeof p.stars === "number" && p.stars > 0 && <span className="inline-flex items-center gap-1 font-mono text-2xs text-muted tabular"><Star size={12} aria-hidden="true" />{p.stars}</span>}
+            {typeof p.stars === "number" && p.stars > 0 && <span className="inline-flex items-center gap-1 font-mono text-2xs text-text-muted tabular"><Star size={12} aria-hidden="true" className="text-soft-amber" />{p.stars}</span>}
           </p>
-          <p className="mt-1 line-clamp-2 text-sm text-muted">{p.description || "No description yet."}</p>
+          <p className="mt-1 line-clamp-2 text-sm text-text-muted">{p.description || "No description yet."}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {p.sources.map((s) => <Tag key={s}>From {sourceLabel(s)}</Tag>)}
             {p.technologies.slice(0, 4).map((t) => <Tag key={t} mono>{t}</Tag>)}
@@ -142,13 +142,13 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
         </div>
         <span className="flex shrink-0 items-center gap-2">
           {p.status === "confirmed" ? <StatusChip tone="verified" icon={Check}>Confirmed</StatusChip> : <StatusChip tone="signal">To review</StatusChip>}
-          <CaretDown size={16} aria-hidden="true" className={cn("text-muted transition-transform", open && "rotate-180")} />
+          <CaretDown size={16} aria-hidden="true" className={cn("text-text-muted transition-transform duration-200", open && "rotate-180")} />
         </span>
       </button>
       {open && (
-        <div className="flex flex-col gap-4 border-t border-line px-4 py-4">
+        <div className="flex flex-col gap-4 border-t border-border-medium px-4 py-4">
           {p.url && (
-            <a href={p.url} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1 self-start text-sm">
+            <a href={p.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 self-start text-sm text-champagne hover:underline">
               {p.url.replace(/^https?:\/\//, "")}<ArrowSquareOut size={14} aria-hidden="true" /><span className="sr-only">(opens in a new tab)</span>
             </a>
           )}
@@ -160,10 +160,10 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
             onChange={(e) => update(p.id, { contributionNote: e.target.value }, true)}
           />
           {repo && (
-            <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-line bg-raised/40 p-3.5">
+            <div className="flex flex-col gap-2 rounded-lg border border-border-medium bg-bg-surface/50 p-3.5">
               <Checkbox checked={consent} onChange={(e) => setConsent(e.target.checked)} label="Let AI read this repository to suggest a description" description="It reads public files only and may be wrong. You review the result." />
               <Button size="sm" variant="secondary" className="self-start" disabled={!consent} loading={busy} loadingLabel="Reading…" onClick={() => void interpret()}>Suggest a description</Button>
-              {p.uncertaintyNotes?.length ? <p className="text-xs text-muted">Not sure about: {p.uncertaintyNotes.join("; ")}</p> : null}
+              {p.uncertaintyNotes?.length ? <p className="text-xs text-text-muted">Not sure about: {p.uncertaintyNotes.join("; ")}</p> : null}
             </div>
           )}
           {msg && <Banner kind={msg.kind}>{msg.text}</Banner>}
@@ -178,7 +178,7 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
             <Button variant="ghost" size="sm" className="text-danger hover:bg-danger-bg" icon={<X size={16} aria-hidden="true" />} onClick={() => update(p.id, { status: "removed" })}>
               Not mine, remove
             </Button>
-            {needsNote && p.status !== "confirmed" && <p className="w-full text-xs text-muted">Add what you did above to confirm this repository.</p>}
+            {needsNote && p.status !== "confirmed" && <p className="w-full text-xs text-text-muted">Add what you did above to confirm this repository.</p>}
           </div>
         </div>
       )}

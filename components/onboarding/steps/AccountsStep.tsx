@@ -32,8 +32,8 @@ export function AccountsStep({ profiles, discovered, saving, guide, onProfilesCh
       />
       <div data-eora-id="eora-digital-footprints" className="mt-6 flex flex-col gap-6">
         {linkedCount > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2.5">
-            <p className="text-sm text-muted"><span className="font-mono text-ink tabular">{linkedCount}</span> linked. Importing reads each one now.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-border-medium bg-bg-elevated px-4 py-3 shadow-card">
+            <p className="text-sm text-text-muted"><span className="font-mono text-warm-ivory tabular">{linkedCount}</span> linked. Importing reads each one now.</p>
             <Button size="sm" variant="secondary" icon={<ArrowsClockwise size={16} aria-hidden="true" />} loading={Boolean(api.busy)} loadingLabel="Importing…" onClick={() => void api.importAllLinked()}>
               Import from all linked
             </Button>

@@ -73,13 +73,13 @@ export function EoraLauncher({ compact }: { compact?: boolean }) {
         if (eora.isMinimized) eora.expand();
         if (eora.isPanelOpen) eora.closePanel(); else eora.openPanel();
       }}
-      className={cn("inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] text-sm transition-colors hover:bg-raised",
-        compact ? "size-10 justify-center pointer-coarse:size-11" : "min-h-10 w-full px-3 text-muted hover:text-ink")}
+      className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg text-sm transition-colors hover:bg-deep-espresso",
+        compact ? "size-10 justify-center pointer-coarse:size-11" : "min-h-10 w-full px-3 text-text-muted hover:text-warm-ivory")}
       aria-label={compact ? `Ask EORA, your guide${hasTip ? " (new tip)" : ""}` : hasTip ? "Ask EORA (new tip)" : undefined}
     >
-      <span className="relative size-6 shrink-0 rounded-full border border-line bg-raised">
+      <span className="relative size-6 shrink-0 rounded-full border border-border-medium bg-deep-espresso">
         <span className="absolute inset-0 overflow-hidden rounded-full"><Image src="/assets/eora/avatar.png" alt="" fill sizes="24px" className="object-cover" /></span>
-        {hasTip && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-signal" aria-hidden="true" />}
+        {hasTip && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-obsidian bg-soft-amber" aria-hidden="true" />}
       </span>
       {!compact && <span>Ask EORA</span>}
     </button>
@@ -180,8 +180,8 @@ export function EoraCompanion() {
     return (
       <Portal>
         <div className={position}>
-          <button type="button" onClick={eora.restore} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-sm text-ink shadow-[var(--shadow-raise)] hover:border-line-strong">
-            <ChatCircleText size={18} aria-hidden="true" className="text-signal" />Ask EORA
+          <button type="button" onClick={eora.restore} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-border-medium bg-bg-elevated px-4 text-sm font-medium text-warm-ivory shadow-card hover:border-champagne/40">
+            <ChatCircleText size={18} aria-hidden="true" className="text-soft-amber" />Ask EORA
           </button>
         </div>
         {chat.open && <EoraChat open seed={chat.seed} onClose={() => setChat({ open: false, seed: null })} />}
@@ -195,7 +195,7 @@ export function EoraCompanion() {
 
   return (
     <Portal>
-      <style>{`:root[data-eora-tour="on"] [data-eora-spotlight="true"] { outline: 2px solid var(--signal); outline-offset: 4px; border-radius: 8px; transition: outline-color 150ms; }`}</style>
+      <style>{`:root[data-eora-tour="on"] [data-eora-spotlight="true"] { outline: 2px solid var(--soft-amber); outline-offset: 4px; border-radius: 8px; transition: outline-color 150ms; }`}</style>
       <div className={position} data-eora-id="eora-floating-companion" data-eora-language={hinglish ? "hinglish" : "english"}>
         {showCard && !eora.isMinimized && (
           <div
@@ -204,15 +204,15 @@ export function EoraCompanion() {
             aria-modal={eora.isPanelOpen ? false : undefined}
             aria-label="EORA, your guide"
             onKeyDown={(e) => { if (e.key === "Escape") { if (eora.isPanelOpen) eora.closePanel(); else eora.clearMessage(); } }}
-            className="w-[min(22rem,calc(100vw-1.5rem))] animate-[rise-in_180ms_var(--ease-out)] rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-overlay)]"
+            className="w-[min(22rem,calc(100vw-1.5rem))] animate-[rise-in_180ms_var(--ease-soft)] rounded-card border border-border-medium bg-bg-elevated shadow-card"
           >
-            <div className="flex items-center gap-2 border-b border-line px-3.5 py-2.5">
-              <span className="text-sm font-medium">EORA</span>
-              {progress && <span className="font-mono text-2xs text-muted tabular" aria-label={`Step ${progress.n} of ${progress.total}`}>{progress.n}/{progress.total}</span>}
-              <span role="group" aria-label="EORA language" className="ml-auto inline-flex rounded-[6px] border border-line">
+            <div className="flex items-center gap-2 border-b border-border-medium px-3.5 py-2.5">
+              <span className="font-display text-sm font-medium text-warm-ivory">EORA</span>
+              {progress && <span className="font-mono text-2xs text-text-muted tabular" aria-label={`Step ${progress.n} of ${progress.total}`}>{progress.n}/{progress.total}</span>}
+              <span role="group" aria-label="EORA language" className="ml-auto inline-flex rounded-md border border-border-medium">
                 {(["english", "hinglish"] as const).map((l) => (
                   <button key={l} type="button" aria-pressed={(l === "hinglish") === hinglish} onClick={() => eora.setLanguage(l)}
-                    className={cn("min-h-7 cursor-pointer px-1.5 text-2xs pointer-coarse:min-h-9", (l === "hinglish") === hinglish ? "bg-raised text-ink" : "text-muted hover:text-ink")}>
+                    className={cn("min-h-7 cursor-pointer px-1.5 text-2xs pointer-coarse:min-h-9 transition-colors", (l === "hinglish") === hinglish ? "bg-deep-espresso text-warm-ivory font-medium" : "text-text-muted hover:text-warm-ivory")}>
                     {l === "english" ? "EN" : "Hinglish"}
                   </button>
                 ))}
@@ -228,8 +228,8 @@ export function EoraCompanion() {
             </div>
 
             <div className="flex max-h-[min(60dvh,26rem)] flex-col gap-3 overflow-y-auto px-3.5 py-3">
-              {progress?.title && <p className="text-xs font-medium text-muted">{progress.title}</p>}
-              {message && <p aria-live="polite" className="text-sm text-ink">{message}</p>}
+              {progress?.title && <p className="text-xs font-medium text-text-muted">{progress.title}</p>}
+              {message && <p aria-live="polite" className="text-sm text-warm-ivory">{message}</p>}
               {eora.currentMessage.actionLabel && eora.currentMessage.actionUrl && (
                 <Button size="sm" variant="primary" className="self-start" onClick={() => window.location.assign(eora.currentMessage.actionUrl!)}>{eora.currentMessage.actionLabel}</Button>
               )}
@@ -257,7 +257,7 @@ export function EoraCompanion() {
 
               {eora.isPanelOpen && (
                 <>
-                  {contract && <p className="text-xs text-muted"><span className="text-ink">{contract.pageTitle}.</span> {contract.pagePurpose}</p>}
+                  {contract && <p className="text-xs text-text-muted"><span className="font-medium text-warm-ivory">{contract.pageTitle}.</span> {contract.pagePurpose}</p>}
                   <div className="flex flex-wrap gap-1.5">
                     {tourId && <Button size="sm" variant="secondary" icon={<MapTrifold size={16} aria-hidden="true" />} onClick={() => eora.startTour(tourId)}>Tour this page</Button>}
                     <Button size="sm" variant="ghost" onClick={() => eora.handleUserMessage(hinglish ? "Ab aage kya?" : "What's next?")}>{hinglish ? "Ab aage kya?" : "What's next?"}</Button>
@@ -267,15 +267,15 @@ export function EoraCompanion() {
                     <label htmlFor="eora-ask" className="sr-only">Ask EORA</label>
                     <input id="eora-ask" value={input} onChange={(e) => setInput(e.target.value.slice(0, 500))} autoComplete="off" data-autofocus
                       placeholder={hinglish ? "EORA se kuch bhi puchiye…" : "Ask about your skills or next step…"}
-                      className="min-h-10 min-w-0 flex-1 rounded-[var(--radius-control)] border border-line-strong bg-canvas px-3 text-sm focus-visible:border-focus focus-visible:outline-none pointer-coarse:min-h-11" />
+                      className="min-h-10 min-w-0 flex-1 rounded-lg border border-border-medium bg-bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus-visible:border-champagne focus-visible:outline-none pointer-coarse:min-h-11" />
                     <IconButton label="Send" variant="secondary" type="submit" disabled={!input.trim()}><PaperPlaneRight size={16} aria-hidden="true" /></IconButton>
                   </form>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-line pt-2 text-2xs text-muted">
-                    <button type="button" className="cursor-pointer hover:text-ink" onClick={() => eora.snooze(60)}>Quiet for 1 hour</button>
-                    <button type="button" className="cursor-pointer hover:text-ink" onClick={() => eora.updatePreferences({ assistanceMode: quiet ? "balanced" : "quiet" })}>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border-medium pt-2 text-2xs text-text-muted">
+                    <button type="button" className="cursor-pointer hover:text-warm-ivory" onClick={() => eora.snooze(60)}>Quiet for 1 hour</button>
+                    <button type="button" className="cursor-pointer hover:text-warm-ivory" onClick={() => eora.updatePreferences({ assistanceMode: quiet ? "balanced" : "quiet" })}>
                       {quiet ? "Show tips again" : "Fewer tips"}
                     </button>
-                    <button type="button" className="cursor-pointer hover:text-ink" onClick={eora.resetAllPreferences}>Reset EORA</button>
+                    <button type="button" className="cursor-pointer hover:text-warm-ivory" onClick={eora.resetAllPreferences}>Reset EORA</button>
                   </div>
                 </>
               )}
@@ -285,7 +285,7 @@ export function EoraCompanion() {
 
         <div className={cn("flex items-center gap-1.5", inWorkspace && "hidden")}>
           {showCard && !eora.isMinimized && (
-            <IconButton label="Minimise EORA" variant="secondary" className="size-9 rounded-full bg-surface pointer-coarse:size-11" onClick={eora.minimize}>
+            <IconButton label="Minimise EORA" variant="secondary" className="size-9 rounded-full bg-bg-elevated border border-border-medium pointer-coarse:size-11" onClick={eora.minimize}>
               <Minus size={16} aria-hidden="true" />
             </IconButton>
           )}
@@ -298,10 +298,10 @@ export function EoraCompanion() {
               if (eora.isMinimized) { eora.expand(); return; }
               if (eora.isPanelOpen) eora.closePanel(); else eora.openPanel();
             }}
-            className="relative size-12 cursor-pointer overflow-hidden rounded-full border border-line-strong bg-raised shadow-[var(--shadow-raise)] transition-transform duration-150 active:scale-95"
+            className="relative size-12 cursor-pointer overflow-hidden rounded-full border border-champagne/40 bg-deep-espresso shadow-[0_0_16px_rgba(201,164,109,0.25)] transition-transform duration-150 active:scale-95"
           >
             <Image src="/assets/eora/avatar.png" alt="" fill sizes="48px" className="object-cover" />
-            {eora.isMinimized && message && <span className="absolute right-1 top-1 size-2.5 rounded-full border-2 border-raised bg-signal" aria-hidden="true" />}
+            {eora.isMinimized && message && <span className="absolute right-1 top-1 size-2.5 rounded-full border-2 border-deep-espresso bg-soft-amber" aria-hidden="true" />}
           </button>
         </div>
       </div>

@@ -63,17 +63,17 @@ export function SkillDetailView({ skill }: { skill: string }) {
           <Panel aria-labelledby="ev-title" data-eora-id="eora-skill-detail-evidence">
             <PanelHeader id="ev-title" title="Evidence" description={`${d.observations.length} observation${d.observations.length === 1 ? "" : "s"} from ${sources.length} source${sources.length === 1 ? "" : "s"}.`} />
             <EvidenceStrip className="mb-4" showCounts label={`${d.name} evidence`} segments={[{ tier: d.state === "Verified" ? "verified" : sources.length >= 2 && d.state !== "Claimed" ? "corroborated" : d.state === "Claimed" ? "gap" : "evidenced", count: d.state === "Claimed" ? 0 : d.observations.length, label: "observations" }]} />
-            <ul className="divide-y divide-line border-t border-line">
+            <ul className="divide-y divide-border-medium border-t border-border-medium">
               {d.observations.map((o) => (
                 <li key={o.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-3">
                   <Tag>{sourceLabel(o.source)}</Tag>
                   <div className="min-w-0 flex-1 basis-56">
-                    <p className="text-sm text-ink">{o.summary}</p>
+                    <p className="text-sm text-text-primary">{o.summary}</p>
                     {o.sourceReference && (/^https?:\/\//.test(o.sourceReference)
-                      ? <a href={o.sourceReference} target="_blank" rel="noopener noreferrer" className="link inline-flex items-center gap-1 break-all text-xs">{o.sourceReference}<ArrowSquareOut size={12} aria-hidden="true" /></a>
-                      : <p className="break-all font-mono text-2xs text-muted">{o.sourceReference}</p>)}
+                      ? <a href={o.sourceReference} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all text-xs text-champagne hover:underline">{o.sourceReference}<ArrowSquareOut size={12} aria-hidden="true" /></a>
+                      : <p className="break-all font-mono text-2xs text-text-muted">{o.sourceReference}</p>)}
                   </div>
-                  {o.observedAt && <span className="font-mono text-2xs text-muted tabular">{formatDate(o.observedAt)}</span>}
+                  {o.observedAt && <span className="font-mono text-2xs text-text-muted tabular">{formatDate(o.observedAt)}</span>}
                 </li>
               ))}
             </ul>
@@ -90,11 +90,11 @@ export function SkillDetailView({ skill }: { skill: string }) {
                   ["Verification", [q.whatIsTheVerificationStatus?.status, q.whatIsTheVerificationStatus?.tierLabel].filter(Boolean).join(" · ") || "Not verified"],
                   ["What to prove next", q.whatShouldStudentLearnOrProveNext?.action || q.whatShouldStudentLearnOrProveNext?.suggestedTask || d.whatToImprove],
                 ] as const).map(([k, v]) => (
-                  <div key={k}><dt className="text-xs text-muted">{k}</dt><dd className="mt-0.5 text-sm text-ink">{v || "Nothing recorded yet."}</dd></div>
+                  <div key={k}><dt className="text-xs text-text-muted">{k}</dt><dd className="mt-0.5 text-sm text-warm-ivory">{v || "Nothing recorded yet."}</dd></div>
                 ))}
               </dl>
               {(q.whatEvidenceIsMissing?.missingPoints?.length ?? 0) > 0 && (
-                <div className="mt-4 border-t border-line pt-3"><p className="text-xs text-muted">What&apos;s missing</p><ul className="mt-1 list-disc pl-5 text-sm">{q.whatEvidenceIsMissing!.missingPoints!.map((m) => <li key={m}>{m}</li>)}</ul></div>
+                <div className="mt-4 border-t border-border-medium pt-3"><p className="text-xs text-text-muted">What&apos;s missing</p><ul className="mt-1 list-disc pl-5 text-sm text-text-primary">{q.whatEvidenceIsMissing!.missingPoints!.map((m) => <li key={m}>{m}</li>)}</ul></div>
               )}
             </Panel>
           )}
@@ -105,10 +105,10 @@ export function SkillDetailView({ skill }: { skill: string }) {
             {d.relatedProjects.length ? (
               <ul className="flex flex-col gap-2">
                 {d.relatedProjects.map((p) => (
-                  <li key={p.id}><Link href={`/student/projects/${p.id}`} className="block rounded-[var(--radius-control)] border border-line px-3 py-2.5 hover:border-line-strong"><span className="text-sm font-medium">{p.title}</span>{p.description && <span className="mt-0.5 block text-xs text-muted">{p.description}</span>}</Link></li>
+                  <li key={p.id}><Link href={`/student/projects/${p.id}`} className="block rounded-lg border border-border-medium bg-bg-surface/40 px-3.5 py-2.5 transition-colors hover:border-champagne/40"><span className="font-display text-sm font-medium text-warm-ivory">{p.title}</span>{p.description && <span className="mt-0.5 block text-xs text-text-muted">{p.description}</span>}</Link></li>
                 ))}
               </ul>
-            ) : <p className="text-sm text-muted">No project shows this yet.</p>}
+            ) : <p className="text-sm text-text-muted">No project shows this yet.</p>}
           </Panel>
           <ContributionForm skill={d.name} onSaved={load} />
           {d.learningPath.length > 0 && (

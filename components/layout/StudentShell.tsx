@@ -70,11 +70,11 @@ function RailLink({ item, pathname }: { item: NavItem; pathname: string }) {
       href={item.href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm font-medium transition-colors duration-150",
-        active ? "bg-raised text-ink shadow-[inset_2px_0_0_var(--signal)]" : "text-muted hover:bg-raised/70 hover:text-ink",
+        "group flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors duration-150",
+        active ? "bg-deep-espresso text-warm-ivory shadow-[inset_2px_0_0_var(--soft-amber)] font-semibold" : "text-text-muted hover:bg-deep-espresso/50 hover:text-text-primary",
       )}
     >
-      <Glyph size={18} weight={active ? "fill" : "regular"} aria-hidden="true" className={active ? "text-signal" : undefined} />
+      <Glyph size={18} weight={active ? "fill" : "regular"} aria-hidden="true" className={active ? "text-accent-warm-bright" : undefined} />
       {item.label}
     </Link>
   );
@@ -88,11 +88,11 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
   const tabs = NAV_PRIMARY.slice(0, 4);
 
   return (
-    <div className="min-h-dvh bg-canvas">
+    <div className="min-h-dvh bg-bg-primary text-text-primary">
       {/* Desktop rail */}
       <aside
         data-eora-id="eora-sidebar"
-        className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-surface lg:flex"
+        className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border-medium bg-bg-elevated lg:flex"
         aria-label="Workspace"
       >
         <div className="px-4 pt-4 pb-3">
@@ -100,27 +100,27 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
         </div>
         <nav aria-label="Primary" className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
           {NAV_PRIMARY.map((item) => <RailLink key={item.href} item={item} pathname={pathname} />)}
-          <p className="mt-5 mb-1.5 px-3 text-2xs font-medium uppercase tracking-[0.08em] text-muted">Plan and practice</p>
+          <p className="mt-5 mb-1.5 px-3 font-mono text-2xs uppercase tracking-[0.14em] text-text-dim">Plan and practice</p>
           {NAV_SECONDARY.map((item) => <RailLink key={item.href} item={item} pathname={pathname} />)}
         </nav>
-        <div className="border-t border-line p-3">
+        <div className="border-t border-border-medium p-3">
           <div className="mb-2"><EoraLauncher /></div>
           <div className="mb-3 flex items-center justify-between gap-2 px-1">
-            <span className="text-xs text-muted">Theme</span>
+            <span className="text-xs text-text-muted">Theme</span>
             <ThemeToggle />
           </div>
-          <div className="flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-1.5">
-            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-line bg-raised text-sm font-semibold">{initial}</span>
+          <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
+            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-border-medium bg-deep-espresso text-sm font-semibold text-warm-ivory">{initial}</span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{name}</p>
-              {email && <p className="truncate text-2xs text-muted">{email}</p>}
+              <p className="truncate text-sm font-medium text-text-primary">{name}</p>
+              {email && <p className="truncate text-2xs text-text-muted">{email}</p>}
             </div>
             <button
               type="button"
               onClick={() => void signOut()}
               aria-label="Sign out"
               title="Sign out"
-              className="grid size-9 cursor-pointer place-items-center rounded-[var(--radius-control)] text-muted transition-colors hover:bg-raised hover:text-ink"
+              className="grid size-9 cursor-pointer place-items-center rounded-md text-text-muted transition-colors hover:bg-deep-espresso hover:text-warm-ivory"
             >
               <SignOut size={18} aria-hidden="true" />
             </button>
@@ -129,7 +129,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
       </aside>
 
       {/* Phone and tablet top bar */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-canvas/95 px-4 backdrop-blur-sm supports-[backdrop-filter]:bg-canvas/80 lg:hidden">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border-medium bg-bg-primary/95 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-bg-primary/80 lg:hidden">
         <Logo href="/student" />
         <div className="flex items-center gap-1"><EoraLauncher compact /><ThemeToggle compact /></div>
       </header>
@@ -141,7 +141,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
       {/* Bottom tab bar */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border-medium bg-bg-elevated/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
       >
         {tabs.map((item) => {
           const active = isActive(pathname, item);
@@ -151,7 +151,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={cn("flex min-h-14 flex-col items-center justify-center gap-0.5 text-2xs font-medium", active ? "text-signal" : "text-muted")}
+              className={cn("flex min-h-14 flex-col items-center justify-center gap-0.5 text-2xs font-medium transition-colors", active ? "text-accent-warm-bright font-semibold" : "text-text-muted hover:text-text-primary")}
             >
               <Glyph size={22} weight={active ? "fill" : "regular"} aria-hidden="true" />
               {item.label}
@@ -163,7 +163,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
           onClick={() => setMoreOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={moreOpen}
-          className={cn("flex min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 text-2xs font-medium", moreActive || isActive(pathname, NAV_PRIMARY[4]) ? "text-signal" : "text-muted")}
+          className={cn("flex min-h-14 cursor-pointer flex-col items-center justify-center gap-0.5 text-2xs font-medium transition-colors", moreActive || isActive(pathname, NAV_PRIMARY[4]) ? "text-accent-warm-bright font-semibold" : "text-text-muted hover:text-text-primary")}
         >
           <DotsThreeOutline size={22} weight={moreActive ? "fill" : "regular"} aria-hidden="true" />
           More
@@ -181,15 +181,15 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
                 href={item.href}
                 onClick={() => setMoreOpen(false)}
                 aria-current={active ? "page" : undefined}
-                className={cn("flex min-h-12 items-center gap-3 rounded-[var(--radius-control)] px-3 text-base", active ? "bg-raised text-ink" : "text-ink hover:bg-raised")}
+                className={cn("flex min-h-12 items-center gap-3 rounded-md px-3 text-base transition-colors", active ? "bg-deep-espresso text-warm-ivory font-medium" : "text-text-primary hover:bg-deep-espresso/50")}
               >
-                <Glyph size={20} weight={active ? "fill" : "regular"} aria-hidden="true" className={active ? "text-signal" : "text-muted"} />
+                <Glyph size={20} weight={active ? "fill" : "regular"} aria-hidden="true" className={active ? "text-accent-warm-bright" : "text-text-muted"} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="mt-5 border-t border-line pt-4">
+        <div className="mt-5 border-t border-border-medium pt-4">
           <Button variant="ghost" className="w-full justify-start" icon={<SignOut size={18} aria-hidden="true" />} onClick={() => void signOut()}>
             Sign out
           </Button>
@@ -219,8 +219,8 @@ export function PageFrame({
     <div className={cn("mx-auto w-full px-4 pt-5 pb-10 sm:px-6 sm:pt-7 lg:px-8", width === "wide" ? "max-w-[1240px]" : "max-w-[880px]")}>
       <div data-eora-id={eoraId} className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 max-w-[70ch]">
-          <h1 className="text-2xl font-semibold tracking-[-0.02em]">{title}</h1>
-          {description && <p className="mt-1.5 text-sm text-muted">{description}</p>}
+          <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">{title}</h1>
+          {description && <p className="mt-1.5 text-sm text-text-muted">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>

@@ -18,9 +18,9 @@ import type { SaveState } from "@/lib/client/onboarding/use-onboarding-flow";
 import { cn } from "@/lib/client/cn";
 
 export function SaveIndicator({ save }: { save: SaveState }) {
-  if (save.saving) return <span className="inline-flex items-center gap-1.5 text-xs text-muted" role="status"><CloudArrowUp size={16} aria-hidden="true" />Saving…</span>;
+  if (save.saving) return <span className="inline-flex items-center gap-1.5 text-xs text-text-muted" role="status"><CloudArrowUp size={16} aria-hidden="true" />Saving…</span>;
   if (save.error) return <span className="inline-flex items-center gap-1.5 text-xs text-danger"><CloudSlash size={16} aria-hidden="true" />Not saved</span>;
-  if (save.lastSavedAt) return <span className="inline-flex items-center gap-1.5 text-xs text-muted"><CloudCheck size={16} aria-hidden="true" />Saved</span>;
+  if (save.lastSavedAt) return <span className="inline-flex items-center gap-1.5 text-xs text-text-muted"><CloudCheck size={16} aria-hidden="true" />Saved</span>;
   return null;
 }
 
@@ -30,22 +30,32 @@ export function Stepper({ screen, role, done }: { screen: number; role: Onboardi
   if (!pos) return null;
   return (
     <nav aria-label="Onboarding progress" className="w-full">
-      <ol className="flex gap-1" aria-hidden="true">
+      <ol className="flex gap-1.5" aria-hidden="true">
         {steps.map((s, i) => {
           const state = i + 1 < pos.number || done.has(s.screen) ? "done" : i + 1 === pos.number ? "current" : "todo";
           return (
-            <li key={s.id} className={cn("h-1 flex-1 rounded-full", state === "done" ? "bg-signal" : state === "current" ? "bg-signal/55" : "bg-line")} />
+            <li
+              key={s.id}
+              className={cn(
+                "h-1.5 flex-1 rounded-full transition-all duration-300",
+                state === "done"
+                  ? "bg-gradient-to-r from-champagne to-soft-amber shadow-[0_0_8px_rgba(244,154,71,0.5)]"
+                  : state === "current"
+                  ? "bg-accent-warm shadow-[0_0_6px_rgba(201,164,109,0.4)]"
+                  : "bg-border-subtle",
+              )}
+            />
           );
         })}
       </ol>
-      <p className="mt-2 flex items-baseline justify-between gap-3 text-xs text-muted">
+      <p className="mt-2.5 flex items-baseline justify-between gap-3 text-xs text-text-muted">
         <span>
-          <span className="font-medium text-ink">Step {pos.number} of {pos.total}</span>
-          <span className="mx-1.5" aria-hidden="true">·</span>
-          {pos.step.shortLabel}
+          <span className="font-bold text-warm-ivory">Step {pos.number} of {pos.total}</span>
+          <span className="mx-2 text-text-dim" aria-hidden="true">·</span>
+          <span className="font-medium text-text-primary">{pos.step.shortLabel}</span>
         </span>
-        <span className="hidden sm:inline">
-          {steps.filter((s, i) => i + 1 < pos.number || done.has(s.screen)).length} done
+        <span className="hidden font-mono text-text-dim sm:inline">
+          {steps.filter((s, i) => i + 1 < pos.number || done.has(s.screen)).length} of {pos.total} completed
         </span>
       </p>
     </nav>
@@ -72,8 +82,8 @@ export function OnboardingShell({
   headerExtra?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 backdrop-blur-sm supports-[backdrop-filter]:bg-canvas/80">
+    <div className="flex min-h-dvh flex-col bg-bg-primary text-text-primary">
+      <header className="sticky top-0 z-20 border-b border-border-medium bg-bg-primary/95 backdrop-blur-md supports-[backdrop-filter]:bg-bg-primary/80">
         <div className="mx-auto flex h-14 w-full max-w-[1120px] items-center justify-between gap-3 px-4 sm:px-6">
           <Logo href="/" />
           <div className="flex items-center gap-3">
@@ -108,8 +118,8 @@ export function StepHeader({ title, description, guide, eoraId }: { title: React
   return (
     <div className="mt-6 flex flex-col gap-3 sm:mt-8" data-eora-id={eoraId}>
       <div>
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">{title}</h1>
-        {description && <p className="mt-2 max-w-[62ch] text-base text-muted">{description}</p>}
+        <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-warm-ivory sm:text-3xl">{title}</h1>
+        {description && <p className="mt-2 max-w-[62ch] text-base text-text-muted leading-relaxed">{description}</p>}
       </div>
       {guide}
     </div>
@@ -140,7 +150,7 @@ export function StepFooter({
   nextId?: string;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 mt-auto border-t border-line bg-canvas/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm sm:static sm:mx-0 sm:mt-10 sm:border-t sm:bg-transparent sm:px-0 sm:py-5 sm:backdrop-blur-none">
+    <div className="sticky bottom-0 z-10 -mx-4 mt-auto border-t border-border-medium bg-bg-primary/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:static sm:mx-0 sm:mt-10 sm:border-t sm:border-border-subtle sm:bg-transparent sm:px-0 sm:py-5 sm:backdrop-blur-none">
       <div className="flex items-center gap-2">
         {onBack && (
           <Button variant="ghost" onClick={onBack} icon={<ArrowLeft size={18} aria-hidden="true" />} disabled={saving}>

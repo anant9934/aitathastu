@@ -1,11 +1,22 @@
 import type { Metadata } from "next";
 import { Landing } from "@/components/landing/Landing";
+import { getServerAuthContext, isGuestEmail } from "@/lib/auth/server-session";
 
 export const metadata: Metadata = {
-  title: { absolute: "AI Tathastu · One honest picture of what you can do in AI and ML" },
-  description: "Turn your CV, GitHub and other profiles into a skills profile where every claim shows its evidence, and see your next step toward the AI/ML role you want.",
+  title: { absolute: "AI Tathastu — You imagine. AI makes it happen." },
+  description:
+    "AI Tathastu helps you discover your strengths, learn what matters, build real skills, and turn your potential into achievement — with EORA, your personal AI guide.",
 };
 
-export default function Home() {
-  return <Landing />;
+export default async function Home() {
+  const auth = await getServerAuthContext();
+  const isRealUser = auth && !isGuestEmail(auth.user.email);
+  const user = isRealUser
+    ? {
+        displayName: auth.person.displayName,
+      }
+    : null;
+
+  return <Landing user={user} />;
 }
+

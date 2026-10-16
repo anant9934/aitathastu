@@ -192,11 +192,11 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
                   aria-current={tab === s.id ? "true" : undefined}
                   onClick={() => { setTab(s.id); setAlert(null); }}
                   className={cn(
-                    "flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-[var(--radius-control)] px-3 text-left text-sm transition-colors",
-                    tab === s.id ? "bg-raised text-ink shadow-[inset_2px_0_0_var(--signal)]" : "text-muted hover:bg-raised/60 hover:text-ink",
+                    "flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-colors",
+                    tab === s.id ? "bg-deep-espresso text-warm-ivory font-medium shadow-[inset_2px_0_0_var(--soft-amber)]" : "text-text-muted hover:bg-deep-espresso/40 hover:text-warm-ivory",
                   )}
                 >
-                  <s.icon size={18} aria-hidden="true" weight={tab === s.id ? "fill" : "regular"} />
+                  <s.icon size={18} aria-hidden="true" weight={tab === s.id ? "fill" : "regular"} className={tab === s.id ? "text-champagne" : undefined} />
                   <span className="flex-1">{s.label}</span>
                   {badge(s)}
                 </button>
@@ -219,15 +219,15 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
 
           {alert && alert.section === tab && <Banner kind="warning" className="mb-4">{alert.text}</Banner>}
 
-          <section aria-label={SECTIONS.find((s) => s.id === tab)?.label} className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
+          <section aria-label={SECTIONS.find((s) => s.id === tab)?.label} className="rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
             {tab === "personal" && (
               <div className="flex flex-col gap-5">
-                <div className="flex items-center gap-3 border-b border-line pb-4">
-                  <span aria-hidden="true" className="grid size-11 place-items-center rounded-full border border-line bg-raised text-lg font-semibold">{(data.name || a.fullName || "?").trim()[0]?.toUpperCase()}</span>
+                <div className="flex items-center gap-3 border-b border-border-medium pb-4">
+                  <span aria-hidden="true" className="grid size-11 place-items-center rounded-full border border-border-medium bg-deep-espresso text-champagne text-lg font-display font-semibold">{(data.name || a.fullName || "?").trim()[0]?.toUpperCase()}</span>
                   <div className="min-w-0">
-                    <p className="truncate text-lg font-semibold">{data.name || a.fullName || "Your name"}</p>
+                    <p className="truncate font-display text-lg font-semibold text-text-primary">{data.name || a.fullName || "Your name"}</p>
                     {/* Reads the same bound value the Institution field edits (P4-16). */}
-                    <p className="truncate text-sm text-muted">{[a.degree, a.department, a.institution].filter(Boolean).join(" · ") || "Education not added yet"}</p>
+                    <p className="truncate text-sm text-text-muted">{[a.degree, a.department, a.institution].filter(Boolean).join(" · ") || "Education not added yet"}</p>
                   </div>
                 </div>
                 <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -269,8 +269,8 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
                 ) : (
                   <>
                     {exp.length === 0 && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-raised/40 px-3.5 py-2.5">
-                        <p className="text-sm text-muted">No internships or jobs yet?</p>
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-medium bg-bg-surface/50 px-3.5 py-2.5">
+                        <p className="text-sm text-text-muted">No internships or jobs yet?</p>
                         <Button size="sm" variant="secondary" icon={<Check size={16} aria-hidden="true" />} onClick={() => { setData((d) => ({ ...d, isFresher: true })); autosave({ isFresher: true }); if (alert?.section === "experience") setAlert(null); }}>
                           I don&apos;t have work experience yet
                         </Button>

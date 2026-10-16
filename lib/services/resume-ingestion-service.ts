@@ -34,6 +34,7 @@ import { readDocumentText } from "@/lib/resume/document-text";
 import { reconstructReadingOrder } from "@/lib/resume/layout";
 import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
 import { extractResumeStructured, type ResumeExtractionResult } from "./resume-extraction-service";
+import { discoverFootprintsFromResume } from "./digital-footprint-discovery";
 import { resumeCandidates, saveResumeCandidates } from "./resume-review-service";
 import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError } from "./extractor-service-client";
@@ -432,6 +433,25 @@ async function finalize(
     throw new PipelineFailure(extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED", extraction.error);
   }
 
+  // Run deterministic discovery to catch embedded PDF annotations, DOCX links, and multi-line URLs
+  const deterministicFootprints = discoverFootprintsFromResume({
+    text: input.text,
+    hyperlinks: input.hyperlinks,
+    documentId,
+  });
+
+  const mergedDiscoveredProfiles: Record<string, string> = {};
+  if (extraction.discoveredProfiles) {
+    for (const [k, v] of Object.entries(extraction.discoveredProfiles)) {
+      if (v) mergedDiscoveredProfiles[k] = v;
+    }
+  }
+  for (const fp of deterministicFootprints) {
+    if (!mergedDiscoveredProfiles[fp.provider] && fp.normalizedUrl) {
+      mergedDiscoveredProfiles[fp.provider] = fp.normalizedUrl;
+    }
+  }
+
   // Record candidate IDs are `${category}_${index}` and index into the stored
   // profile's record arrays (apply maps decisions back by that index).
   const reviewCandidates = [...profileCandidates(extraction, input.text), ...resumeCandidates(extraction.extracted, input.text)];
@@ -450,7 +470,7 @@ async function finalize(
     reviewCandidates,
     structured: extraction.extracted,
     extractedProfile: extraction.extractedProfile ?? null,
-    discoveredProfiles: extraction.discoveredProfiles ?? {},
+    discoveredProfiles: mergedDiscoveredProfiles,
     links: extraction.links ?? [],
     resume: extraction.resume ?? null,
     extractionMeta: {

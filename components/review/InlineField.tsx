@@ -60,9 +60,9 @@ export function InlineField({ label, value, onSave, type = "text", placeholder, 
 
   return (
     <div className="flex min-w-0 flex-col gap-1" data-eora-id={eoraId}>
-      <span className="text-xs text-muted">{label}{required && <span aria-hidden="true"> *</span>}</span>
+      <span className="text-xs text-text-muted">{label}{required && <span aria-hidden="true" className="text-soft-amber"> *</span>}</span>
       <div className="flex min-h-11 items-center gap-2">
-        <span className={value ? "min-w-0 break-words text-base text-ink" : "text-sm text-warning"}>
+        <span className={value ? "min-w-0 break-words text-base text-text-primary" : "text-sm text-soft-amber"}>
           {value || (required ? "Not added yet (needed)" : "Not added")}
         </span>
         <Button ref={trigger} size="sm" variant="quiet" aria-label={`${value ? "Edit" : "Add"} ${label}`} icon={<PencilSimple size={15} aria-hidden="true" />}

@@ -66,11 +66,11 @@ export function SkillsView() {
     <PageFrame
       eoraId="eora-skills-overview"
       title="Skills"
-      description={<>Measured against <span className="text-ink">{data.targetRole || data.activeGoal}</span>. Each skill shows what backs it; nothing counts as verified until faculty verify it.</>}
+      description={<>Measured against <span className="font-medium text-warm-ivory">{data.targetRole || data.activeGoal}</span>. Each skill shows what backs it; nothing counts as verified until faculty verify it.</>}
     >
-      <dl data-eora-id="eora-skill-verification" className="mb-5 grid grid-cols-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-line sm:grid-cols-4" style={{ gap: 1 }}>
+      <dl data-eora-id="eora-skill-verification" className="mb-5 grid grid-cols-2 overflow-hidden rounded-card border border-border-medium bg-border-medium sm:grid-cols-4 shadow-card [&>div]:bg-bg-elevated" style={{ gap: 1 }}>
         {([["Skills", s.totalSkills ?? data.skills.length], ["Shown in projects", s.demonstratedSkills], ["Verified", s.verifiedSkills], ["Core skills met", s.goalPrerequisitesTotal ? `${s.goalPrerequisitesMet ?? 0}/${s.goalPrerequisitesTotal}` : "None set"]] as const).map(([l, v]) => (
-          <div key={l} className="bg-surface px-4 py-3.5"><dt className="text-xs text-muted">{l}</dt><dd className="mt-1 font-mono text-xl font-semibold tabular">{v}</dd></div>
+          <div key={l} className="px-4 py-3.5"><dt className="text-xs text-text-muted">{l}</dt><dd className="mt-1 font-display text-xl font-semibold text-warm-ivory tabular">{v}</dd></div>
         ))}
       </dl>
 
@@ -98,8 +98,8 @@ function SkillsSkeleton() {
   return (
     <LoadingRegion label="Loading your skills" className="mx-auto w-full max-w-[1240px] px-4 pt-7 sm:px-6 lg:px-8">
       <Skeleton className="h-8 w-40" /><Skeleton className="mt-2 h-4 w-96 max-w-full" />
-      <Skeleton className="mt-6 h-20 rounded-[var(--radius-panel)]" />
-      <Skeleton className="mt-5 h-[420px] rounded-[var(--radius-panel)]" />
+      <Skeleton className="mt-6 h-20 rounded-card" />
+      <Skeleton className="mt-5 h-[420px] rounded-card" />
     </LoadingRegion>
   );
 }
@@ -125,23 +125,23 @@ function Ledger({ data, reload }: { data: SkillsData; reload: () => Promise<void
         <TextField label="Search skills" labelHidden type="search" placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
         <SelectField label="Category" labelHidden value={cat} onChange={(e) => setCat(e.target.value)}>{cats.map((c) => <option key={c} value={c}>{c === "All" ? "All categories" : c}</option>)}</SelectField>
         <button type="button" aria-pressed={onlyGoal} onClick={() => setOnlyGoal((v) => !v)}
-          className={cn("min-h-11 cursor-pointer rounded-[var(--radius-control)] border px-3 text-sm", onlyGoal ? "border-signal bg-signal-tint text-ink" : "border-line text-muted hover:text-ink")}>
+          className={cn("min-h-11 cursor-pointer rounded-lg border px-3 text-sm transition-all duration-150", onlyGoal ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory")}>
           Core for my role
         </button>
       </div>
-      {list.length === 0 ? <p className="py-6 text-sm text-muted">{data.skills.length === 0 ? "No skills yet. Add one on this page, or confirm skills from your CV and projects." : "No skills match. Clear the search or filters."}</p> : (
-        <ul className="divide-y divide-line border-t border-line">
+      {list.length === 0 ? <p className="py-6 text-sm text-text-muted">{data.skills.length === 0 ? "No skills yet. Add one on this page, or confirm skills from your CV and projects." : "No skills match. Clear the search or filters."}</p> : (
+        <ul className="divide-y divide-border-medium border-t border-border-medium">
           {list.map((s) => {
             const intel = data.intelligenceSkills?.find((i) => i.name === s.name);
             const v = skillStrip(s.state, s.evidenceCount, (intel?.observations ?? []).map((o) => o.source));
             return (
               <li key={s.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-3 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_9rem_auto]">
                 <div className="min-w-0">
-                  <Link href={`/student/skills/${encodeURIComponent(s.name)}`} className="block truncate font-medium hover:text-signal">{s.name}</Link>
-                  <p className="truncate text-xs text-muted">{s.category}{s.isGoalPrerequisite ? " · core for your role" : ""}</p>
+                  <Link href={`/student/skills/${encodeURIComponent(s.name)}`} className="block truncate font-display font-medium text-warm-ivory hover:text-soft-amber">{s.name}</Link>
+                  <p className="truncate text-xs text-text-muted">{s.category}{s.isGoalPrerequisite ? " · core for your role" : ""}</p>
                 </div>
                 <EvidenceStrip className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto" label={`${s.name} evidence`} showCounts segments={[{ tier: v.tier, count: v.count, label: "evidence items" }]} />
-                <span className="hidden text-xs text-muted sm:block">{v.label}</span>
+                <span className="hidden text-xs text-text-muted sm:block">{v.label}</span>
                 <IconButton label={`Hide ${s.name}`} className="row-start-1 col-start-2 sm:row-auto sm:col-auto" onClick={() => void hide(s.name)}><EyeSlash size={16} aria-hidden="true" /></IconButton>
               </li>
             );
@@ -149,13 +149,13 @@ function Ledger({ data, reload }: { data: SkillsData; reload: () => Promise<void
         </ul>
       )}
       {data.missingGoalSkills && data.missingGoalSkills.length > 0 && (
-        <div className="mt-4 border-t border-line pt-4">
-          <p className="mb-2 text-sm font-medium">Core for your role, not shown yet</p>
+        <div className="mt-4 border-t border-border-medium pt-4">
+          <p className="mb-2 font-display text-sm font-medium text-text-primary">Core for your role, not shown yet</p>
           <ul className="flex flex-col gap-2">
             {data.missingGoalSkills.map((g) => (
               <li key={g.name} className="flex flex-wrap items-start gap-2 text-sm">
                 <StatusChip tone="gap">{g.name}</StatusChip>
-                <span className="min-w-0 flex-1 basis-56 text-muted">{g.suggestedTask}</span>
+                <span className="min-w-0 flex-1 basis-56 text-text-muted">{g.suggestedTask}</span>
               </li>
             ))}
           </ul>
@@ -190,10 +190,10 @@ function SkillEditorPanel({ studentSkills, hiddenSkills, onChanged }: { studentS
         <Button type="submit" variant="secondary" className="justify-self-start" loading={busy === "add"} loadingLabel="Adding…" icon={<Plus size={16} aria-hidden="true" />}>Add skill</Button>
       </form>
       {studentSkills.length > 0 && (
-        <ul className="mt-4 divide-y divide-line border-t border-line">
+        <ul className="mt-4 divide-y divide-border-medium border-t border-border-medium">
           {studentSkills.map((s) => (
             <li key={s.evidenceId} className="flex flex-wrap items-center gap-2 py-2.5">
-              <span className="min-w-0 flex-1 basis-24 font-medium">{s.name}</span>
+              <span className="min-w-0 flex-1 basis-24 font-display font-medium text-warm-ivory">{s.name}</span>
               <SelectField label={`Your level for ${s.name}`} labelHidden wrapperClassName="w-36" value={s.proficiency ?? ""} disabled={busy !== null}
                 onChange={(e) => void run(s.name, () => sendSkillEdit("PATCH", { name: s.name, proficiency: e.target.value || null }), `Level for ${s.name} saved`)}>
                 {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -204,8 +204,8 @@ function SkillEditorPanel({ studentSkills, hiddenSkills, onChanged }: { studentS
         </ul>
       )}
       {hiddenSkills.length > 0 && (
-        <div className="mt-4 border-t border-line pt-3">
-          <p className="mb-2 text-xs text-muted">Hidden from your skills</p>
+        <div className="mt-4 border-t border-border-medium pt-3">
+          <p className="mb-2 text-xs text-text-muted">Hidden from your skills</p>
           <div className="flex flex-wrap gap-1.5">
             {hiddenSkills.map((h) => <Button key={h} size="sm" variant="ghost" disabled={busy !== null} onClick={() => void run(h, () => sendSkillEdit("PATCH", { name: h, hidden: false }), `${h} is shown again`)}>Show {h}</Button>)}
           </div>

@@ -72,14 +72,14 @@ export function ProjectLedgerView() {
     <PageFrame
       eoraId="eora-projects-header"
       title="Project evidence ledger"
-      description={<><span className="font-mono text-ink tabular">{included}</span> of <span className="font-mono tabular">{ledger.projects.length}</span> projects in your portfolio.</>}
+      description={<><span className="font-mono text-warm-ivory tabular">{included}</span> of <span className="font-mono tabular">{ledger.projects.length}</span> projects in your portfolio.</>}
       actions={<>
         <a className={buttonClass("ghost", "sm")} href="/api/student/projects/export" target="_blank" rel="noopener noreferrer"><DownloadSimple size={16} aria-hidden="true" />Export portfolio</a>
         {tab === "projects" && <Button variant="primary" size="sm" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setAdding(true)} data-eora-id="eora-add-project-btn">Add project</Button>}
       </>}
     >
-      <Tabs label="Ledger sections" idBase="ledger" value={tab} onChange={setTab} className="mb-4 border-b border-line"
-        items={[{ id: "projects", label: "Projects", badge: <span className="font-mono text-2xs text-muted tabular">{ledger.projects.length}</span> }, { id: "publications", label: "Research and publications", badge: <span className="font-mono text-2xs text-muted tabular">{ledger.publications.length}</span> }]} />
+      <Tabs label="Ledger sections" idBase="ledger" value={tab} onChange={setTab} className="mb-4 border-b border-border-medium"
+        items={[{ id: "projects", label: "Projects", badge: <span className="font-mono text-2xs text-text-muted tabular">{ledger.projects.length}</span> }, { id: "publications", label: "Research and publications", badge: <span className="font-mono text-2xs text-text-muted tabular">{ledger.publications.length}</span> }]} />
 
       {tab === "projects" ? (
         <section aria-label="Projects" role="tabpanel" id="ledger-panel-projects" aria-labelledby="ledger-tab-projects">
@@ -101,7 +101,7 @@ export function ProjectLedgerView() {
               <EmptyState icon={FolderSimple} title="No projects linked yet" actions={<><Button variant="primary" size="sm" onClick={() => setAdding(true)}>Add manually</Button><Link className={buttonClass("ghost", "sm")} href="/student/connections">Connect GitHub</Link></>}>
                 Projects are the strongest evidence you can show. Connect GitHub or Kaggle, upload your CV, or add one yourself.
               </EmptyState>
-            ) : <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong/60 px-4 py-6 text-sm text-muted">No projects match these filters.</p>
+            ) : <p className="rounded-lg border border-dashed border-border-medium px-4 py-6 text-sm text-text-muted">No projects match these filters.</p>
           ) : (
             <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-eora-id="eora-projects-list">
               {visible.map((p) => <ProjectCard key={p.id} project={p} onChange={replace} onArchived={drop} />)}
@@ -115,15 +115,19 @@ export function ProjectLedgerView() {
   );
 }
 
-const chip = (on: boolean) => cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-colors pointer-coarse:min-h-11", on ? "border-signal bg-signal-tint text-ink" : "border-line text-muted hover:text-ink");
+const chip = (on: boolean) =>
+  cn(
+    "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-150 pointer-coarse:min-h-11",
+    on ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory",
+  );
 
 /** A calm generated tile when there is no preview image: initials and stack, no invented imagery. */
 function Tile({ project }: { project: LedgerProject }) {
   const stack = project.technologies.slice(0, 3).join(" · ") || "Project";
   return (
-    <div role="img" aria-label={`${project.title}: ${stack}`} className="flex h-full flex-col justify-end gap-1 bg-[linear-gradient(135deg,var(--raised),var(--sunken))] p-4">
-      <span className="font-mono text-3xl font-semibold tracking-tight text-ink/80">{project.title.trim().slice(0, 2).toUpperCase()}</span>
-      <span className="truncate font-mono text-xs text-muted">{stack}</span>
+    <div role="img" aria-label={`${project.title}: ${stack}`} className="flex h-full flex-col justify-end gap-1 bg-gradient-to-br from-deep-espresso to-obsidian p-4">
+      <span className="font-display text-3xl font-semibold tracking-tight text-champagne">{project.title.trim().slice(0, 2).toUpperCase()}</span>
+      <span className="truncate font-mono text-xs text-text-muted">{stack}</span>
     </div>
   );
 }
@@ -165,8 +169,8 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
   const preview = project.metadata.preview;
 
   return (
-    <li className={cn("flex min-w-0 flex-col overflow-hidden rounded-[var(--radius-panel)] border bg-surface", project.portfolioIncluded ? "border-line-strong/70" : "border-line")}>
-      <div className="relative aspect-[2/1] border-b border-line">
+    <li className={cn("flex min-w-0 flex-col overflow-hidden rounded-card border bg-bg-elevated transition-colors shadow-card", project.portfolioIncluded ? "border-champagne/40" : "border-border-medium")}>
+      <div className="relative aspect-[2/1] border-b border-border-medium">
         {preview?.kind === "image"
           // eslint-disable-next-line @next/next/no-img-element -- og:image from the student's own site; any domain.
           ? <img src={preview.imageUrl} alt={`Preview of ${project.title}`} loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
@@ -174,7 +178,7 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          <Link href={`/student/projects/${project.id}`} className="min-w-0 break-words font-medium hover:text-signal">{project.title}</Link>
+          <Link href={`/student/projects/${project.id}`} className="min-w-0 break-words font-display font-medium text-warm-ivory hover:text-soft-amber">{project.title}</Link>
           <button
             type="button"
             role="switch"
@@ -182,10 +186,10 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
             aria-label={`${project.title} in portfolio`}
             disabled={busy === "include"}
             onClick={() => void patch({ portfolioIncluded: !project.portfolioIncluded }, "include")}
-            className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-xs text-muted disabled:opacity-50"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-xs text-text-muted disabled:opacity-50"
           >
-            <span aria-hidden="true" className={cn("relative h-5 w-9 rounded-full border transition-colors", project.portfolioIncluded ? "border-signal bg-signal" : "border-line-strong bg-sunken")}>
-              <span className={cn("absolute top-0.5 size-3.5 rounded-full transition-transform duration-150", project.portfolioIncluded ? "translate-x-4 bg-on-signal" : "translate-x-0.5 bg-muted")} />
+            <span aria-hidden="true" className={cn("relative h-5 w-9 rounded-full border transition-colors", project.portfolioIncluded ? "border-soft-amber bg-soft-amber" : "border-border-medium bg-deep-espresso")}>
+              <span className={cn("absolute top-0.5 size-3.5 rounded-full transition-transform duration-150", project.portfolioIncluded ? "translate-x-4 bg-obsidian" : "translate-x-0.5 bg-text-muted")} />
             </span>
             {project.portfolioIncluded ? "In portfolio" : "Not included"}
           </button>
@@ -197,7 +201,7 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
           <ChipPicker project={project} saving={busy === "chips"} onCancel={() => setMode("view")} onSave={async (h, role) => { if (await patch({ highlight: h, role }, "chips", "Card chips saved")) setMode("view"); }} />
         ) : (
           <>
-            <p className="line-clamp-3 text-sm text-muted">{project.summary || project.description || "No description yet."}</p>
+            <p className="line-clamp-3 text-sm text-text-muted">{project.summary || project.description || "No description yet."}</p>
             <EvidenceStrip label={`${project.title} sources`} segments={[{ tier: project.sources.length >= 2 ? "corroborated" : "evidenced", count: Math.max(1, project.sources.length), label: `source${project.sources.length === 1 ? "" : "s"}` }]} />
             <div className="flex flex-wrap gap-1.5">
               {project.sources.map((s) => <Tag key={s}>From {sourceLabel(s)}</Tag>)}
@@ -205,19 +209,19 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
               {project.technologies.slice(0, 5).map((t) => <Tag key={t} mono>{t}</Tag>)}
             </div>
             {project.highlights.length > 0 && (
-              <p className="flex flex-wrap gap-3 text-xs text-muted" aria-label="Shown on your portfolio card">
-                {project.highlights.map((h) => <span key={h.key} className="inline-flex items-center gap-1">{h.key === "stars" && <Star size={12} aria-hidden="true" />}{h.label}</span>)}
+              <p className="flex flex-wrap gap-3 text-xs text-text-muted" aria-label="Shown on your portfolio card">
+                {project.highlights.map((h) => <span key={h.key} className="inline-flex items-center gap-1">{h.key === "stars" && <Star size={12} aria-hidden="true" className="text-soft-amber" />}{h.label}</span>)}
               </p>
             )}
-            <div className="mt-auto flex flex-wrap gap-1 border-t border-line pt-3">
+            <div className="mt-auto flex flex-wrap gap-1 border-t border-border-medium pt-3">
               <Button size="sm" variant="ghost" icon={<PencilSimple size={16} aria-hidden="true" />} onClick={() => setMode("edit")} aria-label={`Edit ${project.title}`}>Edit</Button>
               <Button size="sm" variant="ghost" icon={<Sparkle size={16} aria-hidden="true" />} onClick={() => void enhance()} disabled={!project.portfolioIncluded} loading={busy === "ai"} loadingLabel="Writing…"
                 title={project.portfolioIncluded ? undefined : "AI descriptions are written only for portfolio projects"}>Describe with AI</Button>
               <Button size="sm" variant="ghost" icon={<Check size={16} aria-hidden="true" />} onClick={() => setMode("chips")}>Card chips</Button>
               {project.demoUrl && <Button size="sm" variant="ghost" icon={<ImageIcon size={16} aria-hidden="true" />} loading={busy === "preview"} loadingLabel="Checking…" onClick={() => void checkPreview()}>Preview</Button>}
-              <Button size="sm" variant="ghost" className="ml-auto text-muted" icon={<Archive size={16} aria-hidden="true" />} loading={busy === "archive"} onClick={() => void archive()} aria-label={`Archive ${project.title}`}>Archive</Button>
+              <Button size="sm" variant="ghost" className="ml-auto text-text-muted hover:text-danger" icon={<Archive size={16} aria-hidden="true" />} loading={busy === "archive"} onClick={() => void archive()} aria-label={`Archive ${project.title}`}>Archive</Button>
             </div>
-            {!project.portfolioIncluded && <p className="text-2xs text-muted">AI descriptions are written only for projects in your portfolio.</p>}
+            {!project.portfolioIncluded && <p className="text-2xs text-text-muted">AI descriptions are written only for projects in your portfolio.</p>}
           </>
         )}
       </div>
@@ -271,14 +275,14 @@ function AddProjectForm({ onSaved, onCancel }: { onSaved: (p: LedgerProject) => 
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   return (
-    <form noValidate aria-label="Add a project" className="mb-5 grid gap-3 rounded-[var(--radius-panel)] border border-signal/50 bg-surface p-4 sm:grid-cols-2" onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }} onSubmit={async (e) => {
+    <form noValidate aria-label="Add a project" className="mb-5 grid gap-3 rounded-card border border-soft-amber/40 bg-bg-elevated p-4 shadow-card sm:grid-cols-2" onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }} onSubmit={async (e) => {
       e.preventDefault();
       if (!v.title.trim()) { setErr("A project needs a name."); return; }
       setSaving(true); setErr(null);
       try { const { project } = await send<{ project: LedgerProject }>("/api/student/projects/ledger", "POST", { ...v, technologies: v.technologies.split(",").map((t) => t.trim()).filter(Boolean) }); onSaved(project); }
       catch (error) { setErr((error as Error).message); } finally { setSaving(false); }
     }}>
-      <p className="text-sm font-semibold sm:col-span-2">Add a project</p>
+      <p className="font-display text-sm font-semibold text-text-primary sm:col-span-2">Add a project</p>
       <TextField wrapperClassName="sm:col-span-2" label="Name" required autoFocus value={v.title} error={err} onChange={(e) => setV({ ...v, title: e.target.value })} />
       <TextAreaField wrapperClassName="sm:col-span-2" label="What it does" rows={2} value={v.summary} onChange={(e) => setV({ ...v, summary: e.target.value })} />
       <TextField wrapperClassName="sm:col-span-2" label="Technologies" hint="Separate with commas." value={v.technologies} onChange={(e) => setV({ ...v, technologies: e.target.value })} />
@@ -308,7 +312,7 @@ function Publications({ ledger, onChange }: { ledger: Ledger; onChange: (p: Ledg
       )}
       <div><Button size="sm" variant="secondary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setAdding(true)}>Add a citation yourself</Button></div>
       {adding && (
-        <form noValidate className="grid gap-3 rounded-[var(--radius-panel)] border border-signal/50 bg-surface p-4 sm:grid-cols-2" onSubmit={async (e) => {
+        <form noValidate className="grid gap-3 rounded-card border border-soft-amber/40 bg-bg-elevated p-4 shadow-card sm:grid-cols-2" onSubmit={async (e) => {
           e.preventDefault();
           if (!v.title.trim()) { setErr("A publication needs a title."); return; }
           try {
@@ -328,16 +332,16 @@ function Publications({ ledger, onChange }: { ledger: Ledger; onChange: (p: Ledg
       {ledger.publications.length === 0 ? (
         <EmptyState icon={BookOpen} title="No publications yet">Add a research ID on your profile, or add a citation yourself.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line rounded-[var(--radius-panel)] border border-line bg-surface">
+        <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">
           {ledger.publications.map((p) => (
             <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 basis-64">
-                <p className="font-medium">{p.title}</p>
-                <p className="text-xs text-muted">{[p.venue, p.year].filter(Boolean).join(" · ")}{p.coAuthors.length ? ` · with ${p.coAuthors.slice(0, 4).join(", ")}` : ""}</p>
+                <p className="font-display font-medium text-warm-ivory">{p.title}</p>
+                <p className="text-xs text-text-muted">{[p.venue, p.year].filter(Boolean).join(" · ")}{p.coAuthors.length ? ` · with ${p.coAuthors.slice(0, 4).join(", ")}` : ""}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <Tag>{p.source === "scholar" ? "From your research ID" : "Added by you"}</Tag>
                   {p.citationCount !== null && <Tag mono>{p.citationCount} citation{p.citationCount === 1 ? "" : "s"}</Tag>}
-                  {p.doi ? <a className="link text-xs" href={`https://doi.org/${p.doi}`} target="_blank" rel="noopener noreferrer">DOI {p.doi}</a> : p.url ? <a className="link text-xs" href={p.url} target="_blank" rel="noopener noreferrer">Link</a> : null}
+                  {p.doi ? <a className="text-xs text-champagne hover:underline" href={`https://doi.org/${p.doi}`} target="_blank" rel="noopener noreferrer">DOI {p.doi}</a> : p.url ? <a className="text-xs text-champagne hover:underline" href={p.url} target="_blank" rel="noopener noreferrer">Link</a> : null}
                 </div>
               </div>
               <Checkbox checked={p.portfolioIncluded} onChange={() => void toggle(p)} label="In portfolio" />

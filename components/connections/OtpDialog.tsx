@@ -47,7 +47,7 @@ export function OtpDialog({ secondsLeft, onSubmitted, onSkip }: { secondsLeft: n
       initialFocus={input}
       description={expired
         ? "The 60-second window has closed. Skip LinkedIn for now and try again later."
-        : <>Check your SMS or email. Time left: <span aria-live="polite" className="font-mono tabular text-ink">{mm}:{ss}</span></>}
+        : <>Check your SMS or email. Time left: <span aria-live="polite" className="font-mono tabular text-warm-ivory">{mm}:{ss}</span></>}
       footer={
         <>
           <Button variant="ghost" onClick={onSkip}>Skip LinkedIn</Button>
@@ -67,7 +67,7 @@ export function OtpDialog({ secondsLeft, onSubmitted, onSkip }: { secondsLeft: n
           error={error}
           className="font-mono text-xl tracking-[0.3em] tabular"
         />
-        <p className="mt-3 text-xs text-muted">Skipping never affects your profile or onboarding.</p>
+        <p className="mt-3 text-xs text-text-muted">Skipping never affects your profile or onboarding.</p>
       </form>
     </Dialog>
   );

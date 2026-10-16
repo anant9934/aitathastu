@@ -41,19 +41,19 @@ export function FinishStep({ data, guide, submitting, onBack, onFinish }: {
         description="This is what goes onto your profile. You can edit any of it later, and your edits always win over a source."
         guide={guide}
       />
-      <dl data-eora-id="eora-onboarding-finish" className="mt-6 grid grid-cols-2 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-line sm:grid-cols-3 [&>div]:bg-surface" style={{ gap: 1 }}>
+      <dl data-eora-id="eora-onboarding-finish" className="mt-6 grid grid-cols-2 overflow-hidden rounded-card border border-border-medium bg-border-medium sm:grid-cols-3 shadow-card [&>div]:bg-bg-elevated" style={{ gap: 1 }}>
         {rows.map(([label, n, unit]) => (
           <div key={label} className="px-4 py-4">
-            <dt className="text-xs text-muted">{label}</dt>
+            <dt className="text-xs text-text-muted">{label}</dt>
             <dd className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-mono text-2xl font-semibold tabular">{n}</span>
-              <span className="text-xs text-muted">{unit}</span>
+              <span className="font-display text-2xl font-semibold text-warm-ivory tabular">{n}</span>
+              <span className="text-xs text-text-muted">{unit}</span>
             </dd>
           </div>
         ))}
       </dl>
       {data.targetRole && (
-        <p className="mt-4 text-sm text-muted">Your dashboard will measure progress toward <span className="text-ink">{data.targetRole}</span>.</p>
+        <p className="mt-4 text-sm text-text-muted">Your dashboard will measure progress toward <span className="font-medium text-warm-ivory">{data.targetRole}</span>.</p>
       )}
       {error && (
         <Banner kind="danger" className="mt-4" title="Your workspace wasn't created" action={<Button size="sm" variant="secondary" onClick={() => void go()} loading={submitting}>Try again</Button>}>

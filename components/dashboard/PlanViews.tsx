@@ -35,7 +35,7 @@ function Loading({ label }: { label: string }) {
   return (
     <LoadingRegion label={label} className="mx-auto w-full max-w-[880px] px-4 pt-7 sm:px-6 lg:px-8">
       <Skeleton className="h-8 w-48" /><Skeleton className="mt-2 h-4 w-72" />
-      {[0, 1, 2].map((i) => <Skeleton key={i} className="mt-4 h-28 rounded-[var(--radius-panel)]" />)}
+      {[0, 1, 2].map((i) => <Skeleton key={i} className="mt-4 h-28 rounded-card" />)}
     </LoadingRegion>
   );
 }
@@ -53,32 +53,32 @@ export function RoadmapView() {
   if (!data) return <Loading label="Loading your roadmap" />;
   const r = data.roadmap;
   return (
-    <PageFrame width="narrow" eoraId="eora-roadmap-header" title="Roadmap" description={<>Toward <span className="text-ink">{r.targetRole || r.goal}</span>. Stage <span className="font-mono tabular">{Math.min(r.currentStageIndex + 1, r.totalStages)}</span> of <span className="font-mono tabular">{r.totalStages}</span>.</>}>
+    <PageFrame width="narrow" eoraId="eora-roadmap-header" title="Roadmap" description={<>Toward <span className="font-medium text-warm-ivory">{r.targetRole || r.goal}</span>. Stage <span className="font-mono tabular">{Math.min(r.currentStageIndex + 1, r.totalStages)}</span> of <span className="font-mono tabular">{r.totalStages}</span>.</>}>
       {r.stages.length === 0 ? (
-        <EmptyState icon={Path} title="No roadmap yet" actions={<Link className="link text-sm" href="/student">Set a target role</Link>}>Choose a target role and confirm a few skills; the roadmap orders what to learn and build next.</EmptyState>
+        <EmptyState icon={Path} title="No roadmap yet" actions={<Link className="text-sm font-medium text-accent-warm hover:text-accent-warm-bright" href="/student">Set a target role</Link>}>Choose a target role and confirm a few skills; the roadmap orders what to learn and build next.</EmptyState>
       ) : (
         <ol className="flex flex-col gap-4" data-eora-id="eora-roadmap-milestones">
           {r.stages.map((s) => (
             <li key={s.stageNumber}>
-              <Panel as="section" aria-labelledby={`stage-${s.stageNumber}`} className={cn(s.status === "in_progress" && "border-signal/50")} data-eora-id={s.status === "in_progress" ? "eora-roadmap-next" : undefined}>
+              <Panel as="section" aria-labelledby={`stage-${s.stageNumber}`} className={cn(s.status === "in_progress" && "border-accent-warm-bright/50 bg-bg-elevated")} data-eora-id={s.status === "in_progress" ? "eora-roadmap-next" : undefined}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-mono text-2xs text-muted tabular">Stage {s.stageNumber}</p>
-                    <h2 id={`stage-${s.stageNumber}`} className="text-lg font-semibold">{s.title.replace(/^Stage \d+:\s*/, "")}</h2>
+                    <p className="font-mono text-2xs text-text-dim tabular">Stage {s.stageNumber}</p>
+                    <h2 id={`stage-${s.stageNumber}`} className="font-display text-lg font-bold text-text-primary">{s.title.replace(/^Stage \d+:\s*/, "")}</h2>
                   </div>
                   <StatusChip tone={s.status === "completed" ? "verified" : s.status === "in_progress" ? "signal" : "neutral"} icon={null}>{s.status === "completed" ? "Done" : s.status === "in_progress" ? "Now" : "Later"}</StatusChip>
                 </div>
-                <p className="mt-1.5 text-sm text-muted">{s.description}</p>
+                <p className="mt-1.5 text-sm text-text-muted">{s.description}</p>
                 {s.requiredSkills.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{s.requiredSkills.map((k) => <Tag key={k} mono>{k}</Tag>)}</div>}
                 {s.status !== "locked" && s.recommendedActions.length > 0 && (
-                  <ul className="mt-4 divide-y divide-line border-t border-line">
+                  <ul className="mt-4 divide-y divide-border-subtle border-t border-border-subtle">
                     {s.recommendedActions.map((a) => (
                       <li key={a.title} className="flex items-start gap-3 py-3">
                         <Tag className="mt-0.5 shrink-0">{a.actionType}</Tag>
                         <div className="min-w-0 flex-1">
-                          {a.destinationUrl ? <Link href={a.destinationUrl} className="inline-flex items-center gap-1 font-medium hover:text-signal">{a.title}<ArrowRight size={14} aria-hidden="true" /></Link> : <p className="font-medium">{a.title}</p>}
-                          <p className="text-sm text-muted">{a.description}</p>
-                          {a.reason && <p className="mt-1 text-xs text-muted">Why: {a.reason}</p>}
+                          {a.destinationUrl ? <Link href={a.destinationUrl} className="inline-flex items-center gap-1 font-medium text-text-primary hover:text-accent-warm-bright">{a.title}<ArrowRight size={14} aria-hidden="true" /></Link> : <p className="font-medium text-text-primary">{a.title}</p>}
+                          <p className="text-sm text-text-muted">{a.description}</p>
+                          {a.reason && <p className="mt-1 text-xs text-text-dim">Why: {a.reason}</p>}
                         </div>
                       </li>
                     ))}
@@ -106,12 +106,12 @@ export function JourneyView() {
             <li key={e.id} className="grid grid-cols-[1rem_minmax(0,1fr)] gap-3">
               <span className="flex flex-col items-center" aria-hidden="true">
                 <span className="mt-1.5 size-2.5 shrink-0 rounded-full bg-verified" />
-                {i < events.length - 1 && <span className="w-px flex-1 bg-line" />}
+                {i < events.length - 1 && <span className="w-px flex-1 bg-border-medium" />}
               </span>
               <div className="pb-5">
-                <p className="font-medium">{e.title}</p>
-                {e.description && <p className="mt-0.5 text-sm text-muted">{e.description}</p>}
-                <p className="mt-1 font-mono text-2xs text-muted tabular">{formatDate(e.timestamp, true)}</p>
+                <p className="font-medium text-text-primary">{e.title}</p>
+                {e.description && <p className="mt-0.5 text-sm text-text-muted">{e.description}</p>}
+                <p className="mt-1 font-mono text-2xs text-text-dim tabular">{formatDate(e.timestamp, true)}</p>
               </div>
             </li>
           ))}

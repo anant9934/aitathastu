@@ -57,6 +57,10 @@ const ONBOARDING_MESSAGES: Record<OnboardingStep, EoraMessage> = {
     text: "Upload your resume and I'll help extract your skills and projects. Supported formats: PDF, DOCX. Nothing is stored without your review.",
     animationState: "WORKING",
   },
+  "footprint-intelligence": {
+    text: "I've checked your CV for profile links. Confirm the ones I found, or add accounts you'd like me to explore. You're always in control of what gets added.",
+    animationState: "EXPLAINING",
+  },
   "digital-footprints": {
     text: "Connect your developer profiles to discover more evidence. You're in full control — only connect what you're comfortable sharing.",
     animationState: "EXPLAINING",

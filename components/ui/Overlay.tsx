@@ -116,7 +116,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex items-end justify-center sm:items-center sm:p-6" data-overlay="dialog">
       <div
-        className="absolute inset-0 bg-[var(--scrim)] animate-[fade-in_150ms_var(--ease-out)]"
+        className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-md animate-[fade-in_150ms_var(--ease-out)]"
         aria-hidden="true"
         onClick={role === "dialog" ? onClose : undefined}
       />
@@ -128,16 +128,16 @@ export function Dialog({ open, onClose, title, description, children, footer, si
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         className={cn(
-          "relative flex max-h-[min(100dvh,100%)] w-full flex-col overflow-hidden border border-line bg-surface shadow-[var(--shadow-overlay)]",
+          "relative flex max-h-[min(100dvh,100%)] w-full flex-col overflow-hidden border border-border-medium bg-deep-espresso/95 text-text-primary backdrop-blur-xl shadow-[var(--shadow-premium)]",
           "rounded-t-[var(--radius-panel)] sm:max-h-[calc(100dvh-3rem)] sm:rounded-[var(--radius-panel)]",
           "animate-[sheet-in-up_200ms_var(--ease-out)] sm:animate-[rise-in_180ms_var(--ease-out)]",
           SIZES[size],
         )}
       >
-        <div className="flex items-start gap-3 border-b border-line px-5 pb-3.5 pt-4">
+        <div className="flex items-start gap-3 border-b border-border-subtle px-5 pb-3.5 pt-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
-            {description && <p id={descId} className="mt-1 text-sm text-muted">{description}</p>}
+            <h2 id={titleId} className="text-lg font-bold text-warm-ivory">{title}</h2>
+            {description && <p id={descId} className="mt-1 text-sm text-text-muted">{description}</p>}
           </div>
           {!hideClose && (
             <IconButton label="Close" onClick={onClose} className="-mr-2 -mt-1">
@@ -147,7 +147,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
         </div>
         {children && <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>}
         {footer && (
-          <div className="flex flex-wrap-reverse justify-end gap-2 border-t border-line px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+          <div className="flex flex-wrap-reverse justify-end gap-2 border-t border-border-medium px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
             {footer}
           </div>
         )}
@@ -183,7 +183,7 @@ export function Drawer({ open, onClose, title, description, children, footer, si
   if (!mounted || !open) return null;
   return createPortal(
     <div className="fixed inset-0 z-[1000]" data-overlay="drawer">
-      <div className="absolute inset-0 bg-[var(--scrim)] animate-[fade-in_150ms_var(--ease-out)]" aria-hidden="true" onClick={onClose} />
+      <div className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-md animate-[fade-in_150ms_var(--ease-out)]" aria-hidden="true" onClick={onClose} />
       <div
         ref={panel}
         role="dialog"
@@ -192,7 +192,7 @@ export function Drawer({ open, onClose, title, description, children, footer, si
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         className={cn(
-          "absolute flex flex-col border-line bg-surface shadow-[var(--shadow-overlay)]",
+          "absolute flex flex-col border-border-medium bg-deep-espresso/95 text-text-primary backdrop-blur-xl shadow-[var(--shadow-premium)]",
           // Phone: bottom sheet. Tablet and up: full-height side sheet.
           "inset-x-0 bottom-0 max-h-[88dvh] rounded-t-[var(--radius-panel)] border-t animate-[sheet-in-up_220ms_var(--ease-out)]",
           "md:inset-y-0 md:max-h-none md:w-full md:rounded-none md:border-t-0 md:animate-[sheet-in-right_220ms_var(--ease-out)]",
@@ -200,11 +200,11 @@ export function Drawer({ open, onClose, title, description, children, footer, si
           width === "md" ? "md:max-w-md" : "md:max-w-2xl",
         )}
       >
-        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line md:hidden" aria-hidden="true" />
-        <div className="flex items-start gap-2 border-b border-line px-5 pb-3.5 pt-3 md:pt-4">
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-border-medium md:hidden" aria-hidden="true" />
+        <div className="flex items-start gap-2 border-b border-border-subtle px-5 pb-3.5 pt-3 md:pt-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
-            {description && <p id={descId} className="mt-1 text-sm text-muted">{description}</p>}
+            <h2 id={titleId} className="text-lg font-bold text-warm-ivory">{title}</h2>
+            {description && <p id={descId} className="mt-1 text-sm text-text-muted">{description}</p>}
           </div>
           {headerActions}
           <IconButton label="Close" onClick={onClose} className="-mr-2 -mt-1">
@@ -213,7 +213,7 @@ export function Drawer({ open, onClose, title, description, children, footer, si
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
         {footer && (
-          <div className="flex flex-wrap-reverse justify-end gap-2 border-t border-line px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+          <div className="flex flex-wrap-reverse justify-end gap-2 border-t border-border-medium px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
             {footer}
           </div>
         )}

@@ -33,6 +33,7 @@ export type OnboardingStep =
   | "priorities"      // screen 3.5
   | "academic"        // screen 4
   | "resume"          // screen 5
+  | "footprint-intelligence" // screen 5.5
   | "digital-footprints" // screen 6
   | "ai-analysis"     // screen 7
   | "profile-insights" // screen 8
@@ -52,6 +53,7 @@ export function screenNumberToOnboardingStep(screen: number): OnboardingStep {
     3.5: "priorities",
     4: "academic",
     5: "resume",
+    5.5: "footprint-intelligence",
     6: "digital-footprints",
     7: "ai-analysis",
     8: "profile-insights",

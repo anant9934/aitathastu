@@ -69,34 +69,34 @@ export function PrioritiesStep({ role, initial, saving, guide, onBack, onContinu
                 aria-label={`${p.title}${on ? `, ranked ${RANKS[rank].toLowerCase()}` : ""}`}
                 onClick={() => toggle(p.id)}
                 className={cn(
-                  "relative flex min-h-24 cursor-pointer flex-col items-start gap-2 rounded-[var(--radius-panel)] border p-4 text-left transition-colors duration-150",
-                  on ? "border-signal bg-signal-tint" : "border-line bg-surface hover:border-line-strong",
+                  "relative flex min-h-24 cursor-pointer flex-col items-start gap-2 rounded-card border p-4 text-left transition-all duration-200",
+                  on ? "border-accent-warm-bright bg-accent-warm-bright/10 text-warm-ivory shadow-[0_0_20px_rgba(244,154,71,0.15)]" : "border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm",
                 )}
               >
                 <span className="flex w-full items-center justify-between">
-                  <Glyph size={22} weight={on ? "fill" : "regular"} aria-hidden="true" className={on ? "text-signal" : "text-muted"} />
+                  <Glyph size={22} weight={on ? "fill" : "regular"} aria-hidden="true" className={on ? "text-accent-warm-bright" : "text-text-dim"} />
                   {on ? (
-                    <span className="grid size-6 place-items-center rounded-full bg-signal font-mono text-xs font-semibold text-on-signal tabular" aria-hidden="true">{rank + 1}</span>
+                    <span className="grid size-6 place-items-center rounded-full bg-accent-warm-bright font-mono text-xs font-bold text-obsidian tabular" aria-hidden="true">{rank + 1}</span>
                   ) : (
-                    <Plus size={16} aria-hidden="true" className="text-muted" />
+                    <Plus size={16} aria-hidden="true" className="text-text-dim" />
                   )}
                 </span>
-                <span className="font-medium text-ink">{p.title}</span>
-                <span className="text-xs text-muted">{p.description}</span>
+                <span className="font-display font-semibold text-text-primary">{p.title}</span>
+                <span className="text-xs text-text-muted">{p.description}</span>
               </button>
             );
           })}
         </div>
 
-        <section aria-labelledby="ranked-title" className="self-start rounded-[var(--radius-panel)] border border-line bg-surface p-4">
-          <h2 id="ranked-title" className="text-sm font-semibold">Your order</h2>
+        <section aria-labelledby="ranked-title" className="self-start rounded-card border border-border-medium bg-bg-elevated p-4">
+          <h2 id="ranked-title" className="font-display text-sm font-semibold text-text-primary">Your order</h2>
           <ol className="mt-3 flex flex-col gap-2">
             {RANKS.map((rank, i) => {
               const id = ranked[i];
               return (
-                <li key={rank} className={cn("flex min-h-12 items-center gap-2 rounded-[var(--radius-control)] border px-2.5", id ? "border-line bg-raised" : "border-dashed border-line text-muted")}>
-                  <span className="w-5 font-mono text-xs text-muted tabular">{i + 1}</span>
-                  <span className={cn("min-w-0 flex-1 truncate text-sm", id ? "text-ink" : "text-muted")}>{id ? title(id) : "Optional"}</span>
+                <li key={rank} className={cn("flex min-h-12 items-center gap-2 rounded-md border px-2.5 transition-colors", id ? "border-border-medium bg-deep-espresso" : "border-dashed border-border-medium text-text-dim")}>
+                  <span className="w-5 font-mono text-xs text-text-dim tabular">{i + 1}</span>
+                  <span className={cn("min-w-0 flex-1 truncate text-sm", id ? "font-medium text-text-primary" : "text-text-dim")}>{id ? title(id) : "Optional"}</span>
                   {id && (
                     <span className="flex">
                       <IconButton label={`Move ${title(id)} up`} disabled={i === 0} onClick={() => move(i, -1)} className="size-8 pointer-coarse:size-10"><ArrowUp size={14} aria-hidden="true" /></IconButton>

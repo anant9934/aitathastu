@@ -28,6 +28,7 @@ import { RoleStep } from "./steps/RoleStep";
 import { DirectionStep } from "./steps/DirectionStep";
 import { PrioritiesStep } from "./steps/PrioritiesStep";
 import { CvStep } from "./steps/CvStep";
+import { FootprintIntelligenceStep } from "./steps/FootprintIntelligenceStep";
 import { DetailsStep } from "./steps/DetailsStep";
 import { AccountsStep } from "./steps/AccountsStep";
 import { ImportStep } from "./steps/ImportStep";
@@ -181,6 +182,8 @@ export function OnboardingApp() {
       );
     case 5:
       return shell(<CvStepContainer flow={flow} guide={guide} />);
+    case 5.5:
+      return shell(<FootprintIntelligenceStep flow={flow} guide={guide} />);
     case 4:
       return shell(
         <DetailsStep
@@ -292,7 +295,7 @@ function CvStepContainer({ flow, guide }: { flow: ReturnType<typeof useOnboardin
         return true;
       })}
       onContinue={() => void flow.commit({}, flow.nextAfter(5))}
-      onSkip={() => void flow.commit({ resume: "skipped" }, 4)}
+      onSkip={() => void flow.commit({ resume: "skipped" }, flow.nextAfter(5))}
     />
   );
 }

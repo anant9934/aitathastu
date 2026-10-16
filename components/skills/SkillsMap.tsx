@@ -29,10 +29,10 @@ export type SkillsMapMode = "full" | "compact" | "demo";
 
 const STATUS_STYLE: Record<GraphStatus, { fill: string; stroke: string; dash?: string }> = {
   verified: { fill: "var(--verified)", stroke: "var(--verified)" },
-  corroborated: { fill: "var(--corroborated)", stroke: "var(--corroborated)" },
-  evidenced: { fill: "var(--evidenced)", stroke: "var(--evidenced)" },
-  claimed: { fill: "var(--raised)", stroke: "var(--line-strong)" },
-  gap: { fill: "var(--surface)", stroke: "var(--gap)", dash: "4 3" },
+  corroborated: { fill: "var(--champagne)", stroke: "var(--champagne)" },
+  evidenced: { fill: "var(--soft-amber)", stroke: "var(--soft-amber)" },
+  claimed: { fill: "var(--bg-elevated)", stroke: "var(--border-medium)" },
+  gap: { fill: "var(--bg-primary)", stroke: "var(--text-dim)", dash: "4 3" },
 };
 const RANK: Record<GraphStatus, number> = { verified: 0, corroborated: 1, evidenced: 2, claimed: 3, gap: 4 };
 const MIN_K = 0.5, MAX_K = 3;
@@ -125,22 +125,22 @@ export function SkillsMap({ goal, skills: allSkills, gaps: allGaps, mode = "full
       aria-label={demo ? `Example skills map for ${goal}` : undefined}
       data-testid="skills-map"
       data-mode={mode}
-      className={cn("rounded-[var(--radius-panel)] border border-line bg-surface", !demo && "p-4 sm:p-5", className)}
+      className={cn("rounded-card border border-border-medium bg-bg-elevated", !demo && "p-4 sm:p-5", className)}
     >
       {!demo && (
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0 max-w-[60ch]">
-            <h2 id={`map-title-${mode}`} className="text-lg font-semibold">{title ?? "Skills map"}</h2>
-            <p className="mt-1 text-sm text-muted">
+            <h2 id={`map-title-${mode}`} className="font-display text-lg font-semibold text-text-primary">{title ?? "Skills map"}</h2>
+            <p className="mt-1 text-sm text-text-muted">
               {intro ?? (compact
                 ? <>Your skills around your target role{subset.hidden > 0 ? <>, showing the <span className="font-mono tabular">{skills.length + gaps.length}</span> closest to it</> : null}. Select a skill to see what backs it.</>
                 : "Your target role in the middle, your skills around it, and what backs each one on the outside. Select any node for details.")}
             </p>
           </div>
           {compact ? (
-            <Link href={fullHref} data-testid="view-full-map" className="inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-line-strong hover:bg-raised">
+            <Link href={fullHref} data-testid="view-full-map" className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border-medium px-3 text-sm font-medium text-text-primary transition-colors hover:border-accent-warm hover:bg-deep-espresso">
               View full map
-              {subset.hidden > 0 && <span className="font-mono text-xs text-muted tabular">+{subset.hidden}</span>}
+              {subset.hidden > 0 && <span className="font-mono text-xs text-text-muted tabular">+{subset.hidden}</span>}
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
           ) : (
@@ -163,11 +163,11 @@ export function SkillsMap({ goal, skills: allSkills, gaps: allGaps, mode = "full
           )}
         </div>
       )}
-      {full && <p aria-live="polite" className="mb-2 min-h-4 text-xs text-muted">{matches ? `${matches.size} match${matches.size === 1 ? "" : "es"}${matches.size ? " · press Enter to go to the first" : ""}` : ""}</p>}
+      {full && <p aria-live="polite" className="mb-2 min-h-4 text-xs text-text-muted">{matches ? `${matches.size} match${matches.size === 1 ? "" : "es"}${matches.size ? " · press Enter to go to the first" : ""}` : ""}</p>}
 
       <div className={cn("grid gap-4", full && node && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
-        <div className={cn("relative overflow-hidden bg-canvas", demo ? "rounded-[var(--radius-panel)]" : "rounded-[var(--radius-control)] border border-line")}>
-          <style>{`.sim-node:focus{outline:none}.sim-node:focus-visible .sim-ring{stroke:var(--focus);opacity:1}.sim-stage.sim-smooth{transition:transform 220ms cubic-bezier(.2,.7,.2,1)}.sim-edge,.sim-node{transition:opacity 160ms ease}@media (prefers-reduced-motion:reduce){.sim-stage.sim-smooth,.sim-edge,.sim-node{transition:none}}`}</style>
+        <div className={cn("relative overflow-hidden bg-obsidian", demo ? "rounded-card" : "rounded-md border border-border-medium")}>
+          <style>{`.sim-node:focus{outline:none}.sim-node:focus-visible .sim-ring{stroke:var(--accent-warm);opacity:1}.sim-stage.sim-smooth{transition:transform 220ms cubic-bezier(.22,1,.36,1)}.sim-edge,.sim-node{transition:opacity 160ms cubic-bezier(.4,0,.2,1)}@media (prefers-reduced-motion:reduce){.sim-stage.sim-smooth,.sim-edge,.sim-node{transition:none}}`}</style>
           <svg
             ref={svgRef}
             role={demo ? "img" : "group"}
@@ -183,11 +183,11 @@ export function SkillsMap({ goal, skills: allSkills, gaps: allGaps, mode = "full
             onClick={compact ? (e) => { if (!(e.target as Element).closest(".sim-node")) setSelected(null); } : undefined}
           >
             <g className={cn("sim-stage", smooth && "sim-smooth")} style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`, transformOrigin: "0 0" }}>
-              {layout.clusters.map((c) => <text key={c.id} x={c.x} y={c.y} textAnchor="middle" fontSize={CLUSTER_FONT_PX} fontWeight={600} fill="var(--muted)" aria-hidden="true">{c.label}</text>)}
+              {layout.clusters.map((c) => <text key={c.id} x={c.x} y={c.y} textAnchor="middle" fontSize={CLUSTER_FONT_PX} fontWeight={600} fill="var(--text-dim)" aria-hidden="true">{c.label}</text>)}
               {layout.edges.map((e) => {
                 const a = byId.get(e.from)!, z = byId.get(e.to)!;
                 const on = lit ? lit.has(e.from) && lit.has(e.to) && (e.from === sel || e.to === sel) : false;
-                return <line key={`${e.from}-${e.to}`} className="sim-edge" x1={a.x} y1={a.y} x2={z.x} y2={z.y} stroke={on ? "var(--signal)" : "var(--line)"} strokeWidth={on ? 2.2 : 1} opacity={lit && !on ? 0.2 : matches ? 0.3 : 1} data-lit={on ? "true" : undefined} />;
+                return <line key={`${e.from}-${e.to}`} className="sim-edge" x1={a.x} y1={a.y} x2={z.x} y2={z.y} stroke={on ? "var(--soft-amber)" : "var(--border-subtle)"} strokeWidth={on ? 2.2 : 1} opacity={lit && !on ? 0.2 : matches ? 0.3 : 1} data-lit={on ? "true" : undefined} />;
               })}
               {layout.nodes.map((n) => {
                 const st = n.status ? STATUS_STYLE[n.status] : null;
@@ -200,13 +200,13 @@ export function SkillsMap({ goal, skills: allSkills, gaps: allGaps, mode = "full
                     onPointerEnter={demo ? () => setSelected(n.id) : undefined}
                     onClick={demo ? undefined : () => select(n.id)}
                     onKeyDown={demo ? undefined : (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(n.id); } if (e.key === "Escape") setSelected(null); }}>
-                    <circle className="sim-ring" cx={n.x} cy={n.y} r={n.r + 5} fill="none" stroke="var(--signal)" strokeWidth={2} opacity={isSel && !demo ? 1 : 0} />
-                    {n.kind === "goal" && <circle cx={n.x} cy={n.y} r={n.r} fill="var(--ink)" />}
+                    <circle className="sim-ring" cx={n.x} cy={n.y} r={n.r + 5} fill="none" stroke="var(--accent-warm)" strokeWidth={2} opacity={isSel && !demo ? 1 : 0} />
+                    {n.kind === "goal" && <circle cx={n.x} cy={n.y} r={n.r} fill="var(--soft-amber)" stroke="var(--warm-ivory)" strokeWidth={1.5} />}
                     {n.kind === "skill" && st && <circle cx={n.x} cy={n.y} r={n.r} fill={st.fill} stroke={st.stroke} strokeWidth={1.5} strokeDasharray={st.dash} />}
-                    {n.kind === "evidence" && <rect x={n.x - n.r} y={n.y - n.r} width={n.r * 2} height={n.r * 2} rx={2} fill="var(--surface)" stroke="var(--line-strong)" strokeWidth={1.4} />}
+                    {n.kind === "evidence" && <rect x={n.x - n.r} y={n.y - n.r} width={n.r * 2} height={n.r * 2} rx={3} fill="var(--bg-elevated)" stroke="var(--border-medium)" strokeWidth={1.4} />}
                     <circle cx={n.x} cy={n.y} r={Math.max(n.r, 16)} fill="transparent" />
                     <text x={n.x} y={n.labelBox.y + n.labelBox.h - 5} textAnchor="middle" fontSize={n.kind === "goal" ? 13 : LABEL_FONT_PX} fontWeight={n.kind === "goal" ? 700 : n.kind === "skill" ? 600 : 500}
-                      fill={n.kind === "evidence" ? "var(--muted)" : "var(--ink)"} paintOrder="stroke" stroke="var(--canvas)" strokeWidth={4} strokeLinejoin="round">{n.label}</text>
+                      fill={n.kind === "evidence" ? "var(--text-dim)" : n.kind === "goal" ? "var(--obsidian)" : "var(--text-primary)"} paintOrder="stroke" stroke="var(--bg-primary)" strokeWidth={4} strokeLinejoin="round">{n.label}</text>
                     {n.label !== n.fullLabel && <title>{n.fullLabel}</title>}
                   </g>
                 );
@@ -214,37 +214,37 @@ export function SkillsMap({ goal, skills: allSkills, gaps: allGaps, mode = "full
             </g>
           </svg>
           {compact && node && node.kind === "skill" && (
-            <p aria-live="polite" data-testid="compact-selection" className="border-t border-line bg-surface px-3 py-2 text-xs text-muted">
-              <span className="font-medium text-ink">{node.fullLabel}</span> · {STATUS_TEXT[node.status!]} · {backing.length ? `backed by ${backing.join(", ")}` : "nothing backs it yet"}
+            <p aria-live="polite" data-testid="compact-selection" className="border-t border-border-medium bg-bg-elevated px-3 py-2 text-xs text-text-muted">
+              <span className="font-medium text-text-primary">{node.fullLabel}</span> · {STATUS_TEXT[node.status!]} · {backing.length ? `backed by ${backing.join(", ")}` : "nothing backs it yet"}
             </p>
           )}
-          <ul aria-label="Legend" className={cn("flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line bg-surface px-3 py-2.5 text-xs text-muted", demo && "rounded-b-[var(--radius-panel)]")}>
+          <ul aria-label="Legend" className={cn("flex flex-wrap gap-x-4 gap-y-1.5 border-t border-border-medium bg-bg-elevated px-3 py-2.5 text-xs text-text-muted", demo && "rounded-b-card")}>
             {(Object.keys(STATUS_STYLE) as GraphStatus[]).filter((s) => !demo || counts[s]).map((s) => (
               <li key={s} className="inline-flex items-center gap-1.5">
                 <svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5" fill={STATUS_STYLE[s].fill} stroke={STATUS_STYLE[s].stroke} strokeDasharray={STATUS_STYLE[s].dash} strokeWidth="1.3" /></svg>
                 {STATUS_TEXT[s]} {!demo && <span className="font-mono tabular">({counts[s] ?? 0})</span>}
               </li>
             ))}
-            <li className="inline-flex items-center gap-1.5"><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" fill="var(--surface)" stroke="var(--line-strong)" strokeWidth="1.3" /></svg>Evidence source</li>
+            <li className="inline-flex items-center gap-1.5"><svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" fill="var(--bg-elevated)" stroke="var(--border-medium)" strokeWidth="1.3" /></svg>Evidence source</li>
           </ul>
-          {note && <div className="border-t border-line bg-surface px-3 py-2 text-xs text-muted">{note}</div>}
+          {note && <div className="border-t border-border-medium bg-bg-elevated px-3 py-2 text-xs text-text-muted">{note}</div>}
         </div>
         {full && node && <SkillDetailPanel node={node} skill={skills.find((s) => s.name === node.fullLabel)} gap={gaps.find((g) => g.name === node.fullLabel)} linkedSkills={linked} onClose={() => setSelected(null)} />}
       </div>
 
       {full && (
         <details className="mt-3">
-          <summary className="inline-flex min-h-9 cursor-pointer items-center text-sm text-signal">Read the map as a list</summary>
+          <summary className="inline-flex min-h-9 cursor-pointer items-center text-sm font-medium text-accent-warm transition-colors hover:text-accent-warm-bright">Read the map as a list</summary>
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-sm">
-              <thead><tr>{["Skill", "Status", "Group", "Backed by"].map((h) => <th key={h} scope="col" className="border-b border-line px-2 py-2 text-left text-xs font-medium text-muted">{h}</th>)}</tr></thead>
+            <table className="w-full min-w-[32rem] text-sm text-text-primary">
+              <thead><tr>{["Skill", "Status", "Group", "Backed by"].map((h) => <th key={h} scope="col" className="border-b border-border-medium px-2 py-2 text-left text-xs font-medium text-text-dim">{h}</th>)}</tr></thead>
               <tbody>
                 {layout.nodes.filter((n) => n.kind === "skill").map((n) => (
-                  <tr key={n.id} className="border-b border-line last:border-0">
-                    <td className="px-2 py-2">{n.fullLabel}</td>
-                    <td className="px-2 py-2 text-muted">{STATUS_TEXT[n.status!]}</td>
-                    <td className="px-2 py-2 text-muted">{layout.clusters.find((c) => c.id === n.cluster)?.label}</td>
-                    <td className="px-2 py-2 text-muted">{[...neighbours(layout, n.id)].map((id) => byId.get(id)!).filter((x) => x.kind === "evidence").map((x) => x.fullLabel).join(", ") || "None yet"}</td>
+                  <tr key={n.id} className="border-b border-border-subtle last:border-0">
+                    <td className="px-2 py-2 font-medium">{n.fullLabel}</td>
+                    <td className="px-2 py-2 text-text-muted">{STATUS_TEXT[n.status!]}</td>
+                    <td className="px-2 py-2 text-text-muted">{layout.clusters.find((c) => c.id === n.cluster)?.label}</td>
+                    <td className="px-2 py-2 text-text-muted">{[...neighbours(layout, n.id)].map((id) => byId.get(id)!).filter((x) => x.kind === "evidence").map((x) => x.fullLabel).join(", ") || "None yet"}</td>
                   </tr>
                 ))}
               </tbody>

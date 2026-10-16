@@ -8,8 +8,8 @@ export function Skeleton({ className, style }: { className?: string; style?: Rea
       aria-hidden="true"
       style={style}
       className={cn(
-        "rounded-[var(--radius-control)] bg-raised",
-        "bg-[linear-gradient(90deg,var(--raised)_0px,var(--line)_120px,var(--raised)_240px)] bg-[length:640px_100%]",
+        "rounded-md bg-deep-espresso",
+        "bg-[linear-gradient(90deg,var(--deep-espresso)_0px,var(--border-medium)_120px,var(--deep-espresso)_240px)] bg-[length:640px_100%]",
         "animate-[shimmer_1.4s_linear_infinite] motion-reduce:animate-none",
         className,
       )}

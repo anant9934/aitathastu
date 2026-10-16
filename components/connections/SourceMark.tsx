@@ -21,7 +21,7 @@ export function SourceMark({ id, size = "md", className }: { id: string; size?: 
   const filled = id === "linkedin";
   const Icon = id === "linkedin" ? LinkedinLogo : id === "portfolio" ? Globe : id === "resume" ? FileText : null;
   return (
-    <span aria-hidden="true" className={cn("grid shrink-0 place-items-center rounded-[var(--radius-control)] border border-line bg-raised text-ink", box, className)}>
+    <span aria-hidden="true" className={cn("grid shrink-0 place-items-center rounded-lg border border-border-medium bg-deep-espresso text-champagne", box, className)}>
       {brand ? (
         <svg width={glyph} height={glyph} viewBox="0 0 24 24" fill="currentColor"><path d={brand.path} /></svg>
       ) : Icon ? (

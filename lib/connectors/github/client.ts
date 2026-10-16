@@ -451,7 +451,7 @@ export async function fetchGitHubIntelligence(
       source: "api",
       failedRepos: [],
       truncated: false,
-      rateLimited: false,
+      rateLimited: Boolean(profileRes.rateLimited),
     };
   }
 

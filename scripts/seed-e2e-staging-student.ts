@@ -25,6 +25,8 @@ import {
   goals,
   projects,
   evidenceItems,
+  userPreferences,
+  onboardingDrafts,
 } from "../lib/db/schema";
 import { hashPassword } from "../lib/auth/password";
 import { generatePersonalizedRoadmap, persistRoadmapMilestones } from "../lib/domain/roadmap";
@@ -156,6 +158,31 @@ async function main() {
   // Persist roadmap
   const roadmap = generatePersonalizedRoadmap("Machine Learning Engineer", ["PyTorch", "Python"]);
   await persistRoadmapMilestones(personId, goalId, roadmap);
+
+  // Link user preferences & completed onboarding draft
+  await db
+    .insert(userPreferences)
+    .values({
+      id: `pref_${personId}`,
+      personId,
+      primaryPriority: "projects",
+    })
+    .onConflictDoUpdate({
+      target: userPreferences.personId,
+      set: { primaryPriority: "projects" },
+    });
+
+  await db
+    .insert(onboardingDrafts)
+    .values({
+      personId,
+      draft: { completed: true },
+      revision: 1,
+    })
+    .onConflictDoUpdate({
+      target: onboardingDrafts.personId,
+      set: { draft: { completed: true }, revision: 1 },
+    });
 
   console.log("✅ Seeded staging student account successfully:");
   console.log(`   Email: ${email}`);

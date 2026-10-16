@@ -38,15 +38,15 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
       />
 
       {role && (
-        <section aria-labelledby="role-fit" className="mt-6 rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
-          <h2 id="role-fit" className="text-base font-semibold">Core skills for {role.title}</h2>
+        <section aria-labelledby="role-fit" className="mt-6 rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
+          <h2 id="role-fit" className="font-display text-base font-semibold text-text-primary">Core skills for {role.title}</h2>
           <ul className="mt-3 flex flex-wrap gap-2">
             {role.corePrerequisites.map((p) => (
               <li key={p}>{has(p) ? <StatusChip tone="evidenced">{p}</StatusChip> : <StatusChip tone="gap">{p}</StatusChip>}</li>
             ))}
           </ul>
-          <p className="mt-3 text-sm text-muted">
-            <span className="font-mono text-ink tabular">{role.corePrerequisites.filter(has).length}</span> of <span className="font-mono tabular">{role.corePrerequisites.length}</span> in your skills. Gaps become your first roadmap steps.
+          <p className="mt-3 text-sm text-text-muted">
+            <span className="font-mono text-warm-ivory tabular">{role.corePrerequisites.filter(has).length}</span> of <span className="font-mono tabular">{role.corePrerequisites.length}</span> in your skills. Gaps become your first roadmap steps.
           </p>
         </section>
       )}
@@ -63,21 +63,21 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
           note={(importing.length > 0 || map.unreviewed.length > 0) && (
             <span data-testid="map-progress-note">
               {importing.length > 0 && <>Still importing from {importing.join(", ")}; new evidence appears here when it lands. </>}
-              {map.unreviewed.length > 0 && <><span className="font-mono tabular">{map.unreviewed.length}</span> found skill{map.unreviewed.length === 1 ? "" : "s"} still waiting for your review {map.unreviewed.length === 1 ? "isn't" : "aren't"} drawn yet.</>}
+              {map.unreviewed.length > 0 && <><span className="font-mono tabular text-warm-ivory">{map.unreviewed.length}</span> found skill{map.unreviewed.length === 1 ? "" : "s"} still waiting for your review {map.unreviewed.length === 1 ? "isn't" : "aren't"} drawn yet.</>}
             </span>
           )}
         />
       )}
 
-      <section aria-labelledby="skill-list" className="mt-4 rounded-[var(--radius-panel)] border border-line bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <h2 id="skill-list" className="text-base font-semibold">All your skills <span className="font-mono text-muted tabular">{skills.length}</span></h2>
+      <section aria-labelledby="skill-list" className="mt-4 rounded-card border border-border-medium bg-bg-elevated shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-medium px-4 py-3">
+          <h2 id="skill-list" className="font-display text-base font-semibold text-text-primary">All your skills <span className="font-mono text-text-muted tabular">{skills.length}</span></h2>
           <EvidenceLegend tiers={["corroborated", "evidenced", "gap"]} />
         </div>
         {skills.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted">No skills confirmed yet. Go back to the review step to accept skills from your sources or add your own.</p>
+          <p className="px-4 py-6 text-sm text-text-muted">No skills confirmed yet. Go back to the review step to accept skills from your sources or add your own.</p>
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="divide-y divide-border-medium">
             {evidence.map((e) => {
               const expanded = open === e.skill;
               return (
@@ -86,24 +86,24 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
                     type="button"
                     aria-expanded={expanded}
                     onClick={() => setOpen(expanded ? null : e.skill)}
-                    className="grid w-full cursor-pointer grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left hover:bg-raised/40 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_7rem_auto]"
+                    className="grid w-full cursor-pointer grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-bg-surface/50 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_7rem_auto]"
                   >
-                    <span className="truncate font-medium">{e.skill}</span>
+                    <span className="truncate font-medium text-warm-ivory">{e.skill}</span>
                     <EvidenceStrip segments={evidenceSegments(e)} label={`${e.skill} evidence`} />
-                    <span className="hidden text-xs text-muted sm:block">{TIER_WORD[e.tier]}</span>
-                    <CaretDown size={16} aria-hidden="true" className={cn("text-muted transition-transform", expanded && "rotate-180")} />
+                    <span className="hidden text-xs text-text-muted sm:block">{TIER_WORD[e.tier]}</span>
+                    <CaretDown size={16} aria-hidden="true" className={cn("text-text-muted transition-transform duration-200", expanded && "rotate-180")} />
                   </button>
                   {expanded && (
-                    <div className="px-4 pb-4">
+                    <div className="border-t border-border-medium/60 bg-bg-surface/40 px-4 py-3">
                       {e.items.length === 0 ? (
-                        <p className="text-sm text-muted">Nothing backs this yet. Add a project that uses {e.skill}, or connect an account that shows it.</p>
+                        <p className="text-sm text-text-muted">Nothing backs this yet. Add a project that uses {e.skill}, or connect an account that shows it.</p>
                       ) : (
                         <ul className="flex flex-col gap-1.5">
                           {e.items.map((it, i) => (
                             <li key={i} className="flex flex-wrap items-center gap-2 text-sm">
                               <Tag>{it.kind === "cv" ? "CV" : sourceLabel(it.source)}</Tag>
-                              <span className="text-ink">{it.kind === "project" ? `Project: ${it.title}` : it.title}</span>
-                              {it.detail && <span className="min-w-0 break-all font-mono text-2xs text-muted">{it.detail}</span>}
+                              <span className="text-text-primary">{it.kind === "project" ? `Project: ${it.title}` : it.title}</span>
+                              {it.detail && <span className="min-w-0 break-all font-mono text-2xs text-text-muted">{it.detail}</span>}
                             </li>
                           ))}
                         </ul>

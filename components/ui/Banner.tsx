@@ -6,14 +6,14 @@ import { cn } from "@/lib/client/cn";
 type Kind = "info" | "success" | "warning" | "danger";
 
 const KINDS: Record<Kind, { cls: string; icon: Icon; role: "status" | "alert" }> = {
-  info: { cls: "border-line bg-raised text-ink", icon: Info, role: "status" },
-  success: { cls: "border-verified/40 bg-verified-bg text-ink", icon: CheckCircle, role: "status" },
-  warning: { cls: "border-warning/40 bg-warning-bg text-ink", icon: WarningCircle, role: "status" },
-  danger: { cls: "border-danger/40 bg-danger-bg text-ink", icon: XCircle, role: "alert" },
+  info: { cls: "border-border-medium bg-bg-raised text-text-primary", icon: Info, role: "status" },
+  success: { cls: "border-verified/40 bg-verified-bg text-text-primary", icon: CheckCircle, role: "status" },
+  warning: { cls: "border-warning/40 bg-warning-bg text-text-primary", icon: WarningCircle, role: "status" },
+  danger: { cls: "border-danger/40 bg-danger-bg text-text-primary", icon: XCircle, role: "alert" },
 };
 
 const ICON_TONE: Record<Kind, string> = {
-  info: "text-muted",
+  info: "text-text-muted",
   success: "text-verified",
   warning: "text-warning",
   danger: "text-danger",
@@ -49,7 +49,7 @@ export function Banner({
       <Glyph size={18} weight="bold" aria-hidden="true" className={cn("mt-0.5 shrink-0", ICON_TONE[kind])} />
       <div className="min-w-0 flex-1 basis-48">
         {title && <p className="font-medium">{title}</p>}
-        {children && <div className={cn("text-muted", Boolean(title) && "mt-0.5")}>{children}</div>}
+        {children && <div className={cn("text-text-muted", Boolean(title) && "mt-0.5")}>{children}</div>}
       </div>
       {action && <div className="flex flex-wrap items-center gap-2">{action}</div>}
     </div>

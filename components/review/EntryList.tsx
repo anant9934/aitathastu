@@ -79,9 +79,9 @@ export function EntryList<T extends Entry>({
   return (
     <div className="flex flex-col gap-3" data-eora-id={eoraId}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted">
-          <span className="font-mono tabular text-ink">{visible.length - pending.length}</span> confirmed
-          {pending.length > 0 && <>, <span className="font-mono tabular text-ink">{pending.length}</span> waiting for you</>}
+        <p className="text-sm text-text-muted">
+          <span className="font-mono tabular text-warm-ivory">{visible.length - pending.length}</span> confirmed
+          {pending.length > 0 && <>, <span className="font-mono tabular text-soft-amber">{pending.length}</span> waiting for you</>}
         </p>
         <div className="flex flex-wrap gap-2">
           {pending.length > 1 && (
@@ -110,7 +110,7 @@ export function EntryList<T extends Entry>({
       )}
 
       {visible.length === 0 && !adding && (
-        <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong/60 px-4 py-5 text-sm text-muted">
+        <p className="rounded-lg border border-dashed border-border-medium px-4 py-5 text-sm text-text-muted">
           {sourceFilter ? `Nothing from ${sourceLabel(sourceFilter)} in this section.` : emptyText}
         </p>
       )}
@@ -121,7 +121,7 @@ export function EntryList<T extends Entry>({
           if (!inScope(e)) return null;
           if (isRejected(field, e)) {
             return undo?.key === k ? (
-              <li key={k} aria-live="polite" className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] border border-dashed border-line px-4 py-2 text-sm text-muted">
+              <li key={k} aria-live="polite" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-border-medium px-4 py-2 text-sm text-text-muted">
                 <span>Rejected &ldquo;{title(e)}&rdquo;. It won&apos;t be added to your profile.</span>
                 <Button size="sm" variant="quiet" icon={<ArrowCounterClockwise size={16} aria-hidden="true" />} onClick={() => { restore(e, undo.prev); setUndo(null); }}>
                   Undo
@@ -149,21 +149,21 @@ export function EntryList<T extends Entry>({
             <li
               key={k}
               className={cn(
-                "rounded-[var(--radius-control)] border bg-surface px-4 py-3.5 transition-colors duration-150",
-                confirmed ? "border-line" : "border-line-strong/70 bg-raised/40",
+                "rounded-lg border bg-bg-elevated px-4 py-3.5 transition-colors shadow-card",
+                confirmed ? "border-border-medium" : "border-champagne/40 bg-bg-surface/50",
               )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h4 className="break-words text-base font-medium">{title(e)}</h4>
-                  {subtitle?.(e) && <p className="mt-0.5 break-words text-sm text-muted">{subtitle(e)}</p>}
+                  <h4 className="break-words font-display text-base font-medium text-warm-ivory">{title(e)}</h4>
+                  {subtitle?.(e) && <p className="mt-0.5 break-words text-sm text-text-muted">{subtitle(e)}</p>}
                 </div>
                 {confirmed ? <StatusChip tone="verified" icon={Check}>Confirmed</StatusChip> : <StatusChip tone="signal">Suggested</StatusChip>}
               </div>
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {sources.map((s) => <Tag key={s}>From {sourceLabel(s)}</Tag>)}
                 {chips.map((c) => <Tag key={c}>{c}</Tag>)}
-                {e.editedFields?.length ? <Tag className="border-warning/40 text-warning">Edited by you</Tag> : null}
+                {e.editedFields?.length ? <Tag className="border-soft-amber/40 text-soft-amber">Edited by you</Tag> : null}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
@@ -193,9 +193,9 @@ export function EntryList<T extends Entry>({
             {showRejected ? "Hide" : "Show"} {rejected.length} rejected
           </Button>
           {showRejected && (
-            <ul className="mt-2 divide-y divide-line rounded-[var(--radius-control)] border border-line">
+            <ul className="mt-2 divide-y divide-border-medium rounded-lg border border-border-medium">
               {rejected.map((e, i) => (
-                <li key={keyOf(e, i)} className="flex items-center justify-between gap-2 px-4 py-1.5 text-sm text-muted">
+                <li key={keyOf(e, i)} className="flex items-center justify-between gap-2 px-4 py-1.5 text-sm text-text-muted">
                   <span className="min-w-0 truncate">{title(e)}</span>
                   <Button size="sm" variant="quiet" onClick={() => restore(e)}>Restore</Button>
                 </li>
@@ -238,9 +238,9 @@ function EntryForm<T extends Entry>({ heading, fields, initial, onSave, onCancel
       aria-label={heading}
       onSubmit={(ev) => { ev.preventDefault(); save(); }}
       onKeyDown={(ev) => { if (ev.key === "Escape") { ev.preventDefault(); onCancel(); } }}
-      className="rounded-[var(--radius-control)] border border-signal/50 bg-surface p-4"
+      className="rounded-card border border-soft-amber/40 bg-bg-elevated p-4 shadow-card"
     >
-      <p className="mb-3 text-sm font-semibold">{heading}</p>
+      <p className="mb-3 font-display text-sm font-semibold text-text-primary">{heading}</p>
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
         {fields.map((f) => {
           const common = {

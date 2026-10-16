@@ -25,9 +25,9 @@ const TONES: Record<Tone, { cls: string; icon: Icon }> = {
   gap: { cls: "text-gap bg-transparent border-gap border-dashed", icon: CircleDashed },
   warning: { cls: "text-warning bg-warning-bg border-warning/35", icon: WarningCircle },
   danger: { cls: "text-danger bg-danger-bg border-danger/35", icon: XCircle },
-  neutral: { cls: "text-muted bg-raised border-line", icon: Info },
-  signal: { cls: "text-signal bg-signal-tint border-signal/35", icon: Info },
-  busy: { cls: "text-muted bg-raised border-line", icon: Clock },
+  neutral: { cls: "text-text-muted bg-bg-elevated border-border-medium", icon: Info },
+  signal: { cls: "text-accent-warm-bright bg-accent-warm-bright/10 border-accent-warm-bright/35", icon: Info },
+  busy: { cls: "text-text-muted bg-bg-elevated border-border-medium", icon: Clock },
 };
 
 export function StatusChip({
@@ -66,7 +66,7 @@ export function Tag({ children, className, mono }: { children: React.ReactNode; 
   return (
     <span
       className={cn(
-        "inline-flex h-6 max-w-full items-center rounded-[6px] border border-line bg-raised px-2 text-xs text-muted",
+        "inline-flex h-6 max-w-full items-center rounded-md border border-border-medium bg-tag-bg px-2 text-xs text-tag-fg",
         mono && "font-mono tabular",
         className,
       )}

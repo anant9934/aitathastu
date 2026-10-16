@@ -31,7 +31,7 @@ export function JumpNav({ items }: { items: { id: string; label: string }[] }) {
   }, [active]);
 
   return (
-    <nav aria-label="Dashboard sections" className="sticky top-14 z-20 -mx-4 border-b border-line bg-canvas/95 px-4 py-2 backdrop-blur-sm supports-[backdrop-filter]:bg-canvas/80 sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-8 lg:px-8">
+    <nav aria-label="Dashboard sections" className="sticky top-14 z-20 -mx-4 border-b border-border-medium bg-bg-primary/95 px-4 py-2 backdrop-blur-md supports-[backdrop-filter]:bg-bg-primary/80 sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-8 lg:px-8">
       <div ref={bar} className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((i) => (
           <a
@@ -41,8 +41,8 @@ export function JumpNav({ items }: { items: { id: string; label: string }[] }) {
             aria-current={active === i.id ? "location" : undefined}
             onClick={() => setActive(i.id)}
             className={cn(
-              "inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-sm transition-colors duration-150 pointer-coarse:min-h-11",
-              active === i.id ? "bg-raised text-ink shadow-[0_0_0_1px_var(--line-strong)]" : "text-muted hover:text-ink",
+              "inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-sm font-medium transition-colors duration-150 pointer-coarse:min-h-11",
+              active === i.id ? "bg-deep-espresso text-warm-ivory shadow-[0_0_0_1px_var(--border-medium)]" : "text-text-muted hover:text-text-primary",
             )}
           >
             {i.label}

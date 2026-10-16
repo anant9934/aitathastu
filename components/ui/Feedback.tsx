@@ -24,18 +24,18 @@ export function AppToaster() {
         unstyled: true,
         classNames: {
           toast:
-            "flex w-full items-start gap-3 rounded-[var(--radius-control)] border border-line bg-raised px-4 py-3 text-sm text-ink shadow-[var(--shadow-overlay)] sm:w-[22rem]",
-          title: "font-medium",
-          description: "mt-0.5 text-muted",
+            "flex w-full items-start gap-3 rounded-[var(--radius-card)] border border-border-medium bg-bg-elevated/95 px-4 py-3 text-sm text-text-primary backdrop-blur-xl shadow-[var(--shadow-premium)] sm:w-[22rem]",
+          title: "font-bold text-text-warm",
+          description: "mt-0.5 text-text-muted",
           icon: "mt-0.5 shrink-0",
           success: "[&_[data-icon]]:text-verified",
           error: "border-danger/50 [&_[data-icon]]:text-danger",
           warning: "[&_[data-icon]]:text-warning",
-          info: "[&_[data-icon]]:text-signal",
+          info: "[&_[data-icon]]:text-accent-warm",
           actionButton:
-            "ml-auto shrink-0 rounded-[6px] bg-signal px-2.5 py-1 text-xs font-medium text-on-signal hover:bg-signal-hover cursor-pointer",
-          cancelButton: "ml-auto shrink-0 rounded-[6px] px-2.5 py-1 text-xs text-muted hover:text-ink cursor-pointer",
-          closeButton: "text-muted",
+            "ml-auto shrink-0 rounded-[var(--radius-pill)] bg-signal px-3 py-1.5 text-xs font-bold text-on-signal hover:bg-signal-hover cursor-pointer",
+          cancelButton: "ml-auto shrink-0 rounded-[var(--radius-pill)] px-3 py-1.5 text-xs text-text-muted hover:text-text-primary cursor-pointer",
+          closeButton: "text-text-muted hover:text-text-primary",
         },
       }}
     />

@@ -100,6 +100,11 @@ export const HINGLISH_ONBOARDING_GUIDE: Record<
     actionInstruction: "Main resume se automatically skills aur projects nikal lungi. Bina tumhari permission ke kuch bhi save nahi hoga.",
     pointingNote: "Upload box me file drop karo ya browse karke select karo.",
   },
+  "footprint-intelligence": {
+    characterGreeting: "Main aapke CV me se profiles check kar rahi hoon.",
+    actionInstruction: "Jo profiles mile unhe confirm karo, ya apne dusre coding accounts add karo. Control hamesha aapke paas hai.",
+    pointingNote: "Profiles check karke Confirm ya Add button dabao.",
+  },
   "digital-footprints": {
     characterGreeting: "Apna GitHub account connect karo!",
     actionInstruction: "Isse tumhare real commits aur projects portfolio me jud jayenge. Password hum kabhi nahi maangte.",

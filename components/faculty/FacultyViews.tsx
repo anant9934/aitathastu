@@ -29,11 +29,11 @@ import { cn } from "@/lib/client/cn";
 export function FacultyFrame({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const link = (href: string, label: string) => (
-    <Link href={href} aria-current={path === href ? "page" : undefined} className={cn("inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3 text-sm", path === href ? "bg-raised text-ink" : "text-muted hover:text-ink")}>{label}</Link>
+    <Link href={href} aria-current={path === href ? "page" : undefined} className={cn("inline-flex min-h-10 items-center rounded-md px-3 text-sm transition-colors", path === href ? "bg-deep-espresso text-warm-ivory font-medium" : "text-text-muted hover:text-text-primary hover:bg-deep-espresso/50")}>{label}</Link>
   );
   return (
-    <div className="min-h-dvh bg-canvas">
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 backdrop-blur-sm">
+    <div className="min-h-dvh bg-bg-primary text-text-primary">
+      <header className="sticky top-0 z-20 border-b border-border-medium bg-bg-primary/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-x-3 px-4 sm:h-14 sm:flex-nowrap sm:px-6">
           <div className="flex h-14 items-center"><Logo href="/faculty" /></div>
           <nav aria-label="Faculty" className="order-last -mx-1 flex w-full gap-1 overflow-x-auto px-1 pb-2 sm:order-none sm:ml-2 sm:w-auto sm:pb-0">{link("/faculty", "Workspace")}{link("/faculty/verification", "Verification queue")}</nav>
@@ -66,18 +66,18 @@ export function FacultyHome() {
       }
     })();
   }, []);
-  if (error) return <FacultyFrame><h1 className="mb-4 text-2xl font-semibold tracking-[-0.02em]">Faculty workspace</h1><Banner kind="warning" title="The faculty workspace isn't available" action={<LinkButton href="/sign-in" variant="secondary" size="sm">Sign in</LinkButton>}>{error}</Banner></FacultyFrame>;
-  if (!s) return <FacultyFrame><LoadingRegion label="Loading"><Skeleton className="h-8 w-60" /><Skeleton className="mt-6 h-40 rounded-[var(--radius-panel)]" /></LoadingRegion></FacultyFrame>;
+  if (error) return <FacultyFrame><h1 className="mb-4 font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Faculty workspace</h1><Banner kind="warning" title="The faculty workspace isn't available" action={<LinkButton href="/sign-in" variant="secondary" size="sm">Sign in</LinkButton>}>{error}</Banner></FacultyFrame>;
+  if (!s) return <FacultyFrame><LoadingRegion label="Loading"><Skeleton className="h-8 w-60" /><Skeleton className="mt-6 h-40 rounded-card" /></LoadingRegion></FacultyFrame>;
   return (
     <FacultyFrame>
-      <h1 className="text-2xl font-semibold tracking-[-0.02em]">Welcome, {s.name.split(" ")[0]}</h1>
-      <p className="mt-1 text-sm text-muted">{[s.department, s.institution].filter(Boolean).join(" · ") || "Faculty workspace"}</p>
+      <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Welcome, {s.name.split(" ")[0]}</h1>
+      <p className="mt-1 text-sm text-text-muted">{[s.department, s.institution].filter(Boolean).join(" · ") || "Faculty workspace"}</p>
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <Panel aria-labelledby="queue-title">
           <PanelHeader id="queue-title" title="Verification queue" />
           {s.facultyAccess === "authorized" ? (
             <>
-              <p className="flex items-baseline gap-2"><span className="font-mono text-3xl font-semibold tabular">{count ?? "…"}</span><span className="text-sm text-muted">waiting for review</span></p>
+              <p className="flex items-baseline gap-2"><span className="font-display text-3xl font-bold text-text-primary tabular">{count ?? "…"}</span><span className="text-sm text-text-muted">waiting for review</span></p>
               <LinkButton href="/faculty/verification" variant="primary" size="sm" className="mt-4">Open the queue</LinkButton>
             </>
           ) : (
@@ -86,7 +86,7 @@ export function FacultyHome() {
         </Panel>
         <Panel aria-labelledby="how-title">
           <PanelHeader id="how-title" title="How verification works" />
-          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-muted">
+          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-text-muted">
             <li>Students ask you to verify a specific piece of evidence.</li>
             <li>You record how you checked it and the outcome.</li>
             <li>&ldquo;Changes requested&rdquo; and &ldquo;Not verified&rdquo; always carry a reason the student can act on.</li>
@@ -122,20 +122,20 @@ export function VerificationQueue() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  if (denied) return <FacultyFrame><h1 className="mb-4 text-2xl font-semibold tracking-[-0.02em]">Verification queue</h1><Banner kind="warning" title="You don't have access to the queue">{denied} Verification tools are for approved faculty.</Banner></FacultyFrame>;
+  if (denied) return <FacultyFrame><h1 className="mb-4 font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Verification queue</h1><Banner kind="warning" title="You don't have access to the queue">{denied} Verification tools are for approved faculty.</Banner></FacultyFrame>;
   const items = (queue ?? []).filter((i) => filter === "all" ? true : filter === "pending" ? i.status === "pending" || i.status === "under_review" : filter === "changes_requested" ? i.status === "changes_requested" : i.status === "verified" || i.status === "rejected");
   const count = (f: string) => (queue ?? []).filter((i) => f === "all" ? true : f === "pending" ? i.status === "pending" || i.status === "under_review" : f === "changes_requested" ? i.status === "changes_requested" : i.status === "verified" || i.status === "rejected").length;
 
   return (
     <FacultyFrame>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-semibold tracking-[-0.02em]">Verification queue</h1><p className="mt-1 text-sm text-muted">Review student evidence and record how you checked it.</p></div>
+        <div><h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Verification queue</h1><p className="mt-1 text-sm text-text-muted">Review student evidence and record how you checked it.</p></div>
         <Button variant="secondary" size="sm" icon={<ArrowClockwise size={16} aria-hidden="true" />} onClick={() => void load()}>Refresh</Button>
       </div>
       {error && <Banner kind="danger" className="mb-4" action={<Button size="sm" variant="secondary" onClick={() => void load()}>Try again</Button>}>{error}</Banner>}
-      <Tabs label="Filter requests" idBase="vq" value={filter} onChange={setFilter} className="mb-4 border-b border-line"
-        items={[["pending", "Waiting"], ["changes_requested", "Changes requested"], ["resolved", "Resolved"], ["all", "All"]].map(([id, label]) => ({ id, label, badge: <span className="font-mono text-2xs text-muted tabular">{count(id)}</span> }))} />
-      {!queue ? <LoadingRegion label="Loading the queue" className="flex flex-col gap-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-[var(--radius-panel)]" />)}</LoadingRegion>
+      <Tabs label="Filter requests" idBase="vq" value={filter} onChange={setFilter} className="mb-4 border-b border-border-medium"
+        items={[["pending", "Waiting"], ["changes_requested", "Changes requested"], ["resolved", "Resolved"], ["all", "All"]].map(([id, label]) => ({ id, label, badge: <span className="font-mono text-2xs text-text-dim tabular">{count(id)}</span> }))} />
+      {!queue ? <LoadingRegion label="Loading the queue" className="flex flex-col gap-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 rounded-card" />)}</LoadingRegion>
         : items.length === 0 ? <EmptyState icon={ClipboardText} title="Nothing here">Requests appear here when students ask for verification.</EmptyState>
         : (
           <ul className="flex flex-col gap-3" data-eora-id="eora-verification-queue">
@@ -144,19 +144,19 @@ export function VerificationQueue() {
                 <Panel as="article" aria-label={`${i.evidenceSubject} by ${i.requesterName}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="flex flex-wrap items-center gap-2"><Tag>{i.evidenceCategory}</Tag><span className="text-xs text-muted">by {i.requesterName}</span></p>
-                      <h2 className="mt-1.5 break-words font-medium">{i.evidenceSubject}</h2>
-                      <p className="mt-0.5 break-words text-sm text-muted">{i.evidenceValue}</p>
+                      <p className="flex flex-wrap items-center gap-2"><Tag>{i.evidenceCategory}</Tag><span className="text-xs text-text-muted">by {i.requesterName}</span></p>
+                      <h2 className="mt-1.5 break-words font-display text-base font-semibold text-text-primary">{i.evidenceSubject}</h2>
+                      <p className="mt-0.5 break-words text-sm text-text-muted">{i.evidenceValue}</p>
                     </div>
                     <StatusChip tone={STATUS[i.status].tone}>{STATUS[i.status].label}</StatusChip>
                   </div>
-                  <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs text-muted sm:grid-cols-3">
-                    <div><dt className="inline">Source: </dt><dd className="inline text-ink">{i.evidenceSource.replace(/_/g, " ")}</dd></div>
-                    <div><dt className="inline">Observed: </dt><dd className="inline font-mono tabular text-ink">{formatDate(i.evidenceObservedAt)}</dd></div>
-                    <div><dt className="inline">Requested: </dt><dd className="inline font-mono tabular text-ink">{formatDate(i.requestedAt)}</dd></div>
+                  <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs text-text-muted sm:grid-cols-3">
+                    <div><dt className="inline text-text-dim">Source: </dt><dd className="inline text-text-primary">{i.evidenceSource.replace(/_/g, " ")}</dd></div>
+                    <div><dt className="inline text-text-dim">Observed: </dt><dd className="inline font-mono tabular text-text-primary">{formatDate(i.evidenceObservedAt)}</dd></div>
+                    <div><dt className="inline text-text-dim">Requested: </dt><dd className="inline font-mono tabular text-text-primary">{formatDate(i.requestedAt)}</dd></div>
                   </dl>
-                  {i.supportingReference && <p className="mt-2 text-sm">{i.supportingReference.startsWith("http") ? <a className="link inline-flex items-center gap-1 break-all" href={i.supportingReference} target="_blank" rel="noopener noreferrer">{i.supportingReference}<ArrowSquareOut size={12} aria-hidden="true" /></a> : <span className="text-muted">{i.supportingReference}</span>}</p>}
-                  {i.studentNotes && <p className="mt-2 border-l border-line-strong pl-3 text-sm text-muted">{i.studentNotes}</p>}
+                  {i.supportingReference && <p className="mt-2 text-sm">{i.supportingReference.startsWith("http") ? <a className="inline-flex items-center gap-1 break-all font-medium text-accent-warm hover:text-accent-warm-bright" href={i.supportingReference} target="_blank" rel="noopener noreferrer">{i.supportingReference}<ArrowSquareOut size={12} aria-hidden="true" /></a> : <span className="text-text-muted">{i.supportingReference}</span>}</p>}
+                  {i.studentNotes && <p className="mt-2 border-l border-border-medium pl-3 text-sm text-text-muted">{i.studentNotes}</p>}
                   {(i.status === "pending" || i.status === "under_review") && (
                     <Button size="sm" variant="primary" className="mt-3" icon={<SealCheck size={16} aria-hidden="true" />} onClick={() => setActive(i)} data-eora-id="eora-verification-action">Review</Button>
                   )}
@@ -190,9 +190,9 @@ function DecisionDialog({ item, onClose, onDone }: { item: Item; onClose: () => 
       footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" loading={busy} loadingLabel="Saving…" onClick={() => void submit()}>Record decision</Button></>}>
       <div className="grid gap-4">
         <fieldset className="grid gap-2">
-          <legend className="mb-1 text-sm font-medium">Outcome</legend>
+          <legend className="mb-1 text-sm font-medium text-text-primary">Outcome</legend>
           {([["verified", "Verified"], ["changes_requested", "Changes requested"], ["rejected", "Not verified"]] as const).map(([v, l]) => (
-            <label key={v} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm"><input type="radio" name="decision" checked={decision === v} onChange={() => setDecision(v)} className="size-4 accent-signal" />{l}</label>
+            <label key={v} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-text-primary"><input type="radio" name="decision" checked={decision === v} onChange={() => setDecision(v)} className="size-4 accent-accent-warm" />{l}</label>
           ))}
         </fieldset>
         <SelectField label="How you checked it" value={method} onChange={(e) => setMethod(e.target.value)}>

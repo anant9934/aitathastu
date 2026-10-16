@@ -16,7 +16,7 @@ export function ThemeToggle({ compact, className }: { compact?: boolean; classNa
     <div
       role="radiogroup"
       aria-label="Colour theme"
-      className={cn("inline-flex shrink-0 items-center rounded-[var(--radius-control)] border border-line bg-canvas p-0.5", className)}
+      className={cn("inline-flex shrink-0 items-center rounded-full border border-border-medium bg-bg-elevated p-0.5", className)}
     >
       {options.map(({ value, label, Icon }) => {
         const active = theme === value;
@@ -30,12 +30,12 @@ export function ThemeToggle({ compact, className }: { compact?: boolean; classNa
             title={`${label} theme`}
             onClick={() => setTheme(value)}
             className={cn(
-              "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[6px] text-xs font-medium transition-colors duration-150 pointer-coarse:h-10",
-              compact ? "w-8 justify-center pointer-coarse:w-10" : "px-2.5",
-              active ? "bg-raised text-ink shadow-[0_0_0_1px_var(--line-strong)]" : "text-muted hover:text-ink",
+              "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full text-xs font-medium transition-all duration-150 pointer-coarse:h-10",
+              compact ? "w-8 justify-center pointer-coarse:w-10" : "px-3",
+              active ? "bg-bg-elevated text-text-warm font-semibold shadow-[0_0_8px_rgba(201,164,109,0.2)]" : "text-text-muted hover:text-text-warm",
             )}
           >
-            <Icon size={15} weight={active ? "fill" : "regular"} aria-hidden="true" />
+            <Icon size={15} weight={active ? "fill" : "regular"} className={active ? "text-accent-primary" : undefined} aria-hidden="true" />
             {!compact && <span>{label}</span>}
           </button>
         );

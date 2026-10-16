@@ -90,17 +90,17 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
     : null;
 
   return (
-    <section aria-labelledby="li-title" className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
+    <section aria-labelledby="li-title" className="rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <LinkedinLogo size={22} aria-hidden="true" className="text-muted" />
-        <h3 id="li-title" className="text-base font-semibold">LinkedIn sign-in import</h3>
+        <LinkedinLogo size={22} aria-hidden="true" className="text-champagne" />
+        <h3 id="li-title" className="font-display text-base font-semibold text-text-primary">LinkedIn sign-in import</h3>
         <StatusChip tone="neutral" icon={null}>Optional</StatusChip>
       </div>
-      <p className="mt-2 max-w-[62ch] text-sm text-muted">
+      <p className="mt-2 max-w-[62ch] text-sm text-text-muted">
         Adds your work history and education. Everything else works without it, and onboarding finishes either way.
       </p>
       {line && (
-        <p aria-live="polite" className={failed ? "mt-3 text-sm text-danger" : "mt-3 text-sm text-ink"}>{line}</p>
+        <p aria-live="polite" className={failed ? "mt-3 text-sm text-danger" : "mt-3 text-sm text-warm-ivory"}>{line}</p>
       )}
 
       {!open && !active && s !== "succeeded" && (
@@ -115,14 +115,14 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
 
       {open && (
         <form onSubmit={connect} noValidate className="mt-4 grid max-w-md gap-4">
-          <div className="grid gap-3 rounded-[var(--radius-control)] border border-line bg-canvas/50 p-3.5">
+          <div className="grid gap-3 rounded-lg border border-border-medium bg-bg-surface/50 p-3.5">
             <Checkbox
               checked={consent}
               onChange={(e) => { setConsent(e.target.checked); setError(null); }}
               label={<><span className="font-medium">Sign in to LinkedIn for me once, to read my own profile.</span> LinkedIn may text or email me a code; I&apos;ll have 60 seconds to enter it here.</>}
             />
-            <p className="flex items-start gap-2 text-xs text-muted">
-              <LockSimple size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+            <p className="flex items-start gap-2 text-xs text-text-muted">
+              <LockSimple size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-champagne" />
               Your password is encrypted (AES-256-GCM), used only to sign in for you, never shown or shared, discarded if sign-in fails, and erased when you disconnect.
             </p>
           </div>

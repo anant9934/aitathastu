@@ -25,10 +25,10 @@ function Markdown({ text }: { text: string }) {
     while ((m = re.exec(s))) {
       if (m.index > last) parts.push(s.slice(last, m.index));
       const k = `${key}-${i++}`;
-      if (m[1]) parts.push(<strong key={k} className="font-semibold">{m[1]}</strong>);
-      else if (m[2]) parts.push(<code key={k} className="rounded-[4px] border border-line bg-raised px-1 font-mono text-[0.9em]">{m[2]}</code>);
+      if (m[1]) parts.push(<strong key={k} className="font-semibold text-warm-ivory">{m[1]}</strong>);
+      else if (m[2]) parts.push(<code key={k} className="rounded-md border border-border-medium bg-deep-espresso px-1.5 py-0.5 font-mono text-[0.85em] text-champagne">{m[2]}</code>);
       else if (m[3] || m[4]) parts.push(<em key={k}>{m[3] || m[4]}</em>);
-      else parts.push(<a key={k} href={m[6]} target="_blank" rel="noopener noreferrer" className="link">{m[5]}</a>);
+      else parts.push(<a key={k} href={m[6]} target="_blank" rel="noopener noreferrer" className="text-champagne hover:underline">{m[5]}</a>);
       last = re.lastIndex;
     }
     if (last < s.length) parts.push(s.slice(last));
@@ -95,29 +95,31 @@ export function EoraChat({ open, seed, onClose }: { open: boolean; seed: { text:
             onChange={(e) => setInput(e.target.value.slice(0, 2000))}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
             placeholder="Which of my projects best shows Python?"
-            className="min-h-11 min-w-0 flex-1 resize-none rounded-[var(--radius-control)] border border-line-strong bg-canvas px-3 py-2 text-base focus-visible:border-focus focus-visible:outline-none"
+            className="min-h-11 min-w-0 flex-1 resize-none rounded-card border border-border-medium bg-bg-primary px-3 py-2 text-base text-text-primary placeholder:text-text-muted focus-visible:border-accent-warm focus-visible:shadow-[0_0_0_3px_rgba(201,164,109,0.3)] focus-visible:outline-none"
           />
-          <Button type="submit" variant="primary" disabled={busy || !input.trim()} icon={<PaperPlaneRight size={16} aria-hidden="true" />}>Ask</Button>
+          <Button type="submit" variant="primary" size="md" disabled={busy || !input.trim()} icon={<PaperPlaneRight size={16} aria-hidden="true" />}>Ask</Button>
         </form>
       }
     >
       <div ref={list} aria-live="polite" className="flex flex-col gap-4 text-sm">
-        {turns.length === 0 && !busy && <p className="text-muted">Ask about your skills, projects or next steps.</p>}
+        {turns.length === 0 && !busy && <p className="text-text-muted">Ask about your skills, projects or next steps.</p>}
         {turns.map((t, i) =>
           t.role === "user" ? (
-            <p key={i} className="ml-8 rounded-[var(--radius-control)] border border-line bg-raised px-3 py-2">{t.text}</p>
+            <div key={i} className="ml-8 self-end rounded-2xl rounded-br-sm border border-soft-amber/40 bg-gradient-to-r from-soft-amber/20 to-champagne/15 px-4 py-3 text-warm-ivory shadow-sm">
+              <p>{t.text}</p>
+            </div>
           ) : t.role === "error" ? (
             <p key={i} role="alert" className="text-danger">{t.text}</p>
           ) : (
-            <div key={i}>
+            <div key={i} className="mr-6 rounded-2xl rounded-bl-sm border border-accent-warm/25 bg-soft-amber/10 p-4 text-warm-ivory">
               <Markdown text={t.text} />
               {t.sources.length > 0 && (
-                <div className="mt-1 flex flex-col gap-1.5">
-                  <span className="text-xs text-muted">Based on</span>
+                <div className="mt-3 flex flex-col gap-1.5 border-t border-border-subtle pt-2.5">
+                  <span className="font-mono text-xs uppercase tracking-wider text-text-dim">Based on</span>
                   {t.sources.slice(0, 4).map((s, si) => {
-                    const inner = <><span className="font-medium">{s.title}</span>{s.provider && <span className="text-muted"> · {s.provider}</span>}</>;
-                    const cls = "block rounded-[var(--radius-control)] border border-line px-3 py-2";
-                    return s.url ? <a key={si} href={s.url} target={s.url.startsWith("/") ? undefined : "_blank"} rel="noopener noreferrer" className={`${cls} hover:border-line-strong`}>{inner}</a> : <div key={si} className={cls}>{inner}</div>;
+                    const inner = <><span className="font-medium text-warm-ivory">{s.title}</span>{s.provider && <span className="text-text-dim"> · {s.provider}</span>}</>;
+                    const cls = "block rounded-lg border border-border-subtle bg-bg-primary/50 px-3 py-2 text-xs transition-colors";
+                    return s.url ? <a key={si} href={s.url} target={s.url.startsWith("/") ? undefined : "_blank"} rel="noopener noreferrer" className={`${cls} hover:border-accent-warm hover:text-warm-ivory`}>{inner}</a> : <div key={si} className={cls}>{inner}</div>;
                   })}
                 </div>
               )}
@@ -127,7 +129,12 @@ export function EoraChat({ open, seed, onClose }: { open: boolean; seed: { text:
             </div>
           ),
         )}
-        {busy && <p className="flex items-center gap-2 text-muted"><Spinner size={16} />EORA is looking through your profile…</p>}
+        {busy && (
+          <div className="flex items-center gap-2.5 text-accent-warm">
+            <Spinner size={16} />
+            <span className="text-xs font-medium">EORA is looking through your profile…</span>
+          </div>
+        )}
       </div>
     </Drawer>
   );

@@ -75,13 +75,13 @@ export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid" 
     <div data-eora-id={eoraId} className="flex flex-col gap-5">
       {linked.length > 0 && (
         <section aria-labelledby="linked-title">
-          <h3 id="linked-title" className="mb-2 text-sm font-semibold">Linked <span className="font-mono text-muted tabular">{linked.length}</span></h3>
-          <ul className="divide-y divide-line rounded-[var(--radius-panel)] border border-line bg-surface">{linked.map((p) => row(p.id))}</ul>
+          <h3 id="linked-title" className="mb-2 font-display text-sm font-semibold text-text-primary">Linked <span className="font-mono text-text-muted tabular">{linked.length}</span></h3>
+          <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{linked.map((p) => row(p.id))}</ul>
         </section>
       )}
       <section aria-labelledby="available-title">
-        <h3 id="available-title" className="mb-2 text-sm font-semibold">{linked.length ? "More you can add" : "Available"} <span className="font-mono text-muted tabular">{rest.length}</span></h3>
-        <ul className="divide-y divide-line rounded-[var(--radius-panel)] border border-line bg-surface">{rest.map((p) => row(p.id))}</ul>
+        <h3 id="available-title" className="mb-2 font-display text-sm font-semibold text-text-primary">{linked.length ? "More you can add" : "Available"} <span className="font-mono text-text-muted tabular">{rest.length}</span></h3>
+        <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{rest.map((p) => row(p.id))}</ul>
       </section>
       {openId && <ConnectorDrawer id={openId} api={api} returnTo={returnTo} onClose={() => setOpenId(null)} />}
     </div>
@@ -151,8 +151,8 @@ function ConnectorDrawer({ id, api, returnTo, onClose }: { id: string; api: Conn
         {error && <Banner kind="danger" title="That didn't work">{error}</Banner>}
 
         {id === "github" && status !== "connected" && (
-          <div className="rounded-[var(--radius-control)] border border-line bg-raised/50 p-3.5 text-sm">
-            <p className="text-muted">
+          <div className="rounded-lg border border-border-medium bg-bg-surface/50 p-3.5 text-sm">
+            <p className="text-text-muted">
               {status === "detected" ? "We read this account's public repositories, but haven't confirmed it's yours. " : "Typing a username reads public data only. "}
               Signing in with GitHub proves the account is yours.
             </p>
@@ -188,14 +188,14 @@ function ConnectorDrawer({ id, api, returnTo, onClose }: { id: string; api: Conn
           </div>
         )}
 
-        <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+        <div className="grid gap-4 border-t border-border-medium pt-4 sm:grid-cols-2">
           <div>
-            <p className="mb-2 flex items-center gap-1.5 text-sm font-medium"><CheckCircle size={16} aria-hidden="true" className="text-muted" />What we read</p>
-            <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted">{p.dataCollected.map((d) => <li key={d}>{d}</li>)}</ul>
+            <p className="mb-2 flex items-center gap-1.5 font-display text-sm font-medium text-warm-ivory"><CheckCircle size={16} aria-hidden="true" className="text-champagne" />What we read</p>
+            <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-text-muted">{p.dataCollected.map((d) => <li key={d}>{d}</li>)}</ul>
           </div>
           <div>
-            <p className="mb-2 flex items-center gap-1.5 text-sm font-medium"><ShieldCheck size={16} aria-hidden="true" className="text-muted" />Our promises</p>
-            <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted">{p.guarantees.map((g) => <li key={g}>{g}</li>)}</ul>
+            <p className="mb-2 flex items-center gap-1.5 font-display text-sm font-medium text-warm-ivory"><ShieldCheck size={16} aria-hidden="true" className="text-champagne" />Our promises</p>
+            <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-text-muted">{p.guarantees.map((g) => <li key={g}>{g}</li>)}</ul>
           </div>
         </div>
       </div>

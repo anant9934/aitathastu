@@ -139,7 +139,7 @@ export function SourceProgress({
           )}
 
           {rows.length > 0 && (
-            <ul className={cn("divide-y divide-line rounded-[var(--radius-control)] border border-line", variant === "summary" ? "bg-surface" : "bg-canvas/40")}>
+            <ul className={cn("divide-y divide-border-medium rounded-lg border border-border-medium", variant === "summary" ? "bg-bg-elevated shadow-card" : "bg-bg-surface/50")}>
               {rows.map((s) => (
                 <SourceRow
                   key={s.source}

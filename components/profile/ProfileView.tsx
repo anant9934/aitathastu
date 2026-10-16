@@ -129,12 +129,12 @@ function AboutCard({ data, onSaved }: { data: Person360; onSaved: () => Promise<
         </form>
       ) : (
         <>
-          {saved.bio ? <p className="mb-4 max-w-[68ch] whitespace-pre-line text-sm text-ink">{saved.bio}</p> : <p className="mb-4 text-sm text-muted">No bio yet.</p>}
+          {saved.bio ? <p className="mb-4 max-w-[68ch] whitespace-pre-line text-sm text-text-primary">{saved.bio}</p> : <p className="mb-4 text-sm text-text-muted">No bio yet.</p>}
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
             {([["Institution", saved.institution], ["Degree", saved.degree], ["Specialisation", saved.specialization], ["Graduation year", saved.expectedGraduationYear], ["Placement status", PLACEMENT[saved.placementStatus] ?? saved.placementStatus]] as const).map(([l, v]) => (
               <div key={l} className="min-w-0">
-                <dt className="text-xs text-muted">{l}</dt>
-                <dd className={cn("mt-0.5 break-words text-sm", v ? "text-ink" : "text-muted")}>{v || "Not added"}</dd>
+                <dt className="text-xs text-text-muted">{l}</dt>
+                <dd className={cn("mt-0.5 break-words text-sm", v ? "text-warm-ivory" : "text-text-muted")}>{v || "Not added"}</dd>
               </div>
             ))}
           </dl>
@@ -162,7 +162,7 @@ function EvidenceLedger({ data, onChanged }: { data: Person360; onChanged: () =>
       <div role="group" aria-label="Filter evidence" className="mb-3 flex flex-wrap gap-1.5">
         {(["all", "verified", "pending", "unverified"] as const).map((k) => (
           <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}
-            className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm pointer-coarse:min-h-11", filter === k ? "border-signal bg-signal-tint text-ink" : "border-line text-muted hover:text-ink")}>
+            className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-150 pointer-coarse:min-h-11", filter === k ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory")}>
             {{ all: "All", verified: "Verified", pending: "In review", unverified: "Not verified" }[k]} <span className="font-mono text-2xs tabular">{counts[k]}</span>
           </button>
         ))}
@@ -172,7 +172,7 @@ function EvidenceLedger({ data, onChanged }: { data: Person360; onChanged: () =>
           {data.evidence.length ? "Try another filter." : "Confirm details from your CV, add a project or connect an account; each item appears here with its source."}
         </EmptyState>
       ) : (
-        <ul className="divide-y divide-line border-t border-line">
+        <ul className="divide-y divide-border-medium border-t border-border-medium">
           {items.map((e) => {
             const v = VERIFICATION_VIEW[e.verificationStatus] ?? VERIFICATION_VIEW.unverified;
             const canRequest = ["self_reported", "imported", "unverified", "rejected"].includes(e.verificationStatus);
@@ -326,7 +326,7 @@ function AccountCard() {
         footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Keep my account</Button><Button variant="danger" disabled={phrase.trim().toLowerCase() !== "delete my account"} loading={busy} loadingLabel="Deleting…" onClick={() => void del()}>Delete permanently</Button></>}
       >
         <div className="grid gap-3">
-          <p className="flex items-start gap-2 text-sm text-muted"><ShieldWarning size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />Type <span className="font-mono text-ink">delete my account</span> to confirm.</p>
+          <p className="flex items-start gap-2 text-sm text-text-muted"><ShieldWarning size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />Type <span className="font-mono text-warm-ivory">delete my account</span> to confirm.</p>
           <TextField label="Confirmation" labelHidden value={phrase} onChange={(e) => setPhrase(e.target.value)} autoComplete="off" error={err} />
         </div>
       </Dialog>

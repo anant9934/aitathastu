@@ -13,8 +13,8 @@ const BASE = process.env.VISUAL_BASE_URL || "http://localhost:3100";
 const out = process.argv[2] || ".";
 
 async function main() {
-  const { useTestDatabase } = await import("./lib/test-db");
-  await useTestDatabase();
+  const { setupTestDatabase } = await import("./lib/test-db");
+  await setupTestDatabase();
   const { createUser } = await import("../lib/repositories/user-repository");
   const { hashPassword } = await import("../lib/auth/password");
   const { completeOnboarding } = await import("../lib/services/onboarding-v2-service");

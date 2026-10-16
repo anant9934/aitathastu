@@ -1,9 +1,10 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { LinkedInPolicyError, relayLinkedInOtp } from "@/lib/services/linkedin-import-service";
 
 /** Relays the SMS/email code LinkedIn asked for to the waiting session (Task 1.6.8). */
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   const auth = await getServerAuthContext();
   if (!auth) return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
   const body = (await req.json().catch(() => null)) as { code?: string } | null;
@@ -14,3 +15,6 @@ export async function POST(req: Request) {
     throw error;
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { describeOperation, retryLatestForUser, RetryNotAllowedError } from "@/lib/sync/runners";
@@ -7,7 +8,7 @@ import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 export const maxDuration = 30;
 
 /** Manual retry of a failed or dead-lettered sync (Task 1.9.4). */
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   const auth = await getServerAuthContext();
   if (!auth) return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
   const body = (await req.json().catch(() => null)) as { source?: string } | null;
@@ -25,3 +26,6 @@ export async function POST(req: Request) {
     throw error;
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { syncGitHubConnection } from "@/lib/services/github-sync-service";
@@ -9,7 +10,7 @@ export const maxDuration = 30;
  * retried or double-clicked request return the same sync operation instead
  * of starting another one; without it, identical requests within 60 s collapse.
  */
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -37,3 +38,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

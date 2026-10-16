@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { parseOrcid, parseSemanticScholarAuthorId } from "@/lib/connectors/research-and-dev/scholar-client";
@@ -11,7 +12,7 @@ export const maxDuration = 30;
  * ORCID iD or Semantic Scholar author ID the student enters here; there is no
  * name-based lookup. Omitting it means publication import never runs.
  */
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   const auth = await getServerAuthContext();
   if (!auth) return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
   const body = (await req.json().catch(() => null)) as { kind?: string; value?: string } | null;
@@ -36,9 +37,13 @@ export async function POST(req: Request) {
   return NextResponse.json({ kind, id, sync: result });
 }
 
-export async function DELETE() {
+async function DELETE_handler() {
   const auth = await getServerAuthContext();
   if (!auth) return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
   await disconnectConnection(auth.person.id, "scholar");
   return NextResponse.json({ ok: true });
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);
+export const DELETE = withStudentCacheInvalidation(DELETE_handler);

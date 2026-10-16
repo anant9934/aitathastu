@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { can } from "@/lib/auth/rbac";
@@ -5,7 +6,7 @@ import { setActionState } from "@/lib/repositories/action-repository";
 import { createJourneyEventRecord } from "@/lib/repositories/journey-repository";
 import type { ActionStatus } from "@/lib/domain";
 
-export async function POST(req: Request) {
+async function POST_handler(req: Request) {
   try {
     const auth = await getServerAuthContext();
     if (!auth) {
@@ -68,3 +69,6 @@ export async function POST(req: Request) {
     );
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

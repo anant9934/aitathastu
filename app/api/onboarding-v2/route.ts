@@ -1,3 +1,4 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import {
   applySessionCookie,
@@ -48,7 +49,7 @@ async function upgradeGuestCredentials(auth: AuthContext, body: Record<string, u
  * Draft write. This is the ONLY route that may create a guest session (see
  * lib/auth/server-session.ts), so a first-time visitor's progress has an owner.
  */
-export async function PUT(request: Request) {
+async function PUT_handler(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
@@ -81,7 +82,7 @@ export async function PUT(request: Request) {
 }
 
 /** Final onboarding save. Requires the session established by earlier draft writes. */
-export async function POST(request: Request) {
+async function POST_handler(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
@@ -103,3 +104,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const PUT = withStudentCacheInvalidation(PUT_handler);
+export const POST = withStudentCacheInvalidation(POST_handler);

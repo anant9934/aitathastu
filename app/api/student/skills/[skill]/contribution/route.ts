@@ -1,8 +1,9 @@
+import { withStudentCacheInvalidation } from "@/lib/cache/response-cache";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { SkillIntelligenceService } from "@/lib/services/skill-intelligence-service";
 
-export async function POST(
+async function POST_handler(
   req: Request,
   props: { params: Promise<{ skill: string }> }
 ) {
@@ -64,3 +65,6 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+// Drop the student's cached reads after a successful write (Task 2.6.1).
+export const POST = withStudentCacheInvalidation(POST_handler);

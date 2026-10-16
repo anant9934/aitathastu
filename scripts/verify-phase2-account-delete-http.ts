@@ -11,8 +11,8 @@ import { sql } from "drizzle-orm";
 const BASE = process.env.VISUAL_BASE_URL || "http://localhost:3100";
 
 async function main() {
-  const { useTestDatabase } = await import("./lib/test-db");
-  const db = await useTestDatabase(); // replays migrations: restores every FK
+  const { setupTestDatabase } = await import("./lib/test-db");
+  const db = await setupTestDatabase(); // replays migrations: restores every FK
   const exec = (q: unknown) => (db as unknown as { execute: (q: unknown) => Promise<unknown> }).execute(q);
   const rowsOf = (r: unknown) => (Array.isArray(r) ? r : (r as { rows: unknown[] }).rows) as Record<string, unknown>[];
   const { createUser } = await import("../lib/repositories/user-repository");

@@ -418,7 +418,6 @@ export function parseLinkedInZipArchive(buffer: Buffer): Partial<LinkedInParsedE
     const sig = buffer.readUInt32LE(offset);
     if (sig !== 0x04034b50) break; // Reached end of local file headers
 
-    const flags = buffer.readUInt16LE(offset + 6);
     const method = buffer.readUInt16LE(offset + 8);
     const compSize = buffer.readUInt32LE(offset + 18);
     const uncompSize = buffer.readUInt32LE(offset + 22);

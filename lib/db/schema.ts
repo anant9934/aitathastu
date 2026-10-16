@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, boolean, jsonb, uniqueIndex, index, integer, doublePrecision } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -75,6 +76,7 @@ export const personProfiles = pgTable("person_profiles", {
   education: text("education").default("").notNull(),
   experience: text("experience").default("").notNull(),
   headline: text("headline").default(""),
+  bio: text("bio").default(""),
   degree: text("degree").default(""),
   specialization: text("specialization").default(""),
   institution: text("institution").default(""),
@@ -96,7 +98,11 @@ export const goals = pgTable("goals", {
   status: text("status").default("active").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  // At most one active goal per person, enforced by the database so concurrent
+  // onboarding completions cannot each insert one (Task 2.1.7).
+  uniqueIndex("uq_goals_one_active").on(table.personId).where(sql`${table.status} = 'active'`),
+]);
 
 export const evidenceItems = pgTable("evidence_items", {
   id: text("id").primaryKey(),
@@ -117,6 +123,8 @@ export const evidenceItems = pgTable("evidence_items", {
   confidenceScore: doublePrecision("confidence_score"),
   /** False for evidence the student may not edit (faculty-verified, assessment results). */
   editable: boolean("editable").default(true).notNull(),
+  /** In the student's verified portfolio / application pack, e.g. a publication (Task 2.5.5). */
+  portfolioIncluded: boolean("portfolio_included").default(false).notNull(),
   verifiedByPersonId: text("verified_by_person_id").references(() => persons.id, { onDelete: "set null" }),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   verificationMethod: text("verification_method"),
@@ -165,7 +173,10 @@ export const journeyEvents = pgTable("journey_events", {
   importKey: text("import_key"),
   timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  // An import-keyed event exists once per person, even under concurrent writers (Task 2.1.7).
+  uniqueIndex("uq_journey_events_import_key").on(table.personId, table.importKey).where(sql`${table.importKey} IS NOT NULL`),
+]);
 
 export const actionStates = pgTable(
   "action_states",
@@ -406,6 +417,10 @@ export const projects = pgTable(
     aiDetails: jsonb("ai_details").default({}).notNull(), // AiMlDetailsRecord
     hardwareDetails: jsonb("hardware_details").default({}).notNull(), // HardwareDetailsRecord
     media: jsonb("media").default([]).notNull(),
+    /** In the student's verified portfolio / application pack (Task 2.5.1). */
+    portfolioIncluded: boolean("portfolio_included").default(false).notNull(),
+    /** ProjectLedgerMetadata (lib/domain/project-ledger.ts): GitHub stats, highlights, AI summary, preview, edited fields. */
+    metadata: jsonb("metadata").default({}).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -473,7 +488,7 @@ export const aiAuditLogs = pgTable(
   "ai_audit_logs",
   {
     id: text("id").primaryKey(),
-    personId: text("person_id"),
+    personId: text("person_id").references(() => persons.id, { onDelete: "set null" }), // Task 2.6.4
     task: text("task").notNull(),
     provider: text("provider").notNull(),
     model: text("model").notNull(),
@@ -755,7 +770,7 @@ export const resumeReviewHistory = pgTable(
     fieldKey: text("field_key"),
     action: text("action").notNull(), // 'accept' | 'correct' | 'reject' | 'uncertain' | 'confirm' | 'verify'
     actor: text("actor").notNull(), // 'student' | 'verifier'
-    actorPersonId: text("actor_person_id"),
+    actorPersonId: text("actor_person_id").references(() => persons.id, { onDelete: "set null" }), // Task 2.6.4
     previousValue: text("previous_value"),
     newValue: text("new_value"),
     previousState: text("previous_state"),

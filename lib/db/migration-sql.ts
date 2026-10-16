@@ -14,6 +14,54 @@
  * lib/services/guest-cleanup-service.ts). Adding them needs orphan cleanup on
  * production data first.
  */
+/**
+ * Referential repair (Task 2.6.4). The CREATE TABLE statements above predate
+ * the foreign keys declared in lib/db/schema.ts, so these 27 references were
+ * never enforced (orphans could pile up and account deletion could not
+ * cascade). Each is added NOT VALID (enforced for new rows at once, without
+ * failing on old data), orphans are removed (person/org-owned rows) or
+ * detached (who-did-it references), then the constraint is validated. The
+ * onDelete rule for each comes from schema.ts. Every step is idempotent.
+ */
+type FkSpec = [table: string, column: string, refTable: string, onDelete: "CASCADE" | "SET NULL"];
+const FOREIGN_KEY_REPAIRS: FkSpec[] = [
+  ["action_states", "person_id", "persons", "CASCADE"],
+  ["ai_audit_logs", "person_id", "persons", "SET NULL"],
+  ["assessment_attempts", "organization_id", "organizations", "CASCADE"],
+  ["assessment_attempts", "person_id", "persons", "CASCADE"],
+  ["evidence_items", "person_id", "persons", "CASCADE"],
+  ["evidence_items", "verified_by_person_id", "persons", "SET NULL"],
+  ["goals", "person_id", "persons", "CASCADE"],
+  ["integration_credentials", "organization_id", "organizations", "CASCADE"],
+  ["integration_events", "organization_id", "organizations", "CASCADE"],
+  ["integration_events", "person_id", "persons", "CASCADE"],
+  ["integration_identity_links", "organization_id", "organizations", "CASCADE"],
+  ["integration_identity_links", "person_id", "persons", "CASCADE"],
+  ["interview_sessions", "organization_id", "organizations", "CASCADE"],
+  ["interview_sessions", "person_id", "persons", "CASCADE"],
+  ["journey_events", "person_id", "persons", "CASCADE"],
+  ["organization_memberships", "organization_id", "organizations", "CASCADE"],
+  ["organization_memberships", "person_id", "persons", "CASCADE"],
+  ["person_profiles", "person_id", "persons", "CASCADE"],
+  ["resume_review_history", "actor_person_id", "persons", "SET NULL"],
+  ["roles", "organization_id", "organizations", "CASCADE"],
+  ["sessions", "user_id", "users", "CASCADE"],
+  ["user_preferences", "person_id", "persons", "CASCADE"],
+  ["verification_decisions", "verifier_person_id", "persons", "CASCADE"],
+  ["verification_requests", "assigned_verifier_person_id", "persons", "SET NULL"],
+  ["verification_requests", "evidence_id", "evidence_items", "CASCADE"],
+  ["verification_requests", "organization_id", "organizations", "CASCADE"],
+  ["verification_requests", "requester_person_id", "persons", "CASCADE"],
+];
+const fkName = (t: string, c: string) => `fk_${t}_${c}`.slice(0, 63);
+export const FOREIGN_KEY_REPAIR_STATEMENTS: string[] = FOREIGN_KEY_REPAIRS.flatMap(([t, c, ref, onDelete]) => [
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '${fkName(t, c)}') THEN ALTER TABLE "${t}" ADD CONSTRAINT "${fkName(t, c)}" FOREIGN KEY ("${c}") REFERENCES "${ref}"("id") ON DELETE ${onDelete} NOT VALID; END IF; END $$;`,
+  onDelete === "CASCADE"
+    ? `DELETE FROM "${t}" x WHERE x."${c}" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "${ref}" p WHERE p."id" = x."${c}");`
+    : `UPDATE "${t}" x SET "${c}" = NULL WHERE x."${c}" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "${ref}" p WHERE p."id" = x."${c}");`,
+  `ALTER TABLE "${t}" VALIDATE CONSTRAINT "${fkName(t, c)}";`,
+]);
+
 export const MIGRATION_SQL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS "action_states" (
     "id" text PRIMARY KEY NOT NULL,
@@ -290,6 +338,8 @@ export const MIGRATION_SQL_STATEMENTS = [
   `ALTER TABLE "person_profiles" ADD COLUMN IF NOT EXISTS "location" text DEFAULT '';`,
   `ALTER TABLE "person_profiles" ADD COLUMN IF NOT EXISTS "placement_status" text DEFAULT 'preparing';`,
   `ALTER TABLE "person_profiles" ADD COLUMN IF NOT EXISTS "internship_status" text DEFAULT 'seeking';`,
+  // Task 2.2.2: student-written bio, edited in place on /student/profile.
+  `ALTER TABLE "person_profiles" ADD COLUMN IF NOT EXISTS "bio" text DEFAULT '';`,
   `CREATE TABLE IF NOT EXISTS "external_connections" (
     "id" text PRIMARY KEY NOT NULL,
     "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
@@ -654,5 +704,24 @@ export const MIGRATION_SQL_STATEMENTS = [
 
   // Request-level idempotency ledger (Task 1.9.1).
   `CREATE TABLE IF NOT EXISTS "idempotency_keys" ("key" text PRIMARY KEY NOT NULL, "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE, "scope" text NOT NULL, "response" jsonb, "created_at" timestamp with time zone DEFAULT now() NOT NULL, "completed_at" timestamp with time zone);`,
-  `CREATE INDEX IF NOT EXISTS "idx_idempotency_keys_created" ON "idempotency_keys" ("created_at");`
+  `CREATE INDEX IF NOT EXISTS "idx_idempotency_keys_created" ON "idempotency_keys" ("created_at");`,
+  // One active goal per person (Task 2.1.7). Existing duplicates (left by concurrent
+  // onboarding completions) are paused first, keeping the newest; idempotent.
+  `UPDATE "goals" g SET "status" = 'paused' WHERE g."status" = 'active' AND EXISTS (SELECT 1 FROM "goals" g2 WHERE g2."person_id" = g."person_id" AND g2."status" = 'active' AND (g2."updated_at" > g."updated_at" OR (g2."updated_at" = g."updated_at" AND g2."id" > g."id")));`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "uq_goals_one_active" ON "goals" ("person_id") WHERE "status" = 'active';`,
+  // Import-keyed journey events are written once per person (Task 2.1.7). Exact
+  // duplicates (same person + import_key, left by concurrent completions) are
+  // removed first, keeping the earliest; idempotent.
+  `DELETE FROM "journey_events" j USING "journey_events" k WHERE j."import_key" IS NOT NULL AND j."person_id" = k."person_id" AND j."import_key" = k."import_key" AND (j."created_at" > k."created_at" OR (j."created_at" = k."created_at" AND j."id" > k."id"));`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "uq_journey_events_import_key" ON "journey_events" ("person_id", "import_key") WHERE "import_key" IS NOT NULL;`,
+  ...FOREIGN_KEY_REPAIR_STATEMENTS,
+  // Project Evidence Ledger (Tasks 2.5.1-2.5.5). Confirmed projects start in
+  // the portfolio; the backfill runs only while the column is new (no row
+  // has been touched yet), so it never overrides a student's later choice.
+  `ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL;`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'projects' AND column_name = 'portfolio_included') THEN
+     ALTER TABLE "projects" ADD COLUMN "portfolio_included" boolean DEFAULT false NOT NULL;
+     UPDATE "projects" SET "portfolio_included" = true WHERE "status" = 'confirmed';
+   END IF; END $$;`,
+  `ALTER TABLE "evidence_items" ADD COLUMN IF NOT EXISTS "portfolio_included" boolean DEFAULT false NOT NULL;`,
 ];

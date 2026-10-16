@@ -15,7 +15,7 @@
  */
 import assert from "node:assert/strict";
 import { and, eq } from "drizzle-orm";
-import { useTestDatabase, createTestPerson } from "./lib/test-db";
+import { setupTestDatabase, createTestPerson } from "./lib/test-db";
 
 const runsArg = process.argv.find((a) => a.startsWith("--runs="));
 const RUNS = runsArg ? Number(runsArg.split("=")[1]) : 20;
@@ -26,7 +26,7 @@ let burst = false;
 const jitter = () => new Promise((r) => setTimeout(r, burst ? 0 : Math.random() * WINDOW_MS));
 
 async function main() {
-  const db = await useTestDatabase();
+  const db = await setupTestDatabase();
   const { onboardingDrafts, projects, evidenceItems } = await import("../lib/db");
   const { writeOnboardingDraft, readOnboardingDraft, readOnboardingDraftRevision } = await import("../lib/services/onboarding-v2-service");
   const { saveProject } = await import("../lib/repositories/project-repository");

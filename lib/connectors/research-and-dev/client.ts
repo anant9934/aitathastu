@@ -431,9 +431,17 @@ export async function fetchDevToArticles(rawInput: string): Promise<DevToArticle
 
 let soBackoffUntil = 0;
 
+export function getStackExchangeApiKey(): string | null {
+  const key =
+    process.env.STACKEXCHANGE_API_KEY ||
+    process.env.STACK_EXCHANGE_API_KEY ||
+    process.env.STACK_EXCHANGE_KEY;
+  return key && key.trim() ? key.trim() : null;
+}
+
 export function getStackExchangeCapacity(): { configured: boolean; capacity: number } {
-  const key = process.env.STACKEXCHANGE_API_KEY || process.env.STACK_EXCHANGE_API_KEY;
-  return { configured: Boolean(key && key.trim()), capacity: key && key.trim() ? 1 : 0 };
+  const key = getStackExchangeApiKey();
+  return { configured: Boolean(key), capacity: key ? 1 : 0 };
 }
 
 /**
@@ -469,8 +477,8 @@ export async function fetchStackOverflowProfile(rawInput: string): Promise<Stack
     };
   }
 
-  const key = process.env.STACKEXCHANGE_API_KEY || process.env.STACK_EXCHANGE_API_KEY;
-  const keyParam = key && key.trim() ? `&key=${encodeURIComponent(key.trim())}` : "";
+  const key = getStackExchangeApiKey();
+  const keyParam = key ? `&key=${encodeURIComponent(key)}` : "";
 
   try {
     const [userRes, tagsRes] = await Promise.all([

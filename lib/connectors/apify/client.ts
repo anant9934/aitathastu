@@ -25,14 +25,17 @@ export interface ApifyActorRunAudit {
   executedAt: string;
 }
 
-const apifyKeyPool = new KeyPool([
+export const APIFY_ENV_VARS = [
+  "APIFY_TOKEN",
+  "APIFY_TOKENS",
   "APIFY_API_KEYS",
   "APIFY_API_KEY",
-  "APIFY_TOKEN",
-]);
+] as const;
+
+const apifyKeyPool = new KeyPool([...APIFY_ENV_VARS]);
 
 export function getApifyCapacity(): { configured: boolean; capacity: number } {
-  const pool = new KeyPool(["APIFY_API_KEYS", "APIFY_API_KEY", "APIFY_TOKENS", "APIFY_TOKEN"]);
+  const pool = new KeyPool([...APIFY_ENV_VARS]);
   return {
     configured: pool.hasKeys(),
     capacity: pool.capacity(),

@@ -126,29 +126,22 @@ describe("1.1.2 resume structuring through IntelligenceRouter", () => {
     assert.deepEqual(out.attempts.map((a) => `${a.provider}:${a.outcome}`), ["groq:schema_violation", "gemini:ok"]);
   });
 
-  test("json_object provider: malformed JSON gets exactly one repair turn, then succeeds", async () => {
+  test("retired providers (cerebras, mistral, sambanova) are never called even if in environment", async () => {
+    process.env.CLOUD_AI_PROVIDER_ORDER = "cerebras,mistral,sambanova,groq,gemini,openrouter";
     stubProviders({
-      [HOST.groq]: status(503), [HOST.gemini]: status(503), [HOST.openrouter]: status(503),
-      [HOST.cerebras]: (_c, n) => (n === 1 ? openAi("{not json")() : openAi(VALID)()),
+      [HOST.groq]: status(503),
+      [HOST.gemini]: status(503),
+      [HOST.openrouter]: openAi(VALID),
+      [HOST.cerebras]: openAi(VALID),
+      [HOST.mistral]: openAi(VALID),
+      [HOST.sambanova]: openAi(VALID),
     });
     const out = await structureResumeText("text", "p1", freshRouter());
-    assert.equal(out.provider, "cerebras");
-    assert.deepEqual(out.attempts.filter((a) => a.provider === "cerebras").map((a) => a.outcome), ["malformed_json", "ok"]);
-    const [first, second] = calls.filter((c) => c.host === HOST.cerebras);
-    assert.deepEqual(first.body.response_format, { type: "json_object" }, "no strict schema claimed for cerebras");
-    assert.match((first.body.messages as { content: string }[])[0].content, /JSON Schema exactly/);
-    const repairTurn = (second.body.messages as { role: string; content: string }[]).at(-1)!;
-    assert.match(repairTurn.content, /failed validation/);
-  });
-
-  test("json_object provider that stays invalid after repair is abandoned (no loop)", async () => {
-    stubProviders({
-      [HOST.groq]: status(503), [HOST.gemini]: status(503), [HOST.openrouter]: status(503),
-      [HOST.cerebras]: openAi({ wrong: true }), [HOST.mistral]: openAi(VALID),
-    });
-    const out = await structureResumeText("text", "p1", freshRouter());
-    assert.equal(calls.filter((c) => c.host === HOST.cerebras).length, 2);
-    assert.equal(out.provider, "mistral");
+    assert.equal(out.provider, "openrouter");
+    // Ensure cerebras, mistral, and sambanova received 0 calls
+    assert.equal(calls.filter((c) => c.host === HOST.cerebras).length, 0);
+    assert.equal(calls.filter((c) => c.host === HOST.mistral).length, 0);
+    assert.equal(calls.filter((c) => c.host === HOST.sambanova).length, 0);
   });
 
   test("every provider failing -> ResumeStructuringError(provider) and the quota reservation is refunded", async () => {
@@ -156,7 +149,7 @@ describe("1.1.2 resume structuring through IntelligenceRouter", () => {
     const err = await structureResumeText("text", "p-refund", freshRouter()).catch((e) => e);
     assert.ok(err instanceof ResumeStructuringError);
     assert.equal(err.kind, "provider");
-    assert.equal(err.attempts.length, 6, "each of the 6 providers tried once");
+    assert.equal(err.attempts.length, 3, "each of the 3 active providers tried once");
     // Refund check: 50 more reservations still fit under the 50/day request cap.
     for (let i = 0; i < 50; i++) assert.equal((await cost.reserveAiQuota("p-refund", 1)).allowed, true);
   });
@@ -179,18 +172,18 @@ describe("1.1.2 resume structuring through IntelligenceRouter", () => {
   });
 
   test("402 (billing) is account-wide: no key rotation, provider cooled down for an hour", async () => {
-    process.env.CEREBRAS_API_KEYS = "a,b,c";
+    process.env.OPENROUTER_API_KEYS = "a,b,c";
     try {
       const router = freshRouter();
-      stubProviders({ [HOST.groq]: status(503), [HOST.gemini]: status(503), [HOST.openrouter]: status(503), [HOST.cerebras]: status(402), [HOST.mistral]: openAi(VALID) });
+      stubProviders({ [HOST.groq]: status(503), [HOST.gemini]: status(503), [HOST.openrouter]: status(402) });
       const before = Date.now();
-      const out = await structureResumeText("text", "p1", router);
-      assert.equal(out.provider, "mistral");
-      assert.equal(calls.filter((c) => c.host === HOST.cerebras).length, 1);
-      const until = (router as unknown as { cooldowns: Map<string, number> }).cooldowns.get("cerebras")!;
+      const err = await structureResumeText("text", "p1", router).catch((e) => e);
+      assert.ok(err instanceof ResumeStructuringError);
+      assert.equal(calls.filter((c) => c.host === HOST.openrouter).length, 1);
+      const until = (router as unknown as { cooldowns: Map<string, number> }).cooldowns.get("openrouter")!;
       assert.ok(until - before >= 59 * 60_000);
     } finally {
-      process.env.CEREBRAS_API_KEYS = "stub-cerebras_api_keys";
+      process.env.OPENROUTER_API_KEYS = "stub-openrouter_api_keys";
     }
   });
 

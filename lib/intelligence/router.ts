@@ -8,43 +8,65 @@ import {
   GeminiProvider,
   GroqProvider,
   OpenRouterProvider,
-  CerebrasProvider,
-  MistralProvider,
-  SambaNovaProvider,
 } from "./providers/adapters";
 import { executeDeterministicFallback } from "./deterministic-fallback";
 import { estimateTokens, releaseAiQuota, reserveAiQuota, settleAiQuota, type QuotaReservation } from "./cost-control";
 import { getDb, aiAuditLogs } from "../db";
 import { coreIngestionReady } from "../security/core-ingestion-gate";
 
+export const ACTIVE_ALLOWED_PROVIDERS: readonly ModelProviderName[] = [
+  "groq",
+  "gemini",
+  "openrouter",
+] as const;
+
 export class IntelligenceRouter {
   private providers: ModelProvider[] = [];
   private cooldowns: Map<ModelProviderName, number> = new Map();
 
   constructor() {
-    const providerMap: Record<ModelProviderName, ModelProvider> = {
+    const providerMap: Partial<Record<ModelProviderName, ModelProvider>> = {
       groq: new GroqProvider(),
-      cerebras: new CerebrasProvider(),
       gemini: new GeminiProvider(),
       openrouter: new OpenRouterProvider(),
-      mistral: new MistralProvider(),
-      sambanova: new SambaNovaProvider(),
     };
 
-    const orderStr = process.env.CLOUD_AI_PROVIDER_ORDER || "groq,cerebras,gemini,openrouter,mistral,sambanova";
-    const orderNames = orderStr.split(",").map((s) => s.trim().toLowerCase() as ModelProviderName);
+    const defaultOrder = "groq,gemini,openrouter";
+    const orderStr = process.env.CLOUD_AI_PROVIDER_ORDER || defaultOrder;
+    const orderNames = orderStr
+      .split(",")
+      .map((s) => s.trim().toLowerCase() as ModelProviderName)
+      .filter(Boolean);
 
     const configuredProviders: ModelProvider[] = [];
+    const seen = new Set<ModelProviderName>();
+
     for (const name of orderNames) {
-      if (providerMap[name]) {
-        configuredProviders.push(providerMap[name]);
+      // 1. Strictly enforce active allowed providers; reject sambanova, mistral, cerebras, and unknown providers
+      if (!ACTIVE_ALLOWED_PROVIDERS.includes(name)) {
+        continue;
+      }
+      // 2. Reject duplicate entries
+      if (seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+
+      const p = providerMap[name];
+      if (p) {
+        configuredProviders.push(p);
       }
     }
-    for (const provider of Object.values(providerMap)) {
-      if (!configuredProviders.includes(provider)) {
-        configuredProviders.push(provider);
+
+    // 3. Fallback: if no valid provider configured, default to all allowed providers in standard order
+    if (configuredProviders.length === 0) {
+      for (const name of ACTIVE_ALLOWED_PROVIDERS) {
+        const p = providerMap[name];
+        if (p) configuredProviders.push(p);
       }
     }
+
+    // 4. Do not append any unconfigured or retired providers; CLOUD_AI_PROVIDER_ORDER defines the complete allowed set
     this.providers = configuredProviders;
   }
 

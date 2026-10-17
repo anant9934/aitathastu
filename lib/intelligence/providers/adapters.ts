@@ -220,11 +220,14 @@ Return the corrected JSON only.` }] },
     if (!key) throw new Error("No Gemini key available");
 
     const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+      },
       body: JSON.stringify({
         contents: [
           { role: "user", parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] },

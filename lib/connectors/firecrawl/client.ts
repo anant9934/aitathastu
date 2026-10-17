@@ -34,13 +34,15 @@ export interface FirecrawlEnrichmentResult {
   notes?: string;
 }
 
-const firecrawlKeyPool = new KeyPool([
-  "FIRECRAWL_API_KEYS",
+export const FIRECRAWL_ENV_VARS = [
   "FIRECRAWL_API_KEY",
-]);
+  "FIRECRAWL_API_KEYS",
+] as const;
+
+const firecrawlKeyPool = new KeyPool([...FIRECRAWL_ENV_VARS]);
 
 export function getFirecrawlCapacity(): { configured: boolean; capacity: number } {
-  const pool = new KeyPool(["FIRECRAWL_API_KEYS", "FIRECRAWL_API_KEY"]);
+  const pool = new KeyPool([...FIRECRAWL_ENV_VARS]);
   return {
     configured: pool.hasKeys(),
     capacity: pool.capacity(),

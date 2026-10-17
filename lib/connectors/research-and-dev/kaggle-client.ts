@@ -38,26 +38,45 @@ export class KaggleFetchError extends Error {
   }
 }
 
-export function getKaggleCapacity(): { configured: boolean; capacity: number } {
-  let count = 0;
-  if (process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) count++;
+export function getAllPlatformKaggleCredentials(): Array<{ username: string; key: string }> {
+  const indexed: Array<{ username: string; key: string }> = [];
   for (let i = 1; i <= 3; i++) {
-    if (process.env[`KAGGLE_USERNAME_${i}`] && process.env[`KAGGLE_KEY_${i}`]) count++;
+    const u = process.env[`KAGGLE_USERNAME_${i}`];
+    const k = process.env[`KAGGLE_KEY_${i}`];
+    if (u && k && u.trim() && k.trim()) {
+      indexed.push({ username: u.trim(), key: k.trim() });
+    }
   }
-  return { configured: count > 0, capacity: count };
+
+  // When indexed credentials exist, prioritize them to prevent retired aliases from remaining active
+  const candidates = indexed.length > 0 ? indexed : [];
+  if (candidates.length === 0 && process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) {
+    const u = process.env.KAGGLE_USERNAME.trim();
+    const k = process.env.KAGGLE_KEY.trim();
+    if (u && k) candidates.push({ username: u, key: k });
+  }
+
+  // Deduplicate pairs by username:key
+  const seen = new Set<string>();
+  const deduped: Array<{ username: string; key: string }> = [];
+  for (const pair of candidates) {
+    const sig = `${pair.username.toLowerCase()}:${pair.key}`;
+    if (!seen.has(sig)) {
+      seen.add(sig);
+      deduped.push(pair);
+    }
+  }
+  return deduped;
+}
+
+export function getKaggleCapacity(): { configured: boolean; capacity: number } {
+  const creds = getAllPlatformKaggleCredentials();
+  return { configured: creds.length > 0, capacity: creds.length };
 }
 
 let platformKaggleIndex = 0;
 export function getPlatformKaggleCredential(): { username: string; key: string } | null {
-  const pairs: Array<{ username: string; key: string }> = [];
-  if (process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) {
-    pairs.push({ username: process.env.KAGGLE_USERNAME.trim(), key: process.env.KAGGLE_KEY.trim() });
-  }
-  for (let i = 1; i <= 3; i++) {
-    const u = process.env[`KAGGLE_USERNAME_${i}`];
-    const k = process.env[`KAGGLE_KEY_${i}`];
-    if (u && k) pairs.push({ username: u.trim(), key: k.trim() });
-  }
+  const pairs = getAllPlatformKaggleCredentials();
   if (pairs.length === 0) return null;
   const picked = pairs[platformKaggleIndex % pairs.length];
   platformKaggleIndex++;

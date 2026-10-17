@@ -4,24 +4,52 @@ export class KeyPool {
   private index = 0;
 
   constructor(envVarNames: string[]) {
-    const collected: string[] = [];
+    // Collect all candidate base prefixes (e.g. GROQ_API_KEYS -> GROQ_API_KEY and GROQ_API_KEYS)
+    const prefixes = new Set<string>();
     for (const baseName of envVarNames) {
-      // 1. Direct environment variable (supports comma-separated keys)
-      const val = process.env[baseName];
-      if (val) {
-        const split = val
-          .split(",")
-          .map((k) => k.trim())
-          .filter(Boolean);
-        collected.push(...split);
-      }
+      prefixes.add(baseName);
+      prefixes.add(baseName.replace(/S$/, ""));
+    }
 
-      // 2. Indexed environment variables (e.g., GROQ_API_KEY_1 .. GROQ_API_KEY_10)
-      const rootPrefix = baseName.replace(/S$/, ""); // e.g. GROQ_API_KEYS -> GROQ_API_KEY
-      for (let i = 1; i <= 10; i++) {
-        const indexedVal = process.env[`${rootPrefix}_${i}`];
-        if (indexedVal && indexedVal.trim()) {
-          collected.push(indexedVal.trim());
+    // Check if primary indexed key (_1) is defined
+    let hasPrimaryIndexed = false;
+    for (const prefix of prefixes) {
+      if (process.env[`${prefix}_1`]?.trim()) {
+        hasPrimaryIndexed = true;
+        break;
+      }
+    }
+
+    const collected: string[] = [];
+
+    if (hasPrimaryIndexed) {
+      // Authoritative indexed credential configuration (prevents stale singular/plural aliases from mixing)
+      for (const prefix of prefixes) {
+        for (let i = 1; i <= 10; i++) {
+          const val = process.env[`${prefix}_${i}`];
+          if (val && val.trim()) {
+            collected.push(val.trim());
+          }
+        }
+      }
+    } else {
+      // Hybrid/legacy fallback: collect from direct env vars AND any trailing indexed keys
+      for (const baseName of envVarNames) {
+        const val = process.env[baseName];
+        if (val) {
+          const split = val
+            .split(",")
+            .map((k) => k.trim())
+            .filter(Boolean);
+          collected.push(...split);
+        }
+      }
+      for (const prefix of prefixes) {
+        for (let i = 1; i <= 10; i++) {
+          const val = process.env[`${prefix}_${i}`];
+          if (val && val.trim()) {
+            collected.push(val.trim());
+          }
         }
       }
     }

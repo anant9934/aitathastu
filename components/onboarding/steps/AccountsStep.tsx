@@ -31,12 +31,39 @@ export function AccountsStep({ profiles, discovered, saving, guide, onProfilesCh
         guide={guide}
       />
       <div data-eora-id="eora-digital-footprints" className="mt-6 flex flex-col gap-6">
-        {linkedCount > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-card border border-border-medium bg-bg-elevated px-4 py-3 shadow-card">
-            <p className="text-sm text-text-muted"><span className="font-mono text-warm-ivory tabular">{linkedCount}</span> linked. Importing reads each one now.</p>
-            <Button size="sm" variant="secondary" icon={<ArrowsClockwise size={16} aria-hidden="true" />} loading={Boolean(api.busy)} loadingLabel="Importing…" onClick={() => void api.importAllLinked()}>
+        {linkedCount > 0 ? (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-card border border-champagne/30 bg-bg-surface p-4 shadow-card">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-sm bg-champagne/15 text-champagne border border-champagne/30 font-mono font-semibold text-sm">
+                {linkedCount}
+              </span>
+              <div>
+                <p className="text-sm font-medium text-warm-ivory">
+                  {linkedCount} {linkedCount === 1 ? "account" : "accounts"} ready to sync
+                </p>
+                <p className="text-xs text-text-muted">
+                  Importing reads public repositories, papers, and activity to corroborate skills.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<ArrowsClockwise size={16} aria-hidden="true" />}
+              loading={Boolean(api.busy)}
+              loadingLabel="Importing…"
+              onClick={() => void api.importAllLinked()}
+              className="shrink-0"
+            >
               Import from all linked
             </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-card border border-line-soft bg-bg-surface/50 px-4 py-3 text-xs text-text-muted">
+            <span className="h-2 w-2 rounded-full bg-soft-amber shrink-0" aria-hidden="true" />
+            <p>
+              <strong className="text-warm-ivory font-medium">Read-only & Private:</strong> We only inspect public activity (repositories, commits, publications). No write permissions or passwords are ever accessed.
+            </p>
           </div>
         )}
         <ConnectorList api={api} returnTo="/onboarding" />

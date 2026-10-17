@@ -181,10 +181,10 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
         />
       </div>
 
-      <div ref={content} data-eora-id="eora-profile-insights" className="mt-6 grid gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)]">
-        {/* Desktop section list */}
-        <nav aria-label="Review sections" className="hidden self-start lg:sticky lg:top-20 lg:block">
-          <ul className="flex flex-col gap-0.5">
+      <div ref={content} data-eora-id="eora-profile-insights" className="mt-6 grid gap-6 md:grid-cols-[12.5rem_minmax(0,1fr)] lg:grid-cols-[15rem_minmax(0,1fr)]">
+        {/* Tablet & Desktop section list */}
+        <nav aria-label="Review sections" className="hidden self-start md:sticky md:top-20 md:block">
+          <ul className="flex flex-col gap-1 rounded-card border border-line-soft bg-bg-surface/50 p-2 shadow-card">
             {SECTIONS.map((s) => (
               <li key={s.id}>
                 <button
@@ -192,12 +192,12 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
                   aria-current={tab === s.id ? "true" : undefined}
                   onClick={() => { setTab(s.id); setAlert(null); }}
                   className={cn(
-                    "flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-colors",
-                    tab === s.id ? "bg-deep-espresso text-warm-ivory font-medium shadow-[inset_2px_0_0_var(--soft-amber)]" : "text-text-muted hover:bg-deep-espresso/40 hover:text-warm-ivory",
+                    "flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-all duration-150",
+                    tab === s.id ? "bg-deep-espresso text-warm-ivory font-medium border border-line-medium shadow-sm" : "text-text-muted hover:bg-deep-espresso/40 hover:text-warm-ivory",
                   )}
                 >
                   <s.icon size={18} aria-hidden="true" weight={tab === s.id ? "fill" : "regular"} className={tab === s.id ? "text-champagne" : undefined} />
-                  <span className="flex-1">{s.label}</span>
+                  <span className="flex-1 truncate">{s.label}</span>
                   {badge(s)}
                 </button>
               </li>
@@ -206,8 +206,8 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
         </nav>
 
         <div className="min-w-0">
-          {/* Phone and tablet tabs */}
-          <div className="mb-4 lg:hidden">
+          {/* Mobile tabs (< 768px) */}
+          <div className="mb-4 md:hidden">
             <Tabs
               label="Review sections"
               idBase="review"
@@ -219,7 +219,7 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
 
           {alert && alert.section === tab && <Banner kind="warning" className="mb-4">{alert.text}</Banner>}
 
-          <section aria-label={SECTIONS.find((s) => s.id === tab)?.label} className="rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
+          <section aria-label={SECTIONS.find((s) => s.id === tab)?.label} className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
             {tab === "personal" && (
               <div className="flex flex-col gap-5">
                 <div className="flex items-center gap-3 border-b border-border-medium pb-4">

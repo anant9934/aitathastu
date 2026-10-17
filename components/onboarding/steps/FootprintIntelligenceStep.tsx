@@ -700,8 +700,8 @@ export function FootprintIntelligenceStep({
             )}
           </div>
 
-          {/* RESPONSIVE UNIFIED GRID: 2 COLUMNS ON DESKTOP, 1 COLUMN ON MOBILE */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* RESPONSIVE UNIFIED GRID: ADAPTIVE 1 TO 4 COLUMNS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {ORDERED_PROVIDERS.map((provider) => {
               const meta = PROVIDER_METADATA[provider];
               const savedUrl = profiles?.[provider] || "";
@@ -834,7 +834,7 @@ export function FootprintIntelligenceStep({
                             href={savedUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-mono text-xs text-champagne hover:underline truncate max-w-[210px]"
+                            className="inline-flex items-center gap-1 font-mono text-xs text-champagne hover:underline truncate min-w-0 max-w-[260px] sm:max-w-[320px]"
                             title={savedUrl}
                           >
                             <span className="truncate">{savedUrl}</span>
@@ -902,7 +902,7 @@ export function FootprintIntelligenceStep({
                             href={detected.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 font-mono text-xs text-champagne hover:underline truncate max-w-[210px]"
+                            className="inline-flex items-center gap-1 font-mono text-xs text-champagne hover:underline truncate min-w-0 max-w-[260px] sm:max-w-[320px]"
                             title={detected.url}
                           >
                             <span className="truncate">{detected.url}</span>
@@ -999,7 +999,7 @@ export function FootprintIntelligenceStep({
                         </div>
 
                         <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <p className="text-[11px] text-text-dim truncate max-w-[150px] sm:max-w-[170px]" title={meta.hint}>
+                          <p className="text-[11px] text-text-dim truncate min-w-0 max-w-[160px] sm:max-w-[220px]" title={meta.hint}>
                             {meta.hint}
                           </p>
                           <Button

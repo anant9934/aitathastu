@@ -68,46 +68,146 @@ export function DetailsStep({ initial, isAuthenticated, fromCv, saving, guide, o
         noValidate
         data-eora-id="eora-academic-form"
         onSubmit={(e) => { e.preventDefault(); submit(); }}
-        className="mt-6 grid gap-x-4 gap-y-4 sm:grid-cols-2"
+        className="mt-6 flex flex-col gap-6"
       >
-        <TextField id="field-fullname" wrapperClassName="sm:col-span-2" label="Full name" required autoComplete="name" value={form.fullName} error={errors.fullName} aside={cv("fullName")} onChange={(e) => set("fullName", e.target.value)} />
-        <TextField id="field-email" label="Email" required type="email" inputMode="email" autoComplete="email" value={form.email} error={errors.email} aside={cv("email")} onChange={(e) => set("email", e.target.value)} disabled={isAuthenticated && Boolean(initial.email)} hint={isAuthenticated && initial.email ? "Your account email." : undefined} />
-        <TextField label="Mobile (optional)" type="tel" inputMode="tel" autoComplete="tel" value={form.mobile} aside={cv("mobile")} onChange={(e) => set("mobile", e.target.value)} />
-        {!isAuthenticated && (
-          <div className="flex items-end gap-2 sm:col-span-2">
-            <TextField
-              wrapperClassName="flex-1"
-              label="Create a password"
-              required
-              type={show ? "text" : "password"}
-              autoComplete="new-password"
-              value={form.password ?? ""}
-              error={errors.password}
-              hint="At least 6 characters."
-              onChange={(e) => set("password", e.target.value)}
-            />
-            <Button variant="secondary" className={errors.password ? "mb-7 w-11 px-0" : "mb-5 w-11 px-0"} aria-pressed={show} aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow((v) => !v)}>
-              {show ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-            </Button>
+        {/* SECTION 1: Personal & Account Identity */}
+        <div className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
+          <div className="mb-4 border-b border-line-soft pb-3">
+            <h3 className="font-display text-sm font-semibold text-warm-ivory tracking-wide">
+              Personal Information
+            </h3>
+            <p className="mt-0.5 text-xs text-text-muted">
+              Your name and primary contact details for verification and workspace access.
+            </p>
           </div>
-        )}
-        <TextField wrapperClassName="sm:col-span-2" label="College, university or employer" required autoComplete="organization" value={form.institution} error={errors.institution} aside={cv("institution")} onChange={(e) => set("institution", e.target.value)} />
-        <TextField label="Degree" required placeholder="B.Tech" value={form.degree} error={errors.degree} aside={cv("degree")} onChange={(e) => set("degree", e.target.value)} />
-        <TextField label="Field of study" placeholder="Computer Science" value={form.department} aside={cv("department")} onChange={(e) => set("department", e.target.value)} />
-        <SelectField label="Where you are now" value={form.currentYear} onChange={(e) => set("currentYear", e.target.value)}>
-          <option value="">Choose…</option>
-          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          {form.currentYear && !YEARS.includes(form.currentYear) && <option value={form.currentYear}>{form.currentYear}</option>}
-        </SelectField>
-        <TextField
-          label="Graduation year"
-          inputMode="numeric"
-          placeholder="2027"
-          value={form.expectedGraduationYear ? String(form.expectedGraduationYear) : ""}
-          error={errors.expectedGraduationYear}
-          aside={cv("expectedGraduationYear")}
-          onChange={(e) => set("expectedGraduationYear", e.target.value ? Number(e.target.value.replace(/\D/g, "").slice(0, 4)) : undefined)}
-        />
+
+          <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            <TextField
+              id="field-fullname"
+              wrapperClassName="sm:col-span-2"
+              label="Full name"
+              required
+              autoComplete="name"
+              placeholder="e.g. Jane Doe"
+              value={form.fullName}
+              error={errors.fullName}
+              aside={cv("fullName")}
+              onChange={(e) => set("fullName", e.target.value)}
+            />
+            <TextField
+              id="field-email"
+              label="Email"
+              required
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="name@university.edu"
+              value={form.email}
+              error={errors.email}
+              aside={cv("email")}
+              onChange={(e) => set("email", e.target.value)}
+              disabled={isAuthenticated && Boolean(initial.email)}
+              hint={isAuthenticated && initial.email ? "Your account email." : undefined}
+            />
+            <TextField
+              label="Mobile (optional)"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="+91 98765 43210"
+              value={form.mobile}
+              aside={cv("mobile")}
+              onChange={(e) => set("mobile", e.target.value)}
+            />
+            {!isAuthenticated && (
+              <div className="flex items-end gap-2 sm:col-span-2">
+                <TextField
+                  wrapperClassName="flex-1"
+                  label="Create a password"
+                  required
+                  type={show ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder="At least 6 characters"
+                  value={form.password ?? ""}
+                  error={errors.password}
+                  hint="At least 6 characters."
+                  onChange={(e) => set("password", e.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className={errors.password ? "mb-7 w-11 px-0 shrink-0" : "mb-5 w-11 px-0 shrink-0"}
+                  aria-pressed={show}
+                  aria-label={show ? "Hide password" : "Show password"}
+                  onClick={() => setShow((v) => !v)}
+                >
+                  {show ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* SECTION 2: Academic / Institutional Background */}
+        <div className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
+          <div className="mb-4 border-b border-line-soft pb-3">
+            <h3 className="font-display text-sm font-semibold text-warm-ivory tracking-wide">
+              Academic & Professional Details
+            </h3>
+            <p className="mt-0.5 text-xs text-text-muted">
+              Used to align career roadmaps and verify prerequisite eligibility.
+            </p>
+          </div>
+
+          <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            <TextField
+              wrapperClassName="sm:col-span-2"
+              label="College, university or employer"
+              required
+              autoComplete="organization"
+              placeholder="e.g. Stanford University or Tech Corp"
+              value={form.institution}
+              error={errors.institution}
+              aside={cv("institution")}
+              onChange={(e) => set("institution", e.target.value)}
+            />
+            <TextField
+              label="Degree"
+              required
+              placeholder="e.g. B.Tech, B.Sc, M.S."
+              value={form.degree}
+              error={errors.degree}
+              aside={cv("degree")}
+              onChange={(e) => set("degree", e.target.value)}
+            />
+            <TextField
+              label="Field of study"
+              placeholder="e.g. Computer Science, AI/ML"
+              value={form.department}
+              aside={cv("department")}
+              onChange={(e) => set("department", e.target.value)}
+            />
+            <SelectField
+              label="Where you are now"
+              value={form.currentYear}
+              onChange={(e) => set("currentYear", e.target.value)}
+            >
+              <option value="">Choose…</option>
+              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+              {form.currentYear && !YEARS.includes(form.currentYear) && <option value={form.currentYear}>{form.currentYear}</option>}
+            </SelectField>
+            <TextField
+              label="Graduation year"
+              inputMode="numeric"
+              placeholder="2027"
+              value={form.expectedGraduationYear ? String(form.expectedGraduationYear) : ""}
+              error={errors.expectedGraduationYear}
+              aside={cv("expectedGraduationYear")}
+              onChange={(e) => set("expectedGraduationYear", e.target.value ? Number(e.target.value.replace(/\D/g, "").slice(0, 4)) : undefined)}
+            />
+          </div>
+        </div>
+
         <button type="submit" hidden aria-hidden="true" tabIndex={-1} />
       </form>
       <StepFooter onBack={onBack} onNext={submit} saving={saving} />

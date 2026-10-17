@@ -31,7 +31,7 @@ export function EoraGuideLine({ fallback, onAsk }: { fallback?: string; onAsk?: 
   const hinglish = eora?.preferences.language === "hinglish" || eora?.preferences.language === "hi";
 
   return (
-    <aside aria-label="EORA, your guide" className="rounded-card border border-border-medium bg-bg-elevated shadow-[var(--shadow-warm)]">
+    <aside aria-label="EORA, your guide" className="rounded-card border border-line-soft bg-bg-surface shadow-card transition-all">
       <div className="flex items-start gap-3 px-4 py-3">
         <span className="relative mt-0.5 size-9 shrink-0 overflow-hidden rounded-full border border-accent-warm/40 bg-bg-primary shadow-[0_0_12px_rgba(244,154,71,0.3)]">
           <Image src="/assets/eora/avatar.png" alt="" fill sizes="36px" className="object-cover" />

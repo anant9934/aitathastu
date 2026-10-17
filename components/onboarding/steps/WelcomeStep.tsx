@@ -8,7 +8,7 @@
  */
 import React, { useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
+import { ArrowRight, CheckCircle, ShieldCheck, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/Field";
 import { useEoraStepEvents } from "@/lib/client/eora/step-events";
@@ -37,46 +37,94 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
   useEoraStepEvents({ onNext: submit });
 
   return (
-    <div className="flex flex-1 flex-col justify-center py-8 sm:py-12">
-      <div className="grid items-center gap-8 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:gap-12">
-        <div className="flex items-center gap-4 md:block">
-          <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-card border border-border-medium bg-bg-elevated sm:w-28 md:w-full">
-            <Image src="/assets/eora/welcome-hand.png" alt="EORA, your guide, waving hello" fill sizes="(min-width: 768px) 240px, 112px" className="object-contain object-bottom" priority />
+    <div className="flex flex-1 flex-col justify-center py-6 sm:py-10 lg:py-14">
+      <div className="grid items-center gap-8 md:grid-cols-[18rem_minmax(0,1fr)] lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-14">
+        {/* Left Column: EORA Guide Hero Card */}
+        <div className="flex flex-col items-center rounded-card border border-border-medium bg-bg-elevated p-5 sm:p-6 shadow-card md:items-start text-left">
+          <div className="flex w-full items-center gap-4 md:flex-col md:items-center">
+            <div className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-panel border border-accent-warm/30 bg-bg-primary shadow-[0_0_24px_rgba(244,154,71,0.15)] sm:w-24 md:w-44 lg:w-48">
+              <Image
+                src="/assets/eora/welcome-hand.png"
+                alt="EORA, your guide, waving hello"
+                fill
+                sizes="(min-width: 1024px) 200px, (min-width: 768px) 176px, 96px"
+                className="object-contain object-bottom"
+                priority
+              />
+            </div>
+            <div className="min-w-0 flex-1 md:w-full md:text-center">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-accent-warm/25 bg-accent-warm/10 px-2.5 py-0.5 text-2xs font-bold text-accent-warm tracking-wider uppercase">
+                <Sparkle size={12} weight="fill" aria-hidden="true" />
+                AI Guide & Partner
+              </div>
+              <p className="mt-2 text-sm text-text-muted">
+                I&apos;m <span className="font-semibold text-warm-ivory">EORA</span>. I&apos;ll walk you through this in <span className="text-text-primary">English</span> or <span className="text-text-primary">Hinglish</span>.
+              </p>
+            </div>
           </div>
-          <p className="text-sm text-text-muted md:mt-4">
-            I&apos;m <span className="font-semibold text-warm-ivory">EORA</span>. I&apos;ll walk you through this, and I speak English and Hinglish.
-          </p>
+
+          {/* Value Props / Trust Indicators */}
+          <ul className="mt-5 hidden w-full flex-col gap-2.5 border-t border-border-medium/60 pt-4 text-xs text-text-muted md:flex">
+            <li className="flex items-start gap-2">
+              <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" aria-hidden="true" />
+              <span><strong className="text-warm-ivory">Proof over claims:</strong> Backed by your code and papers.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <ShieldCheck size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" aria-hidden="true" />
+              <span><strong className="text-warm-ivory">Private & read-only:</strong> Nothing is added until you confirm.</span>
+            </li>
+          </ul>
         </div>
 
+        {/* Right Column: Identity Form */}
         <form
           noValidate
           onSubmit={(e) => { e.preventDefault(); submit(); }}
-          className="flex min-w-0 flex-col gap-5"
+          className="flex min-w-0 flex-col gap-5 sm:gap-6"
         >
           <div>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Let&apos;s build one honest picture of what you can do</h1>
-            <p className="mt-3 max-w-[56ch] text-base text-text-muted">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-warm-ivory sm:text-3.5xl lg:text-4xl lg:leading-[1.15]">
+              Let&apos;s build one honest picture of what you can do
+            </h1>
+            <p className="mt-3 max-w-[60ch] text-base text-text-muted leading-relaxed sm:text-lg">
               We&apos;ll read your CV and the accounts you choose to connect, and show you everything we find. Nothing reaches your profile until you confirm it.
             </p>
           </div>
-          <TextField
-            ref={input}
-            data-eora-id="eora-name-input"
-            label="What should I call you?"
-            autoComplete="given-name"
-            placeholder="Your first name"
-            value={name}
-            error={error}
-            onChange={(e) => { setName(e.target.value); setError(null); }}
-          />
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
-            <Button variant="ghost" onClick={onSkip} disabled={saving}>Skip for now</Button>
-            <Button type="submit" variant="primary" loading={saving} loadingLabel="Saving…" className="sm:ml-auto sm:min-w-40">
-              Let&apos;s start <ArrowRight size={18} aria-hidden="true" />
-            </Button>
+
+          <div className="rounded-card border border-border-medium bg-bg-elevated p-5 sm:p-6 shadow-card">
+            <TextField
+              ref={input}
+              data-eora-id="eora-name-input"
+              label="What should I call you?"
+              autoComplete="given-name"
+              placeholder="Your first name or full name"
+              value={name}
+              error={error}
+              onChange={(e) => { setName(e.target.value); setError(null); }}
+              autoFocus
+            />
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+              <Button variant="ghost" onClick={onSkip} disabled={saving}>
+                Skip for now
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={saving}
+                loadingLabel="Saving…"
+                className="font-semibold sm:ml-auto sm:min-w-44"
+              >
+                Let&apos;s start <ArrowRight size={18} aria-hidden="true" />
+              </Button>
+            </div>
           </div>
+
           <p className="text-xs text-text-muted">
-            Already have an account? <a href="/sign-in" className="text-accent-warm hover:text-accent-warm-bright">Sign in</a>
+            Already have an account?{" "}
+            <a href="/sign-in" className="font-medium text-accent-warm hover:text-accent-warm-bright underline underline-offset-4">
+              Sign in
+            </a>
           </p>
         </form>
       </div>

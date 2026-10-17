@@ -61,21 +61,42 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
         eoraId="eora-github-projects"
       />
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-text-muted">
-          <span className="font-mono text-warm-ivory tabular">{visible.length - pending}</span> confirmed
-          {pending > 0 && <>, <span className="font-mono text-soft-amber tabular">{pending}</span> waiting for you</>}
-        </p>
-        <Button size="sm" variant="secondary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setAdding(true)} data-eora-id="eora-add-project-trigger">Add a project</Button>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line-soft bg-bg-surface p-4 shadow-card">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-sm bg-champagne/15 text-champagne border border-champagne/30 font-mono font-semibold text-sm">
+            {visible.length}
+          </span>
+          <div>
+            <p className="text-sm font-medium text-warm-ivory">
+              <span className="font-mono text-champagne tabular">{visible.length - pending}</span> confirmed
+              {pending > 0 && <>, <span className="font-mono text-soft-amber tabular">{pending}</span> awaiting your review</>}
+            </p>
+            <p className="text-xs text-text-muted">
+              Add personal contribution notes to turn imported repositories into verified evidence.
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<Plus size={16} aria-hidden="true" />}
+          onClick={() => setAdding(true)}
+          data-eora-id="eora-add-project-trigger"
+        >
+          Add a project
+        </Button>
       </div>
 
       {adding && (
-        <form noValidate onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-3 grid gap-3 rounded-card border border-soft-amber/40 bg-bg-elevated p-4 shadow-card">
-          <TextField label="Project name" required value={form.title} error={formError} onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(null); }} autoFocus />
-          <TextAreaField label="What it does" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <TextField label="Tech stack" hint="Separate with commas." value={form.tech} onChange={(e) => setForm({ ...form, tech: e.target.value })} />
-          <div className="flex gap-2">
-            <Button type="submit" variant="primary" size="sm">Add project</Button>
+        <form noValidate onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-4 grid gap-3.5 rounded-card border border-champagne/40 bg-bg-surface p-5 shadow-card">
+          <div className="border-b border-line-soft pb-2.5">
+            <h3 className="font-display text-sm font-semibold text-warm-ivory">Add Project Manually</h3>
+          </div>
+          <TextField label="Project name" required value={form.title} error={formError} placeholder="e.g. Real-Time Object Detection Pipeline" onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(null); }} autoFocus />
+          <TextAreaField label="What it does" placeholder="Brief summary of the architecture and outcome..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <TextField label="Tech stack" hint="Separate with commas." placeholder="PyTorch, OpenCV, Docker, FastAPI" value={form.tech} onChange={(e) => setForm({ ...form, tech: e.target.value })} />
+          <div className="flex gap-2 pt-2">
+            <Button type="submit" variant="primary" size="sm">Save project</Button>
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>Cancel</Button>
           </div>
         </form>
@@ -83,22 +104,22 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
 
       {visible.length === 0 && !adding ? (
         <EmptyState
-          className="mt-4"
+          className="mt-6"
           icon={FolderSimple}
           title="No projects yet"
           actions={<Button variant="primary" onClick={() => setAdding(true)} icon={<Plus size={16} aria-hidden="true" />}>Add a project</Button>}
         >
-          Add something you built, or go back and connect GitHub to bring your repositories in.
+          Add something you built, or go back and connect GitHub to bring your repositories in automatically.
         </EmptyState>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2" data-eora-id="eora-projects-list">
+        <ul className="mt-4 flex flex-col gap-3" data-eora-id="eora-projects-list">
           {visible.map((p) => (
             <ProjectRow key={p.id} p={p} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} update={update} />
           ))}
         </ul>
       )}
 
-      <StepFooter onBack={onBack} onNext={onContinue} saving={saving} nextLabel={pending ? `Continue (${pending} left unconfirmed)` : "Continue"} />
+      <StepFooter onBack={onBack} onNext={onContinue} saving={saving} nextLabel={pending ? `Continue (${pending} unconfirmed)` : "Continue"} />
     </>
   );
 }
@@ -126,8 +147,8 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
   };
 
   return (
-    <li className={cn("rounded-card border bg-bg-elevated transition-colors shadow-card", p.status === "confirmed" ? "border-border-medium" : "border-champagne/40")}>
-      <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left">
+    <li className={cn("rounded-card border bg-bg-surface transition-colors shadow-card", p.status === "confirmed" ? "border-line-soft" : "border-champagne/40")}>
+      <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-start gap-3 px-5 py-4 text-left">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-display font-medium text-warm-ivory">{p.title}</span>

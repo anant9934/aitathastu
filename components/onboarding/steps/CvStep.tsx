@@ -1,10 +1,18 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { ArrowClockwise, DownloadSimple, FileArrowUp, FileText, Trash } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowClockwise,
+  CheckCircle,
+  FileArrowUp,
+  FileText,
+  LockKey,
+  ShieldCheck,
+  Trash,
+} from "@phosphor-icons/react/dist/ssr";
 import { RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { FIELD_LABELS, REVIEW_GROUPS, type ResumeIngestion } from "@/lib/client/onboarding/use-resume-ingestion";
-import { Button, buttonClass } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Field";
 import { Banner } from "@/components/ui/Banner";
 import { StatusChip } from "@/components/ui/StatusChip";
@@ -14,7 +22,15 @@ import { useEoraStepEvents } from "@/lib/client/eora/step-events";
 import { cn } from "@/lib/client/cn";
 import { StepFooter, StepHeader } from "../OnboardingShell";
 
-export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, onSkip }: {
+export function CvStep({
+  cv,
+  saving,
+  guide,
+  onBack,
+  onSaveReview,
+  onContinue,
+  onSkip,
+}: {
   cv: ResumeIngestion;
   saving: boolean;
   guide: React.ReactNode;
@@ -33,15 +49,28 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
   const blocked = cv.serviceReady === false;
   const failed = cv.state === "FAILED";
   const inReview = cv.candidates.length > 0 && !cv.reviewSaved;
-  const pick = () => { if (!blocked && !cv.busy) fileInput.current?.click(); };
+  const pick = () => {
+    if (!blocked && !cv.busy) fileInput.current?.click();
+  };
 
-  const next = () => {
+  const next = async () => {
     if (cv.busy) return;
-    if (failed || !cv.fileName) { onSkip(); return; }
-    if (inReview) { setReviewError("Save your reviewed details first, or continue without them using \"Continue without a CV\"."); return; }
+    if (failed || !cv.fileName) {
+      onSkip();
+      return;
+    }
+    if (inReview) {
+      setReviewError(null);
+      const problem = await onSaveReview();
+      if (problem) {
+        setReviewError(problem);
+        return;
+      }
+      toast.success("CV details saved", "Steps your CV fully covers will be filled in for you.");
+    }
     onContinue();
   };
-  useEoraStepEvents({ onNext: next, onBack, enabled: !cv.busy });
+  useEoraStepEvents({ onNext: () => void next(), onBack, enabled: !cv.busy });
 
   const save = async () => {
     setReviewError(null);
@@ -73,39 +102,132 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
         guide={guide}
       />
 
-      <div data-eora-id="eora-resume-upload" className="mt-6 flex flex-col gap-4">
-        <Checkbox
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          label="I agree to have this CV read to suggest profile details."
-          description="I'll review every suggestion before it's saved. The file stays private to my account."
-        />
+      <div data-eora-id="eora-resume-upload" className="mt-6 flex flex-col gap-6">
+        {/* Two-region layout on desktop when candidates are not yet displayed */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-8 items-start">
+          {/* Left Region: Upload Dropzone Card */}
+          <div className="flex flex-col gap-4">
+            <div
+              onDragOver={(e) => {
+                if (!blocked) {
+                  e.preventDefault();
+                  setDragging(true);
+                }
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                if (!blocked) void cv.upload(e.dataTransfer.files?.[0], consent);
+              }}
+              className={cn(
+                "flex flex-col items-center justify-center gap-4 rounded-card border-2 border-dashed p-8 text-center transition-all duration-200 shadow-card min-h-[260px]",
+                dragging
+                  ? "border-accent-warm-bright bg-accent-warm-bright/10 shadow-[0_0_28px_rgba(244,154,71,0.2)]"
+                  : cv.fileName && !failed
+                  ? "border-verified/60 bg-bg-elevated"
+                  : "border-border-medium bg-bg-elevated hover:border-accent-warm hover:bg-bg-elevated/80",
+                blocked && "opacity-70",
+              )}
+            >
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".pdf,.docx"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={(e) => {
+                  void cv.upload(e.target.files?.[0], consent);
+                  e.target.value = "";
+                }}
+              />
+              <span
+                className={cn(
+                  "grid size-14 place-items-center rounded-panel border shadow-sm transition-colors",
+                  cv.fileName && !failed
+                    ? "border-verified/40 bg-verified-bg text-verified"
+                    : "border-border-medium bg-deep-espresso text-accent-warm",
+                )}
+              >
+                {cv.fileName ? (
+                  <FileText size={28} aria-hidden="true" />
+                ) : (
+                  <FileArrowUp size={28} aria-hidden="true" />
+                )}
+              </span>
+              <div>
+                <p className="font-display text-base font-bold text-warm-ivory sm:text-lg">
+                  {cv.fileName ?? "Drag and drop your CV here"}
+                </p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Supports PDF or DOCX formats, up to {RESUME_MAX_UPLOAD_MB} MB
+                </p>
+              </div>
 
-        <div
-          onDragOver={(e) => { if (!blocked) { e.preventDefault(); setDragging(true); } }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => { e.preventDefault(); setDragging(false); if (!blocked) void cv.upload(e.dataTransfer.files?.[0], consent); }}
-          className={cn(
-            "flex flex-col items-center gap-3 rounded-card border border-dashed px-5 py-8 text-center transition-all duration-200",
-            dragging ? "border-soft-amber bg-soft-amber/10 shadow-[0_0_24px_rgba(244,154,71,0.15)]" : cv.fileName && !failed ? "border-verified/50 bg-bg-elevated" : "border-border-medium bg-bg-elevated/70 hover:border-champagne/40",
-            blocked && "opacity-70",
-          )}
-        >
-          <input ref={fileInput} type="file" accept=".pdf,.docx" className="sr-only" tabIndex={-1} aria-hidden="true"
-            onChange={(e) => { void cv.upload(e.target.files?.[0], consent); e.target.value = ""; }} />
-          <span className="grid size-12 place-items-center rounded-full border border-border-medium bg-deep-espresso text-champagne shadow-sm">
-            {cv.fileName ? <FileText size={24} aria-hidden="true" /> : <FileArrowUp size={24} aria-hidden="true" />}
-          </span>
-          <div>
-            <p className="font-display font-medium text-warm-ivory">{cv.fileName ?? "Drop your CV here"}</p>
-            <p className="mt-1 text-sm text-text-muted">PDF or DOCX, up to {RESUME_MAX_UPLOAD_MB} MB</p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant={cv.fileName ? "secondary" : "primary"}
+                  onClick={pick}
+                  disabled={blocked || cv.busy}
+                  className="font-semibold"
+                >
+                  {cv.fileName ? "Choose different file" : "Browse files"}
+                </Button>
+                {cv.fileName && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => void remove()}
+                    disabled={blocked || cv.busy}
+                    className="text-danger hover:bg-danger/10"
+                    icon={<Trash size={16} aria-hidden="true" />}
+                  >
+                    Delete file
+                  </Button>
+                )}
+              </div>
+
+              <p className="text-2xs text-text-dim" aria-live="polite">
+                {cv.serviceReady === null
+                  ? "Checking upload service…"
+                  : blocked
+                  ? "CV upload is temporarily unavailable."
+                  : "Upload service active and ready."}
+              </p>
+            </div>
           </div>
-          <Button variant={cv.fileName ? "secondary" : "primary"} onClick={pick} disabled={blocked || cv.busy}>
-            {cv.fileName ? "Replace file" : "Choose a file"}
-          </Button>
-          <p className="text-xs text-text-dim" aria-live="polite">
-            {cv.serviceReady === null ? "Checking the upload service…" : blocked ? "CV upload is unavailable right now." : "Upload service ready."}
-          </p>
+
+          {/* Right Region: Privacy & Guarantee Box */}
+          <div className="flex flex-col gap-4 rounded-card border border-border-medium bg-bg-elevated p-5 sm:p-6 shadow-card">
+            <div className="flex items-center gap-2 border-b border-border-medium/60 pb-3">
+              <ShieldCheck size={18} weight="bold" className="text-verified" />
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-warm-ivory">
+                Private & Evidence-Driven
+              </h2>
+            </div>
+
+            <Checkbox
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              label="I agree to have my CV parsed for profile suggestions."
+              description="I will review and approve every extracted entry before it is saved to my profile."
+            />
+
+            <ul className="mt-2 space-y-2.5 text-xs text-text-muted border-t border-border-medium/60 pt-3">
+              <li className="flex items-start gap-2">
+                <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" />
+                <span>Pre-fills college details, graduation year, and degree.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" />
+                <span>Identifies GitHub, Kaggle, LinkedIn, and paper links.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <LockKey size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" />
+                <span>Never shared with third parties or used for public AI training.</span>
+              </li>
+            </ul>
+          </div>
         </div>
 
         {blocked && (
@@ -115,12 +237,22 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
         )}
 
         {cv.busy && (
-          <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-lg border border-border-medium bg-bg-elevated px-4 py-3 text-sm">
-            <Spinner size={18} className="text-soft-amber" />
-            <span className="text-text-primary">
-              {cv.state === "UPLOADING" ? "Uploading securely…" : cv.state === "SAVING" ? "Saving your reviewed details…" : `${cv.stage}…`}
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-3 rounded-card border border-accent-warm/40 bg-bg-elevated p-4 text-sm shadow-card"
+          >
+            <Spinner size={20} className="text-accent-warm-bright" />
+            <span className="font-medium text-text-primary">
+              {cv.state === "UPLOADING"
+                ? "Uploading your CV securely…"
+                : cv.state === "SAVING"
+                ? "Saving reviewed details to your draft…"
+                : `${cv.stage}…`}
             </span>
-            <span className="ml-auto hidden text-xs text-text-muted sm:inline">Live status from the server</span>
+            <span className="ml-auto hidden text-xs font-mono text-text-dim sm:inline">
+              Processing server stream
+            </span>
           </div>
         )}
 
@@ -128,72 +260,123 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
           <Banner
             kind={failed ? "danger" : "warning"}
             title={failed ? "We couldn't read this file" : undefined}
-            action={failed ? (
-              <>
-                {(cv.retryDocumentId || cv.hasSelectedFile()) && (
-                  <Button size="sm" variant="secondary" icon={<ArrowClockwise size={16} aria-hidden="true" />} onClick={() => void cv.retry(consent)}>Retry</Button>
-                )}
-                <Button size="sm" variant="ghost" onClick={pick}>Choose another file</Button>
-              </>
-            ) : undefined}
+            action={
+              failed ? (
+                <>
+                  {(cv.retryDocumentId || cv.hasSelectedFile()) && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<ArrowClockwise size={16} aria-hidden="true" />}
+                      onClick={() => void cv.retry(consent)}
+                    >
+                      Retry
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={pick}>
+                    Choose another file
+                  </Button>
+                </>
+              ) : undefined
+            }
           >
             {cv.error.message}
-            {cv.error.code && failed && <span className="mt-1 block font-mono text-2xs text-text-muted">Reference: {cv.error.code}</span>}
-            {failed && cv.candidates.length > 0 && <span className="mt-1 block">Your earlier results below haven&apos;t changed.</span>}
+            {cv.error.code && failed && (
+              <span className="mt-1 block font-mono text-2xs text-text-muted">
+                Reference: {cv.error.code}
+              </span>
+            )}
+            {failed && cv.candidates.length > 0 && (
+              <span className="mt-1 block">Your earlier results below haven&apos;t changed.</span>
+            )}
           </Banner>
         )}
 
+        {/* Candidate Extraction Review Section */}
         {cv.candidates.length > 0 && (
-          <section aria-labelledby="cv-review-title" className="rounded-card border border-border-medium bg-bg-elevated shadow-card">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-medium px-4 py-3">
+          <section
+            aria-labelledby="cv-review-title"
+            className="rounded-card border border-border-medium bg-bg-elevated shadow-card"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-medium px-5 py-4">
               <div>
-                <h2 id="cv-review-title" className="font-display text-base font-semibold text-text-primary">What we found in {cv.fileName}</h2>
-                <p className="text-sm text-text-muted">Tick what&apos;s right. Fix wording before saving. Unticked items are left out.</p>
+                <h2
+                  id="cv-review-title"
+                  className="font-display text-base font-bold text-text-primary sm:text-lg"
+                >
+                  Extracted suggestions from {cv.fileName}
+                </h2>
+                <p className="text-xs text-text-muted sm:text-sm">
+                  Tick what is accurate. Fix wording before saving. Unticked items are omitted.
+                </p>
               </div>
               <StatusChip tone={cv.reviewSaved ? "verified" : "neutral"} icon={cv.reviewSaved ? undefined : null}>
-                {cv.reviewSaved ? "Saved" : `${selectedCount} of ${cv.candidates.length} ticked`}
+                {cv.reviewSaved ? "Saved to profile" : `${selectedCount} of ${cv.candidates.length} selected`}
               </StatusChip>
             </div>
 
-            {cv.advice && <p className="border-b border-border-medium px-4 py-3 text-sm text-text-muted"><span className="font-medium text-warm-ivory">EORA:</span> {cv.advice}</p>}
+            {cv.advice && (
+              <p className="border-b border-border-medium bg-deep-espresso/40 px-5 py-3 text-xs text-text-muted sm:text-sm">
+                <span className="font-bold text-accent-warm">EORA guidance:</span> {cv.advice}
+              </p>
+            )}
 
             <div className="divide-y divide-border-medium">
               {REVIEW_GROUPS.map((group) => {
                 const rows = cv.candidates.filter((c) => group.categories.includes(c.category));
                 if (!rows.length) return null;
                 return (
-                  <fieldset key={group.id} className="px-4 py-3">
+                  <fieldset key={group.id} className="p-4 sm:p-5">
                     <legend className="sr-only">{group.title}</legend>
-                    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <p className="font-display text-sm font-semibold text-warm-ivory" aria-hidden="true">{group.title}</p>
-                      <span className="font-mono text-2xs text-text-muted tabular">{rows.filter((r) => r.selected).length}/{rows.length}</span>
+                    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <p className="font-display text-sm font-bold text-warm-ivory" aria-hidden="true">
+                        {group.title}
+                      </p>
+                      <span className="font-mono text-2xs text-text-muted tabular">
+                        {rows.filter((r) => r.selected).length}/{rows.length}
+                      </span>
                       <span className="ml-auto flex gap-1">
-                        <Button size="sm" variant="quiet" onClick={() => cv.setAll(group.categories, true)}>Tick all</Button>
-                        <Button size="sm" variant="ghost" onClick={() => cv.setAll(group.categories, false)}>Clear</Button>
+                        <Button size="sm" variant="quiet" onClick={() => cv.setAll(group.categories, true)}>
+                          Tick all
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => cv.setAll(group.categories, false)}>
+                          Clear
+                        </Button>
                       </span>
                     </div>
-                    <ul className="flex flex-col gap-2">
+                    <ul className="grid gap-2 sm:grid-cols-2">
                       {rows.map((c) => {
                         const label = c.field ? FIELD_LABELS[c.field] || c.field : c.category;
                         return (
-                          <li key={c.id} className={cn("flex items-start gap-3 rounded-lg border px-3 py-2.5 transition-colors", c.selected ? "border-soft-amber/40 bg-soft-amber/10" : "border-border-medium bg-bg-surface/40")}>
+                          <li
+                            key={c.id}
+                            className={cn(
+                              "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                              c.selected
+                                ? "border-accent-warm/40 bg-accent-warm/10 text-warm-ivory"
+                                : "border-border-medium bg-bg-surface/50 text-text-muted",
+                            )}
+                          >
                             <input
                               type="checkbox"
                               checked={c.selected}
-                              aria-label={`Keep ${label}: ${c.value}`}
                               onChange={(e) => cv.toggle(c.id, e.target.checked)}
-                              className="mt-3 size-5 shrink-0 cursor-pointer accent-soft-amber"
+                              className="mt-0.5 size-4 rounded border-border-medium accent-accent-warm"
                             />
                             <div className="min-w-0 flex-1">
-                              <label htmlFor={`cv-${c.id}`} className="text-xs capitalize text-text-muted">{label}</label>
+                              <label htmlFor={`cv-${c.id}`} className="block text-2xs font-semibold uppercase tracking-wider text-text-dim">
+                                {label}
+                              </label>
                               <input
                                 id={`cv-${c.id}`}
                                 value={c.value}
                                 onChange={(e) => cv.correct(c.id, e.target.value)}
-                                className="mt-0.5 w-full min-w-0 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-base text-text-primary hover:border-border-medium focus-visible:border-champagne focus-visible:outline-none"
+                                className="mt-0.5 w-full rounded border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-text-primary hover:border-border-medium focus:border-accent-warm focus:bg-bg-primary/80 focus:outline-none"
                               />
                               {c.sourceSpan !== c.value && (
-                                <p className="mt-1 break-words px-1.5 text-xs text-text-muted">In your CV: &ldquo;{c.sourceSpan}&rdquo;</p>
+                                <p className="mt-0.5 break-words px-1.5 text-2xs text-text-muted">
+                                  In CV: &ldquo;{c.sourceSpan}&rdquo;
+                                </p>
                               )}
                             </div>
                           </li>
@@ -205,22 +388,18 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-border-medium px-4 py-3">
-              <Button variant="primary" onClick={() => void save()} loading={cv.state === "SAVING"} loadingLabel="Saving…" disabled={cv.busy}>
-                Save ticked details
+            <div className="flex items-center justify-between border-t border-border-medium p-4 sm:px-5">
+              {reviewError && <p className="text-xs text-danger">{reviewError}</p>}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void save()}
+                loading={cv.busy}
+                className="ml-auto font-semibold"
+              >
+                Confirm & save suggestions
               </Button>
-              {cv.documentId && (
-                <>
-                  <a className={buttonClass("ghost", "sm")} href={`/api/resume/${cv.documentId}/export?format=json`} target="_blank" rel="noopener noreferrer">
-                    <DownloadSimple size={16} aria-hidden="true" /> Export JSON
-                  </a>
-                  <Button size="sm" variant="ghost" className="ml-auto text-danger hover:bg-danger-bg" icon={<Trash size={16} aria-hidden="true" />} onClick={() => void remove()}>
-                    Delete CV
-                  </Button>
-                </>
-              )}
             </div>
-            {reviewError && <div className="px-4 pb-3"><Banner kind="danger">{reviewError}</Banner></div>}
           </section>
         )}
       </div>
@@ -229,8 +408,7 @@ export function CvStep({ cv, saving, guide, onBack, onSaveReview, onContinue, on
         onBack={onBack}
         onNext={next}
         saving={saving}
-        nextDisabled={cv.busy}
-        nextLabel={!cv.fileName || failed ? "Continue without a CV" : "Continue"}
+        nextLabel={cv.candidates.length > 0 && !cv.reviewSaved ? "Save & Continue" : cv.fileName ? "Continue" : "Continue without a CV"}
       />
     </>
   );

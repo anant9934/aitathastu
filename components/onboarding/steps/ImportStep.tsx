@@ -20,8 +20,17 @@ export function ImportStep({ saving, guide, onBack, onContinue }: { saving: bool
         guide={guide}
         eoraId="eora-ai-analysis"
       />
-      <div className="mt-6 rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
-        <SourceProgress variant="full" onReadyToReview={() => onContinue()} />
+      <div className="mt-6 flex flex-col gap-4">
+        <div className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
+          <SourceProgress variant="full" onReadyToReview={() => onContinue()} />
+        </div>
+
+        <div className="flex items-center gap-2.5 rounded-card border border-line-soft bg-bg-surface/40 px-4 py-3 text-xs text-text-muted">
+          <span className="flex h-2 w-2 rounded-full bg-verified shrink-0 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+          <p>
+            Real-time synchronization. As soon as your primary sources (CV and GitHub) settle, you&apos;ll be moved automatically to the review workspace.
+          </p>
+        </div>
       </div>
       <StepFooter onBack={onBack} onNext={onContinue} saving={saving} nextLabel="Review what we found" />
     </>

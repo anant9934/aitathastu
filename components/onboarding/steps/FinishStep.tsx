@@ -41,30 +41,73 @@ export function FinishStep({ data, guide, submitting, onBack, onFinish }: {
         description="This is what goes onto your profile. You can edit any of it later, and your edits always win over a source."
         guide={guide}
       />
-      <dl data-eora-id="eora-onboarding-finish" className="mt-6 grid grid-cols-2 overflow-hidden rounded-card border border-border-medium bg-border-medium sm:grid-cols-3 shadow-card [&>div]:bg-bg-elevated" style={{ gap: 1 }}>
-        {rows.map(([label, n, unit]) => (
-          <div key={label} className="px-4 py-4">
-            <dt className="text-xs text-text-muted">{label}</dt>
-            <dd className="mt-1 flex items-baseline gap-1.5">
-              <span className="font-display text-2xl font-semibold text-warm-ivory tabular">{n}</span>
-              <span className="text-xs text-text-muted">{unit}</span>
-            </dd>
+
+      <div className="mt-6 flex flex-col gap-6">
+        {/* Stat Cards Grid: 6 Real Metrics */}
+        <dl
+          data-eora-id="eora-onboarding-finish"
+          className="grid grid-cols-2 sm:grid-cols-3 gap-3.5"
+        >
+          {rows.map(([label, n, unit]) => (
+            <div
+              key={label}
+              className="flex flex-col justify-between rounded-card border border-line-soft bg-bg-surface p-4 sm:p-5 shadow-card transition-all hover:border-champagne/30"
+            >
+              <dt className="text-xs font-medium text-text-muted">{label}</dt>
+              <dd className="mt-3 flex items-baseline gap-2">
+                <span className="font-display text-3xl font-semibold text-warm-ivory tabular">
+                  {n}
+                </span>
+                <span className="text-xs font-mono text-text-dim">{unit}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* Target Role & Roadmap Callout */}
+        {data.targetRole && (
+          <div className="flex items-center gap-3.5 rounded-card border border-champagne/30 bg-bg-surface p-4 sm:p-5 shadow-card">
+            <span className="flex h-10 w-10 items-center justify-center rounded-sm bg-champagne/15 text-champagne border border-champagne/30 font-display font-semibold text-base shrink-0">
+              🎯
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs text-text-muted font-mono uppercase tracking-wider">Target Objective</p>
+              <p className="text-sm sm:text-base font-display font-semibold text-warm-ivory truncate">
+                {data.targetRole}
+              </p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Your workspace dashboard will automatically tailor projects and roadmaps to bridge any identified skill gaps.
+              </p>
+            </div>
           </div>
-        ))}
-      </dl>
-      {data.targetRole && (
-        <p className="mt-4 text-sm text-text-muted">Your dashboard will measure progress toward <span className="font-medium text-warm-ivory">{data.targetRole}</span>.</p>
-      )}
-      {error && (
-        <Banner kind="danger" className="mt-4" title="Your workspace wasn't created" action={<Button size="sm" variant="secondary" onClick={() => void go()} loading={submitting}>Try again</Button>}>
-          {error}
-        </Banner>
-      )}
-      <StepFooter onBack={onBack} saving={false} secondary={
-        <Button variant="primary" onClick={() => void go()} loading={submitting} loadingLabel="Creating your workspace…" className="flex-1 sm:flex-none sm:min-w-48">
-          Open my workspace <ArrowRight size={18} aria-hidden="true" />
-        </Button>
-      } />
+        )}
+
+        {error && (
+          <Banner
+            kind="danger"
+            title="Your workspace wasn't created"
+            action={<Button size="sm" variant="secondary" onClick={() => void go()} loading={submitting}>Try again</Button>}
+          >
+            {error}
+          </Banner>
+        )}
+      </div>
+
+      <StepFooter
+        onBack={onBack}
+        saving={false}
+        secondary={
+          <Button
+            variant="primary"
+            onClick={() => void go()}
+            loading={submitting}
+            loadingLabel="Creating your workspace…"
+            className="flex-1 sm:flex-none sm:min-w-56 shadow-lg shadow-champagne/10 text-sm font-semibold"
+          >
+            Open my workspace <ArrowRight size={18} aria-hidden="true" />
+          </Button>
+        }
+      />
     </>
   );
 }

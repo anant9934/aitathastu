@@ -8,20 +8,54 @@
  *   TEST_DATABASE_URL=postgres://postgres:phase1@127.0.0.1:54399/tathastu_test
  */
 import crypto from "crypto";
+import net from "net";
 
 export const DEFAULT_TEST_DATABASE_URL = "postgres://postgres:phase1@127.0.0.1:54399/tathastu_test";
 
+async function isPortOpen(host: string, port: number, timeoutMs = 300): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, host);
+  });
+}
+
 export async function setupTestDatabase() {
   const url = process.env.TEST_DATABASE_URL || DEFAULT_TEST_DATABASE_URL;
-  const host = new URL(url).hostname;
+  const parsed = new URL(url);
+  const host = parsed.hostname;
   if (!["127.0.0.1", "localhost", "::1"].includes(host)) {
     throw new Error(`Refusing to run backend tests against non-local database host "${host}".`);
   }
-  process.env.DATABASE_URL = url;
-  process.env.DATABASE_MODE = "postgres";
-  process.env.DATABASE_TRANSPORT = "tcp";
-  process.env.DATABASE_AUTO_MIGRATE = "true";
+
+  const port = Number(parsed.port) || 54399;
+  const hasLocalTcpServer = await isPortOpen(host, port, 300);
+
   (process.env as Record<string, string>).NODE_ENV = "test";
+  process.env.DATABASE_AUTO_MIGRATE = "true";
+
+  if (hasLocalTcpServer) {
+    process.env.DATABASE_URL = url;
+    process.env.DATABASE_MODE = "postgres";
+    process.env.DATABASE_TRANSPORT = "tcp";
+  } else {
+    // Isolated in-memory embedded PostgreSQL (PGlite) fallback for hermetic test execution
+    process.env.DATABASE_URL = "";
+    process.env.DATABASE_MODE = "pglite";
+    process.env.PGLITE_IN_MEMORY = "true";
+  }
 
   const { getDb, resetDbForTesting } = await import("../../lib/db");
   const { MIGRATION_SQL_STATEMENTS } = await import("../../lib/db/migration-sql");

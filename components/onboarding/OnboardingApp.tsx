@@ -22,7 +22,7 @@ import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/Button";
 import { Skeleton, LoadingRegion } from "@/components/ui/Skeleton";
 import { Logo } from "@/components/ui/Logo";
-import { OnboardingShell } from "./OnboardingShell";
+import { OnboardingShell, type OnboardingShellWidth } from "./OnboardingShell";
 import { WelcomeStep } from "./steps/WelcomeStep";
 import { RoleStep } from "./steps/RoleStep";
 import { DirectionStep } from "./steps/DirectionStep";
@@ -103,7 +103,7 @@ export function OnboardingApp() {
 
   if (screen === WELCOME_SCREEN) {
     return (
-      <OnboardingShell screen={screen} role={role} done={new Set()} save={save} onRetrySave={() => void flow.retrySave()}>
+      <OnboardingShell screen={screen} role={role} done={new Set()} save={save} onRetrySave={() => void flow.retrySave()} width="balanced">
         <WelcomeStep
           initialName={data.name}
           saving={saving}
@@ -117,7 +117,7 @@ export function OnboardingApp() {
     );
   }
 
-  const shell = (children: React.ReactNode, width: "default" | "wide" = "default") => (
+  const shell = (children: React.ReactNode, width: OnboardingShellWidth = "balanced") => (
     <OnboardingShell screen={screen} role={role} done={flow.completedScreens()} save={save} onRetrySave={() => void flow.retrySave()} width={width}>
       {children}
     </OnboardingShell>
@@ -137,6 +137,7 @@ export function OnboardingApp() {
             void flow.commit({ role: r, ...(changed ? { priorities: [], primaryPriority: null } : {}) }, r === "faculty" ? 3.5 : 3.2);
           }}
         />,
+        "balanced",
       );
     case 3.2:
       return shell(
@@ -150,6 +151,7 @@ export function OnboardingApp() {
             void flow.commit({ targetRole: r.title, targetRoleId: r.id }, 3.5);
           }}
         />,
+        "workspace",
       );
     case 3.5:
       return shell(
@@ -164,6 +166,7 @@ export function OnboardingApp() {
             void flow.commit({ priorities: ranked, primaryPriority: ranked[0] }, role === "faculty" ? 3.7 : 5);
           }}
         />,
+        "balanced",
       );
     case 3.7:
       return shell(
@@ -179,11 +182,12 @@ export function OnboardingApp() {
             return r;
           }}
         />,
+        "balanced",
       );
     case 5:
-      return shell(<CvStepContainer flow={flow} guide={guide} />);
+      return shell(<CvStepContainer flow={flow} guide={guide} />, "balanced");
     case 5.5:
-      return shell(<FootprintIntelligenceStep flow={flow} guide={guide} onCandidates={onCandidates} />);
+      return shell(<FootprintIntelligenceStep flow={flow} guide={guide} onCandidates={onCandidates} />, "workspace");
     case 4:
       return shell(
         <DetailsStep
@@ -208,6 +212,7 @@ export function OnboardingApp() {
             if (ok && !flow.isAuthenticated && a.email && a.password) flow.setIsAuthenticated(true);
           }}
         />,
+        "balanced",
       );
     case 6:
       return shell(
@@ -221,13 +226,14 @@ export function OnboardingApp() {
           onBack={() => flow.goBack(flow.prevBefore(6))}
           onContinue={() => void flow.commit({ profiles: flow.dataRef.current.profiles }, flow.nextAfter(6))}
         />,
+        "balanced",
       );
     case 7:
-      return shell(<ImportStep saving={saving} guide={guide} onBack={() => flow.goBack(flow.prevBefore(7))} onContinue={() => void flow.commit({}, flow.nextAfter(7))} />);
+      return shell(<ImportStep saving={saving} guide={guide} onBack={() => flow.goBack(flow.prevBefore(7))} onContinue={() => void flow.commit({}, flow.nextAfter(7))} />, "balanced");
     case 8:
-      return shell(<ReviewStep flow={flow} guide={guide} onBack={() => flow.goBack(flow.prevBefore(8))} onContinue={() => void flow.commit({}, flow.nextAfter(8))} />, "wide");
+      return shell(<ReviewStep flow={flow} guide={guide} onBack={() => flow.goBack(flow.prevBefore(8))} onContinue={() => void flow.commit({}, flow.nextAfter(8))} />, "review");
     case 9:
-      return shell(<SkillsStep data={data} saving={saving} guide={guide} onBack={() => flow.goBack(flow.prevBefore(9))} onContinue={() => void flow.commit({}, flow.nextAfter(9))} />);
+      return shell(<SkillsStep data={data} saving={saving} guide={guide} onBack={() => flow.goBack(flow.prevBefore(9))} onContinue={() => void flow.commit({}, flow.nextAfter(9))} />, "workspace");
     case 10:
       return shell(
         <ProjectsStep
@@ -239,6 +245,7 @@ export function OnboardingApp() {
           onBack={() => flow.goBack(flow.prevBefore(10))}
           onContinue={() => void flow.commit({ projects: flow.dataRef.current.projects }, 11)}
         />,
+        "workspace",
       );
     case 11:
     default:
@@ -257,6 +264,7 @@ export function OnboardingApp() {
             return r;
           }}
         />,
+        "balanced",
       );
   }
 }

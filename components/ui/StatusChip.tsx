@@ -22,7 +22,7 @@ const TONES: Record<Tone, { cls: string; icon: Icon }> = {
   verified: { cls: "text-verified bg-verified-bg border-verified/35", icon: SealCheck },
   corroborated: { cls: "text-corroborated bg-corroborated-bg border-corroborated/35", icon: Stack },
   evidenced: { cls: "text-evidenced bg-evidenced-bg border-evidenced/35", icon: CheckCircle },
-  gap: { cls: "text-gap bg-transparent border-gap border-dashed", icon: CircleDashed },
+  gap: { cls: "text-text-muted bg-bg-elevated/80 border-border-medium border-dashed", icon: CircleDashed },
   warning: { cls: "text-warning bg-warning-bg border-warning/35", icon: WarningCircle },
   danger: { cls: "text-danger bg-danger-bg border-danger/35", icon: XCircle },
   neutral: { cls: "text-text-muted bg-bg-elevated border-border-medium", icon: Info },

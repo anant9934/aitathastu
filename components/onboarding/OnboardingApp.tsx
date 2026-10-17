@@ -183,7 +183,7 @@ export function OnboardingApp() {
     case 5:
       return shell(<CvStepContainer flow={flow} guide={guide} />);
     case 5.5:
-      return shell(<FootprintIntelligenceStep flow={flow} guide={guide} />);
+      return shell(<FootprintIntelligenceStep flow={flow} guide={guide} onCandidates={onCandidates} />);
     case 4:
       return shell(
         <DetailsStep

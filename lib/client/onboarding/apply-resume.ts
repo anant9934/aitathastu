@@ -15,7 +15,10 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
   const acceptedIndexes = (category: string) =>
     new Set(claims.filter((c) => c.category === category && c.candidateId).map((c) => Number(c.candidateId!.split("_").pop())));
 
-  const discoveredResumeProfiles = { ...data.discoveredResumeProfiles, ...acceptedLinks };
+  const discoveredFromExtraction = Object.fromEntries(
+    Object.entries(extra.discoveredProfiles || {}).filter(([type, url]) => PROFILE_SOURCE_IDS.includes(type) && url)
+  ) as Partial<Record<string, string>>;
+  const discoveredResumeProfiles = { ...data.discoveredResumeProfiles, ...discoveredFromExtraction, ...acceptedLinks };
   const profiles = { ...acceptedLinks, ...data.profiles };
   const skills = Array.from(new Set([...data.skills, ...claims.filter((c) => c.category === "skill").map((c) => c.value)]));
 

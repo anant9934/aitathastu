@@ -65,7 +65,15 @@ def processing(docid: str):
         store.save_json(docid, 'sections.json', [asdict(l) for l in content.lines])
         store.save_json(docid, 'layout.json', content.layout)
         store.save_json(docid, 'profile.json', profile.model_dump(mode='json'))
-        store.update_meta(docid, {'status': profile.metadata.status, 'warnings': profile.metadata.warnings})
+        error_code = None
+        if profile.metadata.status == 'failed':
+            if any('timeout' in w.lower() for w in profile.metadata.warnings):
+                error_code = 'OCR_TIMEOUT'
+            elif content.ocr_attempted:
+                error_code = 'OCR_NO_TEXT'
+            else:
+                error_code = 'NO_TEXT_FOUND'
+        store.update_meta(docid, {'status': profile.metadata.status, 'warnings': profile.metadata.warnings, 'error_code': error_code})
     except OcrEngineUnavailable as e:
         print(f'[extractor] OCR engine unavailable for {docid}: {e}', flush=True)
         store.update_meta(docid, {
@@ -101,7 +109,8 @@ def health():
 @app.post('/api/resumes/upload', response_model=UploadResponse, status_code=201)
 async def upload(
     file: Annotated[UploadFile, File()],
-    user: UserContext = Depends(authorize_action('upload'))
+    user: UserContext = Depends(authorize_action('upload')),
+    x_job_id: Annotated[str | None, Header()] = None
 ):
     original = (file.filename or 'resume').replace('\\', '/').split('/')[-1][:120]
     payload = await file.read(settings.max_upload_mb * 1024 * 1024 + 1)
@@ -123,20 +132,23 @@ async def upload(
         raise HTTPException(400, str(e)) from None
 
     docid = str(uuid.uuid4())
+    doc_meta = {
+        'document_id': docid,
+        'filename': original,
+        'owner_id': user.user_id,
+        'org_id': user.org_id,
+        'format': fmt,
+        'status': 'uploaded',
+        'warnings': [],
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    if x_job_id:
+        doc_meta['job_id'] = x_job_id[:120]
     store.create(
         docid,
         original,
         payload,
-        {
-            'document_id': docid,
-            'filename': original,
-            'owner_id': user.user_id,
-            'org_id': user.org_id,
-            'format': fmt,
-            'status': 'uploaded',
-            'warnings': [],
-            'created_at': datetime.now(timezone.utc).isoformat()
-        }
+        doc_meta
     )
     return UploadResponse(document_id=docid, filename=original, status='uploaded', max_pages=settings.max_pages)
 

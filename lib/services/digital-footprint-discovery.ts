@@ -158,16 +158,32 @@ function isPotentialPortfolioHost(host: string): boolean {
   return true;
 }
 
+const NON_CONTINUATION_WORDS = new Set([
+  "github", "linkedin", "leetcode", "kaggle", "huggingface", "orcid",
+  "devto", "hackerrank", "hackerearth", "codechef", "portfolio",
+  "email", "phone", "education", "skills", "projects", "experience",
+  "summary", "about", "work", "profile", "contact", "certifications",
+  "languages", "achievements", "interests", "publications", "http", "https"
+]);
+
 /**
  * Unwraps links broken across line breaks in OCR / PDF text.
  * Example: "https://github.com/\nanant9934" -> "https://github.com/anant9934"
  */
 export function unwrapMultiLineUrls(text: string): string {
   return text.replace(
-    /(https?:\/\/[^\s\n]+)\n([a-zA-Z0-9_\-\.\/]+)/gi,
-    (_m, p1: string, p2: string) => {
-      if (p1.endsWith("/")) return `${p1}${p2}`;
-      return `${p1}/${p2}`;
+    /(https?:\/\/[^\s\n]+)\n\s*([a-zA-Z0-9_\-\.]+)(?![:\w])/gi,
+    (match, p1: string, p2: string) => {
+      if (NON_CONTINUATION_WORDS.has(p2.toLowerCase())) {
+        return match;
+      }
+      if (p1.endsWith("/")) {
+        return `${p1}${p2}`;
+      }
+      if (p1.endsWith("-")) {
+        return `${p1.slice(0, -1)}${p2}`;
+      }
+      return match;
     }
   );
 }
@@ -314,8 +330,14 @@ export function discoverFootprintsFromResume(options: {
       const match = line.match(rule.pattern);
       if (match) {
         const candidate = match[1]?.trim().replace(/^@/, "");
-        // Filter out false positives like "GitHub: None", "GitHub: Yes", etc.
-        if (candidate && !/^(none|na|n\/a|yes|no|link|url|profile)$/i.test(candidate)) {
+        // Filter out false positives like "GitHub: None", "GitHub: Yes", "GitHub: https://...", etc.
+        if (
+          candidate &&
+          !/^(none|na|n\/a|yes|no|link|url|profile|http|https|www)$/i.test(candidate) &&
+          !candidate.startsWith("http://") &&
+          !candidate.startsWith("https://") &&
+          !candidate.includes("/")
+        ) {
           const normalized = normalizeProviderUrl(rule.provider, candidate);
           addFootprint({
             provider: rule.provider,

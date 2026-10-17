@@ -34,7 +34,12 @@ def extract_profile(content,document_id,started=None):
     warnings=list(content.warnings)
     if quality in ('poor','empty'): warnings.append('Limited extracted text: fields may be missing.')
     total=sum(len(v) for k,v in groups.items() if k!='extraction_metadata')
-    status='partial' if quality in ('poor','empty') or any('timeout' in w.lower() or 'failed' in w.lower() for w in warnings) else 'completed'
+    if not chars:
+        status='failed'
+    elif quality=='poor' or any('timeout' in w.lower() or 'failed' in w.lower() for w in warnings):
+        status='partial'
+    else:
+        status='completed'
     meta=ExtractionMetadata(document_id=document_id,file_format=content.format,page_count=content.pages,ocr_attempted=content.ocr_attempted,ocr_used=content.ocr_used,text_quality=quality,processing_seconds=round(time.perf_counter()-started,3),extraction_methods=content.methods,warnings=warnings,status=status)
     # Technical metadata is derived by our software, NOT represented as a resume claim.
     from ..document import Line

@@ -79,6 +79,7 @@ export type OnboardingDraft = {
   priorities?: string[];
   primaryPriority?: string;
   discoveredResumeProfiles?: Partial<Record<string, string>>;
+  dismissedFootprintProviders?: string[];
   /** Screens fully covered by accepted resume data; onboarding skips them (lib/onboarding-resume-coverage.ts). */
   resumeCoveredScreens?: number[];
   completed: boolean;
@@ -211,7 +212,7 @@ export function safeDraft(value: unknown): OnboardingDraft {
   return {
     version: 2,
     stage: stageIds.includes(raw.stage as StageId) ? (raw.stage as StageId) : "name",
-    currentScreen: [2, 3, 3.2, 3.5, 3.7, 4, 5, 6, 7, 8, 9, 10, 11].includes(raw.currentScreen as number)
+    currentScreen: [2, 3, 3.2, 3.5, 3.7, 4, 5, 5.5, 6, 7, 8, 9, 10, 11].includes(raw.currentScreen as number)
       ? raw.currentScreen
       : undefined,
     name: str(raw.name, 80),
@@ -357,6 +358,9 @@ export function safeDraft(value: unknown): OnboardingDraft {
               .map(([k, v]) => [k, str(v, 300)])
           )
         : undefined,
+    dismissedFootprintProviders: Array.isArray(raw.dismissedFootprintProviders)
+      ? raw.dismissedFootprintProviders.filter((s): s is string => typeof s === "string")
+      : undefined,
     resumeCoveredScreens: Array.isArray(raw.resumeCoveredScreens)
       ? raw.resumeCoveredScreens.filter((n): n is number => [4, 6, 9, 10].includes(n as number))
       : undefined,

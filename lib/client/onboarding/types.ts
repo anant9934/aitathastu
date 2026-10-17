@@ -116,6 +116,7 @@ export interface OnboardingData {
   resumeCovered: number[];
   profiles: Partial<Record<string, string>>;
   discoveredResumeProfiles: Partial<Record<string, string>>;
+  dismissedFootprintProviders: string[];
   skills: string[];
   techCandidates: TechCandidate[];
   projects: ProjectEntry[];
@@ -140,6 +141,7 @@ export const EMPTY_ONBOARDING: OnboardingData = {
   resumeCovered: [],
   profiles: {},
   discoveredResumeProfiles: {},
+  dismissedFootprintProviders: [],
   skills: [],
   techCandidates: [],
   projects: [],

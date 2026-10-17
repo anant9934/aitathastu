@@ -29,7 +29,7 @@ import crypto from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, resumeDocuments, sourceProcessingJobs } from "@/lib/db";
 import { ObjectStorageService } from "@/lib/storage/object-storage";
-import { SourceProcessingJobService, type SourceProcessingJob } from "./source-processing-job-service";
+import { SourceProcessingJobService, type SourceProcessingJob, type ProcessingStage } from "./source-processing-job-service";
 import { readDocumentText } from "@/lib/resume/document-text";
 import { reconstructReadingOrder } from "@/lib/resume/layout";
 import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
@@ -39,7 +39,7 @@ import { resumeCandidates, saveResumeCandidates } from "./resume-review-service"
 import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
-import { runLocalOcrFallback } from "@/lib/resume/local-ocr";
+import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers";
 
 export type ResumeFailureCode =
   | "DOCUMENT_RETRIEVAL_FAILED"
@@ -80,8 +80,8 @@ const FAILURES: Record<ResumeFailureCode, { message: string; retryable: boolean 
 
 /** Fewer non-whitespace characters than this means the PDF has no usable text layer. */
 const MIN_TEXT_CHARS = 40;
-/** A claimed in-process step older than this is assumed to have died with its request. */
-const STALE_CLAIM_MS = 90_000;
+/** Active heartbeat lease duration before a background job can be reclaimed. */
+const LEASE_DURATION_MS = 60_000;
 /**
  * A sleeping Render extractor took 53 s to answer /health (measured
  * 2026-10-14), longer than one 20 s upload attempt. An unreachable extractor
@@ -215,39 +215,197 @@ async function queueJobForDocument(personId: string, documentId: string, filenam
   return jobId;
 }
 
+export type ResumeJobStatusResult = {
+  ok: boolean;
+  httpStatus: number;
+  documentId?: string;
+  jobId?: string;
+  filename?: string;
+  status?: string;
+  stage?: string;
+  errorCode?: string | null;
+  message?: string | null;
+  retryable?: boolean;
+  result?: ResumeReviewPayload | null;
+  shouldNudge?: boolean;
+  code?: string;
+  error?: string;
+};
+
+export function isJobLeaseExpired(job: SourceProcessingJob): boolean {
+  const m = meta(job);
+  const lastActive =
+    typeof m.heartbeatAt === "number"
+      ? m.heartbeatAt
+      : typeof m.claimedAt === "number"
+      ? m.claimedAt
+      : 0;
+  if (!lastActive) return true;
+  if (job.stage === "awaiting_extractor") {
+    return Date.now() - lastActive >= EXTRACTOR_RETRY_GAP_MS;
+  }
+  return Date.now() - lastActive > LEASE_DURATION_MS;
+}
+
 /**
- * Advances a resume job by at most one step and returns its current row.
- * Safe to call repeatedly and concurrently.
+ * Fast, read-only status inspection. Does NOT run extraction or OCR inline.
+ * Safe to call concurrently from multiple browser tabs.
  */
-export async function advanceResumeJob(jobId: string, personId: string): Promise<SourceProcessingJob | null> {
-  const job = await SourceProcessingJobService.getJobForPerson(jobId, personId);
+export async function getResumeJobStatus(
+  documentId: string,
+  personId: string,
+  requestedJobId?: string | null
+): Promise<ResumeJobStatusResult> {
+  const doc = await loadOwnedResumeDocument(documentId, personId);
+  if (!doc) {
+    return { ok: false, httpStatus: 404, code: "NOT_FOUND", error: "Document not found." };
+  }
+
+  const mDoc = docMeta(doc);
+  const jobId = requestedJobId || (mDoc.jobId as string | undefined);
+  if (!jobId) {
+    return { ok: false, httpStatus: 404, code: "NO_JOB", error: "This document has no processing job." };
+  }
+
+  let job = await SourceProcessingJobService.getJobForPerson(jobId, personId);
+  if (!job || job.sourceId !== "resume" || (job.metadata as Record<string, unknown>)?.documentId !== documentId) {
+    return { ok: false, httpStatus: 404, code: "NOT_FOUND", error: "Processing job not found." };
+  }
+
+  // Persist stage recovery:
+  // If the document already has a review payload saved in resumeDocuments, but the job is stuck in persist stage:
+  if (job.status === "processing" && job.stage === "persist" && doc.status === "review_ready" && mDoc.review) {
+    const recovered = await SourceProcessingJobService.transition({
+      jobId: job.id,
+      personId,
+      from: ["processing"],
+      to: "review_ready",
+      stage: "review",
+      errorCode: null,
+      errorMessage: null,
+      resultReference: `resume:${documentId}`,
+      metadata: { heartbeatAt: Date.now(), recoveredFromPersist: true },
+    });
+    if (recovered) job = recovered;
+  }
+
+  const ready = job.status === "review_ready" || job.status === "completed";
+  const failure = failureInfo(job.errorCode);
+  const shouldNudge =
+    job.status === "queued" ||
+    (job.status === "processing" && isJobLeaseExpired(job));
+
+  return {
+    ok: true,
+    httpStatus: 200,
+    documentId,
+    jobId: job.id,
+    filename: doc.filename,
+    status: job.status,
+    stage: job.stage,
+    errorCode: job.errorCode,
+    message: job.errorMessage,
+    retryable: failure ? failure.retryable : Boolean((job.metadata as Record<string, unknown>)?.retryable),
+    result: (ready || job.status === "review_ready" || job.status === "completed") && mDoc.review ? (mDoc.review as ResumeReviewPayload) : null,
+    shouldNudge,
+  };
+}
+
+/**
+ * Executes a resume job asynchronously in the background.
+ * Uses atomic transitions and leases so concurrent executions never duplicate work.
+ */
+export async function processResumeJob(jobId: string, personId: string): Promise<SourceProcessingJob | null> {
+  let job = await SourceProcessingJobService.getJobForPerson(jobId, personId);
   if (!job || job.sourceId !== "resume") return job;
+
+  if (["review_ready", "completed", "failed", "timed_out", "cancelled", "retry"].includes(job.status)) {
+    return job;
+  }
 
   try {
     if (job.status === "queued") {
       const claimed = await SourceProcessingJobService.transition({
-        jobId, personId, from: ["queued"], to: "processing", stage: "parse",
-        metadata: { claimedAt: Date.now() },
+        jobId,
+        personId,
+        from: ["queued"],
+        to: "processing",
+        stage: "parse",
+        metadata: { claimedAt: Date.now(), heartbeatAt: Date.now() },
       });
-      if (claimed) await runInProcessStep(claimed);
+      if (!claimed) return SourceProcessingJobService.getJobForPerson(jobId, personId);
+      job = claimed;
+      await runInProcessStep(job);
     } else if (job.status === "processing") {
       const m = meta(job);
       if (job.stage === "extract" && typeof m.extractorDocumentId === "string") {
         await pollExtractor(job, m.extractorDocumentId);
       } else if (job.stage === "awaiting_extractor") {
-        if (typeof m.claimedAt === "number" && Date.now() - m.claimedAt >= EXTRACTOR_RETRY_GAP_MS && (await reclaimAwaitingJob(job, m.claimedAt))) {
+        const lastClaimed = typeof m.claimedAt === "number" ? m.claimedAt : 0;
+        if (Date.now() - lastClaimed >= EXTRACTOR_RETRY_GAP_MS && (await reclaimAwaitingJob(job, lastClaimed))) {
           await runInProcessStep(job);
         }
-      } else if (typeof m.claimedAt === "number" && Date.now() - m.claimedAt > STALE_CLAIM_MS) {
-        await fail(job, "PROCESSING_STALLED", `stage ${job.stage} claimed ${Date.now() - m.claimedAt}ms ago`);
+      } else if (job.stage === "persist") {
+        const documentId = meta(job).documentId as string;
+        const db = await getDb();
+        const [doc] = await db
+          .select()
+          .from(resumeDocuments)
+          .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)))
+          .limit(1);
+        if (doc && doc.status === "review_ready" && docMeta(doc).review) {
+          await SourceProcessingJobService.transition({
+            jobId: job.id,
+            personId,
+            from: ["processing"],
+            to: "review_ready",
+            stage: "review",
+            resultReference: `resume:${documentId}`,
+            metadata: { recoveredFromPersist: true, heartbeatAt: Date.now() },
+          });
+        } else if (isJobLeaseExpired(job)) {
+          await fail(job, "PERSIST_FAILED", "Persistence interrupted before review could be recorded.");
+        }
+      } else if (isJobLeaseExpired(job)) {
+        const retryCount = Number(job.retryCount || 0);
+        if (retryCount >= 3) {
+          await fail(job, "PROCESSING_STALLED", `stage ${job.stage} lease expired after ${retryCount} retries`);
+          return SourceProcessingJobService.getJobForPerson(jobId, personId);
+        }
+        const reclaimed = await SourceProcessingJobService.transition({
+          jobId,
+          personId,
+          from: ["processing"],
+          to: "processing",
+          stage: job.stage as ProcessingStage,
+          incrementRetry: true,
+          metadata: { claimedAt: Date.now(), heartbeatAt: Date.now() },
+        });
+        if (reclaimed) {
+          job = reclaimed;
+          if (job.stage === "parse") {
+            await runInProcessStep(job);
+          } else if (job.stage === "extract" && typeof meta(job).extractorDocumentId === "string") {
+            await pollExtractor(job, meta(job).extractorDocumentId as string);
+          }
+        }
       }
     }
   } catch (err) {
     const fresh = await SourceProcessingJobService.getJobForPerson(jobId, personId);
-    if (fresh) await fail(fresh, err instanceof PipelineFailure ? err.code : "EXTRACTION_FAILED", err instanceof PipelineFailure ? err.cause : err);
+    if (fresh) {
+      await fail(fresh, err instanceof PipelineFailure ? err.code : "EXTRACTION_FAILED", err instanceof PipelineFailure ? err.cause : err);
+    }
   }
 
   return SourceProcessingJobService.getJobForPerson(jobId, personId);
+}
+
+/**
+ * Advances a resume job by at most one step. Backward-compatible wrapper around processResumeJob.
+ */
+export async function advanceResumeJob(jobId: string, personId: string): Promise<SourceProcessingJob | null> {
+  return processResumeJob(jobId, personId);
 }
 
 async function runInProcessStep(job: SourceProcessingJob) {
@@ -264,9 +422,6 @@ async function runInProcessStep(job: SourceProcessingJob) {
   const forceOcr = extension === "pdf" && process.env.RESUME_FORCE_OCR === "true";
   let parsed;
   try {
-    // Text layer only. OCR never runs inside a serverless request: it needs a
-    // native canvas binary, a WASM worker and a 5 MB model, and routinely
-    // exceeded the function time limit. Scanned PDFs go to the extractor.
     parsed = await readDocumentText(doc.buffer, extension);
   } catch (err) {
     throw new PipelineFailure("PARSE_FAILED", err);
@@ -285,28 +440,12 @@ async function runInProcessStep(job: SourceProcessingJob) {
   }
 
   if (extension === "docx") throw new PipelineFailure("NATIVE_TEXT_UNAVAILABLE");
+
   if (!ExtractorServiceClient.isConfigured()) {
-    try {
-      const local = await runLocalOcrFallback(doc.buffer, extension);
-      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
-        await finalize(job, documentId, {
-          text: local.text,
-          hyperlinks: local.hyperlinks,
-          fileFormat: extension,
-          pageCount: local.pageCount,
-          ocrUsed: true,
-          via: "local-ocr",
-        });
-        return;
-      }
-    } catch (localErr) {
-      console.warn("[resume-pipeline] local OCR fallback failed:", localErr);
-    }
     throw new PipelineFailure("OCR_SERVICE_NOT_CONFIGURED");
   }
 
-  // Hand the scan to the extractor. Both calls are short: upload stores the
-  // file, startExtraction only queues a background task there.
+  // Hand the scan to the Render extractor.
   try {
     const identity = await resolveExtractorIdentity(job.personId);
     const uploaded = await ExtractorServiceClient.uploadResume({
@@ -314,11 +453,13 @@ async function runInProcessStep(job: SourceProcessingJob) {
       filename: doc.filename,
       mimeType: doc.mimeType || "application/pdf",
       identity,
+      jobId: job.id,
     });
     await ExtractorServiceClient.startExtraction(uploaded.document_id, identity, { forceOcr });
     await SourceProcessingJobService.updateStage(job.id, job.personId, "extract", {
       extractorDocumentId: uploaded.document_id,
       submittedAt: Date.now(),
+      heartbeatAt: Date.now(),
     });
     const db = await getDb();
     await db
@@ -328,35 +469,21 @@ async function runInProcessStep(job: SourceProcessingJob) {
         metadata: sql`coalesce(${resumeDocuments.metadata}, '{}'::jsonb) || ${JSON.stringify({ extractorDocumentId: uploaded.document_id })}::jsonb`,
       })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, job.personId)));
+
+    // Immediately begin polling extractor in this background context
+    await pollExtractor(job, uploaded.document_id);
   } catch (err) {
+    if (err instanceof PipelineFailure) throw err;
     const code = classifyExtractorError(err);
     const since = typeof meta(job).extractorWaitSince === "number" ? (meta(job).extractorWaitSince as number) : Date.now();
     if (code === "OCR_SERVICE_UNREACHABLE" && Date.now() - since < EXTRACTOR_WARMUP_BUDGET_MS) {
-      // Probably a cold start: the request above is what wakes the service.
-      // Park the job; the next status poll retries the handoff.
       await SourceProcessingJobService.updateStage(job.id, job.personId, "awaiting_extractor", {
         extractorWaitSince: since,
         claimedAt: Date.now(),
+        heartbeatAt: Date.now(),
         extractorAttempts: Number(meta(job).extractorAttempts || 0) + 1,
       });
       return;
-    }
-    // Attempt local OCR rescue before failing the pipeline
-    try {
-      const local = await runLocalOcrFallback(doc.buffer, extension);
-      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
-        await finalize(job, documentId, {
-          text: local.text,
-          hyperlinks: local.hyperlinks,
-          fileFormat: extension,
-          pageCount: local.pageCount,
-          ocrUsed: true,
-          via: "local-ocr-rescue",
-        });
-        return;
-      }
-    } catch (rescueErr) {
-      console.warn("[resume-pipeline] local OCR rescue on upload error failed:", rescueErr);
     }
     throw new PipelineFailure(code, err);
   }
@@ -365,103 +492,78 @@ async function runInProcessStep(job: SourceProcessingJob) {
 async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: string) {
   const m = meta(job);
   const identity = await resolveExtractorIdentity(job.personId);
-  let status;
-  try {
-    status = await ExtractorServiceClient.getStatus(extractorDocumentId, identity);
-  } catch (err) {
-    // A single failed status poll is not fatal; the deadline below is.
-    const submittedAt = typeof m.submittedAt === "number" ? m.submittedAt : 0;
-    if (Date.now() - submittedAt > OCR_DEADLINE_MS) throw new PipelineFailure("OCR_TIMEOUT", err);
-    console.warn("[resume-pipeline] extractor status poll failed", { jobId: job.id, error: err instanceof Error ? err.message : err });
-    return;
+  const submittedAt = typeof m.submittedAt === "number" ? m.submittedAt : Date.now();
+  const documentId = (m.documentId as string) || job.resultReference?.replace(/^resume:/, "");
+  if (!documentId) {
+    throw new PipelineFailure("DOCUMENT_RETRIEVAL_FAILED", "Document ID not found in job metadata");
   }
 
-  if (status.status === "queued" || status.status === "processing" || status.status === "uploaded") {
-    const submittedAt = typeof m.submittedAt === "number" ? m.submittedAt : 0;
-    if (Date.now() - submittedAt > OCR_DEADLINE_MS) throw new PipelineFailure("OCR_TIMEOUT", `extractor still ${status.status}`);
-    return;
-  }
+  const loopStart = Date.now();
+  while (Date.now() - loopStart < 22_000) {
+    if (Date.now() - submittedAt > OCR_DEADLINE_MS) {
+      throw new PipelineFailure("OCR_TIMEOUT", "OCR deadline exceeded");
+    }
 
-  if (status.status === "failed") {
-    // Before failing, attempt rescue with local OCR
+    let status;
     try {
-      const doc = await ObjectStorageService.getDocument(meta(job).documentId as string, job.personId);
-      const local = await runLocalOcrFallback(doc.buffer, "pdf");
-      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
-        const claimed = await SourceProcessingJobService.transition({
-          jobId: job.id, personId: job.personId, from: ["processing"], fromStage: "extract",
-          to: "processing", stage: "persist", metadata: { claimedAt: Date.now() },
-        });
-        if (claimed) {
-          await finalize(claimed, meta(claimed).documentId as string, {
-            text: local.text,
-            hyperlinks: local.hyperlinks,
-            fileFormat: "pdf",
-            pageCount: local.pageCount,
-            ocrUsed: true,
-            via: "local-ocr-rescue",
-          });
-          return;
+      status = await ExtractorServiceClient.getStatus(extractorDocumentId, identity);
+    } catch (err) {
+      console.warn("[resume-pipeline] extractor status poll warning", { jobId: job.id, error: err instanceof Error ? err.message : err });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      continue;
+    }
+
+    await SourceProcessingJobService.updateStage(job.id, job.personId, "extract", {
+      heartbeatAt: Date.now(),
+    });
+
+    if (status.status === "failed") {
+      let code: ResumeFailureCode = "OCR_EXTRACTION_ERROR";
+      if (status.error_code === "OCR_ENGINE_UNAVAILABLE") code = "OCR_ENGINE_UNAVAILABLE";
+      else if (status.error_code === "OCR_TIMEOUT") code = "OCR_TIMEOUT";
+      else if (status.error_code === "OCR_NO_TEXT") code = "OCR_NO_TEXT";
+      throw new PipelineFailure(code, { extractorErrorCode: status.error_code ?? null, warnings: status.warnings });
+    }
+
+    if (status.status === "completed" || status.status === "partial") {
+      const claimed = await SourceProcessingJobService.transition({
+        jobId: job.id, personId: job.personId, from: ["processing"], fromStage: "extract",
+        to: "processing", stage: "persist", metadata: { claimedAt: Date.now(), heartbeatAt: Date.now() },
+      });
+      if (!claimed) return;
+
+      let text: string;
+      let hyperlinks: string[];
+      let pageCount: number;
+      try {
+        const raw = await ExtractorServiceClient.getRawText(extractorDocumentId, identity);
+        hyperlinks = [...new Set((raw.pages || []).flatMap((p) => (p.links || []).map((l) => l.url)).filter((u) => /^https?:/i.test(u)))];
+        text = raw.pages?.length ? reconstructReadingOrder(raw.pages, hyperlinks) : raw.raw_text || "";
+        if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS && raw.raw_text) {
+          text = raw.raw_text;
         }
+        pageCount = raw.pages?.length || 1;
+      } catch (err) {
+        throw new PipelineFailure(classifyExtractorError(err), err);
       }
-    } catch (rescueErr) {
-      console.warn("[resume-pipeline] local OCR rescue on failed extractor status failed:", rescueErr);
-    }
-    const code: ResumeFailureCode = status.error_code === "OCR_ENGINE_UNAVAILABLE" ? "OCR_ENGINE_UNAVAILABLE" : "OCR_EXTRACTION_ERROR";
-    throw new PipelineFailure(code, { extractorErrorCode: status.error_code ?? null, warnings: status.warnings });
-  }
 
-  // completed | partial: exactly one poll gets to persist.
-  const claimed = await SourceProcessingJobService.transition({
-    jobId: job.id, personId: job.personId, from: ["processing"], fromStage: "extract",
-    to: "processing", stage: "persist", metadata: { claimedAt: Date.now() },
-  });
-  if (!claimed) return;
-
-  let text: string;
-  let hyperlinks: string[];
-  let pageCount: number;
-  try {
-    const raw = await ExtractorServiceClient.getRawText(extractorDocumentId, identity);
-    hyperlinks = [...new Set((raw.pages || []).flatMap((p) => (p.links || []).map((l) => l.url)).filter((u) => /^https?:/i.test(u)))];
-    // Word boxes -> reading order. Documents processed before the extractor
-    // returned positions fall back to its line text.
-    text = raw.pages?.length ? reconstructReadingOrder(raw.pages, hyperlinks) : raw.raw_text || "";
-    if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS && raw.raw_text) {
-      text = raw.raw_text;
-    }
-    pageCount = raw.pages?.length || 1;
-  } catch (err) {
-    throw new PipelineFailure(classifyExtractorError(err), err);
-  }
-
-  if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
-    // Rescue local OCR
-    try {
-      const doc = await ObjectStorageService.getDocument(meta(claimed).documentId as string, job.personId);
-      const local = await runLocalOcrFallback(doc.buffer, "pdf");
-      if (local.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
-        text = local.text;
-        hyperlinks = [...new Set([...hyperlinks, ...local.hyperlinks])];
-        pageCount = local.pageCount || pageCount;
+      if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
+        throw new PipelineFailure("OCR_NO_TEXT", { warnings: status.warnings });
       }
-    } catch (rescueErr) {
-      console.warn("[resume-pipeline] local OCR rescue on empty text failed:", rescueErr);
+
+      await finalize(claimed, documentId, {
+        text,
+        hyperlinks,
+        fileFormat: "pdf",
+        pageCount,
+        ocrUsed: true,
+        via: "extractor-ocr",
+      });
+      return;
     }
-  }
 
-  if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS) {
-    throw new PipelineFailure("OCR_NO_TEXT", { warnings: status.warnings });
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
-
-  await finalize(claimed, meta(claimed).documentId as string, {
-    text,
-    hyperlinks,
-    fileFormat: "pdf",
-    pageCount,
-    ocrUsed: true,
-    via: "extractor-ocr",
-  });
 }
 
 /**
@@ -504,7 +606,7 @@ async function finalize(
   }
 ) {
   const { personId } = job;
-  await SourceProcessingJobService.updateStage(job.id, personId, "validate");
+  await SourceProcessingJobService.updateStage(job.id, personId, "validate", { heartbeatAt: Date.now() });
 
   const extraction = await extractResumeStructured(input.text, personId);
   if (!extraction.success || !extraction.extracted) {
@@ -542,7 +644,7 @@ async function finalize(
     ocrUsed: input.ocrUsed,
   });
 
-  await SourceProcessingJobService.updateStage(job.id, personId, "persist");
+  await SourceProcessingJobService.updateStage(job.id, personId, "persist", { heartbeatAt: Date.now() });
 
   const review: ResumeReviewPayload = {
     reviewCandidates,
@@ -587,10 +689,10 @@ async function finalize(
     jobId: job.id, personId, from: ["processing"], to: "review_ready", stage: "review",
     errorCode: null, errorMessage: null,
     resultReference: `resume:${documentId}`,
-    metadata: { candidates: reviewCandidates.length, via: input.via },
+    metadata: { candidates: reviewCandidates.length, via: input.via, heartbeatAt: Date.now() },
   });
 
-  await seedDraftFromResume(personId, documentId, extraction.extracted);
+  await seedDraftFromResume(personId, documentId, extraction.extracted, mergedDiscoveredProfiles);
 }
 
 /**
@@ -601,12 +703,20 @@ async function finalize(
  * student confirms it on the review screen. Best-effort: the review payload is
  * already persisted, so a failure here is logged, not surfaced.
  */
-async function seedDraftFromResume(personId: string, documentId: string, x: ResumeInterpretationOutput) {
+async function seedDraftFromResume(
+  personId: string,
+  documentId: string,
+  x: ResumeInterpretationOutput,
+  discoveredProfiles?: Record<string, string>
+) {
   try {
     const { writeOnboardingDraft } = await import("./onboarding-v2-service");
     const firstEdu = x.education[0];
     await writeOnboardingDraft(personId, {
       resumeDocumentId: documentId,
+      ...(discoveredProfiles && Object.keys(discoveredProfiles).length > 0
+        ? { discoveredResumeProfiles: discoveredProfiles }
+        : {}),
       institution: firstEdu?.institution || "",
       degree: firstEdu?.degree || "",
       education: x.education.map((e) => ({
@@ -639,7 +749,7 @@ async function reclaimAwaitingJob(job: SourceProcessingJob, claimedAt: number): 
   const db = await getDb();
   const rows = await db
     .update(sourceProcessingJobs)
-    .set({ metadata: sql`${sourceProcessingJobs.metadata} || ${JSON.stringify({ claimedAt: Date.now() })}::jsonb` })
+    .set({ metadata: sql`${sourceProcessingJobs.metadata} || ${JSON.stringify({ claimedAt: Date.now(), heartbeatAt: Date.now() })}::jsonb` })
     .where(and(
       eq(sourceProcessingJobs.id, job.id),
       eq(sourceProcessingJobs.personId, job.personId),

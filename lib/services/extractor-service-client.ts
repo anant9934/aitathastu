@@ -215,12 +215,17 @@ export class ExtractorServiceClient {
     filename: string;
     mimeType: string;
     identity: ExtractorIdentity;
+    jobId?: string;
   }): Promise<ExtractorUploadResponse> {
     const formData = new FormData();
     formData.append("file", new Blob([new Uint8Array(params.fileBuffer)], { type: params.mimeType }), params.filename);
+    const extraHeaders: Record<string, string> = {};
+    if (params.jobId) {
+      extraHeaders["X-Job-Id"] = params.jobId;
+    }
     const res = await this.request("/api/resumes/upload", {
       method: "POST",
-      headers: this.makeHeaders(params.identity),
+      headers: this.makeHeaders(params.identity, extraHeaders),
       body: formData,
       // Must finish inside the hosting function's limit (Vercel: 15s-60s maxDuration).
       // A sleeping Render instance is woken earlier by

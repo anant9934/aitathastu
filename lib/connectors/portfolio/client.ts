@@ -53,6 +53,34 @@ function isPublicIpv4(address: string): boolean {
   );
 }
 
+export function isPublicIpv6(address: string): boolean {
+  if (isIP(address) !== 6) return false;
+  const lower = address.toLowerCase();
+  // Loopback (::1) and unspecified (::)
+  if (lower === "::1" || lower === "::") return false;
+  // IPv4-mapped IPv6 (::ffff:127.0.0.1 or ::ffff:7f00:1)
+  if (lower.startsWith("::ffff:")) {
+    const ipv4Part = lower.slice(7);
+    if (isIP(ipv4Part) === 4) return isPublicIpv4(ipv4Part);
+    return false;
+  }
+  // Unique Local Address (ULA) fc00::/7 (starts with fc or fd)
+  if (/^f[cd][0-9a-f]{2}:/i.test(lower)) return false;
+  // Link-Local Unicast fe80::/10 (starts with fe8, fe9, fea, feb)
+  if (/^fe[89ab][0-9a-f]:/i.test(lower)) return false;
+  // Multicast ff00::/8
+  if (/^ff[0-9a-f]{2}:/i.test(lower)) return false;
+  // Documentation 2001:db8::/32
+  if (/^2001:0?db8:/i.test(lower)) return false;
+  // Discard prefix 100::/64
+  if (/^0?100::/i.test(lower)) return false;
+  return true;
+}
+
+export function isSafePublicIp(address: string): boolean {
+  return isPublicIpv4(address) || isPublicIpv6(address);
+}
+
 import { isSafePublicUrl } from "./url-check";
 export { isSafePublicUrl };
 
@@ -61,10 +89,13 @@ export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Pro
   if (!check.safe || !check.parsed) {
     throw new Error(check.reason || "Invalid portfolio URL");
   }
-  const addresses = await lookup(check.parsed.hostname, { all: true, family: 4 });
-  const address = addresses.find((entry) => isPublicIpv4(entry.address));
-  if (!address || addresses.some((entry) => !isPublicIpv4(entry.address))) {
-    throw new Error("Portfolio host did not resolve exclusively to public IPv4 addresses.");
+  const addresses = await lookup(check.parsed.hostname, { all: true, family: 0 });
+  if (!addresses || addresses.length === 0) {
+    throw new Error("Portfolio host could not be resolved.");
+  }
+  const address = addresses.find((entry) => isSafePublicIp(entry.address));
+  if (!address || addresses.some((entry) => !isSafePublicIp(entry.address))) {
+    throw new Error("Portfolio host did not resolve exclusively to safe public IP addresses.");
   }
   const response = await new Promise<{ status: number; contentType: string; location?: string; html: string }>((resolve, reject) => {
     const request = https.get(check.parsed!, {
@@ -74,8 +105,8 @@ export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Pro
       // Preserve DNS pinning in both callback forms; returning a string for
       // an all-address lookup makes Node read an undefined IP address.
       lookup: (_host, options, callback) => options.all
-        ? callback(null, [{ address: address.address, family: 4 }])
-        : callback(null, address.address, 4),
+        ? callback(null, [{ address: address.address, family: address.family }])
+        : callback(null, address.address, address.family),
     }, (res) => {
       const status = res.statusCode || 0;
       const contentType = String(res.headers["content-type"] || "");

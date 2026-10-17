@@ -4,7 +4,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CHROME_BIN=/usr/bin/chromium \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
-    WORKERS=2
+    WORKERS=2 \
+    OMP_THREAD_LIMIT=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \

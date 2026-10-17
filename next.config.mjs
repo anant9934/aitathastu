@@ -27,7 +27,7 @@ const nextConfig = {
   // Lets a local verification server (pointed at the test database) build
   // beside a running dev server without sharing .next.
   distDir: process.env.NEXT_DIST_DIR || ".next",
-  serverExternalPackages: ["@napi-rs/canvas", "pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres", "tesseract.js", "tesseract.js-core"],
+  serverExternalPackages: ["@napi-rs/canvas", "pdf-parse", "pdfjs-dist", "mammoth", "@electric-sql/pglite", "postgres"],
   // pdf.js loads these at runtime from a computed path (pdfjsAssetDir in
   // lib/resume/document-text.ts), which file tracing cannot see, so they are
   // listed explicitly for the resume routes. OCR never runs inside Next

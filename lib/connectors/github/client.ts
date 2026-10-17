@@ -128,12 +128,16 @@ const MAX_DEEP_INSPECT_REPOS = 6;
 const MAX_README_CHARS = 4000;
 
 function buildHeaders(token?: string): Record<string, string> {
+  const authToken = token || process.env.GITHUB_TOKEN || process.env.GITHUB_PAT;
   const headers: Record<string, string> = {
     Accept: "application/vnd.github.v3+json",
     "User-Agent": USER_AGENT,
   };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  } else if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+    const creds = Buffer.from(`${process.env.GITHUB_CLIENT_ID}:${process.env.GITHUB_CLIENT_SECRET}`).toString("base64");
+    headers.Authorization = `Basic ${creds}`;
   }
   return headers;
 }

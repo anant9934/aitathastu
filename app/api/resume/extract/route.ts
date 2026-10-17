@@ -8,11 +8,12 @@
  */
 
 import crypto from "crypto";
+import { after } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { validateDocumentSafety } from "@/lib/resume/document-safety";
-import { queueResumeUpload } from "@/lib/services/resume-ingestion-service";
+import { queueResumeUpload, processResumeJob } from "@/lib/services/resume-ingestion-service";
 import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { jsonNoStore } from "@/lib/api/resume-route-helpers";
 import { contentIdempotencyKey, requestIdempotencyKey, withIdempotency } from "@/lib/sync/idempotency";
@@ -96,6 +97,14 @@ export async function POST(request: Request) {
       console.error("[resume-extract] storing upload failed", { requestId, error: err instanceof Error ? err.message : err });
       return fail("STORAGE_FAILED", "We could not store your file. Please try again.", 503);
     }
+
+    after(async () => {
+      try {
+        await processResumeJob(queued.jobId, personId);
+      } catch (err) {
+        console.error("[resume-extract] background processResumeJob error", { jobId: queued.jobId, error: err instanceof Error ? err.message : err });
+      }
+    });
 
     return jsonNoStore(
       { ok: true, status: "queued", jobId: queued.jobId, documentId: queued.documentId, filename: file.name, requestId },

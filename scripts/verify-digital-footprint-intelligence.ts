@@ -17,20 +17,18 @@ import {
   onboardingSteps,
   stepForScreen,
   TOTAL_ONBOARDING_STEPS,
-  WELCOME_SCREEN,
 } from "../lib/onboarding-step-registry";
 import { nextOnboardingScreen } from "../lib/onboarding-resume-coverage";
 import {
   discoverFootprintsFromResume,
   unwrapMultiLineUrls,
-  cleanRawUrl,
 } from "../lib/services/digital-footprint-discovery";
 import { isSafePublicUrl } from "../lib/connectors/portfolio/client";
 import { DigitalSourceImportOrchestrator } from "../lib/services/digital-source-import-orchestrator";
 import { PROVIDER_CAPABILITIES_V4 } from "../lib/connectors/registry";
-import { getDb, externalConnections, sourceSnapshots, evidenceItems } from "../lib/db";
+import { getDb, externalConnections, sourceSnapshots } from "../lib/db";
 import { createUser } from "../lib/repositories/user-repository";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { screenNumberToOnboardingStep } from "../lib/eora/context";
 
 let totalTests = 0;

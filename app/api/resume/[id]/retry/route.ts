@@ -5,9 +5,10 @@
  * the file to be picked again. Only allowed when the latest job did not succeed.
  */
 
+import { after } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
-import { requeueResumeDocument } from "@/lib/services/resume-ingestion-service";
+import { requeueResumeDocument, processResumeJob } from "@/lib/services/resume-ingestion-service";
 import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { docMeta, jsonNoStore, loadOwnedResumeDocument, unauthorized } from "@/lib/api/resume-route-helpers";
 
@@ -33,5 +34,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const jobId = await requeueResumeDocument(personId, documentId);
   if (!jobId) return jsonNoStore({ ok: false, code: "NOT_FOUND", error: "Document not found." }, 404);
+
+  after(async () => {
+    try {
+      await processResumeJob(jobId, personId);
+    } catch (err) {
+      console.error("[resume-retry] background processResumeJob error", { jobId, error: err instanceof Error ? err.message : err });
+    }
+  });
+
   return jsonNoStore({ ok: true, status: "queued", jobId, documentId }, 202);
 }

@@ -44,6 +44,7 @@ export const DRAFT_ARRAY_KEYS: Record<string, (entry: unknown) => string> = {
   certifications: lc,
   acceptedResumeSkills: lc,
   priorities: lc,
+  dismissedFootprintProviders: lc,
   resumeCoveredScreens: (e) => String(e),
 };
 
@@ -141,8 +142,15 @@ export function mergeDraftPatch(params: {
       const next: Entry = { ...existing };
       for (const [k, v] of Object.entries(value as Entry)) {
         if (origin === "system" && !isEmptyScalar(existing[k])) continue;
-        if (next[k] !== v) changed = true;
-        next[k] = v;
+        if (origin === "user" && (v === null || v === undefined || v === "")) {
+          if (k in next) {
+            delete next[k];
+            changed = true;
+          }
+        } else {
+          if (next[k] !== v) changed = true;
+          next[k] = v;
+        }
       }
       draft[field] = next;
       continue;

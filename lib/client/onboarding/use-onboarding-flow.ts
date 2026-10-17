@@ -91,6 +91,7 @@ function restoreFromDraft(d: Record<string, any>, base: OnboardingData): { data:
   }
   if (d.profiles) data.profiles = d.profiles;
   if (d.discoveredResumeProfiles) data.discoveredResumeProfiles = d.discoveredResumeProfiles;
+  if (Array.isArray(d.dismissedFootprintProviders)) data.dismissedFootprintProviders = d.dismissedFootprintProviders;
   if (Array.isArray(d.resumeCoveredScreens)) data.resumeCovered = d.resumeCoveredScreens;
   if (Array.isArray(d.priorities)) data.priorities = d.priorities;
   if (d.primaryPriority) data.primaryPriority = d.primaryPriority;

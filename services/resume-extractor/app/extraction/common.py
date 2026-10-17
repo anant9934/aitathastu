@@ -8,13 +8,13 @@ EMAIL=re.compile(r'(?<![\w.\-])([\w.+\-]+@[\w.\-]+\.[a-zA-Z]{2,})(?![\w.])')
 URL=re.compile(r'(?<![@\w.])(?:(?:https?://)?(?:www\.)?(?:[\w-]+\.)+[a-z]{2,}(?:/[^\s\]>),;]*)?)',re.I)
 PHONE=re.compile(r'(?<![\w])(?:\+\d{1,3}[\s.\-]?)?(?:\(?\d{2,5}\)?[\s.\-]?)?\d{3,5}[\s.\-]?\d{3,5}(?!\w)')
 YEAR=re.compile(r'\b(?:19|20)\d{2}\b')
-EDU=re.compile(r'\b(?:B\.?Tech|B\.?E\.?|Bachelor|BSc|B\.Sc|BCA|M\.?Tech|Master|MSc|M\.Sc|MCA|MBA|Ph\.?D|Doctorate|Diploma|Class\s*(?:10|12|X|XII)\b|10th|12th|High School|Senior Secondary|Secondary School|Intermediate|Matriculation|Higher Secondary)\b',re.I)
+EDU=re.compile(r'\b(?:B\.?Tech|B\.?E\.?|Bachelor|BSc|B\.Sc|BCA|BBA|BA|B\.Com|BS|M\.?Tech|Master|MSc|M\.Sc|MCA|MBA|MS|Ph\.?D|Doctorate|Diploma|Associate|Class\s*(?:10|12|X|XII)\b|10th|12th|High School|Senior Secondary|Secondary School|Intermediate|Matriculation|Higher Secondary)\b',re.I)
 GRADE=re.compile(r'\b(?:CGPA|GPA)\s*[:\-]?\s*(\d{1,2}(?:\.\d{1,2})?(?:\s*/\s*\d{1,2})?)|\b\d{1,3}(?:\.\d+)?\s*%',re.I)
 METRIC=re.compile(r'\b\d+(?:\.\d+)?\s*(?:%|x\b|users\b|hours\b|ms\b|points\b|rank\b)',re.I)
 DOI=re.compile(r'\b10\.\d{4,9}/[^\s,;]+',re.I)
-SKILL_NAMES='Python,Java,C++,C#,JavaScript,TypeScript,HTML,CSS,SQL,Go,Rust,R,PyTorch,TensorFlow,Scikit-learn,Keras,OpenCV,NumPy,Pandas,Matplotlib,LangChain,LLM,RAG,Machine Learning,Deep Learning,NLP,Computer Vision,Generative AI,Transformers,FastAPI,Django,Flask,React,Next.js,Node.js,Express,PostgreSQL,MySQL,MongoDB,Redis,Docker,Kubernetes,AWS,Azure,GCP,Git,GitHub Actions,Linux,Tableau,Power BI,Excel,Data Structures,Algorithms,DBMS,Cybersecurity,Networking,Statistics,Data Analysis'.split(',')
+SKILL_NAMES='Python,Java,C++,C#,JavaScript,TypeScript,HTML,CSS,SQL,Go,Rust,R,PyTorch,TensorFlow,Scikit-learn,Keras,OpenCV,NumPy,Pandas,Matplotlib,LangChain,LLM,RAG,Machine Learning,Deep Learning,NLP,Computer Vision,Generative AI,Transformers,FastAPI,Django,Flask,React,Next.js,Node.js,Express,PostgreSQL,MySQL,MongoDB,Redis,Docker,Kubernetes,AWS,Azure,GCP,Git,GitHub Actions,Linux,Tableau,Power BI,Excel,Data Structures,Algorithms,DBMS,Cybersecurity,Networking,Statistics,Data Analysis,GraphQL,Tailwind,CI/CD,Kafka,PyPDF,Redux,Vite,REST APIs'.split(',')
 SKILLS={s.lower():s for s in SKILL_NAMES}
-SKILLS.update({'sklearn':'Scikit-learn','ml':'Machine Learning','gen ai':'Generative AI','retrieval augmented generation':'RAG','large language models':'LLM','postgres':'PostgreSQL','js':'JavaScript','ts':'TypeScript'})
+SKILLS.update({'sklearn':'Scikit-learn','ml':'Machine Learning','gen ai':'Generative AI','generative ai':'Generative AI','retrieval augmented generation':'RAG','large language models':'LLM','postgres':'PostgreSQL','js':'JavaScript','ts':'TypeScript','py':'Python','cpp':'C++','tailwind css':'Tailwind','aws cloud':'AWS','azure cloud':'Azure','google cloud':'GCP'})
 PLATFORMS={'github.com':'GitHub','linkedin.com':'LinkedIn','leetcode.com':'LeetCode','hackerrank.com':'HackerRank','hackerearth.com':'HackerEarth','codechef.com':'CodeChef','kaggle.com':'Kaggle','huggingface.co':'Hugging Face','orcid.org':'ORCID','scholar.google.com':'Google Scholar','stackoverflow.com':'Stack Overflow','dev.to':'DEV Community'}
 
 def evidence(line): return Evidence(page=line.page,section=line.section,snippet=line.text[:320],method=line.method,block_id=line.block_id)
@@ -35,6 +35,9 @@ def normalize_url(raw):
     try:
         p=urlsplit(raw)
         if not p.hostname or '.' not in p.hostname or p.username or p.password: return None
+        h=p.hostname.lower().replace('www.', '')
+        if h in ('next.js', 'node.js', 'react.js', 'vue.js', 'three.js', 'express.js'): return None
+        if re.match(r'^(?:b|m)\.(?:tech|sc|com|e|arch)$', h) or len(h.split('.')[0]) <= 1: return None
         return urlunsplit(('https',p.netloc.lower(),p.path.rstrip('/'),p.query,''))
     except ValueError: return None
 
@@ -60,6 +63,6 @@ def category(skill):
     if skill in ['LLM','RAG','LangChain','Generative AI']: return 'Generative AI'
     if skill in ['Pandas','NumPy','Matplotlib','Statistics','Data Analysis','Tableau','Power BI','Excel']: return 'Data Science'
     if skill in ['PostgreSQL','MySQL','MongoDB','Redis','DBMS']: return 'Databases'
-    if skill in ['Docker','Kubernetes','AWS','Azure','GCP','GitHub Actions']: return 'Cloud/DevOps'
-    if skill in ['FastAPI','Django','Flask','React','Next.js','Node.js','Express','HTML','CSS']: return 'Web Development'
+    if skill in ['Docker','Kubernetes','AWS','Azure','GCP','GitHub Actions','CI/CD','Kafka']: return 'Cloud/DevOps'
+    if skill in ['FastAPI','Django','Flask','React','Next.js','Node.js','Express','HTML','CSS','GraphQL','Tailwind','Vite','Redux','REST APIs']: return 'Web Development'
     return 'Tools & Fundamentals'

@@ -21,6 +21,7 @@
 .DS_Store
 *.pem
 *.traineddata
+*.traineddata.gz
 !/eng.traineddata
 Anant-Kumar-Resume.pdf
 Resumes PDF/
@@ -29,6 +30,7 @@ benchmarks/
 scripts/reproduce*
 scripts/test-live*
 !scripts/test-live-production-extract.ts
+scripts/tesseract_runner.js
 
 # debug
 *.log
@@ -60,6 +62,7 @@ _integration_source/
 universal-resume-extractor/
 
 services/resume-extractor/data/private/
+/data/
 .neon
 .agents/
 .claude/
@@ -72,3 +75,6 @@ backups/
 
 .impeccable/
 .next-prodtest/
+private-fixtures/
+audit-output/
+*.traineddata.gz

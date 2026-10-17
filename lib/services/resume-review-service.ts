@@ -17,7 +17,13 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       const trimmedVal = row.value.trim();
       const trimmedSpan = row.sourceSpan.trim();
       if (!trimmedVal || !trimmedSpan) return;
-      if (normalizedSource && !normalizedSource.includes(trimmedSpan.replace(/\s+/g, " ").toLocaleLowerCase())) return;
+      if (normalizedSource) {
+        const normSpan = trimmedSpan.replace(/[\s\r\n]+/g, " ").trim().toLocaleLowerCase();
+        const words = normSpan.split(" ").filter((w) => w.length > 3);
+        const matchesExact = normalizedSource.includes(normSpan);
+        const matchesKeyWords = words.length >= 2 && words.slice(0, 3).every((w) => normalizedSource.includes(w));
+        if (!matchesExact && !matchesKeyWords) return;
+      }
 
       if (category === "skill") {
         const valRes = ExtractionValidator.validateSkillClaim(trimmedVal, trimmedSpan);
@@ -29,13 +35,70 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       candidates.push({ candidateId: `${category}_${index}`, category, value: trimmedVal, sourceSpan: trimmedSpan });
     });
   };
-  add("education", extracted.education.map((x) => ({ value: [x.degree, x.fieldOfStudy, x.institution].filter(Boolean).join(" · "), sourceSpan: x.sourceSpan })));
-  add("experience", extracted.experience.map((x) => ({ value: [x.role, x.company].filter(Boolean).join(" · "), sourceSpan: x.sourceSpan })));
-  add("project", extracted.projects.map((x) => ({ value: x.title, sourceSpan: x.sourceSpan })));
+  add(
+    "education",
+    extracted.education.map((x) => {
+      const parts = [
+        x.degree || x.fieldOfStudy,
+        x.fieldOfStudy && x.degree ? x.fieldOfStudy : undefined,
+        x.institution,
+        x.gpa ? `CGPA: ${x.gpa}` : x.percentage ? `${x.percentage}` : undefined,
+        x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : x.graduationYear ? `Class of ${x.graduationYear}` : undefined,
+      ].filter(Boolean);
+      return {
+        value: parts.join(" · ") || x.institution || "Education Entry",
+        sourceSpan: x.sourceSpan,
+      };
+    })
+  );
+  add(
+    "experience",
+    extracted.experience.map((x) => {
+      const parts = [
+        x.role,
+        x.company,
+        x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : x.duration,
+      ].filter(Boolean);
+      return {
+        value: parts.join(" · ") || x.company || "Experience Entry",
+        sourceSpan: x.sourceSpan,
+      };
+    })
+  );
+  add(
+    "project",
+    extracted.projects.map((x) => {
+      const techSnippet = x.technologies && x.technologies.length > 0 ? ` (${x.technologies.slice(0, 3).join(", ")})` : "";
+      const descSnippet = x.description ? ` — ${x.description.length > 70 ? x.description.slice(0, 67) + "…" : x.description}` : "";
+      return {
+        value: `${x.title}${techSnippet}${descSnippet}`,
+        sourceSpan: x.sourceSpan,
+      };
+    })
+  );
   add("skill", extracted.skills.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan })));
-  add("certification", extracted.certifications.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan })));
+  add(
+    "certification",
+    extracted.certifications.map((x) => {
+      const parts = [x.name, x.issuer, x.year].filter(Boolean);
+      return {
+        value: parts.join(" · "),
+        sourceSpan: x.sourceSpan,
+      };
+    })
+  );
   if (Array.isArray(extracted.achievements)) {
-    add("achievement", extracted.achievements.map((x) => ({ value: `${x.title} (${x.category})`, sourceSpan: x.sourceSpan })));
+    add(
+      "achievement",
+      extracted.achievements.map((x) => {
+        const cat = x.category ? ` (${x.category})` : "";
+        const desc = x.description ? ` — ${x.description.length > 60 ? x.description.slice(0, 57) + "…" : x.description}` : "";
+        return {
+          value: `${x.title}${cat}${desc}`,
+          sourceSpan: x.sourceSpan,
+        };
+      })
+    );
   }
   return candidates;
 }

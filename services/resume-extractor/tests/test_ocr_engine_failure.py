@@ -29,3 +29,22 @@ def test_text_endpoint_returns_extracted_lines(client, auth, pdf):
     body = client.get(f'/api/resumes/{did}/text', headers=auth).json()
     assert 'Ananya Sharma' in body['raw_text']
     assert body['ocr_used'] is False
+
+
+def test_ocr_timeout_reports_ocr_timeout_code(client, auth, ocr_png, monkeypatch):
+    import app.document as doc_mod
+    def mock_tesseract(fn, *args, **kwargs):
+        raise TimeoutError("Command 'tesseract ...' timed out after 25 seconds")
+    monkeypatch.setattr(doc_mod, '_tesseract', mock_tesseract)
+    up = client.post('/api/resumes/upload', files={'file': ('scan.png', ocr_png, 'image/png')}, headers=auth)
+    assert up.status_code == 201
+    did = up.json()['document_id']
+    assert client.post('/api/resumes/extract', json={'document_id': did}, headers=auth).status_code == 202
+    for _ in range(20):
+        st = client.get(f'/api/resumes/{did}/status', headers=auth).json()
+        if st['status'] in ('failed', 'completed', 'partial'):
+            break
+        time.sleep(0.1)
+    assert st['status'] == 'failed'
+    assert st['error_code'] == 'OCR_TIMEOUT'
+    assert any('timed out' in w.lower() or 'timeout' in w.lower() for w in st['warnings'])

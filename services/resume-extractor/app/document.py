@@ -5,8 +5,14 @@ import re
 import time
 import fitz
 import pytesseract
+import shutil, sys, os
 from PIL import Image, ImageOps
 from docx import Document
+
+if not shutil.which('tesseract'):
+    _venv_tess = os.path.join(sys.prefix, 'bin', 'tesseract')
+    if os.path.exists(_venv_tess):
+        pytesseract.pytesseract.tesseract_cmd = _venv_tess
 
 class OcrEngineUnavailable(RuntimeError):
     """Raised when the Tesseract binary or its language data cannot be loaded.
@@ -51,29 +57,82 @@ class Content:
     layout: list[dict] = field(default_factory=list)
 
 HEADINGS = {
- 'summary':['summary','professional summary','career objective','objective','about me','profile','professional profile'],
- 'education':['education','academic background','academics','academic qualifications','educational qualifications','qualifications'],
- 'experience':['experience','work experience','professional experience','employment history','work history'],
- 'internships':['internships','internship','industrial training','training','professional training'],
- 'skills':['skills','technical skills','technical expertise','technologies','competencies','technical proficiencies','tools and technologies'],
- 'projects':['projects','personal projects','academic projects','technical projects','project experience','selected projects'],
- 'awards':['awards','achievements','honours and awards','honors and awards','accomplishments','scholarships'],
- 'certifications':['certifications','certificates','courses and certifications','licenses and certifications','professional certifications','online courses'],
- 'research':['research','publications','research publications','research experience','papers','research & projects'],
- 'books_patents':['patents','books','books and patents','intellectual property'],
- 'leadership':['leadership','volunteering','volunteer experience','community engagement','extracurricular activities','activities and leadership'],
- 'contact':['contact','contact details','personal details']
+ 'summary': [
+     'summary', 'professional summary', 'career objective', 'objective', 'about me',
+     'profile', 'professional profile', 'bio', 'biography'
+ ],
+ 'education': [
+     'education', 'academic background', 'academics', 'academic qualifications',
+     'educational qualifications', 'qualifications', 'education & qualifications',
+     'education and qualifications'
+ ],
+ 'experience': [
+     'experience', 'work experience', 'professional experience', 'employment history',
+     'work history', 'experience & leadership', 'experience and leadership',
+     'professional background', 'employment'
+ ],
+ 'internships': [
+     'internships', 'internship', 'industrial training', 'training', 'professional training',
+     'vocational training'
+ ],
+ 'skills': [
+     'skills', 'technical skills', 'technical expertise', 'technologies', 'competencies',
+     'technical proficiencies', 'tools and technologies', 'skills summary',
+     'computer/data analytics skills', 'computer and data analytics skills', 'computer skills',
+     'data analytics skills', 'relevant languages', 'core competencies', 'technical background'
+ ],
+ 'projects': [
+     'projects', 'personal projects', 'academic projects', 'technical projects',
+     'project experience', 'selected projects', 'selected projects & client work',
+     'selected projects and client work', 'client work', 'key projects'
+ ],
+ 'awards': [
+     'awards', 'achievements', 'honours and awards', 'honors and awards',
+     'accomplishments', 'scholarships', 'honors', 'key achievements', 'leadership achievements'
+ ],
+ 'certifications': [
+     'certifications', 'certificates', 'courses and certifications',
+     'licenses and certifications', 'professional certifications', 'online courses',
+     'courses'
+ ],
+ 'research': [
+     'research', 'publications', 'research publications', 'research experience',
+     'papers', 'research & projects', 'research, patents & books', 'research, patents and books'
+ ],
+ 'books_patents': [
+     'patents', 'books', 'books and patents', 'intellectual property'
+ ],
+ 'leadership': [
+     'leadership', 'volunteering', 'volunteer experience', 'community engagement',
+     'extracurricular activities', 'activities and leadership', 'extracurriculars'
+ ],
+ 'contact': [
+     'contact', 'contact details', 'personal details', 'get in touch'
+ ]
 }
 def _heading(text):
-    s=re.sub(r'^[\W_]+|[\W_]+$','',text.lower()).strip()
-    return next((k for k,v in HEADINGS.items() if s in v),None)
+    s = re.sub(r'^[\W_\d]+|[\W_\d]+$', '', text.lower()).strip()
+    s = re.sub(r'\s+', ' ', s)
+    h = next((k for k, v in HEADINGS.items() if s == v or s in v), None)
+    if h: return h
+    s_stripped = re.sub(r'^[a-z0-9\W_]{1,3}\s+', '', s).strip()
+    return next((k for k, v in HEADINGS.items() if s_stripped == v or s_stripped in v), None)
 
 def tag_sections(lines):
-    section='header'
+    section = 'header'
     for l in lines:
-        h=_heading(l.text)
-        if h: section=h; l.section='heading:'+h
-        else: l.section=section
+        h = _heading(l.text)
+        if h:
+            section = h
+            l.section = 'heading:' + h
+        else:
+            clean = l.text.strip()
+            # If an uppercase heading-like line appears that matches no known heading,
+            # switch to unknown to prevent polluting critical prior sections.
+            if re.match(r'^[A-Z\s&,/]{3,40}$', clean) and not re.search(r'\d', clean) and len(clean.split()) <= 4:
+                if section in ('education', 'certifications', 'summary'):
+                    section = 'unknown'
+            l.section = section
 
 def _order(blocks,width):
     blocks=[b for b in blocks if isinstance(b[4],str) and b[4].strip()]
@@ -160,7 +219,7 @@ def _ocr(im, page, seconds, warnings):
             words = _words(img, config, step_timeout)
         except OcrEngineUnavailable:
             raise
-        except (pytesseract.pytesseract.TesseractTimeoutError, TimeoutError):
+        except TimeoutError:
             ocr_timed_out = True
             print(f'[_ocr] Tesseract timeout page {page} ({psm})', flush=True)
             words = []
@@ -185,7 +244,7 @@ def _ocr(im, page, seconds, warnings):
                     words.append({'x0': 0.0, 'y0': float(i * 18), 'x1': 100.0, 'y1': float(i * 18 + 14), 'text': text, 'key': (1, 1, i)})
         except OcrEngineUnavailable:
             raise
-        except (pytesseract.pytesseract.TesseractTimeoutError, TimeoutError):
+        except TimeoutError:
             ocr_timed_out = True
             print(f'[_ocr] Tesseract image_to_string fallback timeout page {page}', flush=True)
         except Exception as e:
@@ -193,14 +252,45 @@ def _ocr(im, page, seconds, warnings):
                 ocr_timed_out = True
             print(f'[_ocr] Tesseract image_to_string fallback error page {page}: {type(e).__name__}: {e}', flush=True)
 
-    grouped = {}
+    width = float(im_gray.width)
+    raw_lines = {}
     for w in words:
-        grouped.setdefault(w['key'], []).append(w)
-    lines = []
-    for i, ws in enumerate(grouped.values()):
-        text = ' '.join(w['text'] for w in ws).strip()
+        raw_lines.setdefault(w['key'], []).append(w)
+
+    line_objs = []
+    for k, ws in raw_lines.items():
+        ws_sorted = sorted(ws, key=lambda x: x['x0'])
+        x0 = min(w['x0'] for w in ws)
+        x1 = max(w['x1'] for w in ws)
+        y0 = min(w['y0'] for w in ws)
+        y1 = max(w['y1'] for w in ws)
+        text = ' '.join(w['text'] for w in ws_sorted).strip()
         if text:
-            lines.append(Line(text, page, 'ocr', f'ocr-{page}-{i}', x=float(ws[0]['x0']), y=float(ws[0]['y0'])))
+            line_objs.append({'key': k, 'words': ws_sorted, 'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'text': text})
+
+    left_lines = [l for l in line_objs if l['x1'] < width * 0.52 and l['x0'] < width * 0.45]
+    right_lines = [l for l in line_objs if l['x0'] > width * 0.46 and l['x1'] > width * 0.55]
+
+    if len(left_lines) >= 8 and len(right_lines) >= 8:
+        heading_ys = [l['y0'] for l in line_objs if _heading(l['text']) is not None]
+        first_heading_y = min(heading_ys) if heading_ys else width * 0.25
+        top_banner = []
+        left_col = []
+        right_col = []
+        for l in line_objs:
+            if l['y1'] <= first_heading_y or (l['x0'] < width * 0.40 and l['x1'] > width * 0.60):
+                top_banner.append(l)
+            elif (l['x0'] + l['x1']) / 2 < width * 0.48:
+                left_col.append(l)
+            else:
+                right_col.append(l)
+        ordered = sorted(top_banner, key=lambda l: (round(l['y0'] / 10), l['x0'])) + sorted(left_col, key=lambda l: l['y0']) + sorted(right_col, key=lambda l: l['y0'])
+    else:
+        ordered = sorted(line_objs, key=lambda l: (round(l['y0'] / 8), l['x0']))
+
+    lines = []
+    for i, l in enumerate(ordered):
+        lines.append(Line(l['text'], page, 'ocr', f'ocr-{page}-{i}', x=float(l['x0']), y=float(l['y0'])))
     if not lines:
         if ocr_timed_out:
             warnings.append(f'Page {page}: OCR processing timed out.')

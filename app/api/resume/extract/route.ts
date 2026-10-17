@@ -50,13 +50,14 @@ export async function POST(request: Request) {
     }
 
     let file: File;
-    let aiConsent = true;
+    let aiConsent = false;
     try {
       const form = await request.formData();
-      if (form.get("aiConsent") !== "true" && form.get("consent") !== "true") {
+      const hasParsingConsent = form.get("consent") === "true" || form.get("aiConsent") === "true";
+      if (!hasParsingConsent) {
         return fail("CONSENT_REQUIRED", "Confirm that your resume may be processed.", 400);
       }
-      aiConsent = form.get("aiConsent") === "true" || form.get("consent") === "true";
+      aiConsent = form.get("aiConsent") === "true";
       const candidate = form.get("resume");
       if (!(candidate instanceof File)) return fail("MISSING_FILE", "Choose a PDF or DOCX file first.", 400);
       file = candidate;

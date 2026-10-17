@@ -222,7 +222,7 @@ export function useResumeIngestion({
     return null;
   };
 
-  const upload = async (file: File | undefined, consent: boolean) => {
+  const upload = async (file: File | undefined, consent: boolean, aiConsent?: boolean) => {
     if (!file) return;
     selectedFile.current = file;
     const problem = checkFile(file, consent);
@@ -233,7 +233,8 @@ export function useResumeIngestion({
     if (!(await ensureSession())) { fail("We couldn't start a secure session for the upload. Try again in a moment.", "SESSION_UNAVAILABLE", null); return; }
     const form = new FormData();
     form.append("resume", file);
-    form.append("aiConsent", "true");
+    form.append("consent", consent ? "true" : "false");
+    form.append("aiConsent", aiConsent ? "true" : "false");
     const res = await requestJson<{ ok: boolean; jobId?: string; documentId?: string; code?: string }>("/api/resume/extract", { method: "POST", body: form });
     if (!res.ok || !res.data?.jobId || !res.data.documentId) {
       fail(res.ok ? "The upload didn't start. Try again." : describeError(res.error), res.ok ? null : res.error.code ?? null, null);
@@ -244,8 +245,8 @@ export function useResumeIngestion({
   };
 
   /** Retries the stored document on the server; falls back to re-uploading the picked file. */
-  const retry = async (consent: boolean) => {
-    if (!retryDocumentId) { if (selectedFile.current) await upload(selectedFile.current, consent); return; }
+  const retry = async (consent: boolean, aiConsent?: boolean) => {
+    if (!retryDocumentId) { if (selectedFile.current) await upload(selectedFile.current, consent, aiConsent); return; }
     const docId = retryDocumentId;
     setError(null);
     setState("QUEUED");

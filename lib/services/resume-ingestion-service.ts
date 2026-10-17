@@ -646,7 +646,7 @@ async function finalize(
 
   // 2. Evaluate Optional AI Enrichment
   const m = meta(job);
-  const userConsent = m.aiConsent !== false && m.consent !== false;
+  const userConsent = m.aiConsent === true;
   const decision = shouldEnrichWithLLM(baseline.extracted, { consent: userConsent });
 
   let extraction: ResumeExtractionResult = baseline;
@@ -686,12 +686,16 @@ async function finalize(
     });
   }
 
-  // 3. Fallback verification: only fail if neither baseline nor LLM produced valid extraction
+  // 3. Fallback verification: prefer deterministic baseline before failing
   if (!extraction.success || !extraction.extracted) {
-    throw new PipelineFailure(
-      extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED",
-      extraction.error || llmErrorNotice
-    );
+    if (baseline.success && baseline.extracted) {
+      extraction = baseline;
+    } else {
+      throw new PipelineFailure(
+        extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED",
+        extraction.error || llmErrorNotice
+      );
+    }
   }
 
   // 4. Run deterministic discovery to catch embedded PDF annotations, DOCX links, and multi-line URLs
@@ -713,8 +717,13 @@ async function finalize(
     }
   }
 
+  const extractedInterpretation = extraction.extracted;
+  if (!extractedInterpretation) {
+    throw new PipelineFailure("EXTRACTION_FAILED", "Extracted output is empty");
+  }
+
   // 5. Review Candidates
-  const reviewCandidates = [...profileCandidates(extraction, input.text), ...resumeCandidates(extraction.extracted, input.text)];
+  const reviewCandidates = [...profileCandidates(extraction, input.text), ...resumeCandidates(extractedInterpretation, input.text)];
   if (reviewCandidates.length === 0) throw new PipelineFailure("NO_CLAIMS_FOUND");
   const profile = buildProfileV2({
     documentId,
@@ -728,7 +737,7 @@ async function finalize(
 
   const review: ResumeReviewPayload = {
     reviewCandidates,
-    structured: extraction.extracted,
+    structured: extractedInterpretation,
     extractedProfile: extraction.extractedProfile ?? null,
     discoveredProfiles: mergedDiscoveredProfiles,
     links: extraction.links ?? [],
@@ -752,7 +761,7 @@ async function finalize(
 
   try {
     // Snapshot first: /apply and onboarding completion validate claims against it.
-    await saveResumeCandidates(personId, documentId, extraction.extracted, input.text);
+    await saveResumeCandidates(personId, documentId, extractedInterpretation, input.text);
     const db = await getDb();
     const updated = await db
       .update(resumeDocuments)
@@ -778,11 +787,11 @@ async function finalize(
       via: input.via,
       heartbeatAt: Date.now(),
       llmEnriched: llmEnrichmentSuccess,
-      deterministicCoverage: extraction.extracted ? Object.keys(extraction.extracted).length : 0,
+      deterministicCoverage: extractedInterpretation ? Object.keys(extractedInterpretation).length : 0,
     },
   });
 
-  await seedDraftFromResume(personId, documentId, extraction.extracted, mergedDiscoveredProfiles);
+  await seedDraftFromResume(personId, documentId, extractedInterpretation, mergedDiscoveredProfiles);
 }
 
 /**

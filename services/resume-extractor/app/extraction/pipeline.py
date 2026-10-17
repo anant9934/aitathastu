@@ -36,7 +36,7 @@ def extract_profile(content,document_id,started=None):
     total=sum(len(v) for k,v in groups.items() if k!='extraction_metadata')
     if not chars:
         status='failed'
-    elif quality=='poor' or any('timeout' in w.lower() or 'failed' in w.lower() for w in warnings):
+    elif quality=='poor' or any('timeout' in w.lower() or 'timed out' in w.lower() or 'failed' in w.lower() for w in warnings):
         status='partial'
     else:
         status='completed'

@@ -67,7 +67,7 @@ def processing(docid: str):
         store.save_json(docid, 'profile.json', profile.model_dump(mode='json'))
         error_code = None
         if profile.metadata.status == 'failed':
-            if any('timeout' in w.lower() for w in profile.metadata.warnings):
+            if any('timeout' in w.lower() or 'timed out' in w.lower() for w in profile.metadata.warnings):
                 error_code = 'OCR_TIMEOUT'
             elif content.ocr_attempted:
                 error_code = 'OCR_NO_TEXT'

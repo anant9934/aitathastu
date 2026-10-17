@@ -19,9 +19,17 @@ def extract_identity_contact(content,groups):
         for m in EMAIL.finditer(l.text):
             email=m.group(1)
             if email.lower() not in email_seen:
-                add(groups,'contact',{'email':(email,l,.98)})
+                conf = .70 if re.search(r'[iIl1]{3,}\d+|[a-z]+[A-Z]{2,}', email) else .98
+                add(groups,'contact',{'email':(email,l,conf)})
                 email_seen.add(email.lower())
-        if l.section in ('header','contact'):
+        if not email_seen and (l.section in ('header', 'contact') or re.search(r'\b(?:email|mail)\s*:\s*\S+', l.text, re.I)):
+            m_label = re.search(r'\b(?:email|mail)\s*:\s*(\S+)', l.text, re.I)
+            if m_label:
+                raw_cand = m_label.group(1).strip()
+                if '@' not in raw_cand and len(raw_cand) >= 5 and raw_cand.lower() not in email_seen:
+                    add(groups, 'contact', {'other_contact': (f'Unverified Email: {raw_cand}', l, .50)})
+        is_phone_line = l.section in ('header','contact') or bool(re.search(r'\b(?:mobile|phone|tel|call|contact)\s*[:\-]', l.text, re.I))
+        if is_phone_line:
             for m in PHONE.finditer(l.text):
                 value=m.group(0).strip()
                 digits=re.sub(r'\D','',value)

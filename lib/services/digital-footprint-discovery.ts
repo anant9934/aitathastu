@@ -151,9 +151,13 @@ function isPotentialPortfolioHost(host: string): boolean {
     "github.com", "linkedin.com", "leetcode.com", "kaggle.com", "huggingface.co",
     "orcid.org", "scholar.google.com", "stackoverflow.com", "dev.to",
     "hackerrank.com", "hackerearth.com", "codechef.com", "medium.com", "twitter.com", "x.com",
-    "youtube.com", "facebook.com", "instagram.com", "bit.ly", "tinyurl.com"
+    "youtube.com", "facebook.com", "instagram.com", "bit.ly", "tinyurl.com",
+    "b.tech", "m.tech", "b.sc", "m.sc", "b.com", "m.com", "b.e", "m.e", "b.arch", "m.arch",
+    "next.js", "node.js", "react.js", "vue.js", "three.js", "express.js"
   ]);
   if (ignoredHosts.has(h)) return false;
+  const parts = h.split(".");
+  if (parts.length === 2 && parts[0].length <= 1) return false;
   if (!h.includes(".")) return false;
   return true;
 }
@@ -266,6 +270,20 @@ export function discoverFootprintsFromResume(options: {
     }
   }
 
+function checkHandleConfidence(username: string): { validationResult: "valid" | "warning"; warningReason?: string } {
+  const isMixedCaseAnomaly = /[a-z]+[A-Z]{2,}[a-z0-9]*/.test(username);
+  const hasDigitLetterConfusion = /[iIl1]{3,}\d+/.test(username) || /l\d{4,}/.test(username);
+  const hasPunctuationArtifact = /[._-]{2,}/.test(username) || /^[._-]|[._-]$/.test(username);
+
+  if (isMixedCaseAnomaly || hasDigitLetterConfusion || hasPunctuationArtifact) {
+    return {
+      validationResult: "warning",
+      warningReason: "Possible OCR character substitution or casing ambiguity detected in profile handle. Learner confirmation required before linking.",
+    };
+  }
+  return { validationResult: "valid" };
+}
+
   // ─────────────────────────────────────────────────────────────────────────────
   // 2. Visible URLs in Text (Single & Multi-Line)
   // ─────────────────────────────────────────────────────────────────────────────
@@ -281,6 +299,7 @@ export function discoverFootprintsFromResume(options: {
         if (match) {
           const candidateUser = (match[1] || "").replace(/\/$/, "");
           const normalized = normalizeProviderUrl(rule.provider, candidateUser, cleaned);
+          const conf = checkHandleConfidence(candidateUser);
           addFootprint({
             provider: rule.provider,
             originalUrl: cleaned,
@@ -288,7 +307,8 @@ export function discoverFootprintsFromResume(options: {
             originalSourceText: line.trim().slice(0, 200),
             candidateUsername: candidateUser,
             discoveryMethod: "text_url",
-            validationResult: "valid",
+            validationResult: conf.validationResult,
+            warningReason: conf.warningReason,
             confirmed: false,
           });
           break;
@@ -307,6 +327,7 @@ export function discoverFootprintsFromResume(options: {
         const candidateUser = (match[1] || "").replace(/\/$/, "");
         if (candidateUser && (!rule.usernameRegex || rule.usernameRegex.test(candidateUser))) {
           const normalized = normalizeProviderUrl(rule.provider, candidateUser, match[0]);
+          const conf = checkHandleConfidence(candidateUser);
           addFootprint({
             provider: rule.provider,
             originalUrl: match[0],
@@ -314,7 +335,8 @@ export function discoverFootprintsFromResume(options: {
             originalSourceText: line.trim().slice(0, 200),
             candidateUsername: candidateUser,
             discoveryMethod: "text_url",
-            validationResult: "valid",
+            validationResult: conf.validationResult,
+            warningReason: conf.warningReason,
             confirmed: false,
           });
         }
@@ -330,15 +352,24 @@ export function discoverFootprintsFromResume(options: {
       const match = line.match(rule.pattern);
       if (match) {
         const candidate = match[1]?.trim().replace(/^@/, "");
-        // Filter out false positives like "GitHub: None", "GitHub: Yes", "GitHub: https://...", etc.
+        // Filter out false positives like "GitHub: None", domain names (e.g. "linkedin.com", "github.com"),
+        // URLs with slashes, and month names (e.g. "HackerRank Dec 2025")
+        const isMonth = /^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)(?:uary|ruary|ch|il|e|y|ust|tember|ober|ember)?$/i.test(candidate || "");
+        const isDomain = /\.(?:com|org|net|io|co|in|site|online|edu|dev)$/i.test(candidate || "");
+        const hasUrlPath = line.slice(match.index || 0).includes("/");
+
         if (
           candidate &&
+          !isMonth &&
+          !isDomain &&
+          !hasUrlPath &&
           !/^(none|na|n\/a|yes|no|link|url|profile|http|https|www)$/i.test(candidate) &&
           !candidate.startsWith("http://") &&
           !candidate.startsWith("https://") &&
           !candidate.includes("/")
         ) {
           const normalized = normalizeProviderUrl(rule.provider, candidate);
+          const conf = checkHandleConfidence(candidate);
           addFootprint({
             provider: rule.provider,
             originalUrl: match[0],
@@ -346,7 +377,8 @@ export function discoverFootprintsFromResume(options: {
             originalSourceText: line.trim().slice(0, 200),
             candidateUsername: candidate,
             discoveryMethod: "labeled_handle",
-            validationResult: "valid",
+            validationResult: conf.validationResult,
+            warningReason: conf.warningReason,
             confirmed: false,
           });
         }
@@ -380,10 +412,10 @@ export function discoverFootprintsFromResume(options: {
   // ─────────────────────────────────────────────────────────────────────────────
   // 6. Visible Portfolio / Personal Website Domains
   // ─────────────────────────────────────────────────────────────────────────────
-  const portfolioRegex = /\b(?:https?:\/\/)?([a-zA-Z0-9_\-]+\.(?:dev|me|io|ai|tech|org|com|in|co|app))(?:\/[^\s<>"']*)?/gi;
+  const portfolioRegex = /\b(?:https?:\/\/)?([a-zA-Z0-9_\-]+\.(?:dev|me|io|ai|tech|org|com|in|co|app|site|online|xyz|space|link|live|info|page|bio))(?:\/[^\s<>"']*)?/gi;
   for (const line of lines) {
-    // Only search lines mentioning "portfolio", "website", "blog", "projects", or personal links
-    if (/\b(portfolio|website|site|homepage|webpage|blog|domain)\b/i.test(line) || /alexrivers\.dev/i.test(line)) {
+    // Search lines mentioning "portfolio", "website", "blog", "projects", "web:", or personal links
+    if (/\b(portfolio|website|site|homepage|webpage|blog|domain|web)\b/i.test(line) || /alexrivers\.dev/i.test(line)) {
       let pMatch: RegExpExecArray | null;
       while ((pMatch = portfolioRegex.exec(line)) !== null) {
         const fullUrl = pMatch[0];

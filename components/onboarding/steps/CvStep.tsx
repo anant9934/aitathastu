@@ -42,6 +42,7 @@ export function CvStep({
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [consent, setConsent] = useState(Boolean(cv.fileName));
+  const [aiConsent, setAiConsent] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const confirm = useConfirm();
@@ -98,7 +99,7 @@ export function CvStep({
     <>
       <StepHeader
         title="Add your CV"
-        description="We read it to pre-fill your education, skills, projects and links. You'll tick what's right before anything is saved. No generative AI reads your CV."
+        description="We extract your education, skills, projects, and links using deterministic pattern matching. You review and approve every detail before anything is saved."
         guide={guide}
       />
 
@@ -118,7 +119,7 @@ export function CvStep({
               onDrop={(e) => {
                 e.preventDefault();
                 setDragging(false);
-                if (!blocked) void cv.upload(e.dataTransfer.files?.[0], consent);
+                if (!blocked) void cv.upload(e.dataTransfer.files?.[0], consent, aiConsent);
               }}
               className={cn(
                 "flex flex-col items-center justify-center gap-4 rounded-card border-2 border-dashed p-8 text-center transition-all duration-200 shadow-card min-h-[260px]",
@@ -138,7 +139,7 @@ export function CvStep({
                 tabIndex={-1}
                 aria-hidden="true"
                 onChange={(e) => {
-                  void cv.upload(e.target.files?.[0], consent);
+                  void cv.upload(e.target.files?.[0], consent, aiConsent);
                   e.target.value = "";
                 }}
               />
@@ -213,6 +214,13 @@ export function CvStep({
               description="I will review and approve every extracted entry before it is saved to my profile."
             />
 
+            <Checkbox
+              checked={aiConsent}
+              onChange={(e) => setAiConsent(e.target.checked)}
+              label="Enable external AI enrichment (Optional)."
+              description="Allows secure external AI to help extract deeper project, publication, and experience details. Deterministic parsing is used by default if unchecked."
+            />
+
             <ul className="mt-2 space-y-2.5 text-xs text-text-muted border-t border-border-medium/60 pt-3">
               <li className="flex items-start gap-2">
                 <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" />
@@ -268,7 +276,7 @@ export function CvStep({
                       size="sm"
                       variant="secondary"
                       icon={<ArrowClockwise size={16} aria-hidden="true" />}
-                      onClick={() => void cv.retry(consent)}
+                      onClick={() => void cv.retry(consent, aiConsent)}
                     >
                       Retry
                     </Button>

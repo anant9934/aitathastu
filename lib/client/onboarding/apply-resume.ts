@@ -25,9 +25,15 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
   const resumeProjects: ProjectEntry[] = claims.filter((c) => c.category === "project").map((c, index) => {
     const found = extra.extractedProjects?.find((p) => p.sourceSpan === c.sourceSpan);
     return {
-      id: `resume_${c.documentId.slice(0, 12)}_${index}`, title: c.value,
-      description: found?.description || "", technologies: found?.technologies || [],
-      sources: ["resume"], status: "confirmed", contribution: [], contributionNote: "", url: found?.repositoryUrl,
+      id: `resume_${c.documentId.slice(0, 12)}_${index}`,
+      title: (found?.title && c.value.startsWith(found.title)) ? found.title : c.value,
+      description: found?.description || "",
+      technologies: found?.technologies || [],
+      sources: ["resume"],
+      status: "confirmed",
+      contribution: [],
+      contributionNote: "",
+      url: found?.repositoryUrl,
     };
   });
   const projects = [

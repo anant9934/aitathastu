@@ -82,6 +82,9 @@ function normalizeUrl(raw: string | null | undefined): string | null {
   try {
     const url = new URL(u);
     if (!url.hostname.includes(".")) return null;
+    const h = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (/^(?:b|m)\.(?:tech|sc|com|e|arch)$/i.test(h)) return null;
+    if (h.split(".").length === 2 && h.split(".")[0].length <= 1) return null;
     return url.toString().replace(/\/$/, "");
   } catch {
     return null;
@@ -429,14 +432,30 @@ export function adaptRenderProfileToInterpretation(
 
   // 1. Identity & Contact
   const idRec = groups.identity?.[0]?.fields || {};
-  const ctRec = groups.contact?.[0]?.fields || {};
-
   const fullName = tidy(idRec.full_name?.value, 80) || null;
-  const rawEmail = tidy(ctRec.email?.value).replace(/^mailto:/i, "");
-  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : null;
-  const rawPhone = tidy(ctRec.phone?.value);
-  const phone = (rawPhone.match(/\d/g) || []).length >= 7 ? rawPhone : null;
-  const location = tidy(ctRec.location?.value || idRec.location?.value, 120) || null;
+
+  let email: string | null = null;
+  let phone: string | null = null;
+  let location: string | null = tidy(idRec.location?.value, 120) || null;
+
+  for (const c of groups.contact || []) {
+    const f = c.fields;
+    if (!email && f.email?.value) {
+      const rawEmail = tidy(f.email.value).replace(/^mailto:/i, "");
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+        email = rawEmail;
+      }
+    }
+    if (!phone && f.phone?.value) {
+      const rawPhone = tidy(f.phone.value);
+      if ((rawPhone.match(/\d/g) || []).length >= 7) {
+        phone = rawPhone;
+      }
+    }
+    if (!location && f.location?.value) {
+      location = tidy(f.location.value, 120) || null;
+    }
+  }
 
   // 2. Education
   const education: ResumeInterpretationOutput["education"] = [];
@@ -597,6 +616,17 @@ export function adaptRenderProfileToInterpretation(
       type: linkType(u, "portfolio"),
       url: u,
     });
+  }
+  for (const c of groups.contact || []) {
+    if (c.fields.website?.value) {
+      const u = normalizeUrl(c.fields.website.value);
+      if (u && !links.some((l) => l.url === u)) {
+        links.push({
+          type: linkType(u, "portfolio"),
+          url: u,
+        });
+      }
+    }
   }
 
   const interpreted: ResumeInterpretationOutput = {

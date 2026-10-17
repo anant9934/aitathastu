@@ -49,6 +49,6 @@ test("portfolio DNS pinning rejects mixed public/private answers before connecti
   syncBuiltinESMExports();
   t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
   const request = t.mock.method(https, "get", () => { throw new Error("Must not connect"); });
-  await assert.rejects(fetchPortfolioMetadata("https://portfolio.example/"), /exclusively to public IPv4/);
+  await assert.rejects(fetchPortfolioMetadata("https://portfolio.example/"), /exclusively to safe public IP addresses/);
   assert.equal(request.mock.callCount(), 0);
 });

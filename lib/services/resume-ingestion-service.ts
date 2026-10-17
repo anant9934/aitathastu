@@ -33,11 +33,18 @@ import { SourceProcessingJobService, type SourceProcessingJob, type ProcessingSt
 import { readDocumentText } from "@/lib/resume/document-text";
 import { reconstructReadingOrder } from "@/lib/resume/layout";
 import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
-import { extractResumeStructured, type ResumeExtractionResult } from "./resume-extraction-service";
+import {
+  extractResumeStructured,
+  extractResumeDeterministicResult,
+  adaptRenderProfileToInterpretation,
+  shouldEnrichWithLLM,
+  mergeExtractionResults,
+  type ResumeExtractionResult,
+} from "./resume-extraction-service";
 import { discoverFootprintsFromResume } from "./digital-footprint-discovery";
 import { resumeCandidates, saveResumeCandidates } from "./resume-review-service";
 import { buildProfileV2 } from "./resume-profile-v2";
-import { ExtractorServiceClient, ExtractorServiceError } from "./extractor-service-client";
+import { ExtractorServiceClient, ExtractorServiceError, type ExtractorProfileV2 } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
 import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers";
 
@@ -170,6 +177,7 @@ export async function queueResumeUpload(params: {
   filename: string;
   mimeType: string;
   bytes: Buffer;
+  aiConsent?: boolean;
 }): Promise<{ jobId: string; documentId: string }> {
   const documentId = crypto.randomUUID();
   await ObjectStorageService.storeDocument({
@@ -179,7 +187,7 @@ export async function queueResumeUpload(params: {
     mimeType: params.mimeType,
     buffer: params.bytes,
   });
-  const jobId = await queueJobForDocument(params.personId, documentId, params.filename);
+  const jobId = await queueJobForDocument(params.personId, documentId, params.filename, params.aiConsent);
   return { jobId, documentId };
 }
 
@@ -195,13 +203,13 @@ export async function requeueResumeDocument(personId: string, documentId: string
   return queueJobForDocument(personId, documentId, doc.filename);
 }
 
-async function queueJobForDocument(personId: string, documentId: string, filename: string): Promise<string> {
+async function queueJobForDocument(personId: string, documentId: string, filename: string, aiConsent?: boolean): Promise<string> {
   const jobId = await SourceProcessingJobService.startJob({
     personId,
     sourceId: "resume",
     stage: "acquire",
     status: "queued",
-    metadata: { documentId, filename },
+    metadata: { documentId, filename, ...(aiConsent !== undefined ? { aiConsent } : {}) },
   });
   const db = await getDb();
   await db
@@ -535,6 +543,7 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
       let text: string;
       let hyperlinks: string[];
       let pageCount: number;
+      let renderProfile: ExtractorProfileV2 | null = null;
       try {
         const raw = await ExtractorServiceClient.getRawText(extractorDocumentId, identity);
         hyperlinks = [...new Set((raw.pages || []).flatMap((p) => (p.links || []).map((l) => l.url)).filter((u) => /^https?:/i.test(u)))];
@@ -543,6 +552,16 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
           text = raw.raw_text;
         }
         pageCount = raw.pages?.length || 1;
+
+        // Retrieve Render Schema v2.0 structured profile
+        try {
+          const docView = await ExtractorServiceClient.getDocument(extractorDocumentId, identity);
+          if (docView && docView.profile) {
+            renderProfile = docView.profile;
+          }
+        } catch (profileErr) {
+          console.warn("[resume-pipeline] could not fetch Render profile view, will use raw text", profileErr);
+        }
       } catch (err) {
         throw new PipelineFailure(classifyExtractorError(err), err);
       }
@@ -558,6 +577,7 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
         pageCount,
         ocrUsed: true,
         via: "extractor-ocr",
+        renderProfile,
       });
       return;
     }
@@ -603,17 +623,78 @@ async function finalize(
     pageCount: number;
     ocrUsed: boolean;
     via: string;
+    renderProfile?: ExtractorProfileV2 | null;
   }
 ) {
   const { personId } = job;
   await SourceProcessingJobService.updateStage(job.id, personId, "validate", { heartbeatAt: Date.now() });
 
-  const extraction = await extractResumeStructured(input.text, personId);
-  if (!extraction.success || !extraction.extracted) {
-    throw new PipelineFailure(extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED", extraction.error);
+  // 1. Establish Tier 1 Deterministic Baseline
+  let baseline: ResumeExtractionResult;
+  if (input.renderProfile) {
+    baseline = adaptRenderProfileToInterpretation(input.renderProfile, input.text);
+    if (!baseline.success || !baseline.extracted) {
+      console.warn("[resume-pipeline] Render profile adaptation fell back to in-process deterministic parser", {
+        jobId: job.id,
+        error: baseline.error,
+      });
+      baseline = extractResumeDeterministicResult(input.text, input.hyperlinks);
+    }
+  } else {
+    baseline = extractResumeDeterministicResult(input.text, input.hyperlinks);
   }
 
-  // Run deterministic discovery to catch embedded PDF annotations, DOCX links, and multi-line URLs
+  // 2. Evaluate Optional AI Enrichment
+  const m = meta(job);
+  const userConsent = m.aiConsent !== false && m.consent !== false;
+  const decision = shouldEnrichWithLLM(baseline.extracted, { consent: userConsent });
+
+  let extraction: ResumeExtractionResult = baseline;
+  let llmEnrichmentAttempted = false;
+  let llmEnrichmentSuccess = false;
+  let llmErrorNotice: string | undefined;
+
+  if (decision.shouldEnrich) {
+    llmEnrichmentAttempted = true;
+    try {
+      const enrichedResult = await extractResumeStructured(input.text, personId);
+      if (enrichedResult.success && enrichedResult.extracted) {
+        extraction = mergeExtractionResults(baseline, enrichedResult, input.text);
+        llmEnrichmentSuccess = true;
+      } else {
+        llmErrorNotice = enrichedResult.error;
+        console.warn("[resume-pipeline] optional LLM enrichment unavailable, proceeding with deterministic baseline", {
+          jobId: job.id,
+          errorKind: enrichedResult.errorKind,
+          error: enrichedResult.error,
+        });
+        // Non-blocking AI: preserve successful deterministic extraction
+        extraction = baseline;
+      }
+    } catch (err) {
+      llmErrorNotice = err instanceof Error ? err.message : String(err);
+      console.warn("[resume-pipeline] exception during optional LLM enrichment, falling back to deterministic baseline", {
+        jobId: job.id,
+        error: llmErrorNotice,
+      });
+      extraction = baseline;
+    }
+  } else {
+    console.info("[resume-pipeline] optional LLM enrichment skipped", {
+      jobId: job.id,
+      reason: decision.reason,
+    });
+  }
+
+  // 3. Fallback verification: only fail if neither baseline nor LLM produced valid extraction
+  if (!extraction.success || !extraction.extracted) {
+    throw new PipelineFailure(
+      extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED",
+      extraction.error || llmErrorNotice
+    );
+  }
+
+  // 4. Run deterministic discovery to catch embedded PDF annotations, DOCX links, and multi-line URLs
   const deterministicFootprints = discoverFootprintsFromResume({
     text: input.text,
     hyperlinks: input.hyperlinks,
@@ -632,8 +713,7 @@ async function finalize(
     }
   }
 
-  // Record candidate IDs are `${category}_${index}` and index into the stored
-  // profile's record arrays (apply maps decisions back by that index).
+  // 5. Review Candidates
   const reviewCandidates = [...profileCandidates(extraction, input.text), ...resumeCandidates(extraction.extracted, input.text)];
   if (reviewCandidates.length === 0) throw new PipelineFailure("NO_CLAIMS_FOUND");
   const profile = buildProfileV2({
@@ -658,11 +738,15 @@ async function finalize(
       provider: extraction.provider,
       modelUsed: extraction.modelUsed,
       promptVersion: extraction.promptVersion,
-      llmUsed: true,
+      llmUsed: llmEnrichmentSuccess,
+      llmAttempted: llmEnrichmentAttempted,
+      llmSkippedReason: !decision.shouldEnrich ? decision.reason : undefined,
+      llmError: llmErrorNotice,
       ocrUsed: input.ocrUsed,
       latencyMs: extraction.latencyMs,
       truncated: extraction.truncated,
       via: input.via,
+      deterministicBaselineUsed: true,
     },
   };
 
@@ -689,7 +773,13 @@ async function finalize(
     jobId: job.id, personId, from: ["processing"], to: "review_ready", stage: "review",
     errorCode: null, errorMessage: null,
     resultReference: `resume:${documentId}`,
-    metadata: { candidates: reviewCandidates.length, via: input.via, heartbeatAt: Date.now() },
+    metadata: {
+      candidates: reviewCandidates.length,
+      via: input.via,
+      heartbeatAt: Date.now(),
+      llmEnriched: llmEnrichmentSuccess,
+      deterministicCoverage: extraction.extracted ? Object.keys(extraction.extracted).length : 0,
+    },
   });
 
   await seedDraftFromResume(personId, documentId, extraction.extracted, mergedDiscoveredProfiles);

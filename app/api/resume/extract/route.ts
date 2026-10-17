@@ -50,11 +50,13 @@ export async function POST(request: Request) {
     }
 
     let file: File;
+    let aiConsent = true;
     try {
       const form = await request.formData();
       if (form.get("aiConsent") !== "true" && form.get("consent") !== "true") {
         return fail("CONSENT_REQUIRED", "Confirm that your resume may be processed.", 400);
       }
+      aiConsent = form.get("aiConsent") === "true" || form.get("consent") === "true";
       const candidate = form.get("resume");
       if (!(candidate instanceof File)) return fail("MISSING_FILE", "Choose a PDF or DOCX file first.", 400);
       file = candidate;
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
       const clientKey = request.headers.get("idempotency-key")?.trim().slice(0, 120);
       const key = clientKey ? requestIdempotencyKey(personId, "resume_upload", clientKey) : contentIdempotencyKey(personId, "resume_upload", bytes);
       const { response, replayed } = await withIdempotency({ key, personId, scope: "resume_upload" }, async () => {
-        const q = await queueResumeUpload({ personId, filename: file.name, mimeType: MIME_BY_EXTENSION[extension], bytes });
+        const q = await queueResumeUpload({ personId, filename: file.name, mimeType: MIME_BY_EXTENSION[extension], bytes, aiConsent });
         return { jobId: q.jobId, documentId: q.documentId };
       });
       queued = response;

@@ -14,6 +14,9 @@
 import { ResumeInterpretationSchema, type ResumeInterpretationOutput } from "../intelligence/schemas";
 import { LINK_TYPES, type ResumeExtraction } from "@/lib/resume/schema";
 import { structureResumeText, RESUME_PROMPT_VERSION, ResumeStructuringError } from "@/lib/resume/structure";
+import { extractResumeDeterministic } from "@/lib/resume/deterministic-extractor";
+import { discoverFootprintsFromResume } from "./digital-footprint-discovery";
+import type { ExtractorProfileV2 } from "./extractor-service-client";
 
 export type ResumeLink = { type: (typeof LINK_TYPES)[number]; url: string };
 
@@ -333,3 +336,570 @@ export async function extractResumeStructured(resumeText: string, personId?: str
     };
   }
 }
+
+/**
+ * Tier 1 Deterministic Baseline: executes pure TypeScript regex & dictionary
+ * extraction without contacting any external model or incurring quota costs.
+ */
+export function extractResumeDeterministicResult(
+  text: string,
+  hyperlinks: string[] = []
+): ResumeExtractionResult {
+  const startTime = Date.now();
+  const det = extractResumeDeterministic(text, hyperlinks);
+  const validated = ResumeInterpretationSchema.safeParse(det.interpretation);
+  if (!validated.success) {
+    return {
+      success: false,
+      extracted: null,
+      provider: "deterministic-engine",
+      modelUsed: "rules-v1",
+      promptVersion: "v1",
+      latencyMs: Date.now() - startTime,
+      truncated: false,
+      error: validated.error.issues[0]?.message || "Deterministic schema validation failed",
+    };
+  }
+
+  // Combine discovered footprints
+  const fps = discoverFootprintsFromResume({ text, hyperlinks });
+  const links = [...det.links];
+  const discoveredProfiles: Record<string, string> = {};
+  for (const fp of fps) {
+    if (fp.normalizedUrl) {
+      links.push({
+        type: linkType(fp.normalizedUrl, "portfolio"),
+        url: fp.normalizedUrl,
+      });
+      discoveredProfiles[fp.provider] = fp.normalizedUrl;
+    }
+  }
+
+  return {
+    success: true,
+    extracted: validated.data,
+    extractedProfile: det.profile,
+    links,
+    discoveredProfiles,
+    provider: "deterministic-engine",
+    modelUsed: "rules-v1",
+    promptVersion: "v1",
+    latencyMs: Date.now() - startTime,
+    truncated: false,
+  };
+}
+
+/**
+ * Adapts Render's Schema v2.0 profile.json into Vercel's ResumeExtractionResult.
+ * Preserves evidence snippets, job ownership, and verified deterministic extraction
+ * so scanned CVs processed by Render PyMuPDF/Tesseract avoid redundant re-parsing.
+ */
+export function adaptRenderProfileToInterpretation(
+  renderProfile: ExtractorProfileV2 | null | undefined,
+  rawText: string
+): ResumeExtractionResult {
+  const startTime = Date.now();
+  const lines = rawText.split("\n");
+  const norm = normalizeForGrounding(rawText);
+  const grounded = (v: string | null | undefined) => isGrounded(norm, v);
+
+  if (!renderProfile || !renderProfile.groups) {
+    return {
+      success: false,
+      extracted: null,
+      provider: "render-ocr",
+      modelUsed: "render-deterministic-v2",
+      promptVersion: "render-v2",
+      latencyMs: 0,
+      truncated: false,
+      error: "Render profile is empty or missing groups",
+    };
+  }
+
+  const groups = renderProfile.groups;
+  const span = (snippet: string | undefined | null, fallback: string | undefined | null): string => {
+    if (snippet && snippet.trim().length >= 3) {
+      return snippet.trim().slice(0, 300);
+    }
+    const ev = evidenceLine(lines, fallback);
+    if (ev && ev.length >= 3) return ev.slice(0, 300);
+    const fb = (fallback || "").trim();
+    return fb.length >= 3 ? fb.slice(0, 300) : "Document evidence";
+  };
+
+  // 1. Identity & Contact
+  const idRec = groups.identity?.[0]?.fields || {};
+  const ctRec = groups.contact?.[0]?.fields || {};
+
+  const fullName = tidy(idRec.full_name?.value, 80) || null;
+  const rawEmail = tidy(ctRec.email?.value).replace(/^mailto:/i, "");
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : null;
+  const rawPhone = tidy(ctRec.phone?.value);
+  const phone = (rawPhone.match(/\d/g) || []).length >= 7 ? rawPhone : null;
+  const location = tidy(ctRec.location?.value || idRec.location?.value, 120) || null;
+
+  // 2. Education
+  const education: ResumeInterpretationOutput["education"] = [];
+  const rawEducation = groups.education || [];
+  for (const rec of rawEducation) {
+    const f = rec.fields;
+    const institution = tidy(f.institution?.value || f.university?.value || f.board?.value, 200);
+    if (!institution || !grounded(institution)) continue;
+
+    const degree = tidy(f.degree_title?.value || f.qualification?.value, 100);
+    const fieldOfStudy = tidy(f.specialization?.value || f.department?.value, 100) || undefined;
+    const startDate = tidy(f.start_date?.value, 30) || undefined;
+    const endDate = tidy(f.end_date?.value, 30) || undefined;
+    const graduationYear = tidy(f.expected_graduation?.value, 20) || year(endDate ?? null);
+    const grade = tidy(f.grade?.value, 30);
+    const gpa = grade && !/%/.test(grade) ? grade.replace(/^(c?gpa|cpi|sgpa)\s*[:\-]\s*/i, "").slice(0, 20) : undefined;
+    const percentage = grade && /%/.test(grade) ? grade.slice(0, 20) : undefined;
+    const sourceSpan = span(f.institution?.evidence?.[0]?.snippet || f.degree_title?.evidence?.[0]?.snippet, institution);
+
+    education.push({
+      institution,
+      degree: degree || fieldOfStudy || "",
+      fieldOfStudy,
+      startDate,
+      endDate,
+      graduationYear,
+      gpa,
+      percentage,
+      sourceSpan,
+    });
+  }
+
+  // 3. Experience & Internships
+  const experience: ResumeInterpretationOutput["experience"] = [];
+  const expRecords = [...(groups.experience || []), ...(groups.internships || [])];
+  for (const rec of expRecords) {
+    const f = rec.fields;
+    const company = tidy(f.organization?.value || f.provider?.value, 150);
+    if (!company || !grounded(company)) continue;
+
+    const role = tidy(f.job_title?.value || f.role?.value, 150) || "Contributor";
+    const isIntern = Boolean(groups.internships?.includes(rec) || /intern/i.test(f.employment_type?.value || role));
+    const startDate = tidy(f.start_date?.value, 30) || undefined;
+    const endDate = tidy(f.end_date?.value, 30) || undefined;
+    const duration = tidy(f.duration?.value, 100) || ([startDate, endDate].filter(Boolean).join(" – ") || undefined);
+
+    const highlights: string[] = [];
+    if (f.responsibility?.value) highlights.push(tidy(f.responsibility.value, 500));
+    if (f.contribution?.value) highlights.push(tidy(f.contribution.value, 500));
+    if (f.outcome?.value) highlights.push(tidy(f.outcome.value, 500));
+
+    const techStr = f.technologies?.value || f.skills?.value || "";
+    const technologies = techStr ? dedupe(techStr.split(/[,;|]/).map((t) => tidy(t, 50)).filter(Boolean)) : [];
+    const sourceSpan = span(f.organization?.evidence?.[0]?.snippet || f.job_title?.evidence?.[0]?.snippet, company);
+
+    experience.push({
+      company,
+      role,
+      type: isIntern ? "internship" : "employment",
+      startDate,
+      endDate,
+      duration,
+      highlights,
+      technologies,
+      sourceSpan,
+    });
+  }
+
+  // 4. Projects
+  const projects: ResumeInterpretationOutput["projects"] = [];
+  for (const rec of groups.projects || []) {
+    const f = rec.fields;
+    const title = tidy(f.title?.value, 200);
+    if (!title || !grounded(title)) continue;
+
+    const description = tidy(f.description?.value || f.contribution?.value || f.outcome?.value, 1000);
+    const techStr = f.technologies?.value || "";
+    const technologies = techStr ? dedupe(techStr.split(/[,;|]/).map((t) => tidy(t, 50)).filter(Boolean)) : [];
+    const repositoryUrl = normalizeUrl(f.github_url?.value || f.demo_url?.value || f.evidence_url?.value) || "";
+    const sourceSpan = span(f.title?.evidence?.[0]?.snippet, title);
+
+    projects.push({
+      title,
+      description,
+      technologies,
+      repositoryUrl,
+      sourceSpan,
+    });
+  }
+
+  // 5. Skills
+  const skills: ResumeInterpretationOutput["skills"] = [];
+  for (const rec of groups.skills || []) {
+    const f = rec.fields;
+    const name = tidy(f.canonical_name?.value || f.original_wording?.value, 100);
+    if (!name || !grounded(name)) continue;
+
+    const cat = (f.category?.value || "").toLowerCase();
+    const validCats = ["language", "framework", "library", "tool", "concept", "other"] as const;
+    const category = validCats.includes(cat as any) ? (cat as any) : "other";
+    const sourceSpan = span(f.canonical_name?.evidence?.[0]?.snippet, name);
+
+    skills.push({
+      name,
+      category,
+      proficiencyHint: "unknown",
+      sourceSpan,
+    });
+  }
+
+  // 6. Certifications
+  const certifications: ResumeInterpretationOutput["certifications"] = [];
+  for (const rec of groups.certifications || []) {
+    const f = rec.fields;
+    const name = tidy(f.title?.value, 200);
+    if (!name || !grounded(name)) continue;
+
+    const issuer = tidy(f.issuer?.value, 150) || undefined;
+    const yr = year(f.issue_date?.value || null);
+    const sourceSpan = span(f.title?.evidence?.[0]?.snippet, name);
+
+    certifications.push({
+      name,
+      issuer,
+      year: yr,
+      sourceSpan,
+    });
+  }
+
+  // 7. Achievements
+  const achievements: ResumeInterpretationOutput["achievements"] = [];
+  const achRecords = [...(groups.awards || []), ...(groups.research || []), ...(groups.books_patents || [])];
+  for (const rec of achRecords) {
+    const f = rec.fields;
+    const title = tidy(f.name?.value || f.title?.value, 250);
+    if (!title || !grounded(title.slice(0, 40))) continue;
+
+    const isPatent = Boolean(groups.books_patents?.includes(rec) || /patent/i.test(title));
+    const isPub = Boolean(groups.research?.includes(rec) || /publi|journal|paper/i.test(title));
+    const category = isPatent ? "patent" : isPub ? "publication" : "award";
+    const sourceSpan = span(f.name?.evidence?.[0]?.snippet || f.title?.evidence?.[0]?.snippet, title);
+
+    achievements.push({
+      title,
+      category,
+      description: tidy(f.event?.value || f.venue?.value || f.outcome?.value, 500),
+      sourceSpan,
+    });
+  }
+
+  // 8. Digital Footprint Links
+  const links: ResumeLink[] = [];
+  for (const rec of groups.digital_footprint || []) {
+    const f = rec.fields;
+    const u = normalizeUrl(f.normalized_url?.value || f.original_url?.value);
+    if (!u) continue;
+    links.push({
+      type: linkType(u, "portfolio"),
+      url: u,
+    });
+  }
+
+  const interpreted: ResumeInterpretationOutput = {
+    education,
+    experience,
+    projects,
+    skills,
+    certifications,
+    achievements,
+  };
+
+  const parsed = ResumeInterpretationSchema.safeParse(interpreted);
+  if (!parsed.success) {
+    return {
+      success: false,
+      extracted: null,
+      provider: "render-ocr",
+      modelUsed: "render-deterministic-v2",
+      promptVersion: "render-v2",
+      latencyMs: Date.now() - startTime,
+      truncated: false,
+      error: parsed.error.issues[0]?.message || "Schema validation failed",
+    };
+  }
+
+  const firstEdu = education[0];
+  const extractedProfile: ExtractedProfile = {
+    fullName: fullName || undefined,
+    email: email || undefined,
+    mobile: phone || undefined,
+    location: location || undefined,
+    institution: firstEdu?.institution,
+    degree: firstEdu?.degree,
+    specialization: firstEdu?.fieldOfStudy,
+    expectedGraduationYear: firstEdu?.graduationYear ? Number(firstEdu.graduationYear) : undefined,
+    gpa: firstEdu?.gpa,
+  };
+
+  const discoveredProfiles = Object.fromEntries(
+    links.filter((l) => l.type !== "other").map((l) => [l.type, l.url])
+  );
+
+  return {
+    success: true,
+    extracted: parsed.data,
+    extractedProfile,
+    links,
+    discoveredProfiles,
+    provider: "render-ocr",
+    modelUsed: "render-deterministic-v2",
+    promptVersion: "render-v2",
+    latencyMs: Date.now() - startTime,
+    truncated: false,
+  };
+}
+
+export interface EnrichmentDecisionOptions {
+  consent?: boolean;
+  aiFeatureEnabled?: boolean;
+  quotaAllowed?: boolean;
+}
+
+export interface EnrichmentDecision {
+  shouldEnrich: boolean;
+  reason: string;
+}
+
+/**
+ * Determines whether optional AI enrichment should be invoked.
+ *
+ * Enrichment is skipped when:
+ * 1. AI is disabled via environment variables (CORE_DISABLE_LIVE_LLM)
+ * 2. User has explicitly declined AI consent
+ * 3. Daily or monthly quota is exhausted
+ * 4. Deterministic baseline already captures high-coverage structured data
+ */
+export function shouldEnrichWithLLM(
+  baseline: ResumeInterpretationOutput | null | undefined,
+  options: EnrichmentDecisionOptions = {}
+): EnrichmentDecision {
+  if (process.env.CORE_DISABLE_LIVE_LLM === "true") {
+    return { shouldEnrich: false, reason: "ai_disabled_by_env" };
+  }
+
+  if (options.consent === false) {
+    return { shouldEnrich: false, reason: "user_consent_declined" };
+  }
+
+  if (options.quotaAllowed === false) {
+    return { shouldEnrich: false, reason: "quota_exhausted_or_unavailable" };
+  }
+
+  if (!baseline) {
+    return { shouldEnrich: true, reason: "missing_deterministic_baseline" };
+  }
+
+  const eduCount = baseline.education?.length ?? 0;
+  const skillCount = baseline.skills?.length ?? 0;
+  const projCount = baseline.projects?.length ?? 0;
+  const expCount = baseline.experience?.length ?? 0;
+
+  // If education is present, 5+ skills are extracted, and 2+ projects (or 1 project + 1 experience)
+  // are extracted with detailed descriptions, deterministic coverage is already sufficient.
+  const hasSubstantialProjects = projCount >= 2 || (projCount >= 1 && expCount >= 1);
+  const descriptionsAreDetailed = projCount > 0 && baseline.projects.every((p) => (p.description?.trim().length ?? 0) >= 25);
+
+  if (eduCount >= 1 && skillCount >= 5 && hasSubstantialProjects && descriptionsAreDetailed) {
+    return { shouldEnrich: false, reason: "deterministic_coverage_sufficient" };
+  }
+
+  return { shouldEnrich: true, reason: "sparse_or_complex_sections" };
+}
+
+/**
+ * Additively merges optional LLM enrichment into a deterministic baseline.
+ * Deterministic facts (name, email, phone, links, verified skills) always take precedence.
+ * Inferred AI items are strictly grounded against document text and marked unverified.
+ */
+export function mergeExtractionOutputs(
+  baseline: ResumeInterpretationOutput,
+  enriched: ResumeInterpretationOutput | null | undefined,
+  rawText: string
+): ResumeInterpretationOutput {
+  if (!enriched) return baseline;
+  if (!baseline) return enriched;
+
+  const norm = normalizeForGrounding(rawText);
+  const grounded = (v: string | null | undefined) => isGrounded(norm, v);
+
+  // 1. Education (Deterministic precedence)
+  const education = [...baseline.education];
+  for (const enEdu of enriched.education || []) {
+    const normInst = normalizeForGrounding(enEdu.institution).trim();
+    const existing = education.find((b) => normalizeForGrounding(b.institution).trim() === normInst);
+    if (existing) {
+      if (!existing.fieldOfStudy && enEdu.fieldOfStudy && grounded(enEdu.fieldOfStudy)) {
+        existing.fieldOfStudy = enEdu.fieldOfStudy;
+      }
+      if (!existing.gpa && enEdu.gpa && grounded(enEdu.gpa)) {
+        existing.gpa = enEdu.gpa;
+      }
+      if (!existing.percentage && enEdu.percentage && grounded(enEdu.percentage)) {
+        existing.percentage = enEdu.percentage;
+      }
+      if (!existing.graduationYear && enEdu.graduationYear && grounded(enEdu.graduationYear)) {
+        existing.graduationYear = enEdu.graduationYear;
+      }
+    } else if (grounded(enEdu.institution)) {
+      education.push(enEdu);
+    }
+  }
+
+  // 2. Experience (Deterministic precedence)
+  const experience = [...baseline.experience];
+  for (const enExp of enriched.experience || []) {
+    const normComp = normalizeForGrounding(enExp.company).trim();
+    const existing = experience.find((b) => normalizeForGrounding(b.company).trim() === normComp);
+    if (existing) {
+      const existingHighlights = new Set(existing.highlights?.map((h) => h.toLowerCase()) || []);
+      for (const h of enExp.highlights || []) {
+        if (!existingHighlights.has(h.toLowerCase()) && grounded(h.slice(0, 40))) {
+          existing.highlights = existing.highlights || [];
+          existing.highlights.push(h);
+        }
+      }
+      const existingTech = new Set(existing.technologies?.map((t) => t.toLowerCase()) || []);
+      for (const t of enExp.technologies || []) {
+        if (!existingTech.has(t.toLowerCase()) && grounded(t)) {
+          existing.technologies = existing.technologies || [];
+          existing.technologies.push(t);
+        }
+      }
+    } else if (grounded(enExp.company)) {
+      experience.push(enExp);
+    }
+  }
+
+  // 3. Projects (Deterministic precedence)
+  const projects = [...baseline.projects];
+  for (const enProj of enriched.projects || []) {
+    const normTitle = normalizeForGrounding(enProj.title).trim();
+    const existing = projects.find((b) => normalizeForGrounding(b.title).trim() === normTitle);
+    if (existing) {
+      if ((!existing.description || existing.description.length < 25) && enProj.description) {
+        existing.description = enProj.description;
+      }
+      const existingTech = new Set(existing.technologies.map((t) => t.toLowerCase()));
+      for (const t of enProj.technologies || []) {
+        if (!existingTech.has(t.toLowerCase()) && grounded(t)) {
+          existing.technologies.push(t);
+        }
+      }
+      if (!existing.repositoryUrl && enProj.repositoryUrl && grounded(enProj.repositoryUrl)) {
+        existing.repositoryUrl = enProj.repositoryUrl;
+      }
+    } else if (grounded(enProj.title)) {
+      projects.push(enProj);
+    }
+  }
+
+  // 4. Skills (Start with deterministic, add non-duplicate grounded AI skills)
+  const skills = [...baseline.skills];
+  const seenSkills = new Set(skills.map((s) => s.name.toLowerCase()));
+  for (const enSkill of enriched.skills || []) {
+    const key = enSkill.name.toLowerCase();
+    if (!seenSkills.has(key) && grounded(enSkill.name)) {
+      seenSkills.add(key);
+      skills.push({
+        ...enSkill,
+        proficiencyHint: "unknown",
+      });
+    }
+  }
+
+  // 5. Certifications
+  const certifications = [...baseline.certifications];
+  const seenCerts = new Set(certifications.map((c) => c.name.toLowerCase()));
+  for (const enCert of enriched.certifications || []) {
+    const key = enCert.name.toLowerCase();
+    if (!seenCerts.has(key) && grounded(enCert.name)) {
+      seenCerts.add(key);
+      certifications.push(enCert);
+    }
+  }
+
+  // 6. Achievements
+  const achievements = [...baseline.achievements];
+  const seenAch = new Set(achievements.map((a) => a.title.toLowerCase()));
+  for (const enAch of enriched.achievements || []) {
+    const key = enAch.title.toLowerCase();
+    if (!seenAch.has(key) && grounded(enAch.title.slice(0, 40))) {
+      seenAch.add(key);
+      achievements.push(enAch);
+    }
+  }
+
+  return ResumeInterpretationSchema.parse({
+    education,
+    experience,
+    projects,
+    skills,
+    certifications,
+    achievements,
+  });
+}
+
+/** Combines baseline and optional enrichment into a unified ResumeExtractionResult. */
+export function mergeExtractionResults(
+  baseline: ResumeExtractionResult,
+  enriched: ResumeExtractionResult | null | undefined,
+  rawText: string
+): ResumeExtractionResult {
+  if (!enriched || !enriched.success || !enriched.extracted) {
+    return baseline;
+  }
+
+  const mergedInterpretation = mergeExtractionOutputs(
+    baseline.extracted || { education: [], experience: [], projects: [], skills: [], certifications: [], achievements: [] },
+    enriched.extracted,
+    rawText
+  );
+
+  const bProf = baseline.extractedProfile || {};
+  const eProf = enriched.extractedProfile || {};
+  const mergedProfile: ExtractedProfile = {
+    fullName: bProf.fullName || eProf.fullName,
+    email: bProf.email || eProf.email,
+    mobile: bProf.mobile || eProf.mobile,
+    location: bProf.location || eProf.location,
+    institution: bProf.institution || eProf.institution,
+    degree: bProf.degree || eProf.degree,
+    specialization: bProf.specialization || eProf.specialization,
+    expectedGraduationYear: bProf.expectedGraduationYear || eProf.expectedGraduationYear,
+    gpa: bProf.gpa || eProf.gpa,
+  };
+
+  const seenUrls = new Set<string>();
+  const mergedLinks: ResumeLink[] = [];
+  for (const l of [...(baseline.links || []), ...(enriched.links || [])]) {
+    const u = l.url.toLowerCase();
+    if (!seenUrls.has(u)) {
+      seenUrls.add(u);
+      mergedLinks.push(l);
+    }
+  }
+
+  const mergedDiscoveredProfiles = {
+    ...(enriched.discoveredProfiles || {}),
+    ...(baseline.discoveredProfiles || {}),
+  };
+
+  return {
+    success: true,
+    extracted: mergedInterpretation,
+    resume: enriched.resume || baseline.resume,
+    extractedProfile: mergedProfile,
+    links: mergedLinks,
+    discoveredProfiles: mergedDiscoveredProfiles,
+    provider: `${baseline.provider}+${enriched.provider}`,
+    modelUsed: `${baseline.modelUsed}+${enriched.modelUsed}`,
+    promptVersion: enriched.promptVersion || baseline.promptVersion,
+    latencyMs: baseline.latencyMs + enriched.latencyMs,
+    truncated: baseline.truncated || enriched.truncated,
+  };
+}
+

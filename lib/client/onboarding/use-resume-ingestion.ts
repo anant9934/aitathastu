@@ -20,7 +20,7 @@ export type ResumeProcessingState = "IDLE" | "UPLOADING" | "QUEUED" | "PROCESSIN
 export type ResumeCandidate = Omit<ReviewedResumeClaim, "category"> & {
   id: string;
   selected: boolean;
-  category: ReviewedResumeClaim["category"] | "achievement" | "profile" | "link";
+  category: ReviewedResumeClaim["category"] | "achievement" | "profile" | "link" | "publication";
   field?: string;
 };
 
@@ -30,6 +30,7 @@ export type ResumeExtraData = {
   extractedProfile?: Record<string, unknown>;
   acceptedProfile?: AcceptedResumeProfile;
   acceptedLinks?: Partial<Record<string, string>>;
+  acceptedPortfolioUrls?: string[];
   reviewSummary?: Record<string, { total: number; accepted: number }>;
   discoveredProfiles?: Partial<Record<string, string>>;
   extractedProjects?: Array<{ title: string; description: string; technologies: string[]; repositoryUrl?: string; sourceSpan: string }>;
@@ -53,13 +54,17 @@ type JobStatus = {
 
 const RECORD_CANDIDATE_ID = /^[a-z]+_\d+$/;
 
-/** Review sections, one per onboarding step the accepted data fills. */
+/** Review sections, structured per record category (Phase 8). */
 export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: ResumeCandidate["category"][] }> = [
-  { id: "academic", title: "Academic details", categories: ["profile", "education"] },
-  { id: "links", title: "Links", categories: ["link"] },
+  { id: "identity", title: "Identity and contact", categories: ["profile"] },
+  { id: "education", title: "Education", categories: ["education"] },
   { id: "skills", title: "Skills", categories: ["skill"] },
+  { id: "experience", title: "Experience and training", categories: ["experience"] },
   { id: "projects", title: "Projects", categories: ["project"] },
-  { id: "history", title: "Experience and achievements", categories: ["experience", "certification", "achievement"] },
+  { id: "certifications", title: "Certifications", categories: ["certification"] },
+  { id: "publications", title: "Research and publications", categories: ["publication"] },
+  { id: "achievements", title: "Achievements", categories: ["achievement"] },
+  { id: "links", title: "Digital footprints", categories: ["link"] },
 ];
 
 export const FIELD_LABELS: Record<string, string> = {
@@ -283,9 +288,13 @@ export function useResumeIngestion({
     }));
     const acceptedProfile: AcceptedResumeProfile = {};
     const acceptedLinks: Partial<Record<string, string>> = {};
+    const acceptedPortfolioUrls: string[] = [];
     for (const c of accepted) {
       if (c.category === "profile" && c.field) acceptedProfile[c.field as keyof AcceptedResumeProfile] = c.value.trim();
-      if (c.category === "link" && c.field) acceptedLinks[c.field] = c.value.trim();
+      if (c.category === "link" && c.field) {
+        if (!acceptedLinks[c.field]) acceptedLinks[c.field] = c.value.trim();
+        if (c.field === "portfolio") acceptedPortfolioUrls.push(c.value.trim());
+      }
     }
     const reviewSummary = Object.fromEntries(REVIEW_GROUPS.map((g) => {
       const rows = candidates.filter((c) => g.categories.includes(c.category));
@@ -303,7 +312,7 @@ export function useResumeIngestion({
       setState("REVIEW_REQUIRED");
       return res.ok ? "Your review couldn't be saved. Try again." : describeError(res.error);
     }
-    const saved = await applyToOnboarding(fileName || "CV", claims, { ...extra, acceptedProfile, acceptedLinks, reviewSummary });
+    const saved = await applyToOnboarding(fileName || "CV", claims, { ...extra, acceptedProfile, acceptedLinks, acceptedPortfolioUrls, reviewSummary });
     if (!saved) {
       setState("REVIEW_REQUIRED");
       return "Your review was saved to your profile, but your onboarding progress couldn't be updated. Try again.";

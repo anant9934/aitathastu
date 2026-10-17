@@ -6,7 +6,7 @@ import time
 import fitz
 import pytesseract
 import shutil, sys, os
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageChops
 from docx import Document
 
 if not shutil.which('tesseract'):
@@ -63,7 +63,7 @@ HEADINGS = {
  ],
  'education': [
      'education', 'academic background', 'academics', 'academic qualifications',
-     'educational qualifications', 'qualifications', 'education & qualifications',
+     'educational qualifications', 'education & qualifications',
      'education and qualifications'
  ],
  'experience': [
@@ -79,7 +79,8 @@ HEADINGS = {
      'skills', 'technical skills', 'technical expertise', 'technologies', 'competencies',
      'technical proficiencies', 'tools and technologies', 'skills summary',
      'computer/data analytics skills', 'computer and data analytics skills', 'computer skills',
-     'data analytics skills', 'relevant languages', 'core competencies', 'technical background'
+     'data analytics skills', 'relevant languages', 'core competencies', 'technical background',
+     'qualifications', 'qualification', 'qualifications summary', 'summary of qualifications'
  ],
  'projects': [
      'projects', 'personal projects', 'academic projects', 'technical projects',
@@ -97,10 +98,11 @@ HEADINGS = {
  ],
  'research': [
      'research', 'publications', 'research publications', 'research experience',
-     'papers', 'research & projects', 'research, patents & books', 'research, patents and books'
+     'papers', 'research & projects'
  ],
  'books_patents': [
-     'patents', 'books', 'books and patents', 'intellectual property'
+     'patents', 'books', 'books and patents', 'intellectual property',
+     'research, patents & books', 'research, patents and books'
  ],
  'leadership': [
      'leadership', 'volunteering', 'volunteer experience', 'community engagement',
@@ -118,6 +120,8 @@ def _heading(text):
     s_stripped = re.sub(r'^[a-z0-9\W_]{1,3}\s+', '', s).strip()
     return next((k for k, v in HEADINGS.items() if s_stripped == v or s_stripped in v), None)
 
+LOCATION_KW = re.compile(r'\b(?:united kingdom|london|seattle|rochester|bristol|suva|fiji|punjab|bihar|india|remote|hybrid|spain|el paraiso|chichester|ny|wa|uk|usa)\b', re.I)
+
 def tag_sections(lines):
     section = 'header'
     for l in lines:
@@ -127,22 +131,24 @@ def tag_sections(lines):
             l.section = 'heading:' + h
         else:
             clean = l.text.strip()
-            # If an uppercase heading-like line appears that matches no known heading,
+            # If an uppercase heading-like line appears that is not a location and matches no known heading,
             # switch to unknown to prevent polluting critical prior sections.
             if re.match(r'^[A-Z\s&,/]{3,40}$', clean) and not re.search(r'\d', clean) and len(clean.split()) <= 4:
-                if section in ('education', 'certifications', 'summary'):
-                    section = 'unknown'
+                if not LOCATION_KW.search(clean):
+                    if section in ('education', 'certifications', 'summary'):
+                        section = 'unknown'
             l.section = section
 
 def _order(blocks,width):
     blocks=[b for b in blocks if isinstance(b[4],str) and b[4].strip()]
-    left=[b for b in blocks if b[0]<width*.45 and b[2]<width*.6]
+    left=[b for b in blocks if b[0]<width*.45 and b[2]<width*.65]
     right=[b for b in blocks if b[0]>width*.44 and b[2]>width*.62]
     if len(left)>=2 and len(right)>=2:
         top_y=min(min(b[1] for b in left),min(b[1] for b in right))
         top=[b for b in blocks if b[1]<top_y and b[2]-b[0]>width*.5]
         rest=[b for b in blocks if b not in top]
-        return sorted(top,key=lambda b:(b[1],b[0])) + sorted([b for b in rest if (b[0]+b[2])/2<width*.52],key=lambda b:b[1]) + sorted([b for b in rest if (b[0]+b[2])/2>=width*.52],key=lambda b:b[1])
+        split = (max(b[2] for b in left) + min(b[0] for b in right)) / 2 if left and right else width * .52
+        return sorted(top,key=lambda b:(b[1],b[0])) + sorted([b for b in rest if (b[0]+b[2])/2<split],key=lambda b:b[1]) + sorted([b for b in rest if (b[0]+b[2])/2>=split],key=lambda b:b[1])
     return sorted(blocks,key=lambda b:(round(b[1]/8),b[0],b[1]))
 
 import os
@@ -180,7 +186,13 @@ def _ocr(im, page, seconds, warnings):
     start_t = time.monotonic()
     deadline = start_t + seconds
 
-    im_gray = ImageOps.exif_transpose(im).convert('L')
+    transposed = ImageOps.exif_transpose(im)
+    if transposed.mode in ('RGB', 'RGBA'):
+        # Red channel provides high contrast for blue, cyan, and black ink
+        # while preserving light paper background and header text
+        im_gray = transposed.convert('RGB').split()[0]
+    else:
+        im_gray = transposed.convert('L')
     if min(im_gray.size) < 500:
         warnings.append(f'Page {page}: low resolution, OCR may be unreliable.')
 
@@ -205,7 +217,7 @@ def _ocr(im, page, seconds, warnings):
     im_enhanced = ImageOps.autocontrast(im_gray)
     words = []
     ocr_timed_out = False
-    base_opt = '--oem 1 --dpi 150 -c omp_thread_limit=1'
+    base_opt = '-c omp_thread_limit=1'
 
     # Attempt word-level extraction with bounded per-attempt timeouts
     for img, psm in ((im_enhanced, '--psm 3'), (im_gray, '--psm 6')):
@@ -253,40 +265,70 @@ def _ocr(im, page, seconds, warnings):
             print(f'[_ocr] Tesseract image_to_string fallback error page {page}: {type(e).__name__}: {e}', flush=True)
 
     width = float(im_gray.width)
-    raw_lines = {}
+    height = float(im_gray.height)
+
+    # 1. Detect candidate headings to establish top banner boundary
+    first_heading_y = height * 0.18
     for w in words:
-        raw_lines.setdefault(w['key'], []).append(w)
+        if _heading(w['text']) is not None and w['y0'] < first_heading_y:
+            first_heading_y = w['y0']
 
-    line_objs = []
-    for k, ws in raw_lines.items():
-        ws_sorted = sorted(ws, key=lambda x: x['x0'])
-        x0 = min(w['x0'] for w in ws)
-        x1 = max(w['x1'] for w in ws)
-        y0 = min(w['y0'] for w in ws)
-        y1 = max(w['y1'] for w in ws)
-        text = ' '.join(w['text'] for w in ws_sorted).strip()
-        if text:
-            line_objs.append({'key': k, 'words': ws_sorted, 'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'text': text})
+    # 2. Histogram on body words (between 12% and 95% height) to detect multi-column gutters
+    body_words = [w for w in words if w['y0'] >= height * 0.12 and w['y1'] <= height * 0.95]
+    num_bins = 60
+    bin_width = width / num_bins
+    bins = [0] * num_bins
+    for w in body_words:
+        b0 = max(0, min(num_bins - 1, int(w['x0'] / bin_width)))
+        b1 = max(0, min(num_bins - 1, int(w['x1'] / bin_width)))
+        for b in range(b0, b1 + 1):
+            bins[b] += 1
 
-    left_lines = [l for l in line_objs if l['x1'] < width * 0.52 and l['x0'] < width * 0.45]
-    right_lines = [l for l in line_objs if l['x0'] > width * 0.46 and l['x1'] > width * 0.55]
+    min_b = int(num_bins * 0.35)
+    max_b = int(num_bins * 0.72)
+    min_count = min(bins[min_b:max_b]) if max_b > min_b else 999
+    gutter_b = min_b + bins[min_b:max_b].index(min_count) if max_b > min_b else 0
+    split_x = gutter_b * bin_width
+    left_mass = sum(bins[max(0, gutter_b - 15):gutter_b])
+    right_mass = sum(bins[gutter_b + 1:min(num_bins, gutter_b + 16)])
 
-    if len(left_lines) >= 8 and len(right_lines) >= 8:
-        heading_ys = [l['y0'] for l in line_objs if _heading(l['text']) is not None]
-        first_heading_y = min(heading_ys) if heading_ys else width * 0.25
-        top_banner = []
-        left_col = []
-        right_col = []
-        for l in line_objs:
-            if l['y1'] <= first_heading_y or (l['x0'] < width * 0.40 and l['x1'] > width * 0.60):
-                top_banner.append(l)
-            elif (l['x0'] + l['x1']) / 2 < width * 0.48:
-                left_col.append(l)
+    # Distinct two-column gutter requires a low density valley between two substantial text masses
+    is_two_col = (min_count <= 4 and left_mass >= 15 and right_mass >= 15)
+
+    def _cluster_words_into_lines(ws):
+        raw_lines = {}
+        for w in ws:
+            raw_lines.setdefault(w['key'], []).append(w)
+        lines_out = []
+        for k, ws_k in raw_lines.items():
+            ws_sorted = sorted(ws_k, key=lambda x: x['x0'])
+            x0 = min(w['x0'] for w in ws_k)
+            x1 = max(w['x1'] for w in ws_k)
+            y0 = min(w['y0'] for w in ws_k)
+            y1 = max(w['y1'] for w in ws_k)
+            text = ' '.join(w['text'] for w in ws_sorted).strip()
+            if text:
+                lines_out.append({'key': k, 'words': ws_sorted, 'x0': x0, 'x1': x1, 'y0': y0, 'y1': y1, 'text': text})
+        return lines_out
+
+    if is_two_col:
+        top_words = []
+        left_words = []
+        right_words = []
+        for w in words:
+            if w['y1'] <= first_heading_y:
+                top_words.append(w)
+            elif (w['x0'] + w['x1']) / 2 < split_x:
+                left_words.append(w)
             else:
-                right_col.append(l)
-        ordered = sorted(top_banner, key=lambda l: (round(l['y0'] / 10), l['x0'])) + sorted(left_col, key=lambda l: l['y0']) + sorted(right_col, key=lambda l: l['y0'])
+                right_words.append(w)
+        top_lines = sorted(_cluster_words_into_lines(top_words), key=lambda l: (round(l['y0'] / 8), l['x0']))
+        left_lines = sorted(_cluster_words_into_lines(left_words), key=lambda l: (round(l['y0'] / 6), l['x0']))
+        right_lines = sorted(_cluster_words_into_lines(right_words), key=lambda l: (round(l['y0'] / 6), l['x0']))
+        ordered = top_lines + left_lines + right_lines
     else:
-        ordered = sorted(line_objs, key=lambda l: (round(l['y0'] / 8), l['x0']))
+        all_lines = _cluster_words_into_lines(words)
+        ordered = sorted(all_lines, key=lambda l: (round(l['y0'] / 8), l['x0']))
 
     lines = []
     for i, l in enumerate(ordered):
@@ -360,7 +402,7 @@ def read_document(data, fmt, settings, force_ocr=False):
                         if page.rect.width * page.rect.height * 4 > 30_000_000:
                             warnings.append(f'Page {pageno}: rendered OCR image exceeds safe pixel limit.')
                             continue
-                        scale = 2.0 if force_ocr else 1.5
+                        scale = 1.5
                         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
                         page_budget = max(2, min(settings.max_ocr_seconds, int(deadline - time.monotonic())))
                         ocr, ocr_layout = _ocr(Image.open(BytesIO(pix.tobytes('png'))), pageno, page_budget, warnings)

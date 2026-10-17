@@ -37,7 +37,7 @@ export type Project = ReviewEditMeta & {
 };
 export type ReviewedResumeClaim = {
   candidateId?: string;
-  category: "education" | "experience" | "project" | "skill" | "certification" | "achievement";
+  category: "education" | "experience" | "project" | "skill" | "certification" | "achievement" | "publication";
   value: string;
   sourceSpan: string;
   documentId: string;
@@ -67,6 +67,7 @@ export type OnboardingDraft = {
   resumeReviewed: ReviewedResumeClaim[];
   certificationSuggestions: { title: string; status: "suggested" | "kept" | "removed" }[];
   profiles: Partial<Record<SourceId, string>>;
+  portfolioUrls?: string[];
   githubConsent: boolean;
   python: "yes" | "not_yet" | "";
   skills: string[];

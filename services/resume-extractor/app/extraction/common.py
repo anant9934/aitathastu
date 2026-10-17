@@ -12,9 +12,9 @@ EDU=re.compile(r'\b(?:B\.?Tech|B\.?E\.?|Bachelor|BSc|B\.Sc|BCA|BBA|BA|B\.Com|BS|
 GRADE=re.compile(r'\b(?:CGPA|GPA)\s*[:\-]?\s*(\d{1,2}(?:\.\d{1,2})?(?:\s*/\s*\d{1,2})?)|\b\d{1,3}(?:\.\d+)?\s*%',re.I)
 METRIC=re.compile(r'\b\d+(?:\.\d+)?\s*(?:%|x\b|users\b|hours\b|ms\b|points\b|rank\b)',re.I)
 DOI=re.compile(r'\b10\.\d{4,9}/[^\s,;]+',re.I)
-SKILL_NAMES='Python,Java,C++,C#,JavaScript,TypeScript,HTML,CSS,SQL,Go,Rust,R,PyTorch,TensorFlow,Scikit-learn,Keras,OpenCV,NumPy,Pandas,Matplotlib,LangChain,LLM,RAG,Machine Learning,Deep Learning,NLP,Computer Vision,Generative AI,Transformers,FastAPI,Django,Flask,React,Next.js,Node.js,Express,PostgreSQL,MySQL,MongoDB,Redis,Docker,Kubernetes,AWS,Azure,GCP,Git,GitHub Actions,Linux,Tableau,Power BI,Excel,Data Structures,Algorithms,DBMS,Cybersecurity,Networking,Statistics,Data Analysis,GraphQL,Tailwind,CI/CD,Kafka,PyPDF,Redux,Vite,REST APIs'.split(',')
+SKILL_NAMES='Python,Java,C++,C#,JavaScript,TypeScript,HTML,CSS,SQL,Go,Rust,R,PyTorch,TensorFlow,Scikit-learn,Keras,OpenCV,NumPy,Pandas,Matplotlib,LangChain,LLM,RAG,Machine Learning,Deep Learning,NLP,Computer Vision,Generative AI,Transformers,FastAPI,Django,Flask,React,Next.js,Node.js,Express,PostgreSQL,MySQL,MongoDB,Redis,Docker,Kubernetes,AWS,Azure,GCP,Git,GitHub Actions,Linux,Tableau,Power BI,Excel,Data Structures,Algorithms,DBMS,Cybersecurity,Networking,Statistics,Data Analysis,GraphQL,Tailwind,CI/CD,Kafka,PyPDF,Redux,Vite,REST APIs,WordPress,Drupal,Joomla,phpMyAdmin,Prestashop,Adobe Captivate,Adobe Flash,Adobe Fireworks,Adobe Illustrator,Adobe InDesign,Adobe Photoshop,Adobe Connect,Eclipse,Microsoft Word,Microsoft Office,MS SQL Server,Sisense,Zoho Analytics,GoodData,Qlik Sense,PHP,XHTML,XML,JSP,Supabase,Prisma,Confluence,Pixelmator'.split(',')
 SKILLS={s.lower():s for s in SKILL_NAMES}
-SKILLS.update({'sklearn':'Scikit-learn','ml':'Machine Learning','gen ai':'Generative AI','generative ai':'Generative AI','retrieval augmented generation':'RAG','large language models':'LLM','postgres':'PostgreSQL','js':'JavaScript','ts':'TypeScript','py':'Python','cpp':'C++','tailwind css':'Tailwind','aws cloud':'AWS','azure cloud':'Azure','google cloud':'GCP'})
+SKILLS.update({'sklearn':'Scikit-learn','ml':'Machine Learning','gen ai':'Generative AI','generative ai':'Generative AI','retrieval augmented generation':'RAG','large language models':'LLM','postgres':'PostgreSQL','js':'JavaScript','ts':'TypeScript','py':'Python','cpp':'C++','tailwind css':'Tailwind','aws cloud':'AWS','azure cloud':'Azure','google cloud':'GCP','illustrator':'Adobe Illustrator','photoshop':'Adobe Photoshop','indesign':'Adobe InDesign','ms excel':'Excel','microsoft excel':'Excel'})
 PLATFORMS={'github.com':'GitHub','linkedin.com':'LinkedIn','leetcode.com':'LeetCode','hackerrank.com':'HackerRank','hackerearth.com':'HackerEarth','codechef.com':'CodeChef','kaggle.com':'Kaggle','huggingface.co':'Hugging Face','orcid.org':'ORCID','scholar.google.com':'Google Scholar','stackoverflow.com':'Stack Overflow','dev.to':'DEV Community'}
 
 def evidence(line): return Evidence(page=line.page,section=line.section,snippet=line.text[:320],method=line.method,block_id=line.block_id)
@@ -58,11 +58,12 @@ def detect_skills(text):
     return found
 
 def category(skill):
-    if skill in ['Python','Java','C++','C#','JavaScript','TypeScript','SQL','Go','Rust','R']: return 'Programming'
+    if skill in ['Python','Java','C++','C#','JavaScript','TypeScript','SQL','Go','Rust','R','PHP','XHTML']: return 'Programming'
     if skill in ['PyTorch','TensorFlow','Scikit-learn','Keras','Machine Learning','Deep Learning','NLP','Computer Vision','OpenCV','Transformers']: return 'AI/ML'
     if skill in ['LLM','RAG','LangChain','Generative AI']: return 'Generative AI'
-    if skill in ['Pandas','NumPy','Matplotlib','Statistics','Data Analysis','Tableau','Power BI','Excel']: return 'Data Science'
-    if skill in ['PostgreSQL','MySQL','MongoDB','Redis','DBMS']: return 'Databases'
+    if skill in ['Pandas','NumPy','Matplotlib','Statistics','Data Analysis','Tableau','Power BI','Excel','Sisense','Zoho Analytics','GoodData','Qlik Sense']: return 'Data Science'
+    if skill in ['PostgreSQL','MySQL','MongoDB','Redis','DBMS','MS SQL Server','Supabase','Prisma','phpMyAdmin']: return 'Databases'
     if skill in ['Docker','Kubernetes','AWS','Azure','GCP','GitHub Actions','CI/CD','Kafka']: return 'Cloud/DevOps'
-    if skill in ['FastAPI','Django','Flask','React','Next.js','Node.js','Express','HTML','CSS','GraphQL','Tailwind','Vite','Redux','REST APIs']: return 'Web Development'
+    if skill in ['FastAPI','Django','Flask','React','Next.js','Node.js','Express','HTML','CSS','GraphQL','Tailwind','Vite','Redux','REST APIs','WordPress','Drupal','Joomla','Prestashop','XML','JSP']: return 'Web Development'
+    if skill in ['Adobe Captivate','Adobe Flash','Adobe Fireworks','Adobe Illustrator','Adobe InDesign','Adobe Photoshop','Adobe Connect','Eclipse','Microsoft Word','Microsoft Office','Confluence','Pixelmator']: return 'Design & Tools'
     return 'Tools & Fundamentals'

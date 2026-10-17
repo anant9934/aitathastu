@@ -572,11 +572,21 @@ function extractEducation(taggedLines: Array<{ text: string; section: string }>)
         startDate = parts[0];
         endDate = parts[1];
       }
+      const isOngoing = /(?:present|current|ongoing|pursuing)/i.test(l.text);
       const years = l.text.match(YEAR_RE);
       if (years && years.length > 0) {
-        graduationYear = years[years.length - 1];
-        if (!startDate) startDate = years[0];
-        if (!endDate) endDate = years[years.length - 1];
+        if (years.length === 1 && isOngoing) {
+          startDate = years[0];
+          endDate = "Present";
+          graduationYear = undefined;
+        } else if (years.length >= 2) {
+          startDate = years[0];
+          endDate = years[years.length - 1];
+          graduationYear = years[years.length - 1];
+        } else if (!isOngoing) {
+          graduationYear = years[0];
+          if (!endDate) endDate = years[0];
+        }
       }
 
       // Grades and percentages
@@ -702,20 +712,20 @@ function extractProjects(taggedLines: Array<{ text: string; section: string }>, 
   const chunks: Array<Array<{ text: string }>> = [];
   let currentChunk: Array<{ text: string }> = [];
 
-  const hasTopBullets = projLines.some((l) => /^[•·*◦\-–—]\s+/.test(l.text));
+  const ACTION_VERBS = /^(?:created|developed|built|designed|implemented|architected|spearheaded|automated|integrated|assisted|collaborated)\b/i;
 
   for (const line of projLines) {
-    const isBullet = /^[•·*◦\-–—]\s+/.test(line.text);
-    const isHeaderCandidate = !isBullet && line.text.length < 80 && (line.text.includes("|") || line.text.includes(":") || /^[A-Z0-9]/.test(line.text));
+    const cleanText = line.text.replace(/^[•·*◦\-–—»«+]\s*/, "").trim();
+    const isBullet = /^[•·*◦\-–—»«+]\s*/.test(line.text);
+    const isSentence = ACTION_VERBS.test(cleanText) || cleanText.startsWith("◦:");
 
-    let isNewChunk = false;
-    if (hasTopBullets) {
-      isNewChunk = isBullet && currentChunk.length > 0;
-    } else {
-      isNewChunk = isHeaderCandidate && currentChunk.length > 0 && !isBullet;
-    }
+    const bulletTitleMatch = isBullet && !isSentence && cleanText.match(/^([A-Za-z0-9\s&/\-]{2,40})\s*[:\(]/);
+    const isBulletTitle = Boolean(bulletTitleMatch && bulletTitleMatch[1].trim().split(/\s+/).length <= 4);
+    const isStandaloneTitle = !isBullet && !isSentence && cleanText.length > 2 && cleanText.length < 60 && !cleanText.endsWith(".");
 
-    if (isNewChunk && currentChunk.length > 0) {
+    const isNewChunk = currentChunk.length > 0 && (isBulletTitle || isStandaloneTitle);
+
+    if (isNewChunk) {
       chunks.push(currentChunk);
       currentChunk = [];
     }
@@ -739,7 +749,7 @@ function extractProjects(taggedLines: Array<{ text: string; section: string }>, 
       const restLines = chunk.slice(1).map((l) => l.text.replace(/^[•·*◦\-–—\s]+/, "").trim()).filter(Boolean);
       description = [firstLineDesc, ...restLines].join(" ").slice(0, 600);
     } else {
-      rawTitle = headLine.text.replace(/^[•·*◦\-–—|#\s]+|[•·*◦\-–—|#\s]+$/g, "").split("|")[0].trim();
+      rawTitle = headLine.text.replace(/^[•·*◦\-–—|#»«+\s]+|[•·*◦\-–—|#»«+\s]+$/g, "").split("|")[0].trim();
       const descLines = chunk.slice(1).map((l) => l.text.replace(/^[•·*◦\-–—\s]+/, "").trim()).filter((l) => !/^https?:\/\//i.test(l) && Boolean(l));
       description = descLines.slice(0, 4).join(" ").slice(0, 600);
     }

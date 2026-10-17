@@ -82,7 +82,7 @@ export type TechCandidate = {
 
 export type ReviewedResumeClaim = {
   candidateId?: string;
-  category: "education" | "experience" | "project" | "skill" | "certification";
+  category: "education" | "experience" | "project" | "skill" | "certification" | "achievement" | "publication";
   value: string;
   sourceSpan: string;
   documentId: string;
@@ -124,6 +124,7 @@ export interface OnboardingData {
   experiences: ExperienceEntry[];
   achievements: AchievementEntry[];
   isFresher: boolean;
+  portfolioUrls?: string[];
 }
 
 export const EMPTY_ONBOARDING: OnboardingData = {

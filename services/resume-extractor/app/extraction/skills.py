@@ -3,7 +3,9 @@ from .common import detect_skills,category,add
 def extract_skills(content,groups):
     found={}
     for line in content.lines:
-        if line.section not in ('skills','projects','experience','internships','research'): continue
+        if line.section not in ('skills','projects','experience','internships','research'):
+            if not any(k in line.text.lower() for k in ('software:', 'languages:', 'tools:', 'cms:', 'technologies:', 'skills:')):
+                continue
         # In prose, only count exact dictionary matches and label where observed.
         for skill in detect_skills(line.text):
             prev=found.get(skill)

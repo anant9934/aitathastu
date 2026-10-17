@@ -88,17 +88,34 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
     })
   );
   if (Array.isArray(extracted.achievements)) {
-    add(
-      "achievement",
-      extracted.achievements.map((x) => {
-        const cat = x.category ? ` (${x.category})` : "";
-        const desc = x.description ? ` — ${x.description.length > 60 ? x.description.slice(0, 57) + "…" : x.description}` : "";
-        return {
-          value: `${x.title}${cat}${desc}`,
-          sourceSpan: x.sourceSpan,
-        };
-      })
-    );
+    const pubs = extracted.achievements.filter((x) => x.category === "publication" || x.category === "patent" || x.category === "book");
+    const achs = extracted.achievements.filter((x) => x.category !== "publication" && x.category !== "patent" && x.category !== "book");
+    if (pubs.length > 0) {
+      add(
+        "publication",
+        pubs.map((x) => {
+          const cat = x.category ? ` (${x.category})` : "";
+          const desc = x.description ? ` — ${x.description.length > 60 ? x.description.slice(0, 57) + "…" : x.description}` : "";
+          return {
+            value: `${x.title}${cat}${desc}`,
+            sourceSpan: x.sourceSpan,
+          };
+        })
+      );
+    }
+    if (achs.length > 0) {
+      add(
+        "achievement",
+        achs.map((x) => {
+          const cat = x.category ? ` (${x.category})` : "";
+          const desc = x.description ? ` — ${x.description.length > 60 ? x.description.slice(0, 57) + "…" : x.description}` : "";
+          return {
+            value: `${x.title}${cat}${desc}`,
+            sourceSpan: x.sourceSpan,
+          };
+        })
+      );
+    }
   }
   return candidates;
 }

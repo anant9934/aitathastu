@@ -399,12 +399,13 @@ export function extractResumeDeterministicResult(
  */
 export function adaptRenderProfileToInterpretation(
   renderProfile: ExtractorProfileV2 | null | undefined,
-  rawText: string
+  rawText: string = ""
 ): ResumeExtractionResult {
   const startTime = Date.now();
-  const lines = rawText.split("\n");
-  const norm = normalizeForGrounding(rawText);
-  const grounded = (v: string | null | undefined) => isGrounded(norm, v);
+  const text = rawText || "";
+  const lines = text ? text.split("\n") : [];
+  const norm = text ? normalizeForGrounding(text) : "";
+  const grounded = (v: string | null | undefined) => !norm || isGrounded(norm, v);
 
   if (!renderProfile || !renderProfile.groups) {
     return {
@@ -469,7 +470,8 @@ export function adaptRenderProfileToInterpretation(
     const fieldOfStudy = tidy(f.specialization?.value || f.department?.value, 100) || undefined;
     const startDate = tidy(f.start_date?.value, 30) || undefined;
     const endDate = tidy(f.end_date?.value, 30) || undefined;
-    const graduationYear = tidy(f.expected_graduation?.value, 20) || year(endDate ?? null);
+    const isOngoing = Boolean((endDate && /(?:present|current|ongoing)/i.test(endDate)) || (!endDate && startDate));
+    const graduationYear = tidy(f.expected_graduation?.value, 20) || (!isOngoing && endDate ? year(endDate) : undefined);
     const grade = tidy(f.grade?.value, 30);
     const gpa = grade && !/%/.test(grade) ? grade.replace(/^(c?gpa|cpi|sgpa)\s*[:\-]\s*/i, "").slice(0, 20) : undefined;
     const percentage = grade && /%/.test(grade) ? grade.slice(0, 20) : undefined;
@@ -493,10 +495,10 @@ export function adaptRenderProfileToInterpretation(
   const expRecords = [...(groups.experience || []), ...(groups.internships || [])];
   for (const rec of expRecords) {
     const f = rec.fields;
-    const company = tidy(f.organization?.value || f.provider?.value, 150);
+    const company = tidy(f.organization?.value || f.provider?.value || f.program?.value, 150);
     if (!company || !grounded(company)) continue;
 
-    const role = tidy(f.job_title?.value || f.role?.value, 150) || "Contributor";
+    const role = tidy(f.job_title?.value || f.role?.value, 150) || "";
     const isIntern = Boolean(groups.internships?.includes(rec) || /intern/i.test(f.employment_type?.value || role));
     const startDate = tidy(f.start_date?.value, 30) || undefined;
     const endDate = tidy(f.end_date?.value, 30) || undefined;
@@ -585,7 +587,7 @@ export function adaptRenderProfileToInterpretation(
     });
   }
 
-  // 7. Achievements
+  // 7. Achievements, Books & Patents
   const achievements: ResumeInterpretationOutput["achievements"] = [];
   const achRecords = [...(groups.awards || []), ...(groups.research || []), ...(groups.books_patents || [])];
   for (const rec of achRecords) {
@@ -593,9 +595,11 @@ export function adaptRenderProfileToInterpretation(
     const title = tidy(f.name?.value || f.title?.value, 250);
     if (!title || !grounded(title.slice(0, 40))) continue;
 
-    const isPatent = Boolean(groups.books_patents?.includes(rec) || /patent/i.test(title));
-    const isPub = Boolean(groups.research?.includes(rec) || /publi|journal|paper/i.test(title));
-    const category = isPatent ? "patent" : isPub ? "publication" : "award";
+    const typeVal = (f.type?.value || "").toLowerCase();
+    const isPatent = typeVal === "patent" || /patent/i.test(title);
+    const isBook = typeVal === "book" || /book/i.test(title);
+    const isPub = typeVal === "publication" || Boolean(groups.research?.includes(rec)) || /publi|journal|paper/i.test(title);
+    const category = isPatent ? "patent" : isBook ? "book" : isPub ? "publication" : "award";
     const sourceSpan = span(f.name?.evidence?.[0]?.snippet || f.title?.evidence?.[0]?.snippet, title);
 
     achievements.push({

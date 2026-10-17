@@ -102,17 +102,32 @@ export class EoraResumeAdvisor {
     let mood: EoraReviewGuidance["mood"] = "CHEERFUL";
     let suggestedNextStep = "Review and confirm your extracted details.";
 
+    const eduCount = (profile.groups.education || []).filter((r) => r.record_state !== "rejected").length;
+    const projCount = (profile.groups.projects || []).filter((r) => r.record_state !== "rejected").length;
+    const expCount =
+      (profile.groups.experience || []).filter((r) => r.record_state !== "rejected").length +
+      (profile.groups.internships || []).filter((r) => r.record_state !== "rejected").length;
+    const skillCount = (profile.groups.skills || []).filter((r) => r.record_state !== "rejected").length;
+    const certCount = (profile.groups.certifications || []).filter((r) => r.record_state !== "rejected").length;
+
+    const parts: string[] = [];
+    if (eduCount > 0) parts.push(`${eduCount} education record${eduCount > 1 ? "s" : ""}`);
+    if (projCount > 0) parts.push(`${projCount} project${projCount > 1 ? "s" : ""}`);
+    if (expCount > 0) parts.push(`${expCount} experience position${expCount > 1 ? "s" : ""}`);
+    if (skillCount > 0) parts.push(`${skillCount} skill${skillCount > 1 ? "s" : ""}`);
+    if (certCount > 0) parts.push(`${certCount} certification${certCount > 1 ? "s" : ""}`);
+
     if (totalFields === 0) {
       primaryMessage = "I couldn't detect clear sections in this document. You can retry with a sharper PDF or enter details directly.";
       mood = "REASSURING";
       suggestedNextStep = "Try uploading an uncompressed digital PDF or enter details manually.";
-    } else if (uncertainCount > 0) {
-      primaryMessage = `I've read your resume across ${groupsFound} categories! I noticed ${uncertainCount} field${uncertainCount > 1 ? "s" : ""} where a quick check from you would ensure complete accuracy.`;
-      mood = "THINKING";
-      suggestedNextStep = "Review highlighted items in amber below.";
+    } else if (parts.length > 0) {
+      primaryMessage = `Found ${parts.slice(0, 3).join(", ")}${parts.length > 3 ? `, and ${parts.slice(3).join(", ")}` : ""}. Please review and approve before saving.`;
+      mood = uncertainCount > 0 ? "THINKING" : "CHEERFUL";
+      suggestedNextStep = uncertainCount > 0 ? "Review highlighted items below." : "Review and confirm your details.";
     } else {
-      primaryMessage = `Great! I've extracted ${totalFields} source-backed details across ${groupsFound} categories with strong confidence.`;
-      mood = "CELEBRATING";
+      primaryMessage = `Extracted ${totalFields} fields across ${groupsFound} sections. Please review before saving.`;
+      mood = "CHEERFUL";
       suggestedNextStep = "Confirm your details to link them directly to your Person 360 profile.";
     }
 

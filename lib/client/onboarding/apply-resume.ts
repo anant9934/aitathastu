@@ -20,6 +20,10 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
   ) as Partial<Record<string, string>>;
   const discoveredResumeProfiles = { ...data.discoveredResumeProfiles, ...discoveredFromExtraction, ...acceptedLinks };
   const profiles = { ...acceptedLinks, ...data.profiles };
+  const portfolioUrls = Array.from(new Set([
+    ...(data.portfolioUrls || []),
+    ...(extra.acceptedPortfolioUrls || []),
+  ])).filter(Boolean);
   const skills = Array.from(new Set([...data.skills, ...claims.filter((c) => c.category === "skill").map((c) => c.value)]));
 
   const resumeProjects: ProjectEntry[] = claims.filter((c) => c.category === "project").map((c, index) => {
@@ -88,6 +92,7 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
     projects,
     skills,
     profiles,
+    portfolioUrls: portfolioUrls.length > 0 ? portfolioUrls : data.portfolioUrls,
     discoveredResumeProfiles,
     resumeCovered: covered,
     resumeReviewed,
@@ -97,7 +102,9 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
   const patch = {
     skills, projects, experiences, achievements,
     education: next.education.length ? next.education : undefined,
-    resumeReviewed, resume: "processed", profiles, discoveredResumeProfiles, resumeCoveredScreens: covered,
+    resumeReviewed, resume: "processed", profiles,
+    portfolioUrls: portfolioUrls.length > 0 ? portfolioUrls : undefined,
+    discoveredResumeProfiles, resumeCoveredScreens: covered,
     name, degree: next.academic.degree, specialization: next.academic.department, institution: next.academic.institution,
     year: next.academic.currentYear, expectedGraduationYear: next.academic.expectedGraduationYear,
   };

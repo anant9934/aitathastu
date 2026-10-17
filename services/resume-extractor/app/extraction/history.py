@@ -6,14 +6,14 @@ BULLET_PREFIX_RE = re.compile(r'^\s*[-•*»©°«+·◦–—]\s*')
 LOCATION_LINE_RE = re.compile(r'^\W*(?:©|Q|§)?\s*(?:united kingdom|london|seattle|rochester|bristol|suva|fiji|punjab|bihar|india|remote|hybrid|onsite|wa|ny|ri|uk|usa)\b', re.I)
 DATE_LINE_RE = re.compile(r'^\W*(?:[£E\d]{1,3}\s*)?(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\s*[-–—to]+\s*(?:(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}|Present|Current|Ongoing)\W*$', re.I)
 
-ROLE_KEYWORDS = re.compile(r'\b(?:engineer|developer|president|founder|ceo|cto|lead|associate|manager|intern|analyst|consultant|scientist|specialist|architect|co-founder|head|director|coordinator|officer|contributor|trainee|tutor|editor|designer|assistant)\b', re.I)
+ROLE_KEYWORDS = re.compile(r'\b(?:engineer|developer|president|founder|ceo|cto|lead|associate|manager|intern|analyst|consultant|scientist|specialist|architect|co-founder|head|director|coordinator|officer|contributor|trainee|tutor|editor|designer|assistant|assstant|marketing\s+streat\b|marketing\s+street\b|street\s+team\b|team\s+ate\b|team\s+associate\b|streat\s+tears\b|chief\s+operating\s+officer\b|vice\s+president\b|technical\s+advisor\b|techmical\s+support\b|technical\s+support\b)\b', re.I)
 ORG_KEYWORDS = re.compile(r'\b(?:inc|llc|ltd|corp|corporation|solutions|technologies|systems|university|college|school|magazine|associates|lab|labs|verbinden|kit|asha|agency)\b|\bzipcar', re.I)
 DATE_PATTERN = re.compile(r'\b(?:19|20)\d{2}\b')
 
 def _is_noise_or_contact(text):
     clean = re.sub(r'^\W+', '', text).strip()
     if not clean: return True
-    if clean.endswith(('—', '–', '-')) or clean.lower() in ('pre—', 'pre-'): return True
+    if clean.endswith(('—', '–', '-')) or clean.lower() in ('pre—', 'pre-', 'cowbpovnont'): return True
     if '@' in clean or re.search(r'\|\s*\d{8,}', clean) or clean.lower().startswith(('wee:', 'web:', 'mail:', 'email:')): return True
     if DATE_PATTERN.search(clean): return False
     if len(re.sub(r'[^a-zA-Z]', '', clean)) < 2: return True
@@ -30,19 +30,31 @@ def _entries(content,section):
         is_loc = bool(LOCATION_LINE_RE.search(text)) and not (ORG_KEYWORDS.search(text) or ROLE_KEYWORDS.search(text))
         is_date = bool(DATE_LINE_RE.match(text)) or bool(DATE_PATTERN.search(text) and ('-' in text or '–' in text or '—' in text))
 
-        is_sentence = bool(re.match(r'^(?:and|for|with|while|the|in|at|by|to|from|of|ted|using|developed|designed|managed|created|utilized|assisted|collaborated)\s+', text, re.I)) or (text.endswith('.') and not text.lower().endswith(('inc.', 'ltd.', 'co.', 'corp.', 'dept.')))
+        is_sentence = bool(re.match(r'^(?:and|for|with|while|the|in|at|by|to|from|of|ted|using|developed|designed|managed|created|utilized|assisted|collaborated|architected|spearheaded|automated|integrated)\s+', text, re.I)) or (text.endswith('.') and not text.lower().endswith(('inc.', 'ltd.', 'co.', 'corp.', 'dept.')))
         has_pipe = ' | ' in text and not is_bullet
         has_org = (bool(ORG_KEYWORDS.search(text)) or bool(re.match(r'^[A-Z0-9\s&,\.\-]{4,60}$', text))) and not is_bullet and not is_loc and not is_sentence and (len(text.split()) >= 2 or bool(ORG_KEYWORDS.search(text))) and len(text.split()) <= 6
         has_role = bool(ROLE_KEYWORDS.search(text)) and not is_bullet and not is_sentence and len(text.split()) <= 6
 
+        is_sub_bullet = bool(re.match(r'^[◦·\s]*:', text)) or '◦:' in text
+        is_bullet_header = is_bullet and not is_sub_bullet and not is_sentence and not is_loc and len(text.split()) <= 5
+        curr_has_dates = any(DATE_PATTERN.search(l.text) and ('-' in l.text or '–' in l.text or '—' in l.text) for l in chunk)
         current_has_org = any(ORG_KEYWORDS.search(l.text) or (re.match(r'^[A-Z0-9\s&,\.\-]{4,60}$', l.text) and len(l.text.split()) <= 6 and not LOCATION_LINE_RE.search(l.text)) for l in chunk)
 
+        # For projects: A bullet with project title pattern, or a short non-bullet title line after previous description
+        is_proj_bullet_title = (section == 'projects' and is_bullet and not is_sentence and bool(re.match(r'^(?:[-•*»©°«+·◦–—]|\d+\.)\s*([A-Za-z0-9\s&/\-]{2,30})\s*[:\(]', text)) and len(re.match(r'^(?:[-•*»©°«+·◦–—]|\d+\.)\s*([A-Za-z0-9\s&/\-]{2,30})\s*[:\(]', text).group(1).split()) <= 3)
+        is_proj_short_title = (section == 'projects' and not is_bullet and not is_sentence and not is_date and len(text.split()) <= 6 and len(chunk) >= 1)
+
         # A new position begins when a fresh date range appears, or a company appears when current chunk already has one
-        is_new_entry = chunk and not is_bullet and not is_loc and (
-            is_date or
-            has_pipe or
-            (has_org and current_has_org) or
-            (section == 'projects' and has_role and chunk)
+        is_new_entry = chunk and not is_loc and (
+            is_proj_bullet_title or
+            is_proj_short_title or
+            (is_bullet_header and (current_has_org or any(ROLE_KEYWORDS.search(l.text) for l in chunk) or curr_has_dates)) or
+            (not is_bullet and (
+                (is_date and curr_has_dates) or
+                has_pipe or
+                (has_org and current_has_org) or
+                (section == 'projects' and has_role and chunk)
+            ))
         )
         if is_new_entry:
             entries.append(chunk);chunk=[]
@@ -57,6 +69,20 @@ def _is_plausible_org(org_name: str) -> bool:
         return False
     return True
 
+def _clean_role(raw: str) -> str:
+    r = raw.strip(' •*-«+»')
+    if re.search(r'\bmarketing\s+streat\b|\bmarketing\s+street\b|\bstreat\s+tears\b', r, re.I):
+        return 'Marketing Street Team Associate'
+    if re.search(r'\bweb\s+&\s+graph', r, re.I):
+        return 'Web & Graphic Designer'
+    if re.search(r'\btechmical\s+support|\btechnical\s+support', r, re.I):
+        return 'Technical Support Assistant'
+    if re.search(r'\b(?:spl\s+)?web\s+developer\b', r, re.I):
+        return 'Web Developer'
+    if re.search(r'\bexecutive\s+editor\b', r, re.I):
+        return 'Executive Editor'
+    return r
+
 def extract_experience(content,groups):
     for chunk in _entries(content,'experience'):
         if not chunk: continue
@@ -64,20 +90,22 @@ def extract_experience(content,groups):
         fields = {}
 
         # Look for explicit role line
-        role_line = next((l for l in chunk if ROLE_KEYWORDS.search(l.text) and not bool(BULLET_PREFIX_RE.match(l.text))), None)
+        role_line = next((l for l in chunk if ROLE_KEYWORDS.search(l.text) and not bool(re.match(r'^[◦·\s]*:', l.text)) and not bool(re.match(r'^(?:and|for|with|while)\s+', l.text, re.I))), None)
         # Look for organization line
         org_line = None
         for l in chunk:
-            if l == role_line or bool(BULLET_PREFIX_RE.match(l.text)): continue
-            if re.search(r'\b(?:at|@)\s+([\w &.\-]+)', l.text, re.I):
+            if l == role_line: continue
+            clean_l = l.text.strip(' •*-')
+            if bool(re.match(r'^[◦·\s]*:', clean_l)) or clean_l.endswith('.'): continue
+            if re.search(r'\b(?:at|@)\s+([\w &.\-]+)', clean_l, re.I):
                 org_line = l
                 break
-            clean_l = l.text.strip(' •*-')
             if (ORG_KEYWORDS.search(clean_l) or re.match(r'^[A-Z0-9\s&,\.\-]{4,60}$', clean_l)) and not LOCATION_LINE_RE.search(clean_l):
                 org_line = l
                 break
-            if not years(l.text)[0] and len(clean_l) < 80 and not org_line and not LOCATION_LINE_RE.search(clean_l) and clean_l[0].isupper() and _is_plausible_org(clean_l):
+            if not DATE_PATTERN.search(clean_l) and len(clean_l) < 80 and not org_line and not LOCATION_LINE_RE.search(clean_l) and clean_l and clean_l[0].isupper() and _is_plausible_org(clean_l):
                 org_line = l
+                break
 
         job_title = None
         organization = None
@@ -85,14 +113,14 @@ def extract_experience(content,groups):
         if ' | ' in head.text:
             bits = head.text.split(' | ')
             if ROLE_KEYWORDS.search(bits[0]):
-                job_title = (bits[0].strip(), head, .85)
+                job_title = (_clean_role(bits[0]), head, .85)
                 organization = (bits[1].strip(), head, .80)
             else:
                 organization = (bits[0].strip(), head, .85)
-                job_title = (bits[1].strip(), head, .80)
+                job_title = (_clean_role(bits[1]), head, .80)
         else:
             if role_line:
-                job_title = (role_line.text.strip(' •*-'), role_line, .82)
+                job_title = (_clean_role(role_line.text), role_line, .82)
             if org_line:
                 clean_org = org_line.text.strip(' •*-')
                 if match := re.search(r'(?:at|@)\s+([\w &.\-]+)', clean_org, re.I):
@@ -103,7 +131,7 @@ def extract_experience(content,groups):
                 clean_head = head.text.strip(' •*-')
                 if len(clean_head) >= 3 and not BULLET_PREFIX_RE.match(head.text):
                     if ROLE_KEYWORDS.search(clean_head):
-                        job_title = (clean_head, head, .70)
+                        job_title = (_clean_role(clean_head), head, .70)
                     elif ORG_KEYWORDS.search(clean_head) and _is_plausible_org(clean_head):
                         organization = (clean_head, head, .70)
 
@@ -136,7 +164,8 @@ def extract_experience(content,groups):
             if b: fields['end_date'] = (b, l, .80)
             if re.search(r'\bpresent|current\b', l.text, re.I): fields['current_position'] = ('stated current', l, .80)
             if l != head and l != role_line and l != org_line and len(clean_text) > 20:
-                fields.setdefault('responsibility', (clean_text, l, .66))
+                if not LOCATION_LINE_RE.search(clean_text) and not clean_text.startswith(('(', 'Q)', '§)')):
+                    fields.setdefault('responsibility', (clean_text, l, .66))
             if METRIC.search(l.text): fields['outcome'] = (clean_text, l, .75)
             s = detect_skills(l.text)
             if s: fields['technologies'] = (', '.join(s), l, .77)
@@ -144,33 +173,62 @@ def extract_experience(content,groups):
 
 def extract_internships(content,groups):
     for chunk in _entries(content,'internships'):
-        head=chunk[0]; fields={'program':(head.text,head,.75)}
-        if ' | ' in head.text:
-            split=head.text.split(' | ')
-            fields['role']=(split[0],head,.76)
-            fields['provider']=(split[1],head,.70)
+        head=chunk[0]
+        clean_head = head.text.strip(' •*-«+»')
+        prog_name = re.sub(r'\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*(?:19|20)\d{2}\b.*$', '', clean_head, flags=re.I).strip()
+        fields={'program':(prog_name or clean_head, head, .75), 'provider': (prog_name or clean_head, head, .80)}
+        if ' | ' in clean_head:
+            split=clean_head.split(' | ')
+            fields['role']=(_clean_role(split[0]),head,.76)
+            fields['provider']=(split[1].strip(),head,.80)
+        else:
+            role_l = next((l for l in chunk[1:] if ROLE_KEYWORDS.search(l.text) and len(l.text.split()) <= 7), None)
+            if role_l:
+                fields['role'] = (_clean_role(role_l.text), role_l, .80)
         for l in chunk:
             a,b=years(l.text)
             if a: fields.setdefault('start_date',(a,l,.78))
             if b: fields['end_date']=(b,l,.78)
             if m:=re.search(r'\b\d+\s*(?:weeks?|months?)\b',l.text,re.I): fields['duration']=(m.group(0),l,.89)
             if re.search(r'completed|in progress|ongoing',l.text,re.I):fields['completion_status']=(l.text,l,.68)
-            if l!=head and len(l.text)>22: fields.setdefault('responsibility',(l.text,l,.66))
+            if l!=head and (not fields.get('role') or l.text!=fields['role'][0]) and len(l.text)>22:
+                fields.setdefault('responsibility',(l.text.strip(' •*-«+»'),l,.66))
             if skills:=detect_skills(l.text): fields['technologies']=(', '.join(skills),l,.78)
         add(groups,'internships',fields)
 
 def extract_projects(content,groups):
     for chunk in _entries(content,'projects'):
-        head=chunk[0];title=re.sub(r'^\s*[-•*]\s*','',head.text).strip()
-        if not title or title.lower() in ('projects','selected projects'):continue
-        fields={'title':(title.split(' | ')[0],head,.83)}
-        desc=next((l for l in chunk[1:] if len(l.text)>=22),None)
-        if desc: fields['description']=(desc.text,desc,.67)
+        head=chunk[0]; raw_head=re.sub(r'^\s*[-•*»©°«+·◦–—]\s*','',head.text).strip()
+        if not raw_head or raw_head.lower() in ('projects','selected projects'):continue
+
+        title = raw_head
+        inline_desc = ''
+        m = re.match(r'^([^:(]+?)\s*(?:\([^)]+\))?\s*:\s*(.*)$', raw_head)
+        if m:
+            t_cand = m.group(1).strip()
+            d_cand = m.group(2).strip()
+            if 'client work' in t_cand.lower() and '(' in raw_head:
+                cw_m = re.match(r'^([^:]+):\s*(.*)$', raw_head)
+                if cw_m:
+                    title, inline_desc = cw_m.group(1).strip(), cw_m.group(2).strip()
+            else:
+                title, inline_desc = t_cand, d_cand
+        elif ' | ' in raw_head:
+            parts = raw_head.split(' | ')
+            title, inline_desc = parts[0].strip(), parts[1].strip()
+
+        fields={'title':(title, head, .85)}
+        desc_line = next((l for l in chunk[1:] if len(l.text)>=22), None)
+        full_desc = ' '.join(filter(None, [inline_desc, desc_line.text if desc_line else ''])).strip()
+        if full_desc:
+            fields['description'] = (full_desc, desc_line or head, .70)
+
         skills=[]
         for l in chunk:
             skills.extend(s for s in detect_skills(l.text) if s not in skills)
-            if METRIC.search(l.text): fields['outcome']=(l.text,l,.76)
-            if re.search(r'\b(?:lead|built|developed|designed|implemented)\b',l.text,re.I):fields.setdefault('contribution',(l.text,l,.67))
+            if METRIC.search(l.text): fields['outcome']=(l.text.strip(' •*-«+»'),l,.76)
+            if re.search(r'\b(?:lead|built|developed|designed|implemented|architected)\b',l.text,re.I):
+                fields.setdefault('contribution',(l.text.strip(' •*-«+»'),l,.67))
             a,b=years(l.text)
             if a:fields.setdefault('start_date',(a,l,.71))
             if b:fields['end_date']=(b,l,.71)
@@ -183,7 +241,7 @@ def extract_projects(content,groups):
 
 def extract_awards(content,groups):
     for line in lines_of(content,'awards'):
-        t=line.text.lstrip(' -•*')
+        t=line.text.lstrip(' -•*»')
         if len(t)<4:continue
         fields={'name':(t,line,.78)}
         if re.search(r'participated|participant',t,re.I):fields['participation_status']=('participant',line,.85)
@@ -194,23 +252,73 @@ def extract_awards(content,groups):
         add(groups,'awards',fields)
 
 def extract_certifications(content,groups):
-    for line in lines_of(content,'certifications'):
-        t=line.text.lstrip(' -•*')
-        if len(t)<4: continue
+    seq = lines_of(content, 'certifications')
+    if not seq: return
+    chunks = []; current = []
+    for line in seq:
+        text = line.text.strip()
+        is_bullet = bool(BULLET_PREFIX_RE.match(text))
+        has_date_only = bool(re.match(r'^\W*(?:[£E\d]{1,3}\s*)?(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\W*$', text, re.I)) or bool(re.match(r'^\W*[\d]{1,2}/(?:19|20)\d{2}\W*$', text))
+        has_known_cert = bool(re.search(r'\b(?:certificate|certification|certified|bootcamp|course|licen[sc]e|specialization)\b', text, re.I))
+        curr_has_title = any(re.search(r'\b(?:certificate|certification|certified|bootcamp|course|licen[sc]e|specialization|python|ai|azure|aws|oracle)\b', l.text, re.I) for l in current)
+
+        is_new = current and (
+            (is_bullet and len(current) >= 1) or
+            (has_known_cert and curr_has_title and not has_date_only)
+        )
+        if is_new:
+            chunks.append(current)
+            current = []
+        current.append(line)
+    if current: chunks.append(current)
+
+    for chunk in chunks:
+        title_line = None
+        issuer_line = None
+        for l in chunk:
+            t = l.text.strip(' -•*©«»')
+            is_date_only = bool(re.search(r'[\d]{1,2}/(?:19|20)\d{2}', t) and len(t) <= 14) or bool(re.match(r'^\W*(?:[£E\d]{1,3}\s*)?(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\W*$', t, re.I)) or (len(re.sub(r'[^a-zA-Z]', '', t)) < 3)
+            if is_date_only:
+                continue
+            elif re.search(r'(?:Coursera|Udemy|AWS|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation|The Chartered Institute for IT|BCS|Society|Association|Academy|Institute|University)', t, re.I) and not re.search(r'\b(?:certificate|certified|course|specialization)\b', t, re.I):
+                issuer_line = l
+            elif re.search(r'\b(?:certificate|certification|certified|bootcamp|course|licen[sc]e|specialization|foundations|fundamentals)\b', t, re.I):
+                title_line = l
+            elif not title_line and len(t) >= 4:
+                title_line = l
+            elif not issuer_line and len(t) >= 4:
+                issuer_line = l
+
+        if not title_line:
+            # Fall back to first non-date line if available
+            title_line = next((l for l in chunk if len(re.sub(r'[^a-zA-Z]', '', l.text)) >= 3), chunk[0])
+
+        t = title_line.text.strip(' -•*©«»')
         parts = [p.strip() for p in t.split('|')]
         title = parts[0]
         issuer = parts[1] if len(parts) > 1 else None
-        if not issuer:
-            known = re.search(r'(?:Coursera|Udemy|AWS|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation)', t, re.I)
-            if known: issuer = known.group(0)
 
-        fields={'title':(title,line,.82)}
+        if not issuer and issuer_line:
+            issuer = issuer_line.text.strip(' -•*©«»')
+
+        if not issuer:
+            for l in chunk:
+                known = re.search(r'(?:Coursera|Udemy|AWS|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation|The Chartered Institute for IT|BCS)', l.text, re.I)
+                if known:
+                    issuer = known.group(0)
+                    break
+
+        fields = {'title': (title, title_line, .82)}
         if issuer:
             issuer_clean = re.sub(r'\b(?:19|20)\d{2}\b', '', issuer).strip(' -•*,')
-            if issuer_clean: fields['issuer'] = (issuer_clean, line, .78)
-        if re.search(r'completed|earned|issued',t,re.I):fields['completion_status']=(t,line,.74)
-        a,b=years(t)
-        if a:fields['issue_date']=(a,line,.75)
-        if b:fields['expiry_date']=(b,line,.69)
-        if skills:=detect_skills(t): fields['skills']=(', '.join(skills),line,.72)
-        add(groups,'certifications',fields)
+            if issuer_clean: fields['issuer'] = (issuer_clean, issuer_line or title_line, .78)
+
+        for l in chunk:
+            if re.search(r'completed|earned|issued', l.text, re.I):
+                fields['completion_status'] = (l.text.strip(), l, .74)
+            a, b = years(l.text)
+            if a and 'issue_date' not in fields: fields['issue_date'] = (a, l, .75)
+            if b: fields['expiry_date'] = (b, l, .69)
+            if skills := detect_skills(l.text):
+                fields['skills'] = (', '.join(skills), l, .72)
+        add(groups, 'certifications', fields)

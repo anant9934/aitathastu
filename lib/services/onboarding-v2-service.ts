@@ -482,5 +482,14 @@ export async function completeOnboarding(personId: string, input: unknown) {
   draft.completed = true;
   draft.stage = "reveal";
   await writeOnboardingDraft(personId, draft);
+
+  // Stage B — Background enrichment:
+  // Queue eligible external source synchronization with bounded concurrency asynchronously.
+  // The immediate first dashboard (Stage A) renders right away without waiting for external API latency.
+  const { syncAllFootprints } = await import("@/lib/sync/footprint-sync");
+  void syncAllFootprints(personId, "user").catch(() => {
+    // Non-blocking background sync error; never blocks onboarding completion
+  });
+
   return draft;
 }

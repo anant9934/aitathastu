@@ -923,8 +923,39 @@ export class DigitalSourceImportOrchestrator {
               });
             }
 
-            rawSnapshotPayload = meta as unknown as Record<string, unknown>;
-            summary = `Verified portfolio website (${meta.title || meta.url}) with ${meta.discoveredProjects.length} candidate projects.`;
+            let firecrawlResult = null;
+            try {
+              const { enrichWebsiteWithFirecrawl } = await import("@/lib/connectors/firecrawl/client");
+              firecrawlResult = await enrichWebsiteWithFirecrawl(profileUrl);
+            } catch {
+              // Graceful fallback to lightweight reader; Firecrawl errors never fail the import
+            }
+
+            if (firecrawlResult && firecrawlResult.projects.length > 0) {
+              for (const fp of firecrawlResult.projects) {
+                if (!candidates.projects.some((p) => p.title.toLowerCase() === fp.title.toLowerCase() || (p.url && fp.url && p.url === fp.url))) {
+                  candidates.projects.push({
+                    title: fp.title,
+                    description: fp.description,
+                    technologies: fp.technologies || [],
+                    url: fp.url || meta.url,
+                    source: "portfolio_firecrawl",
+                  });
+                }
+              }
+              for (const t of firecrawlResult.technologies) {
+                if (!candidates.skills.some((s) => s.name.toLowerCase() === t.toLowerCase())) {
+                  candidates.skills.push({
+                    name: t,
+                    sourceReference: meta.url,
+                    confidence: "portfolio_mention",
+                  });
+                }
+              }
+            }
+
+            rawSnapshotPayload = { ...meta, firecrawl: firecrawlResult } as unknown as Record<string, unknown>;
+            summary = `Verified portfolio website (${meta.title || meta.url}) with ${candidates.projects.length} candidate projects${firecrawlResult ? " (enriched via Firecrawl)" : ""}.`;
           } catch (err: unknown) {
             acquisitionMode = "MANUAL_PROFILE_REFERENCE";
             await saveExternalConnection({

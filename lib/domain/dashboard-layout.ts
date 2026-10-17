@@ -10,7 +10,7 @@
  */
 import type { CanonicalInterest } from "./personalization-engine";
 
-export type FootprintSource = "github" | "linkedin" | "leetcode" | "hackerrank" | "kaggle" | "scholar";
+export type FootprintSource = "github" | "linkedin" | "leetcode" | "hackerrank" | "kaggle" | "scholar" | "stackoverflow" | "portfolio";
 
 export type DashboardLayoutInput = {
   primary: CanonicalInterest;
@@ -60,16 +60,17 @@ export type DashboardLayout = {
 
 const LABEL: Record<FootprintSource, string> = {
   github: "GitHub", linkedin: "LinkedIn", leetcode: "LeetCode", hackerrank: "HackerRank", kaggle: "Kaggle", scholar: "Research papers",
+  stackoverflow: "Stack Overflow", portfolio: "Portfolio / Website",
 };
 
 /** How much each focus values each source (0-3). */
 const WEIGHTS: Record<CanonicalInterest, Partial<Record<FootprintSource, number>>> = {
-  learning: { leetcode: 3, hackerrank: 3, github: 2, kaggle: 1 },
-  jobs: { github: 3, linkedin: 3, leetcode: 2, hackerrank: 2, kaggle: 1 },
-  projects: { github: 3, kaggle: 2, linkedin: 1 },
+  learning: { leetcode: 3, hackerrank: 3, github: 2, stackoverflow: 2, kaggle: 1 },
+  jobs: { github: 3, linkedin: 3, portfolio: 3, leetcode: 2, hackerrank: 2, stackoverflow: 1, kaggle: 1 },
+  projects: { github: 3, portfolio: 3, kaggle: 2, stackoverflow: 1, linkedin: 1 },
   research_events: { scholar: 3, kaggle: 2, github: 1 },
-  collaboration: { linkedin: 3, github: 2, kaggle: 1 },
-  people: { linkedin: 3, github: 1, scholar: 1 },
+  collaboration: { linkedin: 3, github: 2, portfolio: 2, kaggle: 1 },
+  people: { linkedin: 3, portfolio: 2, github: 1, scholar: 1 },
 };
 
 const WHY: Record<CanonicalInterest, string> = {

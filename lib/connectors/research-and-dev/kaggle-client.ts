@@ -38,6 +38,32 @@ export class KaggleFetchError extends Error {
   }
 }
 
+export function getKaggleCapacity(): { configured: boolean; capacity: number } {
+  let count = 0;
+  if (process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) count++;
+  for (let i = 1; i <= 3; i++) {
+    if (process.env[`KAGGLE_USERNAME_${i}`] && process.env[`KAGGLE_KEY_${i}`]) count++;
+  }
+  return { configured: count > 0, capacity: count };
+}
+
+let platformKaggleIndex = 0;
+export function getPlatformKaggleCredential(): { username: string; key: string } | null {
+  const pairs: Array<{ username: string; key: string }> = [];
+  if (process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) {
+    pairs.push({ username: process.env.KAGGLE_USERNAME.trim(), key: process.env.KAGGLE_KEY.trim() });
+  }
+  for (let i = 1; i <= 3; i++) {
+    const u = process.env[`KAGGLE_USERNAME_${i}`];
+    const k = process.env[`KAGGLE_KEY_${i}`];
+    if (u && k) pairs.push({ username: u.trim(), key: k.trim() });
+  }
+  if (pairs.length === 0) return null;
+  const picked = pairs[platformKaggleIndex % pairs.length];
+  platformKaggleIndex++;
+  return picked;
+}
+
 export function normalizeKaggleHandle(input: string): string {
   return input.trim().replace(/^https?:\/\/(www\.)?kaggle\.com\//i, "").split(/[/?#]/)[0].toLowerCase();
 }
@@ -48,7 +74,17 @@ export async function fetchKaggleArtifacts(rawHandle: string, opts: { apiKey?: s
   const username = normalizeKaggleHandle(rawHandle);
   if (!/^[a-z0-9_-]{2,40}$/.test(username)) throw new KaggleFetchError("Invalid Kaggle username.", 400);
   const headers: Record<string, string> = { Accept: "application/json", "User-Agent": "AI-Tathastu-ProfileAuditor/1.0" };
-  const auth: Record<string, string> = opts.apiKey ? { Authorization: `Basic ${Buffer.from(`${username}:${opts.apiKey}`).toString("base64")}` } : {};
+  
+  // Use student's personal key if provided; otherwise use platform service credential for public query
+  let auth: Record<string, string> = {};
+  if (opts.apiKey) {
+    auth = { Authorization: `Basic ${Buffer.from(`${username}:${opts.apiKey}`).toString("base64")}` };
+  } else {
+    const plat = getPlatformKaggleCredential();
+    if (plat) {
+      auth = { Authorization: `Basic ${Buffer.from(`${plat.username}:${plat.key}`).toString("base64")}` };
+    }
+  }
 
   const ds = await connectorFetch("kaggle", `https://www.kaggle.com/api/v1/datasets/list?user=${encodeURIComponent(username)}&page=1`, {
     correlationId: opts.correlationId, headers: { ...headers, ...auth },

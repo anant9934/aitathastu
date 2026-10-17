@@ -84,6 +84,8 @@ export interface StackOverflowProfile {
   displayName?: string;
   reputation: number;
   badgeCounts?: { bronze: number; silver: number; gold: number };
+  questionsCount?: number;
+  answersCount?: number;
   topTags?: Array<{ tagName: string; answerCount: number; questionCount: number }>;
   status: "LIVE_VERIFIED" | "PROFILE_LINK_ONLY" | "UNAVAILABLE";
   retrievedAt: string;
@@ -427,8 +429,16 @@ export async function fetchDevToArticles(rawInput: string): Promise<DevToArticle
   };
 }
 
+let soBackoffUntil = 0;
+
+export function getStackExchangeCapacity(): { configured: boolean; capacity: number } {
+  const key = process.env.STACKEXCHANGE_API_KEY || process.env.STACK_EXCHANGE_API_KEY;
+  return { configured: Boolean(key && key.trim()), capacity: key && key.trim() ? 1 : 0 };
+}
+
 /**
  * Queries public Stack Overflow reputation, badges and top tags.
+ * Respects Stack Exchange API v2.3 backoff requirements and supports optional API key.
  */
 export async function fetchStackOverflowProfile(rawInput: string): Promise<StackOverflowProfile> {
   const cleaned = rawInput.trim();
@@ -448,13 +458,27 @@ export async function fetchStackOverflowProfile(rawInput: string): Promise<Stack
     };
   }
 
+  if (Date.now() < soBackoffUntil) {
+    return {
+      userId,
+      profileUrl,
+      reputation: 0,
+      status: "PROFILE_LINK_ONLY",
+      retrievedAt: now,
+      notes: "Stack Exchange API cooling down per provider backoff requirement.",
+    };
+  }
+
+  const key = process.env.STACKEXCHANGE_API_KEY || process.env.STACK_EXCHANGE_API_KEY;
+  const keyParam = key && key.trim() ? `&key=${encodeURIComponent(key.trim())}` : "";
+
   try {
     const [userRes, tagsRes] = await Promise.all([
-      fetch(`https://api.stackexchange.com/2.3/users/${userId}?site=stackoverflow`, {
+      fetch(`https://api.stackexchange.com/2.3/users/${userId}?site=stackoverflow${keyParam}`, {
         headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-SOAuditor/1.0" },
         signal: AbortSignal.timeout(5000),
       }),
-      fetch(`https://api.stackexchange.com/2.3/users/${userId}/top-tags?site=stackoverflow`, {
+      fetch(`https://api.stackexchange.com/2.3/users/${userId}/top-tags?site=stackoverflow${keyParam}`, {
         headers: { Accept: "application/json", "User-Agent": "AI-Tathastu-SOAuditor/1.0" },
         signal: AbortSignal.timeout(5000),
       }).catch(() => null),
@@ -462,11 +486,17 @@ export async function fetchStackOverflowProfile(rawInput: string): Promise<Stack
 
     if (userRes.ok) {
       const data = await userRes.json();
+      if (typeof data.backoff === "number") {
+        soBackoffUntil = Date.now() + data.backoff * 1000;
+      }
       const user = data.items?.[0];
       if (user) {
         let topTags: Array<{ tagName: string; answerCount: number; questionCount: number }> | undefined = undefined;
         if (tagsRes && tagsRes.ok) {
           const tagsData = await tagsRes.json();
+          if (typeof tagsData.backoff === "number") {
+            soBackoffUntil = Math.max(soBackoffUntil, Date.now() + tagsData.backoff * 1000);
+          }
           if (Array.isArray(tagsData.items)) {
             topTags = tagsData.items.slice(0, 10).map((t: any) => ({
               tagName: String(t.tag_name),
@@ -482,6 +512,8 @@ export async function fetchStackOverflowProfile(rawInput: string): Promise<Stack
           displayName: user.display_name,
           reputation: Number(user.reputation) || 0,
           badgeCounts: user.badge_counts,
+          questionsCount: typeof user.question_count === "number" ? user.question_count : undefined,
+          answersCount: typeof user.answer_count === "number" ? user.answer_count : undefined,
           topTags,
           status: "LIVE_VERIFIED",
           retrievedAt: now,

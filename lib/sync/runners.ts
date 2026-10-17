@@ -24,7 +24,7 @@ export const SYNC_RUNNERS: Partial<Record<SyncSource, Runner>> = {
     return typeof prepared === "function" ? prepared : { error: prepared.error || "GitHub cannot be synced right now." };
   },
   // Footprint sources resolve lazily, so the retry cron needs no extra imports.
-  ...Object.fromEntries((["leetcode", "hackerrank", "kaggle", "scholar"] as const).map((source) => [source, async (personId: string) => {
+  ...Object.fromEntries((["leetcode", "hackerrank", "kaggle", "scholar", "stackoverflow", "portfolio"] as const).map((source) => [source, async (personId: string) => {
     const { resolveFootprintTarget } = await import("./footprint-sync");
     const target = await resolveFootprintTarget(personId, source);
     return target ? target.run : { error: `${source} is not connected.` };
@@ -144,6 +144,8 @@ export function describeFound(source: string, result: unknown): string | null {
     case "kaggle": return n("datasets") !== null ? `${plural(n("datasets")!, "dataset")}, ${plural(n("notebooks") ?? 0, "notebook")}` : null;
     case "leetcode": return n("totalSolved") !== null ? `${n("totalSolved")} problems solved` : null;
     case "hackerrank": return n("badges") !== null ? plural(n("badges")!, "badge") : null;
+    case "stackoverflow": return n("reputation") !== null ? `${n("reputation")} reputation` : null;
+    case "portfolio": return n("projects") !== null ? `${plural(n("projects")!, "project")} found` : null;
     default: return null;
   }
 }

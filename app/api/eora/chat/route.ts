@@ -84,6 +84,8 @@ export async function POST(req: Request) {
     const codechefEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("codechef"));
     const hackerrankBadges = (person360.evidence || []).filter((e) => e.subject.toLowerCase().includes("hackerrank"));
     const kaggleArtifacts = (person360.projects || []).filter((p) => (p.sources || []).includes("kaggle"));
+    const stackoverflowEvidence = (person360.evidence || []).find((e) => e.subject.toLowerCase().includes("stackoverflow") || (e.sourceReference && e.sourceReference.includes("stackoverflow.com")));
+    const portfolioProjects = (person360.projects || []).filter((p) => (p.sources || []).includes("portfolio"));
 
     // 1. RAG Knowledge Retrieval over Canonical AI/ML Knowledge Base
     const ragBundle = retrieveKnowledge({
@@ -114,6 +116,8 @@ GROUNDING RULES:
    - GitHub Projects: ${wrapUntrustedContent("github_projects", githubProjects.join(", ") || "None")}
    - Hugging Face Models: ${wrapUntrustedContent("hf_models", hfModels.join(", ") || "None")}
    - Kaggle Artifacts: ${wrapUntrustedContent("kaggle_artifacts", kaggleArtifacts.map((k) => k.title).join(", ") || "None")}
+   - Stack Overflow Activity: ${wrapUntrustedContent("stackoverflow_activity", stackoverflowEvidence ? `${stackoverflowEvidence.subject}: ${stackoverflowEvidence.value}` : "None")}
+   - Portfolio Projects: ${wrapUntrustedContent("portfolio_projects", portfolioProjects.map((p) => p.title).join(", ") || "None")}
    - LeetCode Evidence: ${wrapUntrustedContent("leetcode_evidence", leetcodeEvidence ? `${leetcodeEvidence.subject}: ${leetcodeEvidence.value}` : "None")}
    - CodeChef Evidence: ${wrapUntrustedContent("codechef_evidence", codechefEvidence ? `${codechefEvidence.subject}: ${codechefEvidence.value}` : "None")}
    - HackerRank Badges: ${wrapUntrustedContent("hackerrank_badges", hackerrankBadges.map((b) => b.subject).join(", ") || "None")}

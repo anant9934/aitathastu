@@ -25,6 +25,8 @@ export const SOURCE_SYNC_POLICY: Record<SyncSource, {
   // One automated login attempt per run; the 14-day cooldown is never bypassed.
   linkedin:   { ttlMs: 14 * DAY, manualBypassesTtl: false, maxAttempts: 1, attemptTimeoutMs: 120_000 },
   resume:     { ttlMs: 0,        manualBypassesTtl: true,  maxAttempts: 3, attemptTimeoutMs: 60_000 },
+  stackoverflow: { ttlMs: DAY,   manualBypassesTtl: true,  maxAttempts: 3, attemptTimeoutMs: 15_000 },
+  portfolio:  { ttlMs: DAY,      manualBypassesTtl: true,  maxAttempts: 2, attemptTimeoutMs: 20_000 },
 };
 
 /** Window in which identical "Sync Now" requests collapse into one operation. */

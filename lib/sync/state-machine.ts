@@ -4,7 +4,7 @@
  * these states through `transition()`; nothing writes ad-hoc status strings.
  */
 
-export const SYNC_SOURCES = ["resume", "github", "linkedin", "scholar", "kaggle", "leetcode", "hackerrank"] as const;
+export const SYNC_SOURCES = ["resume", "github", "linkedin", "scholar", "kaggle", "leetcode", "hackerrank", "stackoverflow", "portfolio"] as const;
 export type SyncSource = (typeof SYNC_SOURCES)[number];
 
 export const SOURCE_SYNC_STATES = [

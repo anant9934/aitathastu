@@ -17,6 +17,9 @@ import { fetchLeetCodeProfileStats } from "@/lib/connectors/leetcode/client";
 import { fetchHackerRankProfile } from "@/lib/connectors/coding-platforms/client";
 import { fetchKaggleArtifacts, KaggleFetchError } from "@/lib/connectors/research-and-dev/kaggle-client";
 import { fetchPublications, ScholarFetchError, type ScholarIdentifier } from "@/lib/connectors/research-and-dev/scholar-client";
+import { fetchStackOverflowProfile } from "@/lib/connectors/research-and-dev/client";
+import { fetchPortfolioMetadata } from "@/lib/connectors/portfolio/client";
+import { enrichWebsiteWithFirecrawl } from "@/lib/connectors/firecrawl/client";
 import { isServeFromCacheError } from "@/lib/connectors/rate-limiter";
 import { getExternalConnectionByProvider, getSourceSnapshots, saveSourceSnapshot } from "@/lib/repositories/connection-repository";
 import { writeEvidenceBatch, type EvidenceInsertParams } from "@/lib/repositories/evidence-repository";
@@ -25,7 +28,7 @@ import { decryptConnectionToken } from "@/lib/security/connection-token";
 import { isSyncDue } from "./policy";
 import { latestSyncOperations, runSyncOperation, SyncError, type SyncContext, type SyncTrigger, type SyncWorkResult } from "./sync-operation";
 
-export const FOOTPRINT_SOURCES = ["leetcode", "hackerrank", "kaggle", "scholar"] as const;
+export const FOOTPRINT_SOURCES = ["leetcode", "hackerrank", "kaggle", "scholar", "stackoverflow", "portfolio"] as const;
 export type FootprintSource = (typeof FOOTPRINT_SOURCES)[number];
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 80);
@@ -154,6 +157,135 @@ export async function scholarWork(personId: string, id: ScholarIdentifier, ctx: 
   return { outcome: "succeeded", result: { papers: papers.length, identifier: id.kind } };
 }
 
+// ── Stack Overflow ──────────────────────────────────────────────────────────
+export async function stackoverflowWork(personId: string, userId: string, ctx: SyncContext): Promise<SyncWorkResult> {
+  let so;
+  try {
+    so = await fetchStackOverflowProfile(userId);
+  } catch (error) {
+    if (isServeFromCacheError(error) || (error instanceof Error && error.name === "TimeoutError")) {
+      return cachedOrThrow(personId, "stackoverflow", userId, (error as Error).message, ctx);
+    }
+    throw error;
+  }
+  if (so.status === "PROFILE_LINK_ONLY") {
+    return cachedOrThrow(personId, "stackoverflow", userId, so.notes || "profile link only", ctx);
+  }
+  if (so.status === "UNAVAILABLE") {
+    throw new SyncError(so.notes || "Invalid Stack Overflow user ID.", "stackoverflow_invalid", false);
+  }
+  await saveSourceSnapshot(personId, "stackoverflow", so.userId, { ...so, correlationId: ctx.correlationId }, checksum(so));
+
+  const items: EvidenceInsertParams[] = [];
+  for (const tag of so.topTags ?? []) {
+    items.push(evidence("stackoverflow", {
+      category: "skill",
+      subject: tag.tagName,
+      value: `${tag.answerCount} answers`,
+      sourceReference: so.profileUrl,
+      importKey: `stackoverflow_tag_${slug(tag.tagName)}`,
+      interpretation: `Demonstrated public Q&A activity in ${tag.tagName} on Stack Overflow (${tag.answerCount} answers, ${tag.questionCount} questions).`,
+      whyItMatters: "Public community troubleshooting and Q&A answers corroborate hands-on technology familiarity.",
+    }));
+  }
+  if (so.reputation > 0) {
+    const badgeStr = so.badgeCounts
+      ? `${so.badgeCounts.gold} gold, ${so.badgeCounts.silver} silver, and ${so.badgeCounts.bronze} bronze badges`
+      : "community badges";
+    items.push(evidence("stackoverflow", {
+      category: "assessment",
+      subject: "Stack Overflow Reputation",
+      value: `${so.reputation} reputation`,
+      sourceReference: so.profileUrl,
+      importKey: "stackoverflow_reputation",
+      interpretation: `Earned ${so.reputation} reputation points on Stack Overflow across ${badgeStr}. Note: reputation indicates community participation, not formal certification.`,
+      whyItMatters: "Community reputation reflects peer recognition of helpful technical solutions.",
+    }));
+  }
+  await writeEvidenceBatch(personId, items);
+  const totalBadges = so.badgeCounts ? (so.badgeCounts.gold + so.badgeCounts.silver + so.badgeCounts.bronze) : 0;
+  return { outcome: "succeeded", result: { reputation: so.reputation, tags: so.topTags?.length ?? 0, badges: totalBadges, evidence: items.length } };
+}
+
+// ── Portfolio & Website ─────────────────────────────────────────────────────
+export async function portfolioWork(personId: string, portfolioUrl: string, ctx: SyncContext): Promise<SyncWorkResult> {
+  let meta;
+  try {
+    meta = await fetchPortfolioMetadata(portfolioUrl);
+  } catch (error) {
+    if (isServeFromCacheError(error) || (error instanceof Error && error.name === "TimeoutError")) {
+      return cachedOrThrow(personId, "portfolio", portfolioUrl, (error as Error).message, ctx);
+    }
+    throw new SyncError((error as Error).message, "portfolio_unreachable", false);
+  }
+
+  // Optional Firecrawl enrichment if enabled and safe
+  let firecrawlResult = null;
+  try {
+    firecrawlResult = await enrichWebsiteWithFirecrawl(portfolioUrl);
+  } catch {
+    // Graceful fallback to lightweight reader; Firecrawl failure never breaks portfolio sync
+  }
+
+  const combinedProjects = [...meta.discoveredProjects];
+  if (firecrawlResult && firecrawlResult.projects.length > 0) {
+    for (const fp of firecrawlResult.projects) {
+      if (!combinedProjects.some((cp) => cp.title.toLowerCase() === fp.title.toLowerCase() || (cp.url && fp.url && cp.url === fp.url))) {
+        combinedProjects.push({
+          title: fp.title,
+          description: fp.description,
+          url: fp.url,
+          technologies: fp.technologies,
+        });
+      }
+    }
+  }
+
+  const combinedTech = Array.from(new Set([...meta.technologies, ...(firecrawlResult?.technologies || [])]));
+
+  await saveSourceSnapshot(personId, "portfolio", portfolioUrl, { meta, firecrawl: firecrawlResult, correlationId: ctx.correlationId }, checksum({ meta, firecrawl: firecrawlResult }));
+
+  for (const p of combinedProjects) {
+    await saveProject(personId, {
+      title: p.title,
+      summary: "Portfolio Project",
+      description: p.description || `Discovered from personal portfolio ${portfolioUrl}`,
+      sources: ["portfolio"],
+      demoUrl: p.url || portfolioUrl,
+      technologies: p.technologies || [],
+      status: "candidate",
+      projectType: "software",
+    });
+  }
+
+  const items: EvidenceInsertParams[] = [];
+  for (const p of combinedProjects) {
+    items.push(evidence("portfolio", {
+      category: "project",
+      subject: p.title,
+      value: "Portfolio Project",
+      sourceReference: p.url || portfolioUrl,
+      importKey: `portfolio_project_${slug(p.title)}`,
+      interpretation: `Candidate project discovered from personal portfolio website: ${p.title}.`,
+      whyItMatters: "Projects documented on your public portfolio provide practical demonstrations of skills.",
+    }));
+  }
+  for (const tech of combinedTech.slice(0, 15)) {
+    items.push(evidence("portfolio", {
+      category: "skill",
+      subject: tech,
+      value: "Mentioned on Portfolio",
+      sourceReference: portfolioUrl,
+      importKey: `portfolio_tech_${slug(tech)}`,
+      interpretation: `Technology mentioned on personal portfolio website: ${tech}.`,
+      whyItMatters: "Portfolio technology mentions corroborate candidate skill claims.",
+    }));
+  }
+
+  await writeEvidenceBatch(personId, items);
+  return { outcome: "succeeded", result: { title: meta.title, projects: combinedProjects.length, technologies: combinedTech.length, enrichedWithFirecrawl: Boolean(firecrawlResult) } };
+}
+
 // ── wiring ─────────────────────────────────────────────────────────────────
 /** The connected handle/ID for a source, or null when the student hasn't added one (=> the source never runs). */
 export async function resolveFootprintTarget(personId: string, source: FootprintSource): Promise<{ run: (ctx: SyncContext) => Promise<SyncWorkResult> } | null> {
@@ -173,6 +305,8 @@ export async function resolveFootprintTarget(personId: string, source: Footprint
       if (!kind) return null;
       return { run: (ctx) => scholarWork(personId, { kind, value: conn.externalUsername }, ctx) };
     }
+    case "stackoverflow": return { run: (ctx) => stackoverflowWork(personId, conn.externalUsername, ctx) };
+    case "portfolio": return { run: (ctx) => portfolioWork(personId, conn.externalUsername, ctx) };
   }
 }
 

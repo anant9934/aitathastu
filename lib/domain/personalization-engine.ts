@@ -140,6 +140,129 @@ export function normalizeInterest(val?: string | null): CanonicalInterest {
   return "learning";
 }
 
+export const AIML_CORE_MODULES: Array<{
+  id: string;
+  title: string;
+  topics: string[];
+  roleMatches: string[];
+  provider: string;
+  duration: string;
+  level: string;
+  actionUrl: string;
+  actionLabel: string;
+}> = [
+  {
+    id: "python_aiml",
+    title: "Python for AI/ML",
+    topics: ["Python", "NumPy", "Pandas"],
+    roleMatches: ["exploring_aiml", "ml_engineer", "ai_engineer", "genai_engineer", "deep_learning_engineer", "data_scientist", "ai_researcher", "nlp_engineer", "computer_vision_engineer"],
+    provider: "Study LPU",
+    duration: "14 hours",
+    level: "Foundational",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Start",
+  },
+  {
+    id: "math_foundations",
+    title: "Mathematics Foundations",
+    topics: ["Linear Algebra", "Calculus", "Probability", "Statistics"],
+    roleMatches: ["ml_engineer", "ai_researcher", "deep_learning_engineer"],
+    provider: "Study LPU",
+    duration: "18 hours",
+    level: "Foundational",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Learn",
+  },
+  {
+    id: "machine_learning",
+    title: "Machine Learning",
+    topics: ["Machine Learning", "Scikit-Learn", "Regression", "Classification"],
+    roleMatches: ["ml_engineer", "ai_engineer", "data_scientist", "ai_researcher"],
+    provider: "Padho Code",
+    duration: "20 hours",
+    level: "Intermediate",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Practice",
+  },
+  {
+    id: "deep_learning",
+    title: "Deep Learning",
+    topics: ["Deep Learning", "PyTorch", "TensorFlow", "Neural Networks"],
+    roleMatches: ["deep_learning_engineer", "genai_engineer", "computer_vision_engineer", "nlp_engineer", "ai_researcher"],
+    provider: "Study LPU",
+    duration: "22 hours",
+    level: "Intermediate",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Start",
+  },
+  {
+    id: "nlp",
+    title: "NLP",
+    topics: ["NLP", "Transformers", "Tokenization", "BERT"],
+    roleMatches: ["nlp_engineer", "genai_engineer", "ai_researcher"],
+    provider: "Padho Code",
+    duration: "16 hours",
+    level: "Advanced",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Practice",
+  },
+  {
+    id: "computer_vision",
+    title: "Computer Vision",
+    topics: ["Computer Vision", "OpenCV", "CNNs", "YOLO"],
+    roleMatches: ["computer_vision_engineer", "deep_learning_engineer"],
+    provider: "Padho Code",
+    duration: "18 hours",
+    level: "Advanced",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Practice",
+  },
+  {
+    id: "generative_ai",
+    title: "Generative AI",
+    topics: ["Generative AI", "Diffusion Models", "Transformers", "Prompt Engineering"],
+    roleMatches: ["genai_engineer", "ai_engineer", "ai_researcher"],
+    provider: "Study LPU",
+    duration: "16 hours",
+    level: "Advanced",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Start",
+  },
+  {
+    id: "llm_engineering",
+    title: "LLM Engineering",
+    topics: ["LLMs", "Fine-Tuning", "LoRA", "Prompt Engineering"],
+    roleMatches: ["genai_engineer", "ai_engineer"],
+    provider: "Padho Code",
+    duration: "15 hours",
+    level: "Advanced",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Practice",
+  },
+  {
+    id: "rag",
+    title: "RAG",
+    topics: ["RAG", "Vector Databases", "LangChain", "LlamaIndex", "Embeddings"],
+    roleMatches: ["genai_engineer", "ai_engineer"],
+    provider: "Padho Code",
+    duration: "14 hours",
+    level: "Intermediate",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Build",
+  },
+  {
+    id: "mlops",
+    title: "MLOps",
+    topics: ["MLOps", "Docker", "Kubernetes", "CI/CD", "FastAPI"],
+    roleMatches: ["mlops_engineer", "ml_engineer", "ai_engineer"],
+    provider: "Padho Code",
+    duration: "18 hours",
+    level: "Advanced",
+    actionUrl: "/student/roadmap",
+    actionLabel: "Deploy",
+  },
+];
+
 export type CompetencyEvidenceTier =
   | "institutionally_verified" // Verified by faculty / ERIS / Padho Code / MentorMaze
   | "demonstrated"             // Evidenced in confirmed projects / public repo code
@@ -1384,9 +1507,43 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       explanation: `Benchmark evaluation precision against golden test sets to elevate project evidence from hobby to production grade.`,
       urgency: "recommended" as const,
     },
-  ] : [];
+  ] : pendingPrerequisites.slice(0, 3).map((p) => ({
+    title: `${p} Competency Evidence`,
+    explanation: `Your target role (${targetRoleName}) requires verifiable proof of ${p}. Add supporting code or complete an assessment to close this gap.`,
+    urgency: "critical" as const,
+  }));
 
-  // Recommended Learning Paths tailored to target role
+  // Recommended Learning Paths tailored to target role and demonstrated prerequisites
+  const studentSkillsLower = new Set(context.skills.map((s) => s.name.toLowerCase()));
+  const pendingLower = new Set(pendingPrerequisites.map((p) => p.toLowerCase()));
+
+  const resolvedLearningModules = (() => {
+    const scored = AIML_CORE_MODULES.map((mod) => {
+      let score = 0;
+      if (mod.topics.some((t) => pendingLower.has(t.toLowerCase()))) {
+        score += 50;
+      }
+      if (mod.roleMatches.includes(roleDef.id)) {
+        score += 30;
+      }
+      const allKnown = mod.topics.every((t) => studentSkillsLower.has(t.toLowerCase()));
+      if (allKnown) {
+        score -= 40;
+      }
+      return { mod, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 3).map(({ mod }) => ({
+      title: mod.title,
+      provider: mod.provider,
+      duration: mod.duration,
+      level: mod.level,
+      actionUrl: mod.actionUrl,
+      actionLabel: mod.actionLabel,
+    }));
+  })();
+
   const recommendedLearning = context.isDemo ? [
     {
       title: roleDef.id === "genai_engineer"
@@ -1412,7 +1569,7 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
       actionUrl: "/student/roadmap",
       actionLabel: "Practice",
     },
-  ] : [];
+  ] : resolvedLearningModules;
 
   // Career Stages
   const careerStages = context.isDemo ? [
@@ -1421,12 +1578,18 @@ export function composePersonalizedDashboard(context: StudentPersonalizationCont
     { stageNumber: 3, title: `Stage 3: ${roleDef.corePrerequisites[0] || "Deep Learning"} (Current)`, description: `Advanced specialization milestones for ${targetRoleName}.`, status: "in_progress" as const },
     { stageNumber: 4, title: "Stage 4: Production Deployment & Verification", description: "Docker serving, CI/CD testing, and faculty audit approval.", status: "up_next" as const },
     { stageNumber: 5, title: `Stage 5: ${primary === "jobs" ? "High-Impact Placement & Internship" : primary === "research_events" ? "Research Publication & Conference" : "Industry Leadership"}`, description: `Achievement of your active goal: ${context.goal || targetRoleName}.`, status: "up_next" as const },
-  ] : roleDef.corePrerequisites.slice(0, 5).map((competency, index) => ({
-    stageNumber: index + 1,
-    title: `Stage ${index + 1}: ${competency}`,
-    description: `Review evidence for ${competency} and choose a practical next action.`,
-    status: (index === 0 ? "in_progress" : "up_next") as "in_progress" | "up_next",
-  }));
+  ] : roleDef.corePrerequisites.slice(0, 5).map((competency, index) => {
+    const isMet = evaluatedPrerequisites.find((ep) => ep.name.toLowerCase() === competency.toLowerCase())?.isMet;
+    const status = isMet ? ("completed" as const) : (index === 0 || !evaluatedPrerequisites.slice(0, index).some((ep) => !ep.isMet)) ? ("in_progress" as const) : ("up_next" as const);
+    return {
+      stageNumber: index + 1,
+      title: `Stage ${index + 1}: ${competency}`,
+      description: isMet
+        ? `Demonstrated evidence recorded for ${competency}.`
+        : `Review evidence requirements for ${competency} and build supporting project artifacts.`,
+      status,
+    };
+  });
 
   // Ecosystem Section Cards Order & Prominence
   let ecosystemCardsOrder: ("internships" | "opportunities" | "mentors" | "people" | "collaborative_projects")[] = [

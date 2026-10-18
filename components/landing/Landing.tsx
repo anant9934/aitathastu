@@ -60,16 +60,16 @@ const EORA_LINES = [
 ];
 
 const SKILL_NODES = [
-  { id: "ml",    label: "Machine Learning", x: 430, y: 220, r: 46, main: true,  color: "#F49A47" },
-  { id: "py",    label: "Python",           x: 250, y: 96,  r: 34, color: "#F49A47" },
-  { id: "math",  label: "Mathematics",      x: 168, y: 250, r: 30, color: "#C9A46D" },
-  { id: "ds",    label: "Data Structures",  x: 300, y: 370, r: 32, color: "#C9A46D" },
-  { id: "dl",    label: "Deep Learning",    x: 618, y: 100, r: 36, color: "#C9A46D" },
-  { id: "nlp",   label: "NLP",              x: 730, y: 232, r: 28, color: "#C9A46D" },
-  { id: "mlops", label: "MLOps",            x: 640, y: 368, r: 28, color: "#C9A46D" },
-  { id: "res",   label: "Research",         x: 430, y: 62,  r: 27, color: "#F4E7D0" },
-  { id: "gh",    label: "Project Evidence", x: 762, y: 380, r: 26, color: "#F4E7D0" },
-  { id: "comm",  label: "Communication",    x: 130, y: 386, r: 25, color: "#F4E7D0" },
+  { id: "ml",    label: "Machine Learning", lines: ["Machine", "Learning"], x: 430, y: 220, r: 52, main: true,  color: "#F49A47", fontSize: 13 },
+  { id: "py",    label: "Python",           lines: ["Python"],              x: 250, y: 96,  r: 36, color: "#F49A47", fontSize: 12 },
+  { id: "math",  label: "Mathematics",      lines: ["Mathematics"],         x: 168, y: 246, r: 40, color: "#C9A46D", fontSize: 10.5 },
+  { id: "ds",    label: "Data Structures",  lines: ["Data", "Structures"],  x: 300, y: 368, r: 40, color: "#C9A46D", fontSize: 11 },
+  { id: "dl",    label: "Deep Learning",    lines: ["Deep", "Learning"],    x: 618, y: 100, r: 40, color: "#C9A46D", fontSize: 11 },
+  { id: "nlp",   label: "NLP",              lines: ["NLP"],                 x: 732, y: 232, r: 30, color: "#C9A46D", fontSize: 12 },
+  { id: "mlops", label: "MLOps",            lines: ["MLOps"],               x: 640, y: 366, r: 32, color: "#C9A46D", fontSize: 11.5 },
+  { id: "res",   label: "Research",         lines: ["Research"],            x: 430, y: 62,  r: 32, color: "#F4E7D0", fontSize: 11 },
+  { id: "gh",    label: "Project Evidence", lines: ["Project", "Evidence"], x: 760, y: 374, r: 40, color: "#F4E7D0", fontSize: 10.5 },
+  { id: "comm",  label: "Communication",    lines: ["Communication"],       x: 126, y: 382, r: 42, color: "#F4E7D0", fontSize: 9.8 },
 ];
 
 const SKILL_EDGES: [string, string][] = [
@@ -384,8 +384,24 @@ export function Landing({ user }: LandingProps) {
 
       const t = document.createElementNS(NS, "text");
       t.setAttribute("x", String(n.x));
-      t.setAttribute("y", String(n.y + 4));
-      t.textContent = n.label;
+      t.setAttribute("text-anchor", "middle");
+      if (n.fontSize) {
+        t.style.fontSize = `${n.fontSize}px`;
+      }
+
+      const lines = n.lines || [n.label];
+      const lineHeight = (n.fontSize || 12) * 1.25;
+      const totalH = (lines.length - 1) * lineHeight;
+      const startY = n.y - totalH / 2;
+
+      lines.forEach((lineText, idx) => {
+        const tspan = document.createElementNS(NS, "tspan");
+        tspan.setAttribute("x", String(n.x));
+        tspan.setAttribute("y", String(startY + idx * lineHeight));
+        tspan.setAttribute("dominant-baseline", "central");
+        tspan.textContent = lineText;
+        t.appendChild(tspan);
+      });
 
       g.appendChild(c);
       g.appendChild(t);
@@ -803,9 +819,8 @@ export function Landing({ user }: LandingProps) {
         <div className="hero-spot" id="heroSpot" ref={heroSpotRef}></div>
         <div className="wrap hero-grid">
           <div className="hero-copy">
-            <div className="label">Your ambition. Your journey. Your possibilities.</div>
             <h1>
-              <span className="line split">
+              <span className="line split line-1">
                 <span className="w">
                   <span className="wi" style={{ animationDelay: "0.000s" }}>You</span>
                 </span>{" "}
@@ -813,7 +828,7 @@ export function Landing({ user }: LandingProps) {
                   <span className="wi" style={{ animationDelay: "0.090s" }}>imagine.</span>
                 </span>
               </span>
-              <span className="line split">
+              <span className="line split line-2">
                 <span className="w">
                   <span className="wi grad-warm" style={{ animationDelay: "0.120s" }}>AI</span>
                 </span>{" "}
@@ -1001,7 +1016,6 @@ export function Landing({ user }: LandingProps) {
         <canvas id="neural" ref={neuralCanvasRef}></canvas>
         <div className="wrap solution-inner">
           <div className="section-head center reveal">
-            <div className="label label--intel">Built around you</div>
             <h2 className="h2">
               One ambition. A journey <span className="grad-intel">built around you.</span>
             </h2>
@@ -1712,9 +1726,6 @@ export function Landing({ user }: LandingProps) {
         <div className="wrap">
           <div className="cta-shell reveal">
             <div className="cta-eora"></div>
-            <div className="label" style={{ color: "var(--accent-warm)", justifyContent: "center" }}>
-              The future begins with an idea
-            </div>
             <h2>
               Your next chapter begins with <span className="grad-intel">what you imagine.</span>
             </h2>

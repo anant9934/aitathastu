@@ -493,8 +493,10 @@ export function adaptRenderProfileToInterpretation(
     if (!company || !grounded(company)) continue;
 
     const role = tidy(f.job_title?.value || f.role?.value, 150) || "";
-    const isIntern = Boolean(groups.internships?.includes(rec) || /intern/i.test(f.employment_type?.value || role));
-    const isLeadership = Boolean(groups.leadership?.includes(rec) || /lead|coordinator|volunteer/i.test(role));
+    const isIntern = /\b(?:intern|internship|trainee|apprentice)\b/i.test(f.employment_type?.value || role || f.program?.value || "");
+    const isFounder = /\b(?:founder|co-founder|coo|ceo|president|vice president|vp)\b/i.test(role);
+    const isLeadership = isFounder || Boolean(groups.leadership?.includes(rec)) || /\b(?:lead|advisor|coordinator|director|head)\b/i.test(role);
+    const expType = isFounder ? "founder" : isLeadership ? "leadership" : isIntern ? "internship" : "employment";
     const startDate = tidy(f.start_date?.value, 30) || undefined;
     const endDate = tidy(f.end_date?.value, 30) || undefined;
     const duration = tidy(f.duration?.value, 100) || ([startDate, endDate].filter(Boolean).join(" – ") || undefined);
@@ -511,7 +513,7 @@ export function adaptRenderProfileToInterpretation(
     experience.push({
       company,
       role,
-      type: isIntern ? "internship" : isLeadership ? "leadership" : "employment",
+      type: expType,
       startDate,
       endDate,
       duration,
@@ -543,10 +545,14 @@ export function adaptRenderProfileToInterpretation(
     });
   }
 
-  // 5. Skills
+  // 5. Skills (Preserve explicit skills; project-only technologies belong to contextual project technologies)
   const skills: ResumeInterpretationOutput["skills"] = [];
   for (const rec of groups.skills || []) {
     const f = rec.fields;
+    const sectionsFound = (f.sections_found?.value || "").toLowerCase();
+    if (sectionsFound && sectionsFound !== "skills" && sectionsFound.includes("project")) {
+      continue;
+    }
     const name = tidy(f.canonical_name?.value || f.original_wording?.value, 100);
     if (!name || !grounded(name)) continue;
 
@@ -567,7 +573,8 @@ export function adaptRenderProfileToInterpretation(
   const certifications: ResumeInterpretationOutput["certifications"] = [];
   for (const rec of groups.certifications || []) {
     const f = rec.fields;
-    const name = tidy(f.title?.value || f.name?.value, 200);
+    const rawName = tidy(f.title?.value || f.name?.value, 200);
+    const name = rawName.replace(/^[•·*◦\-–—|#©«»°+‘“"'\s]+|[•·*◦\-–—|#©«»°+‘“"'\s]+$/g, "").trim();
     if (!name || !grounded(name)) continue;
 
     const issuer = tidy(f.issuer?.value || f.organization?.value, 150) || undefined;
@@ -605,8 +612,9 @@ export function adaptRenderProfileToInterpretation(
     });
   }
 
-  // 8. Digital Footprint Links
+  // 8. Digital Footprint Links & Dedicated Footprints
   const links: ResumeLink[] = [];
+  const digitalFootprints: NonNullable<ResumeInterpretationOutput["digitalFootprints"]> = [];
   for (const rec of groups.digital_footprint || []) {
     const f = rec.fields;
     const u = normalizeUrl(f.normalized_url?.value || f.original_url?.value);
@@ -614,6 +622,16 @@ export function adaptRenderProfileToInterpretation(
     links.push({
       type: linkType(u, "portfolio"),
       url: u,
+    });
+    const platform = tidy(f.platform?.value, 50) || (u.includes("github.com") ? "GitHub" : u.includes("linkedin.com") ? "LinkedIn" : "Portfolio");
+    const handle = u.includes("github.com/") ? u.split("github.com/")[1]?.split("/")[0] : u.includes("linkedin.com/in/") ? u.split("linkedin.com/in/")[1]?.split("/")[0] : undefined;
+    digitalFootprints.push({
+      platform,
+      url: u,
+      handle: handle ? handle.replace(/^@/, "") : undefined,
+      type: u.includes("github.com") ? "profile" : u.includes("linkedin.com") ? "profile" : "portfolio",
+      discoveryMethod: "ocr",
+      sourceSpan: span(f.original_url?.evidence?.[0]?.snippet, u),
     });
   }
   for (const c of groups.contact || []) {
@@ -624,6 +642,15 @@ export function adaptRenderProfileToInterpretation(
           type: linkType(u, "portfolio"),
           url: u,
         });
+        if (!digitalFootprints.some((df) => df.url.toLowerCase() === u.toLowerCase())) {
+          digitalFootprints.push({
+            platform: "Portfolio",
+            url: u,
+            type: "portfolio",
+            discoveryMethod: "ocr",
+            sourceSpan: span(c.fields.website?.evidence?.[0]?.snippet, u),
+          });
+        }
       }
     }
   }
@@ -635,6 +662,7 @@ export function adaptRenderProfileToInterpretation(
     skills,
     certifications,
     achievements,
+    digitalFootprints,
   };
 
   const parsed = ResumeInterpretationSchema.safeParse(interpreted);

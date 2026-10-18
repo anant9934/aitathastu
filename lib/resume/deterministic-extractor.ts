@@ -840,8 +840,8 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
   );
   if (expLines.length === 0) return { experience: [], leadership: [] };
 
-  const chunks: Array<Array<{ text: string }>> = [];
-  let currentChunk: Array<{ text: string }> = [];
+  const chunks: Array<Array<{ text: string; section: string }>> = [];
+  let currentChunk: Array<{ text: string; section: string }> = [];
 
   for (const line of expLines) {
     const isBullet = /^[•·*◦\-–—]\s*/.test(line.text);
@@ -957,7 +957,7 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
       sourceSpan,
     });
 
-    if (isFounderOrLeadership) {
+    if (isFounderOrLeadership && chunk[0]?.section === "leadership") {
       outLeadership.push({
         organization: (company || "Organization").slice(0, 100),
         role: (role || "Role").slice(0, 100),
@@ -981,19 +981,25 @@ function extractCertifications(taggedLines: Array<{ text: string; section: strin
   const out: ResumeInterpretationOutput["certifications"] = [];
 
   for (const item of certLines) {
-    const clean = item.text.replace(/^[•·*◦\-–—|#\s]+|[•·*◦\-–—|#\s]+$/g, "").trim();
+    const clean = item.text.replace(/^[•·*◦\-–—|#©«»°+‘“"'\s]+|[•·*◦\-–—|#©«»°+‘“"'\s]+$/g, "").trim();
     if (clean.length < 5) continue;
 
-    const parts = clean.split("|").map((p) => p.trim());
-    let name = parts[0];
-    let issuer = parts.length > 1 ? parts[1] : undefined;
+    const rawParts = clean
+      .split("|")
+      .map((p) => p.replace(/^[•·*◦\-–—|#©«»°+‘“"'\s]+|[•·*◦\-–—|#©«»°+‘“"'\s]+$/g, "").trim())
+      .filter((p) => p.length >= 2 && /[a-zA-Z0-9]/.test(p));
+
+    if (rawParts.length === 0) continue;
+
+    let name = rawParts[0];
+    let issuer = rawParts.length > 1 ? rawParts[1] : undefined;
     let year: string | undefined;
 
     const knownIssuers = /(?:Coursera|Udemy|AWS|Amazon|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation|The Chartered Institute for IT|Chartered Institute|BlockSeBlock)/i;
 
-    if (parts.length >= 2 && knownIssuers.test(parts[0]) && !knownIssuers.test(parts[1])) {
-      name = parts[1];
-      issuer = parts[0];
+    if (rawParts.length >= 2 && knownIssuers.test(rawParts[0]) && !knownIssuers.test(rawParts[1])) {
+      name = rawParts[1];
+      issuer = rawParts[0];
     }
 
     const yearMatches = clean.match(YEAR_RE);
@@ -1105,20 +1111,26 @@ function extractDigitalFootprints(
   ];
 
   for (const src of allCandidateSources) {
-    // 1. GitHub matching (Reject generic github.com/github)
-    const ghMatch = src.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_-]+)(?:\/([a-zA-Z0-9_.-]+))?/i);
+    // 1. GitHub matching (including OCR typos like 'gittub', 'github com', or spaced handle 'shiviii5 165')
+    const ghMatch = src.match(/(?:https?:\/\/)?(?:www\.)?(?:github|gittub|gittubs)[\s.:/]+(?:github[\s.]*com[\s/]*)?([a-zA-Z0-9_-]+)/i);
     if (ghMatch) {
-      const user = ghMatch[1].toLowerCase();
-      const repo = ghMatch[2];
-      if (user !== "github" && user !== "orgs" && user !== "topics") {
-        const canonicalUrl = `https://github.com/${ghMatch[1]}`;
+      let handle = ghMatch[1].trim();
+      const afterMatch = src.slice((ghMatch.index || 0) + ghMatch[0].length).trim();
+      const numSuffix = afterMatch.match(/^([0-9a-zA-Z_-]+)/);
+      if (numSuffix && !/^(?:email|mobile|phone|linkedin)/i.test(numSuffix[1])) {
+        handle = `${handle}${numSuffix[1]}`;
+      }
+      handle = handle.replace(/[^a-zA-Z0-9_-]/g, "");
+      const lower = handle.toLowerCase();
+      if (lower && lower.length >= 3 && !["github", "orgs", "topics", "com", "www"].includes(lower)) {
+        const canonicalUrl = `https://github.com/${handle}`;
         if (!seenUrls.has(canonicalUrl)) {
           seenUrls.add(canonicalUrl);
           out.push({
             platform: "GitHub",
             url: canonicalUrl,
-            handle: ghMatch[1],
-            type: repo ? "repository" : "profile",
+            handle,
+            type: "profile",
             discoveryMethod: "cv_source",
             sourceSpan: src.slice(0, 300),
           });
@@ -1126,20 +1138,26 @@ function extractDigitalFootprints(
       }
     }
 
-    // 2. LinkedIn matching
-    const liMatch = src.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|company)\/([a-zA-Z0-9_-]+)/i);
+    // 2. LinkedIn matching (including OCR typos like 'linkedin.comy/in/...')
+    const liMatch =
+      src.match(/(?:https?:\/\/)?(?:www\.)?linkedin[\s.]*com[y]?[\s/]+(?:in|pub)[\s/]+([a-zA-Z0-9_\-\.]+)/i) ||
+      src.match(/(?:linkedin|linked\s*in)\s*:\s*(?:https?:\/\/)?(?:www\.)?(?:linkedin[\s.]*com[y]?\/in\/)?([a-zA-Z0-9_\-\.]+)/i);
     if (liMatch) {
-      const canonicalUrl = `https://linkedin.com/in/${liMatch[1]}`;
-      if (!seenUrls.has(canonicalUrl)) {
-        seenUrls.add(canonicalUrl);
-        out.push({
-          platform: "LinkedIn",
-          url: canonicalUrl,
-          handle: liMatch[1],
-          type: "profile",
-          discoveryMethod: "cv_source",
-          sourceSpan: src.slice(0, 300),
-        });
+      const handle = liMatch[1].trim().replace(/[^a-zA-Z0-9_-]/g, "");
+      const lower = handle.toLowerCase();
+      if (lower && lower.length >= 3 && !["feed", "jobs", "in", "pub", "company"].includes(lower)) {
+        const canonicalUrl = `https://linkedin.com/in/${handle}`;
+        if (!seenUrls.has(canonicalUrl)) {
+          seenUrls.add(canonicalUrl);
+          out.push({
+            platform: "LinkedIn",
+            url: canonicalUrl,
+            handle,
+            type: "profile",
+            discoveryMethod: "cv_source",
+            sourceSpan: src.slice(0, 300),
+          });
+        }
       }
     }
   }

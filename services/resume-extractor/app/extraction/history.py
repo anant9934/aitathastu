@@ -92,10 +92,12 @@ def extract_experience(content,groups):
         # Look for explicit role line
         role_line = next((l for l in chunk if ROLE_KEYWORDS.search(l.text) and not bool(re.match(r'^[◦·\s]*:', l.text)) and not bool(re.match(r'^(?:and|for|with|while)\s+', l.text, re.I))), None)
         # Look for organization line
+        # Look for organization line or clean head candidate
         org_line = None
+        org_name_extracted = None
         for l in chunk:
             if l == role_line: continue
-            clean_l = l.text.strip(' •*-')
+            clean_l = l.text.strip(' •*-«+»')
             if bool(re.match(r'^[◦·\s]*:', clean_l)) or clean_l.endswith('.'): continue
             if re.search(r'\b(?:at|@)\s+([\w &.\-]+)', clean_l, re.I):
                 org_line = l
@@ -103,8 +105,11 @@ def extract_experience(content,groups):
             if (ORG_KEYWORDS.search(clean_l) or re.match(r'^[A-Z0-9\s&,\.\-]{4,60}$', clean_l)) and not LOCATION_LINE_RE.search(clean_l):
                 org_line = l
                 break
-            if not DATE_PATTERN.search(clean_l) and len(clean_l) < 80 and not org_line and not LOCATION_LINE_RE.search(clean_l) and clean_l and clean_l[0].isupper() and _is_plausible_org(clean_l):
+            # Check if line without its date pattern forms a plausible organization
+            cand_no_date = re.sub(r'\s+(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\b.*$', '', clean_l, flags=re.I).strip(' •*-«+»')
+            if len(cand_no_date) >= 3 and len(cand_no_date) < 60 and not LOCATION_LINE_RE.search(cand_no_date) and cand_no_date[0].isupper() and _is_plausible_org(cand_no_date):
                 org_line = l
+                org_name_extracted = cand_no_date
                 break
 
         job_title = None
@@ -122,17 +127,18 @@ def extract_experience(content,groups):
             if role_line:
                 job_title = (_clean_role(role_line.text), role_line, .82)
             if org_line:
-                clean_org = org_line.text.strip(' •*-')
+                clean_org = org_name_extracted or org_line.text.strip(' •*-«+»')
+                clean_org = re.sub(r'\s+(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\b.*$', '', clean_org, flags=re.I).strip(' •*-«+»')
                 if match := re.search(r'(?:at|@)\s+([\w &.\-]+)', clean_org, re.I):
                     clean_org = match.group(1).strip()
                 if not LOCATION_LINE_RE.search(clean_org) and _is_plausible_org(clean_org):
                     organization = (clean_org, org_line, .80)
-            elif not job_title and not LOCATION_LINE_RE.search(head.text):
-                clean_head = head.text.strip(' •*-')
+            elif not organization and not LOCATION_LINE_RE.search(head.text):
+                clean_head = re.sub(r'\s+(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\b.*$', '', head.text, flags=re.I).strip(' •*-«+»')
                 if len(clean_head) >= 3 and not BULLET_PREFIX_RE.match(head.text):
                     if ROLE_KEYWORDS.search(clean_head):
                         job_title = (_clean_role(clean_head), head, .70)
-                    elif ORG_KEYWORDS.search(clean_head) and _is_plausible_org(clean_head):
+                    elif _is_plausible_org(clean_head):
                         organization = (clean_head, head, .70)
 
         # Skip noise chunks that lack both a plausible organization and a valid role
@@ -324,23 +330,33 @@ def extract_certifications(content,groups):
         if not title_line:
             title_line = next((l for l in chunk if len(re.sub(r'[^a-zA-Z]', '', l.text)) >= 3), chunk[0])
 
-        t = title_line.text.strip(' -•*©«»')
-        parts = [p.strip() for p in t.split('|')]
-        title = parts[0]
+        t = title_line.text.strip(' -•*©«»◦·°+—–|#')
+        raw_parts = [p.strip(' -•*©«»◦·°+—–|#') for p in t.split('|')]
+        parts = [p for p in raw_parts if p and len(re.sub(r'[^a-zA-Z0-9]', '', p)) >= 2]
+        title = parts[0] if parts else t
         issuer = parts[1] if len(parts) > 1 else None
+        extracted_date = None
+
+        if len(parts) >= 3:
+            m_p_date = DATE_TOKEN_RE.search(parts[2])
+            if m_p_date:
+                extracted_date = m_p_date.group(0).strip()
 
         if not issuer and issuer_line:
-            issuer = issuer_line.text.strip(' -•*©«»')
+            issuer = issuer_line.text.strip(' -•*©«»◦·°+—–|#')
 
         if not issuer:
             for l in chunk:
-                known = re.search(r'(?:Coursera|Udemy|AWS|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation|The Chartered Institute for IT|BCS)', l.text, re.I)
+                known = re.search(r'(?:Coursera|Udemy|AWS|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation|The Chartered Institute for IT|BCS|BlockseBlock)', l.text, re.I)
                 if known:
                     issuer = known.group(0)
                     break
 
+        known_issuers_re = re.compile(r'(?:Coursera|Udemy|AWS|Amazon|Google|Microsoft|NPTEL|edX|HackerRank|Oracle|Infosys|Simplilearn|Forage|Reliance Foundation|The Chartered Institute for IT|BCS|BlockseBlock)', re.I)
+        if issuer and known_issuers_re.search(title) and not known_issuers_re.search(issuer):
+            title, issuer = issuer, title
+
         fields = {'title': (title, title_line, .82)}
-        extracted_date = None
 
         if issuer:
             # Separate month + year from issuer

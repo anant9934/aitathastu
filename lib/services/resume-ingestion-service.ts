@@ -633,19 +633,21 @@ async function finalize(
   const { personId } = job;
   await SourceProcessingJobService.updateStage(job.id, personId, "validate", { heartbeatAt: Date.now() });
 
-  // 1. Establish Tier 1 Deterministic Baseline
+  // 1. Establish Tier 1 Deterministic Baseline via Source-Grounded Reconciliation
+  const tsBaseline = extractResumeDeterministicResult(input.text, input.hyperlinks);
   let baseline: ResumeExtractionResult;
   if (input.renderProfile) {
-    baseline = adaptRenderProfileToInterpretation(input.renderProfile, input.text);
-    if (!baseline.success || !baseline.extracted) {
-      console.warn("[resume-pipeline] Render profile adaptation fell back to in-process deterministic parser", {
-        jobId: job.id,
-        error: baseline.error,
-      });
-      baseline = extractResumeDeterministicResult(input.text, input.hyperlinks);
+    const renderResult = adaptRenderProfileToInterpretation(input.renderProfile, input.text);
+    if (renderResult.success && renderResult.extracted && tsBaseline.success && tsBaseline.extracted) {
+      // Reconcile Render structured profile with TypeScript deterministic baseline
+      baseline = mergeExtractionResults(renderResult, tsBaseline, input.text);
+    } else if (renderResult.success && renderResult.extracted) {
+      baseline = renderResult;
+    } else {
+      baseline = tsBaseline;
     }
   } else {
-    baseline = extractResumeDeterministicResult(input.text, input.hyperlinks);
+    baseline = tsBaseline;
   }
 
   // 2. Evaluate Optional AI Enrichment

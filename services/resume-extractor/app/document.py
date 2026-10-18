@@ -69,11 +69,10 @@ HEADINGS = {
  'experience': [
      'experience', 'work experience', 'professional experience', 'employment history',
      'work history', 'experience & leadership', 'experience and leadership',
-     'professional background', 'employment'
+     'professional background', 'employment', 'training', 'professional training'
  ],
  'internships': [
-     'internships', 'internship', 'industrial training', 'training', 'professional training',
-     'vocational training'
+     'internships', 'internship', 'industrial training', 'vocational training'
  ],
  'skills': [
      'skills', 'technical skills', 'technical expertise', 'technologies', 'competencies',

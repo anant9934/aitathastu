@@ -143,21 +143,29 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
     }
   }
   if (Array.isArray(extracted.leadership) && extracted.leadership.length > 0) {
-    add(
-      "leadership",
-      extracted.leadership.map((x) => {
-        const parts = [
-          x.role,
-          x.organization,
-          x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : undefined,
-        ].filter(Boolean);
-        return {
-          value: (x as any).displayText || parts.join(" · ") || x.organization || "Leadership Entry",
-          sourceSpan: x.sourceSpan || (x as any).displayText || x.role || "",
-          recordData: x as Record<string, any>,
-        };
-      })
-    );
+    const distinctLeadership = extracted.leadership.filter((l) => {
+      return !extracted.experience.some((e) =>
+        e.company.toLowerCase().trim() === l.organization.toLowerCase().trim() &&
+        e.role.toLowerCase().trim() === l.role.toLowerCase().trim()
+      );
+    });
+    if (distinctLeadership.length > 0) {
+      add(
+        "leadership",
+        distinctLeadership.map((x) => {
+          const parts = [
+            x.role,
+            x.organization,
+            x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : undefined,
+          ].filter(Boolean);
+          return {
+            value: (x as any).displayText || parts.join(" · ") || x.organization || "Leadership Entry",
+            sourceSpan: x.sourceSpan || (x as any).displayText || x.role || "",
+            recordData: x as Record<string, any>,
+          };
+        })
+      );
+    }
   }
   if (extracted.summary && (extracted.summary.text || extracted.summary.headline)) {
     const s = extracted.summary;

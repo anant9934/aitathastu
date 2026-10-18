@@ -120,14 +120,15 @@ def test_shivam_resume_acceptance():
     assert any('EduCore' in t for t in titles)
     assert any('Self-Surveillance' in t or 'Surveillance' in t for t in titles)
     
-    # D. Training & leadership: exactly 4
-    internships = profile.groups.get('internships', [])
-    assert len(internships) == 4
-    orgs = [i.fields['provider'].value for i in internships]
-    assert 'Nayee Asha' in orgs
-    assert 'Study LPU' in orgs
-    assert 'Mangalkit' in orgs
-    assert 'Founders Verbinden' in orgs
+    # D. Professional experience & leadership: exactly 4 roles (not mislabeled as internships)
+    exp = profile.groups.get('experience', [])
+    assert len(exp) == 4, f"Expected 4 experience roles, got {len(exp)}"
+    orgs = [e.fields['organization'].value for e in exp]
+    assert any('Nayee Asha' in o for o in orgs)
+    assert any('Study LPU' in o for o in orgs)
+    assert any('Mangalkit' in o for o in orgs)
+    assert any('Founders Verbinden' in o for o in orgs)
+    assert len(profile.groups.get('internships', [])) == 0
     
     # E. Certifications: exactly 7
     certs = profile.groups.get('certifications', [])

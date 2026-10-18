@@ -259,7 +259,7 @@ test("Phase 10.1 — Archetype 1 (Native Single-Column, Anant Kumar Pattern) Hig
   // 1. Identity & Contacts
   assert.equal(result.profile.fullName, "Alex Mercer");
   assert.equal(result.profile.email, "alex.mercer@testmail.com");
-  assert.equal(result.profile.mobile, "+91 9123456789");
+  assert.equal(result.profile.mobile, undefined, "V6 Privacy Guarantee: Mobile numbers must never be extracted from CV");
   assert.equal(result.profile.location, "Jaipur, Rajasthan, India");
 
   // 2. Education (3 distinct tiers preserved without placeholder values)
@@ -269,7 +269,8 @@ test("Phase 10.1 — Archetype 1 (Native Single-Column, Anant Kumar Pattern) Hig
   assert.match(edu1.institution, /Apex Global University/i);
   assert.equal(edu1.degree, "B.Tech");
   assert.equal(edu1.gpa, "8.84 / 10");
-  assert.equal(edu1.graduationYear, "2025");
+  assert.equal(edu1.startDate, "2025");
+  assert.equal(edu1.endDate, "Present");
 
   assert.match(edu2.institution, /Heritage Mission School/i);
   assert.equal(edu2.degree, "Intermediate");

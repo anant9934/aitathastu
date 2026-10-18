@@ -15,6 +15,7 @@ import { ResumeInterpretationSchema, type ResumeInterpretationOutput } from "../
 import { LINK_TYPES, type ResumeExtraction } from "@/lib/resume/schema";
 import { structureResumeText, RESUME_PROMPT_VERSION, ResumeStructuringError } from "@/lib/resume/structure";
 import { extractResumeDeterministic } from "@/lib/resume/deterministic-extractor";
+import { ResumeDeduplicationEngine } from "@/lib/resume/deduplication-engine";
 import { discoverFootprintsFromResume } from "./digital-footprint-discovery";
 import type { ExtractorProfileV2 } from "./extractor-service-client";
 
@@ -861,14 +862,118 @@ export function mergeExtractionOutputs(
     }
   }
 
-  return ResumeInterpretationSchema.parse({
+  // 7. Leadership
+  const leadership = [...(baseline.leadership || [])];
+  const seenLead = new Set(leadership.map((l) => `${l.role.toLowerCase()}:${l.organization.toLowerCase()}`));
+  for (const enLead of enriched.leadership || []) {
+    const key = `${enLead.role.toLowerCase()}:${enLead.organization.toLowerCase()}`;
+    if (!seenLead.has(key) && grounded(enLead.organization)) {
+      seenLead.add(key);
+      leadership.push(enLead);
+    }
+  }
+
+  // 8. Research
+  const research = [...(baseline.research || [])];
+  const seenRes = new Set(research.map((r) => r.title.toLowerCase()));
+  for (const enRes of enriched.research || []) {
+    const key = enRes.title.toLowerCase();
+    if (!seenRes.has(key) && grounded(enRes.title.slice(0, 40))) {
+      seenRes.add(key);
+      research.push(enRes);
+    }
+  }
+
+  // 9. Hackathons
+  const hackathons = [...(baseline.hackathons || [])];
+  const seenHack = new Set(hackathons.map((h) => h.event.toLowerCase()));
+  for (const enHack of enriched.hackathons || []) {
+    const key = enHack.event.toLowerCase();
+    if (!seenHack.has(key) && grounded(enHack.event)) {
+      seenHack.add(key);
+      hackathons.push(enHack);
+    }
+  }
+
+  // 10. Training
+  const training = [...(baseline.training || [])];
+  const seenTrain = new Set(training.map((t) => t.title.toLowerCase()));
+  for (const enTrain of enriched.training || []) {
+    const key = enTrain.title.toLowerCase();
+    if (!seenTrain.has(key) && grounded(enTrain.title)) {
+      seenTrain.add(key);
+      training.push(enTrain);
+    }
+  }
+
+  // 11. Volunteering
+  const volunteering = [...(baseline.volunteering || [])];
+  const seenVol = new Set(volunteering.map((v) => `${v.role.toLowerCase()}:${v.organization.toLowerCase()}`));
+  for (const enVol of enriched.volunteering || []) {
+    const key = `${enVol.role.toLowerCase()}:${enVol.organization.toLowerCase()}`;
+    if (!seenVol.has(key) && grounded(enVol.organization)) {
+      seenVol.add(key);
+      volunteering.push(enVol);
+    }
+  }
+
+  // 12. Languages
+  const languages = [...(baseline.languages || [])];
+  const seenLang = new Set(languages.map((l) => l.language.toLowerCase()));
+  for (const enLang of enriched.languages || []) {
+    const key = enLang.language.toLowerCase();
+    if (!seenLang.has(key) && grounded(enLang.language)) {
+      seenLang.add(key);
+      languages.push(enLang);
+    }
+  }
+
+  // 13. Digital Footprints
+  const digitalFootprints = [...(baseline.digitalFootprints || [])];
+  const seenFps = new Set(digitalFootprints.map((df) => df.url.toLowerCase()));
+  for (const enDf of enriched.digitalFootprints || []) {
+    const key = enDf.url.toLowerCase();
+    if (!seenFps.has(key) && grounded(enDf.url)) {
+      seenFps.add(key);
+      digitalFootprints.push(enDf);
+    }
+  }
+
+  // 14. Additional
+  const additional = [...(baseline.additional || [])];
+  for (const enAdd of enriched.additional || []) {
+    if (grounded(enAdd.content.slice(0, 40))) {
+      additional.push(enAdd);
+    }
+  }
+
+  // 15. Summary
+  const summary = baseline.summary || enriched.summary;
+
+  // 16. Personal
+  const personal = baseline.personal || enriched.personal;
+
+  const rawParsed = ResumeInterpretationSchema.parse({
+    personal,
+    summary,
     education,
     experience,
     projects,
     skills,
     certifications,
     achievements,
+    leadership,
+    research,
+    hackathons,
+    training,
+    volunteering,
+    languages,
+    digitalFootprints,
+    additional,
   });
+
+  const deduped = ResumeDeduplicationEngine.deduplicateAll(rawParsed);
+  return deduped.interpretation;
 }
 
 /** Combines baseline and optional enrichment into a unified ResumeExtractionResult. */

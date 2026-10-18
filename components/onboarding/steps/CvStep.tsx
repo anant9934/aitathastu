@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowClockwise,
+  BookOpen,
   Briefcase,
   CaretDown,
   CaretUp,
@@ -12,13 +13,17 @@ import {
   Code,
   FileArrowUp,
   FileText,
+  Globe,
   GraduationCap,
+  Heart,
+  LinkSimple,
   LockKey,
   PencilSimple,
   ShieldCheck,
   Sparkle,
   Trash,
   Trophy,
+  Users,
 } from "@phosphor-icons/react/dist/ssr";
 import { RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { FIELD_LABELS, REVIEW_GROUPS, type ResumeIngestion } from "@/lib/client/onboarding/use-resume-ingestion";
@@ -119,13 +124,26 @@ export function CvStep({
         return <Sparkle size={18} weight="bold" className="text-accent-warm" />;
       case "experience":
         return <Briefcase size={18} weight="bold" className="text-accent-warm" />;
+      case "leadership":
+        return <Users size={18} weight="bold" className="text-accent-warm" />;
       case "projects":
         return <Code size={18} weight="bold" className="text-accent-warm" />;
       case "certifications":
         return <Certificate size={18} weight="bold" className="text-accent-warm" />;
       case "achievements":
-      case "publications":
+      case "hackathons":
         return <Trophy size={18} weight="bold" className="text-accent-warm" />;
+      case "research":
+      case "publications":
+        return <BookOpen size={18} weight="bold" className="text-accent-warm" />;
+      case "training":
+        return <GraduationCap size={18} weight="bold" className="text-accent-warm" />;
+      case "volunteering":
+        return <Heart size={18} weight="bold" className="text-accent-warm" />;
+      case "languages":
+        return <Globe size={18} weight="bold" className="text-accent-warm" />;
+      case "links":
+        return <LinkSimple size={18} weight="bold" className="text-accent-warm" />;
       default:
         return <FileText size={18} weight="bold" className="text-accent-warm" />;
     }

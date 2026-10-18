@@ -170,6 +170,13 @@ const NON_CONTINUATION_WORDS = new Set([
   "languages", "achievements", "interests", "publications", "http", "https"
 ]);
 
+export const RESERVED_PROVIDER_HANDLES = new Set([
+  "github", "linkedin", "feed", "in", "pub", "jobs", "company", "explore",
+  "trending", "pricing", "features", "enterprise", "about", "blog",
+  "settings", "login", "signup", "help", "support", "security", "contact",
+  "terms", "privacy", "organizations", "users", "profile", "home"
+]);
+
 /**
  * Unwraps links broken across line breaks in OCR / PDF text.
  * Example: "https://github.com/\nanant9934" -> "https://github.com/anant9934"
@@ -238,6 +245,9 @@ export function discoverFootprintsFromResume(options: {
       if (match) {
         matchedProvider = true;
         const candidateUser = (match[1] || "").replace(/\/$/, "");
+        if (RESERVED_PROVIDER_HANDLES.has(candidateUser.toLowerCase())) {
+          break;
+        }
         const normalized = normalizeProviderUrl(rule.provider, candidateUser, cleaned);
         addFootprint({
           provider: rule.provider,
@@ -304,6 +314,9 @@ function checkHandleConfidence(username: string): { validationResult: "valid" | 
         const match = cleaned.match(rule.pattern);
         if (match) {
           const candidateUser = (match[1] || "").replace(/\/$/, "");
+          if (RESERVED_PROVIDER_HANDLES.has(candidateUser.toLowerCase())) {
+            break;
+          }
           const normalized = normalizeProviderUrl(rule.provider, candidateUser, cleaned);
           const conf = checkHandleConfidence(candidateUser);
           addFootprint({
@@ -331,7 +344,7 @@ function checkHandleConfidence(username: string): { validationResult: "valid" | 
       const match = line.match(rule.pattern);
       if (match) {
         const candidateUser = (match[1] || "").replace(/\/$/, "");
-        if (candidateUser && (!rule.usernameRegex || rule.usernameRegex.test(candidateUser))) {
+        if (candidateUser && !RESERVED_PROVIDER_HANDLES.has(candidateUser.toLowerCase()) && (!rule.usernameRegex || rule.usernameRegex.test(candidateUser))) {
           const normalized = normalizeProviderUrl(rule.provider, candidateUser, match[0]);
           const conf = checkHandleConfidence(candidateUser);
           addFootprint({

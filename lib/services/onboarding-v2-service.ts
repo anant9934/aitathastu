@@ -258,9 +258,9 @@ export async function completeOnboarding(personId: string, input: unknown) {
 
   for (const claim of draft.resumeReviewed) {
     const category: "education" | "skill" | "project" | "goal" | "experience" | "other" =
-      claim.category === "certification" || claim.category === "achievement" || claim.category === "publication"
-        ? "other"
-        : claim.category;
+      claim.category === "education" || claim.category === "skill" || claim.category === "project" || claim.category === "experience"
+        ? claim.category
+        : "other";
     await add(
       category,
       claim.value,

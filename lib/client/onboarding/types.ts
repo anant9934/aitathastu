@@ -82,7 +82,23 @@ export type TechCandidate = {
 
 export type ReviewedResumeClaim = {
   candidateId?: string;
-  category: "education" | "experience" | "project" | "skill" | "certification" | "achievement" | "publication";
+  category:
+    | "education"
+    | "experience"
+    | "project"
+    | "skill"
+    | "certification"
+    | "achievement"
+    | "publication"
+    | "leadership"
+    | "summary"
+    | "research"
+    | "hackathon"
+    | "training"
+    | "volunteering"
+    | "language"
+    | "digitalFootprint"
+    | "additional";
   value: string;
   sourceSpan: string;
   documentId: string;

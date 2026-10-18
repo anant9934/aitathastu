@@ -52,19 +52,26 @@ type JobStatus = {
   result?: Record<string, any> | null;
 };
 
-const RECORD_CANDIDATE_ID = /^[a-z]+_\d+$/;
+const RECORD_CANDIDATE_ID = /^[a-zA-Z_]+_\d+$/;
 
-/** Review sections, structured per record category (Phase 8). */
+/** Review sections, structured per record category for all 16 CV categories. */
 export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: ResumeCandidate["category"][] }> = [
   { id: "identity", title: "Identity and contact", categories: ["profile"] },
+  { id: "summary", title: "Professional summary", categories: ["summary"] },
   { id: "education", title: "Education", categories: ["education"] },
-  { id: "skills", title: "Skills", categories: ["skill"] },
-  { id: "experience", title: "Experience and training", categories: ["experience"] },
+  { id: "skills", title: "Skills and technologies", categories: ["skill"] },
+  { id: "experience", title: "Work experience and internships", categories: ["experience"] },
+  { id: "leadership", title: "Leadership and positions", categories: ["leadership"] },
   { id: "projects", title: "Projects", categories: ["project"] },
   { id: "certifications", title: "Certifications", categories: ["certification"] },
-  { id: "publications", title: "Research and publications", categories: ["publication"] },
-  { id: "achievements", title: "Achievements", categories: ["achievement"] },
-  { id: "links", title: "Digital footprints", categories: ["link"] },
+  { id: "achievements", title: "Achievements and awards", categories: ["achievement"] },
+  { id: "research", title: "Research and intellectual property", categories: ["research", "publication"] },
+  { id: "hackathons", title: "Hackathons and competitions", categories: ["hackathon"] },
+  { id: "training", title: "Training, courses and workshops", categories: ["training"] },
+  { id: "volunteering", title: "Volunteering and community", categories: ["volunteering"] },
+  { id: "languages", title: "Languages", categories: ["language"] },
+  { id: "links", title: "Digital footprints", categories: ["link", "digitalFootprint"] },
+  { id: "additional", title: "Additional information", categories: ["additional"] },
 ];
 
 export const FIELD_LABELS: Record<string, string> = {
@@ -140,7 +147,12 @@ export function useResumeIngestion({
       ? result.reviewCandidates.flatMap((item: Record<string, unknown>) => {
           const { category, candidateId, value, sourceSpan, field, recordData } = item ?? {};
           if (
-            !["profile", "link", "education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
+            ![
+              "profile", "link", "education", "experience", "project", "skill",
+              "certification", "achievement", "publication", "leadership",
+              "summary", "research", "hackathon", "training", "volunteering",
+              "language", "digitalFootprint", "additional"
+            ].includes(String(category)) ||
             typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string"
           ) return [];
           return [{

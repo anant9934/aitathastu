@@ -11,6 +11,20 @@ import { z } from "zod";
 // Task A: Resume Interpretation (PROFILE_EXTRACT)
 // ------------------------------------------------------------------------------
 export const ResumeInterpretationSchema = z.object({
+  personal: z.object({
+    fullName: z.string().max(100).optional(),
+    email: z.string().email().optional().or(z.literal("")),
+    title: z.string().max(150).optional(),
+    location: z.string().max(150).optional(),
+    sourceSpan: z.string().max(300).optional(),
+  }).optional(),
+  summary: z.object({
+    headline: z.string().max(200).optional(),
+    text: z.string().max(2000).optional(),
+    careerObjective: z.string().max(1000).optional(),
+    aboutMe: z.string().max(1500).optional(),
+    sourceSpan: z.string().max(300).optional(),
+  }).optional(),
   education: z.array(
     z.object({
       institution: z.string().min(1).max(200),
@@ -52,7 +66,10 @@ export const ResumeInterpretationSchema = z.object({
       name: z.string().min(1).max(100),
       category: z.enum(["language", "framework", "library", "tool", "concept", "other"]).default("other"),
       proficiencyHint: z.enum(["beginner", "intermediate", "advanced", "unknown"]).default("unknown"),
-      sourceSpan: z.string().min(3).max(200),
+      sourceSpan: z.string().min(1).max(200),
+      isExplicit: z.boolean().default(true).optional(),
+      sourceSection: z.string().max(50).default("skills").optional(),
+      associatedEntity: z.string().max(150).optional(),
     })
   ).default([]),
   certifications: z.array(
@@ -60,7 +77,11 @@ export const ResumeInterpretationSchema = z.object({
       name: z.string().min(1).max(200),
       issuer: z.string().max(150).optional(),
       year: z.string().max(20).optional(),
-      sourceSpan: z.string().min(3).max(300),
+      issueDate: z.string().max(30).optional(),
+      expiryDate: z.string().max(30).optional(),
+      credentialId: z.string().max(100).optional(),
+      credentialUrl: z.string().url().max(500).optional().or(z.literal("")),
+      sourceSpan: z.string().min(1).max(300),
     })
   ).default([]),
   achievements: z.array(
@@ -75,6 +96,91 @@ export const ResumeInterpretationSchema = z.object({
       sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),
+  leadership: z.array(
+    z.object({
+      organization: z.string().min(1).max(150),
+      role: z.string().min(1).max(150),
+      type: z.enum(["founder", "leadership", "advisor", "student_org", "nonprofit", "other"]).default("leadership"),
+      startDate: z.string().max(30).optional(),
+      endDate: z.string().max(30).optional(),
+      duration: z.string().max(100).optional(),
+      responsibilities: z.array(z.string().max(500)).default([]).optional(),
+      impact: z.string().max(500).optional(),
+      sourceSpan: z.string().min(1).max(300),
+      underlyingRecordId: z.string().max(100).optional(),
+    })
+  ).default([]).optional(),
+  research: z.array(
+    z.object({
+      title: z.string().min(1).max(250),
+      type: z.enum(["paper", "conference", "journal", "book", "patent", "thesis", "report", "other"]).default("paper"),
+      publisher: z.string().max(150).optional(),
+      date: z.string().max(30).optional(),
+      doi: z.string().max(100).optional(),
+      url: z.string().url().max(500).optional().or(z.literal("")),
+      description: z.string().max(500).default("").optional(),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
+  hackathons: z.array(
+    z.object({
+      event: z.string().min(1).max(200),
+      organizer: z.string().max(150).optional(),
+      type: z.string().max(50).optional(),
+      date: z.string().max(30).optional(),
+      project: z.string().max(200).optional(),
+      rank: z.string().max(50).optional(),
+      award: z.string().max(150).optional(),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
+  training: z.array(
+    z.object({
+      title: z.string().min(1).max(200),
+      provider: z.string().max(150).optional(),
+      duration: z.string().max(100).optional(),
+      dates: z.string().max(100).optional(),
+      completionStatus: z.string().max(50).optional(),
+      certificateLink: z.string().max(500).optional(),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
+  volunteering: z.array(
+    z.object({
+      organization: z.string().min(1).max(150),
+      role: z.string().min(1).max(150),
+      dates: z.string().max(100).optional(),
+      responsibilities: z.array(z.string().max(500)).default([]).optional(),
+      impact: z.string().max(500).optional(),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
+  languages: z.array(
+    z.object({
+      language: z.string().min(1).max(100),
+      proficiency: z.string().max(50).optional(),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
+  digitalFootprints: z.array(
+    z.object({
+      platform: z.string().min(1).max(50),
+      url: z.string().url().max(500),
+      handle: z.string().max(100).optional(),
+      type: z.enum(["profile", "repository", "organization", "portfolio", "unresolved"]).default("profile"),
+      discoveryMethod: z.string().max(50).default("cv_source"),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
+  additional: z.array(
+    z.object({
+      heading: z.string().min(1).max(100),
+      content: z.string().max(1500),
+      suggestedCategory: z.string().max(50).optional(),
+      uncertaintyReason: z.string().max(200).optional(),
+      sourceSpan: z.string().min(1).max(300),
+    })
+  ).default([]).optional(),
 });
 
 export type ResumeInterpretationOutput = z.infer<typeof ResumeInterpretationSchema>;

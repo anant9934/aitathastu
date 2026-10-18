@@ -37,7 +37,23 @@ export type Project = ReviewEditMeta & {
 };
 export type ReviewedResumeClaim = {
   candidateId?: string;
-  category: "education" | "experience" | "project" | "skill" | "certification" | "achievement" | "publication";
+  category:
+    | "education"
+    | "experience"
+    | "project"
+    | "skill"
+    | "certification"
+    | "achievement"
+    | "publication"
+    | "leadership"
+    | "summary"
+    | "research"
+    | "hackathon"
+    | "training"
+    | "volunteering"
+    | "language"
+    | "digitalFootprint"
+    | "additional";
   value: string;
   sourceSpan: string;
   documentId: string;
@@ -239,7 +255,11 @@ export function safeDraft(value: unknown): OnboardingDraft {
     },
     acceptedResumeSkills: strings(raw.acceptedResumeSkills),
     resumeReviewed: Array.isArray(raw.resumeReviewed) ? raw.resumeReviewed.slice(0, 100).filter((claim): claim is ReviewedResumeClaim =>
-      Boolean(claim && ["education", "experience", "project", "skill", "certification", "achievement"].includes(claim.category) &&
+      Boolean(claim && [
+        "education", "experience", "project", "skill", "certification", "achievement",
+        "publication", "leadership", "summary", "research", "hackathon", "training",
+        "volunteering", "language", "digitalFootprint", "additional"
+      ].includes(claim.category) &&
       typeof claim.value === "string" && typeof claim.sourceSpan === "string" &&
       typeof claim.documentId === "string" && RESUME_DOCUMENT_ID.test(claim.documentId))
     ).map((claim) => ({ candidateId: str(claim.candidateId, 80) || undefined, category: claim.category, value: str(claim.value, 300), sourceSpan: str(claim.sourceSpan, 300), documentId: claim.documentId, corrected: claim.corrected === true })) : [],

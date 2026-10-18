@@ -65,7 +65,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : x.graduationYear ? `Class of ${x.graduationYear}` : undefined,
       ].filter(Boolean);
       return {
-        value: parts.join(" · ") || x.institution || "Education Entry",
+        value: (x as any).displayText || parts.join(" · ") || x.institution || "Education Entry",
         sourceSpan: x.sourceSpan,
         recordData: x as Record<string, any>,
       };
@@ -80,7 +80,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : x.duration,
       ].filter(Boolean);
       return {
-        value: parts.join(" · ") || x.company || "Experience Entry",
+        value: (x as any).displayText || parts.join(" · ") || x.company || "Experience Entry",
         sourceSpan: x.sourceSpan,
         recordData: x as Record<string, any>,
       };
@@ -92,19 +92,19 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       const techSnippet = x.technologies && x.technologies.length > 0 ? ` (${x.technologies.slice(0, 3).join(", ")})` : "";
       const descSnippet = x.description ? ` — ${x.description.length > 70 ? x.description.slice(0, 67) + "…" : x.description}` : "";
       return {
-        value: `${x.title}${techSnippet}${descSnippet}`,
+        value: (x as any).displayText || `${x.title}${techSnippet}${descSnippet}`,
         sourceSpan: x.sourceSpan,
         recordData: x as Record<string, any>,
       };
     })
   );
-  add("skill", extracted.skills.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan, recordData: x as Record<string, any> })));
+  add("skill", extracted.skills.map((x) => ({ value: (x as any).displayText || x.name, sourceSpan: x.sourceSpan, recordData: x as Record<string, any> })));
   add(
     "certification",
     extracted.certifications.map((x) => {
       const parts = [x.name, x.issuer, x.year].filter(Boolean);
       return {
-        value: parts.join(" · "),
+        value: (x as any).displayText || parts.join(" · "),
         sourceSpan: x.sourceSpan,
         recordData: x as Record<string, any>,
       };
@@ -120,7 +120,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
           const cat = x.category ? ` (${x.category})` : "";
           const desc = x.description ? ` — ${x.description.length > 60 ? x.description.slice(0, 57) + "…" : x.description}` : "";
           return {
-            value: `${x.title}${cat}${desc}`,
+            value: (x as any).displayText || `${x.title}${cat}${desc}`,
             sourceSpan: x.sourceSpan,
             recordData: x as Record<string, any>,
           };
@@ -134,13 +134,132 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
           const cat = x.category ? ` (${x.category})` : "";
           const desc = x.description ? ` — ${x.description.length > 60 ? x.description.slice(0, 57) + "…" : x.description}` : "";
           return {
-            value: `${x.title}${cat}${desc}`,
+            value: (x as any).displayText || `${x.title}${cat}${desc}`,
             sourceSpan: x.sourceSpan,
             recordData: x as Record<string, any>,
           };
         })
       );
     }
+  }
+  if (Array.isArray(extracted.leadership) && extracted.leadership.length > 0) {
+    add(
+      "leadership",
+      extracted.leadership.map((x) => {
+        const parts = [
+          x.role,
+          x.organization,
+          x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : undefined,
+        ].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" · ") || x.organization || "Leadership Entry",
+          sourceSpan: x.sourceSpan || (x as any).displayText || x.role || "",
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (extracted.summary && (extracted.summary.text || extracted.summary.headline)) {
+    const s = extracted.summary;
+    const val = (s as any).displayText || (s.headline ? `${s.headline} — ${s.text || ""}` : s.text || "");
+    add(
+      "summary",
+      [{
+        value: val,
+        sourceSpan: s.sourceSpan || s.text || s.headline || "",
+        recordData: s as Record<string, any>,
+      }]
+    );
+  }
+  if (Array.isArray(extracted.research) && extracted.research.length > 0) {
+    add(
+      "research",
+      extracted.research.map((x) => {
+        const parts = [x.title, x.type, x.publisher, x.date].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" · ") || x.title || "Research Entry",
+          sourceSpan: x.sourceSpan || x.title || "",
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (Array.isArray(extracted.hackathons) && extracted.hackathons.length > 0) {
+    add(
+      "hackathon",
+      extracted.hackathons.map((x) => {
+        const parts = [x.event, x.organizer, x.award || x.rank, x.date].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" · ") || x.event || "Hackathon Entry",
+          sourceSpan: x.sourceSpan || x.event || "",
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (Array.isArray(extracted.training) && extracted.training.length > 0) {
+    add(
+      "training",
+      extracted.training.map((x) => {
+        const parts = [x.title, x.provider, x.dates, x.duration].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" · ") || x.title || "Training Entry",
+          sourceSpan: x.sourceSpan || x.title || "",
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (Array.isArray(extracted.volunteering) && extracted.volunteering.length > 0) {
+    add(
+      "volunteering",
+      extracted.volunteering.map((x) => {
+        const parts = [x.role, x.organization, x.dates].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" · ") || x.organization || "Volunteering Entry",
+          sourceSpan: x.sourceSpan || x.organization || "",
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (Array.isArray(extracted.languages) && extracted.languages.length > 0) {
+    add(
+      "language",
+      extracted.languages.map((x) => {
+        const parts = [x.language, x.proficiency].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" — ") || x.language,
+          sourceSpan: x.sourceSpan || x.language,
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (Array.isArray(extracted.digitalFootprints) && extracted.digitalFootprints.length > 0) {
+    add(
+      "digitalFootprint",
+      extracted.digitalFootprints.map((x) => {
+        const parts = [x.platform, x.url, x.handle ? `@${x.handle}` : undefined].filter(Boolean);
+        return {
+          value: (x as any).displayText || parts.join(" · ") || x.url,
+          sourceSpan: x.sourceSpan || x.url,
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
+  }
+  if (Array.isArray(extracted.additional) && extracted.additional.length > 0) {
+    add(
+      "additional",
+      extracted.additional.map((x) => {
+        return {
+          value: (x as any).displayText || `${x.heading}: ${x.content.slice(0, 100)}`,
+          sourceSpan: x.sourceSpan || x.content,
+          recordData: x as Record<string, any>,
+        };
+      })
+    );
   }
   return candidates;
 }

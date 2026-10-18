@@ -4,8 +4,8 @@ Two services:
 
 | Service | Host | Config |
 |---|---|---|
-| Next.js app | Vercel, production branch `newmain` | `vercel.json` |
-| Resume extractor (Python) | Render (Docker), branch `newmain` | `render.yaml` |
+| Next.js app | Vercel, production branch `main` | `vercel.json` |
+| Resume extractor (Python) | Render (Docker), branch `main` | `render.yaml` |
 
 ## 1. Database (Neon)
 
@@ -21,7 +21,7 @@ Two services:
 ## 2. Resume extractor (Render)
 
 1. Render Dashboard → Blueprints → connect the repo; `render.yaml` defines `aitathastu-resume-extractor`.
-   For the existing `aitathastu` service, use branch `newmain`, root directory
+   For the existing `aitathastu` service, use branch `main`, root directory
    `services/resume-extractor`, and Dockerfile `./Dockerfile` relative to that root.
 2. Set `EXTRACTOR_API_TOKEN` (Render can generate it), optionally `EXTRACTOR_VERIFIER_TOKEN`,
    and `ALLOWED_ORIGIN` = your `APP_BASE_URL`.
@@ -31,9 +31,8 @@ Two services:
 ## 3. Next.js app (Vercel)
 
 1. Use the existing `professor-f740/aitathastu` Vercel project. Under Settings →
-   Environments → Production, set branch tracking to `newmain`. Deploying or
-   redeploying `main` serves the older resume flow; `newmain` must be Production,
-   not just a Preview deployment. Build settings come from `vercel.json`
+   Environments → Production, set branch tracking to `main`.
+   Build settings come from `vercel.json`
    (`npm ci --include=dev`, `npm run build`, Next.js). Node 22 is pinned in `package.json`.
 2. Environment variables (see `.env.example` for the full list). Set these for the
    **Production** environment, then redeploy after any change:

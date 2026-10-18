@@ -16,7 +16,7 @@ roadmap). There's also a faculty workspace with an evidence verification queue.
 | CV parsing | In-process text extraction (pdf.js, mammoth). Scanned PDFs are OCR'd by the separate Python service |
 | Resume extractor | Python FastAPI + PyMuPDF + Tesseract in `services/resume-extractor/`, deployed on Render |
 | AI | Optional multi-provider LLM pool for EORA, with a deterministic fallback. CV extraction uses no LLM |
-| Hosting | Vercel (Next.js app), Render (extractor), both from `newmain` |
+| Hosting | Vercel (Next.js app), Render (extractor), both from `main` |
 
 How it fits together: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). How to deploy it: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 

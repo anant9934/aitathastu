@@ -7,7 +7,7 @@
 services:
   - type: web
     name: aitathastu-resume-extractor
-    branch: newmain
+    branch: main
     runtime: docker
     rootDir: services/resume-extractor
     dockerfilePath: Dockerfile

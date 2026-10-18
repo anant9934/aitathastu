@@ -142,9 +142,18 @@ export class IntelligenceRouter {
 
           await this.logAudit(request, finalResponse, latencyMs, "success");
           return finalResponse;
-        } catch {
-          // Provider failure (429 or 5xx) -> set 60s cooldown
-          this.setProviderCooldown(provider.name, 60_000);
+        } catch (error) {
+          let cooldownMs = 60_000;
+          if (error instanceof ProviderHttpError) {
+            if (error.status === 402 || error.isAccountWideQuota) {
+              cooldownMs = (error.retryAfterMs && error.retryAfterMs > 0)
+                ? Math.max(error.retryAfterMs, 15 * 60_000)
+                : 60 * 60_000;
+            } else if (error.retryAfterMs && error.retryAfterMs > 0) {
+              cooldownMs = Math.max(error.retryAfterMs, 60_000);
+            }
+          }
+          this.setProviderCooldown(provider.name, cooldownMs);
           continue;
         }
       }
@@ -218,11 +227,26 @@ export class IntelligenceRouter {
         } catch (error) {
           const ms = Date.now() - t0;
           if (error instanceof ProviderHttpError) {
+            const isAccountWide = error.status === 402 || error.isAccountWideQuota;
             const transient = error.status === 429 || error.status >= 500;
-            if (transient) this.setProviderCooldown(provider.name, 60_000);
-            // 402: billing/plan problem on the whole account; don't retry it for an hour.
-            if (error.status === 402) this.setProviderCooldown(provider.name, 60 * 60_000);
-            attempts.push({ provider: provider.name, outcome: transient ? "rate_limited_or_5xx" : "rejected_4xx", status: error.status, ms, detail: error.message.slice(0, 300) });
+            if (isAccountWide) {
+              const accountCooldown = (error.retryAfterMs && error.retryAfterMs > 0)
+                ? Math.max(error.retryAfterMs, 15 * 60_000)
+                : 60 * 60_000;
+              this.setProviderCooldown(provider.name, accountCooldown);
+            } else if (transient) {
+              const cooldown = (error.retryAfterMs && error.retryAfterMs > 0)
+                ? Math.max(error.retryAfterMs, 60_000)
+                : 60_000;
+              this.setProviderCooldown(provider.name, cooldown);
+            }
+            attempts.push({
+              provider: provider.name,
+              outcome: isAccountWide ? "account_quota_exceeded" : transient ? "rate_limited_or_5xx" : "rejected_4xx",
+              status: error.status,
+              ms,
+              detail: error.message.slice(0, 300),
+            });
           } else {
             const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
             if (timedOut) this.setProviderCooldown(provider.name, 60_000);
@@ -239,7 +263,7 @@ export class IntelligenceRouter {
 
 export type StructuredAttempt = {
   provider: ModelProviderName;
-  outcome: "ok" | "cooling_down" | "malformed_json" | "schema_violation" | "rate_limited_or_5xx" | "rejected_4xx" | "timeout" | "network_error";
+  outcome: "ok" | "cooling_down" | "malformed_json" | "schema_violation" | "rate_limited_or_5xx" | "rejected_4xx" | "timeout" | "network_error" | "account_quota_exceeded";
   status?: number;
   ms: number;
   detail?: string;

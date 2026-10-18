@@ -26,10 +26,12 @@ Return the corrected JSON object only. Do not add information that is not in the
 }
 
 /**
- * Runs `attempt` with successive keys from the pool: a 401/403 drops that key,
- * a 429 moves to the next key (keys are often separately throttled), up to 3
- * keys per call. Anything else (incl. 402 billing, which is account-wide)
- * is thrown to the router at once.
+ * Runs `attempt` with successive keys from the pool:
+ * - 401/403 drops that key and rotates to the next key.
+ * - 429: If it's an account-wide limit (e.g. RESOURCE_EXHAUSTED, insufficient_quota, daily caps),
+ *   rotating keys under the same account is futile and wasteful. It is thrown to the router at once.
+ * - 429 per-key rate limit: Honors provider-supplied backoff before next attempt (if <= 2000ms), then rotates.
+ * - Anything else (incl. 402 billing, which is account-wide) is thrown to the router at once.
  */
 async function withKeyRotation<T>(pool: KeyPool, provider: ModelProviderName, attempt: (key: string) => Promise<T>): Promise<T> {
   const tries = Math.min(3, Math.max(1, pool.size()));
@@ -42,8 +44,21 @@ async function withKeyRotation<T>(pool: KeyPool, provider: ModelProviderName, at
     } catch (error) {
       last = error;
       if (!(error instanceof ProviderHttpError)) throw error;
-      if (error.status === 401 || error.status === 403) { pool.markKeyFailed(key); continue; }
-      if (error.status === 429) continue;
+      if (error.status === 401 || error.status === 403) {
+        pool.markKeyFailed(key);
+        continue;
+      }
+      if (error.status === 429) {
+        // Do NOT rotate credentials against an account-wide limit
+        if (error.isAccountWideQuota) {
+          throw error;
+        }
+        // Honor provider-supplied backoff before next key attempt if short
+        if (error.retryAfterMs && error.retryAfterMs > 0 && error.retryAfterMs <= 2000) {
+          await new Promise((resolve) => setTimeout(resolve, error.retryAfterMs));
+        }
+        continue;
+      }
       throw error;
     }
   }
@@ -51,7 +66,8 @@ async function withKeyRotation<T>(pool: KeyPool, provider: ModelProviderName, at
 }
 
 async function readProviderError(provider: ModelProviderName, res: Response): Promise<never> {
-  throw new ProviderHttpError(provider, res.status, await res.text().catch(() => ""));
+  const body = await res.text().catch(() => "");
+  throw new ProviderHttpError(provider, res.status, body, res.headers);
 }
 import { KeyPool } from "./key-pool";
 
@@ -87,6 +103,7 @@ abstract class BaseHttpProvider implements ModelProvider {
       ],
       temperature: request.temperature ?? 0.2,
       max_tokens: request.maxTokens ?? 1000,
+      ...(this.defaultModel.includes("gpt-oss") ? { reasoning_effort: "low" } : {}),
     };
 
     const res = await fetch(this.endpointUrl, {
@@ -103,7 +120,7 @@ abstract class BaseHttpProvider implements ModelProvider {
       if (res.status === 401 || res.status === 403) {
         this.keyPool.markKeyFailed(key);
       }
-      throw new Error(`Provider ${this.name} request failed with status ${res.status}`);
+      return readProviderError(this.name, res);
     }
 
     const data = await res.json();
@@ -241,7 +258,10 @@ Return the corrected JSON only.` }] },
     });
 
     if (!res.ok) {
-      throw new Error(`Gemini API error: ${res.status}`);
+      if (res.status === 401 || res.status === 403) {
+        this.keyPool.markKeyFailed(key);
+      }
+      return readProviderError("gemini", res);
     }
 
     const data = await res.json();

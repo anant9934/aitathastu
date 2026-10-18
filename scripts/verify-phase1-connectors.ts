@@ -89,7 +89,12 @@ describe("1.7.2 connector circuit breaker", () => {
     assert.equal(sent[1].headers.get("x-correlation-id"), null);
   });
 
-  test("breaker state lives in Redis, so every instance sees it", async () => {
+  test("breaker state lives in Redis, so every instance sees it", async (t) => {
+    const reachable = await fetch("http://127.0.0.1:18079").then(() => true).catch(() => false);
+    if (!reachable) {
+      t.skip("Local Upstash emulator container is not running on 18079");
+      return;
+    }
     process.env.UPSTASH_REDIS_REST_URL = "http://127.0.0.1:18079";
     process.env.UPSTASH_REDIS_REST_TOKEN = "phase1token";
     const { redisPipeline } = await import("../lib/cache/redis");

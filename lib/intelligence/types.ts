@@ -65,11 +65,113 @@ export type StructuredCompletionRequest = CompletionRequest & {
 
 export type StructuredProviderResponse = { content: string; modelUsed: string; totalTokens?: number };
 
+export function parseProviderRetryAfter(
+  headers?: Headers | Record<string, string | null | undefined> | null,
+  body?: string
+): number | undefined {
+  if (headers) {
+    const getHeader = (name: string): string | null | undefined => {
+      if (typeof (headers as Headers).get === "function") {
+        return (headers as Headers).get(name);
+      }
+      const record = headers as Record<string, string | null | undefined>;
+      return record[name] ?? record[name.toLowerCase()];
+    };
+
+    const retryAfter = getHeader("retry-after");
+    if (retryAfter) {
+      const sec = parseFloat(retryAfter);
+      if (!isNaN(sec) && isFinite(sec)) {
+        return Math.max(0, Math.round(sec * 1000));
+      }
+      const dateMs = Date.parse(retryAfter);
+      if (!isNaN(dateMs)) {
+        return Math.max(0, dateMs - Date.now());
+      }
+    }
+
+    const retryAfterMs = getHeader("retry-after-ms");
+    if (retryAfterMs) {
+      const ms = parseFloat(retryAfterMs);
+      if (!isNaN(ms) && isFinite(ms)) {
+        return Math.max(0, Math.round(ms));
+      }
+    }
+
+    const resetReq = getHeader("x-ratelimit-reset-requests") || getHeader("x-ratelimit-reset-tokens");
+    if (resetReq) {
+      if (resetReq.endsWith("ms")) {
+        const ms = parseFloat(resetReq.slice(0, -2));
+        if (!isNaN(ms) && isFinite(ms)) return Math.max(0, Math.round(ms));
+      } else if (resetReq.endsWith("s")) {
+        const s = parseFloat(resetReq.slice(0, -1));
+        if (!isNaN(s) && isFinite(s)) return Math.max(0, Math.round(s * 1000));
+      } else {
+        const val = parseFloat(resetReq);
+        if (!isNaN(val) && isFinite(val)) return Math.max(0, Math.round(val * 1000));
+      }
+    }
+  }
+
+  if (body) {
+    const match = body.match(/try again in\s+([0-9.]+)\s*(ms|s|sec|seconds|m|min|minutes)/i);
+    if (match) {
+      const amount = parseFloat(match[1]);
+      const unit = match[2].toLowerCase();
+      if (!isNaN(amount) && isFinite(amount)) {
+        if (unit.startsWith("ms")) return Math.round(amount);
+        if (unit.startsWith("m")) return Math.round(amount * 60_000);
+        return Math.round(amount * 1000);
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function isAccountWideQuotaError(status: number, body?: string): boolean {
+  if (status === 402) return true;
+  if (!body) return false;
+  const lower = body.toLowerCase();
+  return (
+    lower.includes("resource_exhausted") ||
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota_exceeded") ||
+    lower.includes("quota exceeded") ||
+    lower.includes("exceeded your current quota") ||
+    lower.includes("daily_limit") ||
+    lower.includes("daily limit") ||
+    lower.includes("tokens per day") ||
+    lower.includes("requests per day") ||
+    lower.includes("tpd") ||
+    lower.includes("rpd") ||
+    lower.includes("organization quota") ||
+    lower.includes("account quota") ||
+    lower.includes("account-wide") ||
+    lower.includes("check your plan and billing") ||
+    lower.includes("free_tier_limit")
+  );
+}
+
 export class ProviderHttpError extends Error {
-  constructor(readonly provider: ModelProviderName, readonly status: number, body: string) {
+  readonly retryAfterMs?: number;
+  readonly isAccountWideQuota: boolean;
+  readonly responseBody: string;
+
+  constructor(
+    readonly provider: ModelProviderName,
+    readonly status: number,
+    body: string,
+    headers?: Headers | Record<string, string | null | undefined> | null
+  ) {
     super(`${provider} ${status}: ${body.slice(0, 300)}`);
+    this.name = "ProviderHttpError";
+    this.responseBody = body;
+    this.retryAfterMs = parseProviderRetryAfter(headers, body);
+    this.isAccountWideQuota = isAccountWideQuotaError(status, body);
   }
 }
+
 
 export interface ModelProvider {
   name: ModelProviderName;

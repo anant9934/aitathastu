@@ -16,6 +16,12 @@ import crypto from "node:crypto";
 
 const PROVIDER_KEYS = ["GROQ_API_KEYS", "GEMINI_API_KEYS", "OPENROUTER_API_KEYS", "CEREBRAS_API_KEYS", "MISTRAL_API_KEYS", "SAMBANOVA_API_KEYS"];
 for (const k of PROVIDER_KEYS) process.env[k] = `stub-${k.toLowerCase()}`;
+for (const p of ["GROQ", "GEMINI", "OPENROUTER", "CEREBRAS", "MISTRAL", "SAMBANOVA"]) {
+  for (let i = 1; i <= 10; i++) {
+    delete process.env[`${p}_API_KEY_${i}`];
+    delete process.env[`${p}_API_KEYS_${i}`];
+  }
+}
 (process.env as Record<string, string>).NODE_ENV = "test";
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -187,6 +193,43 @@ describe("1.1.2 resume structuring through IntelligenceRouter", () => {
     }
   });
 
+  test("429 with account-wide limit (RESOURCE_EXHAUSTED / quota_exceeded): no key rotation, provider cooled down", async () => {
+    process.env.GROQ_API_KEYS = "key1,key2,key3";
+    try {
+      const router = freshRouter();
+      stubProviders({
+        [HOST.groq]: () => new Response(JSON.stringify({ error: { message: "Quota exceeded for organization: RESOURCE_EXHAUSTED" } }), { status: 429 }),
+        [HOST.gemini]: gemini(VALID),
+      });
+      const out = await structureResumeText("text", "p1", router);
+      assert.equal(out.provider, "gemini");
+      // Key rotation must NOT have rotated keys 2 and 3 against an account-wide limit: exactly 1 call to groq
+      assert.equal(calls.filter((c) => c.host === HOST.groq).length, 1);
+      assert.equal(router.isProviderCoolingDown("groq"), true);
+    } finally {
+      process.env.GROQ_API_KEYS = "stub-groq_api_keys";
+    }
+  });
+
+  test("429 with Retry-After header: honors provider-supplied backoff for cooldown", async () => {
+    process.env.GROQ_API_KEYS = "single_key";
+    try {
+      const router = freshRouter();
+      stubProviders({
+        [HOST.groq]: () => new Response("rate limited", { status: 429, headers: { "Retry-After": "120" } }),
+        [HOST.gemini]: gemini(VALID),
+      });
+      const before = Date.now();
+      const out = await structureResumeText("text", "p1", router);
+      assert.equal(out.provider, "gemini");
+      const until = (router as unknown as { cooldowns: Map<string, number> }).cooldowns.get("groq")!;
+      // Cooldown must be at least 120 seconds based on Retry-After
+      assert.ok(until - before >= 119 * 1000, `Expected cooldown >= 120s, got ${until - before}ms`);
+    } finally {
+      process.env.GROQ_API_KEYS = "stub-groq_api_keys";
+    }
+  });
+
   test("Gemini schema conversion: nullable string becomes anyOf string|null", () => {
     assert.deepEqual(toGeminiJsonSchema({ type: ["string", "null"] }), { anyOf: [{ type: "string" }, { type: "null" }] });
   });
@@ -294,13 +337,18 @@ describe("1.7.1 AI quota", () => {
     assert.equal(calls.length, 0);
   });
 
-  test("distributed: 3 processes x 20 concurrent reservations share one Redis counter (limit 30 -> exactly 30 granted)", async () => {
+  test("distributed: 3 processes x 20 concurrent reservations share one Redis counter (limit 30 -> exactly 30 granted)", async (t) => {
     const env = {
       ...process.env,
       UPSTASH_REDIS_REST_URL: process.env.TEST_UPSTASH_URL || "http://127.0.0.1:18079",
       UPSTASH_REDIS_REST_TOKEN: process.env.TEST_UPSTASH_TOKEN || "phase1token",
       CLOUD_AI_GLOBAL_DAILY_LIMIT: "30",
     };
+    const reachable = await fetch(env.UPSTASH_REDIS_REST_URL).then(() => true).catch(() => false);
+    if (!reachable) {
+      t.skip("Local Upstash emulator container is not running on 18079");
+      return;
+    }
     // A random far-future day isolates this run's keys from any other.
     const day = new Date(Date.UTC(2100 + crypto.randomInt(0, 800), crypto.randomInt(0, 12), 1)).toISOString();
     const run = promisify(execFile);

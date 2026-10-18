@@ -242,10 +242,12 @@ export async function importGitHubRepositories(params: {
       const deep = acq.deep.get(repo.full_name);
       if (deep?.failure) failedRepos.push({ repo: repo.full_name, reason: deep.failure });
       try {
-        const project = mapRawRepoToProject(repo, deep);
+        const project = mapRawRepoToProject(repo, deep, params.login);
         await saveSourceSnapshot(personId, "github", project.repositoryUrl, {
           fullName: repo.full_name, pushedAt: repo.pushed_at, title: project.title, description: project.description,
           technologies: project.technologies, stars: project.stars, forks: project.forks, isFork: project.isFork,
+          isArchived: project.isArchived, isTemplate: project.isTemplate, isEmpty: project.isEmpty,
+          projectClassification: project.projectClassification, license: project.license,
           detectedManifests: project.detectedManifests, checksum: project.checksum,
           correlationId: ctx.correlationId, syncedAt: new Date().toISOString(),
         }, project.checksum);
@@ -260,7 +262,19 @@ export async function importGitHubRepositories(params: {
           status: "candidate",
           aiDetails: { categories: project.aiMlCategories || [], observedFiles: project.observedFiles || [], primaryLanguage: project.primaryLanguage || null },
           // Ledger chips the student can choose to show (Task 2.5.4).
-          metadata: { stars: project.stars, forks: project.forks, isFork: project.isFork, languages: project.languages },
+          metadata: {
+            stars: project.stars,
+            forks: project.forks,
+            isFork: project.isFork,
+            languages: project.languages,
+            externalRepoId: project.externalRepoId,
+            projectClassification: project.projectClassification,
+            isArchived: project.isArchived,
+            isTemplate: project.isTemplate,
+            isEmpty: project.isEmpty,
+            license: project.license || undefined,
+            analysisStage: project.analysisStage,
+          },
         });
         await writeEvidenceBatch(personId, project.technologyFindings.map((finding) => ({
           category: "skill" as const,

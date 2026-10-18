@@ -14,8 +14,10 @@ import crypto from "crypto";
 import {
   detectRepositoryTechnologies,
   classifyRepositoryAiMl,
+  classifyRepositoryType,
   type TechnologyFinding,
   type AiMlProjectCategory,
+  type RepositoryClassification,
 } from "./tech-detector";
 import { sanitizeTextForPrompt } from "@/lib/intelligence/prompt-defense";
 
@@ -55,6 +57,10 @@ export interface RawGitHubRepo {
   fork?: boolean;
   private?: boolean;
   archived?: boolean;
+  isTemplate?: boolean;
+  isEmpty?: boolean;
+  diskUsage?: number;
+  license?: string | null;
   default_branch?: string;
   created_at?: string;
   updated_at?: string;
@@ -64,6 +70,7 @@ export interface RawGitHubRepo {
   readmeSnippet?: string;
   languages?: Record<string, number>;
   workflows?: string[];
+  projectClassification?: RepositoryClassification;
 }
 
 export interface DiscoveredGitHubProject {
@@ -78,10 +85,15 @@ export interface DiscoveredGitHubProject {
   technologies: string[];
   technologyFindings: TechnologyFinding[];
   aiMlCategories: AiMlProjectCategory[];
+  projectClassification: RepositoryClassification;
   stars: number;
   forks: number;
   isFork: boolean;
   isArchived: boolean;
+  isTemplate?: boolean;
+  isEmpty?: boolean;
+  diskUsage?: number;
+  license?: string | null;
   isPrivate: boolean;
   sources: string[];
   status: "candidate";
@@ -112,19 +124,19 @@ export interface FetchGitHubIntelligenceResult {
   source: "api" | "fallback";
   /** Repos whose README/manifests could not be read (rate limit, timeout, HTTP error). Their tech lists are incomplete. */
   failedRepos: Array<{ repo: string; reason: string }>;
-  /** True when the account has more public repos than were listed (MAX_REPO_PAGES cap). */
+  /** True when the account has more public repos than were listed. */
   truncated: boolean;
   rateLimited: boolean;
 }
 
-/** Bounded so one import cannot exhaust the shared 5000/h (token) or 60/h (anonymous) budget. */
-const MAX_REPO_PAGES = 3;
+/** Default discovery window: unconstrained by default, bounded only by rate limits or student quota. */
+const DEFAULT_MAX_REPOS = 2000;
 const REPOS_PER_PAGE = 100;
 
 const GITHUB_API_BASE = "https://api.github.com";
-const USER_AGENT = "AI-Tathastu-LiveIntelligence/4.3";
+const USER_AGENT = "AI-Tathastu-LiveIntelligence/5.0";
 const DEFAULT_TIMEOUT_MS = 8000;
-const MAX_DEEP_INSPECT_REPOS = 6;
+const MAX_DEEP_INSPECT_REPOS = 15;
 const MAX_README_CHARS = 4000;
 
 function buildHeaders(token?: string): Record<string, string> {
@@ -212,20 +224,29 @@ export async function fetchGitHubUserProfile(
   }
 }
 
+function detectedManifestsCount(manifests: Record<string, string>): number {
+  return Object.keys(manifests).length;
+}
+
 /**
- * 2. Repository Discovery: GET /users/{username}/repos (with bounded pagination)
+ * 2. Repository Discovery: GET /users/{username}/repos (with complete pagination)
  */
 export async function fetchGitHubUserRepos(
   username: string,
   options: { token?: string; maxRepos?: number } = {}
-): Promise<{ success: boolean; repos: RawGitHubRepo[]; error?: string; rateLimited?: boolean }> {
+): Promise<{
+  success: boolean;
+  repos: RawGitHubRepo[];
+  error?: string;
+  rateLimited?: boolean;
+  totalPublicRepos?: number;
+  isComplete?: boolean;
+}> {
   const clean = cleanGitHubUsername(username);
-  const maxRepos = options.maxRepos ?? MAX_REPO_PAGES * REPOS_PER_PAGE;
+  const maxRepos = options.maxRepos ?? DEFAULT_MAX_REPOS;
   const token = options.token;
   const repos: RawGitHubRepo[] = [];
   let page = 1;
-  // Always request full pages. Sizing the page to maxRepos (e.g. 60) used to
-  // make the first page look "full" and silently stop after it.
   const perPage = REPOS_PER_PAGE;
 
   try {
@@ -245,16 +266,39 @@ export async function fetchGitHubUserRepos(
       }
       if (!res.ok) return { success: false, repos, error: `GitHub API error (${res.status}).` };
 
-      const pageRepos = (await res.json()) as RawGitHubRepo[];
+      const pageRepos = (await res.json()) as any[];
       if (!Array.isArray(pageRepos) || pageRepos.length === 0) break;
 
-      repos.push(...pageRepos);
+      const normalized: RawGitHubRepo[] = pageRepos.map((r) => ({
+        id: Number(r.id),
+        name: String(r.name),
+        full_name: String(r.full_name || `${clean}/${r.name}`),
+        description: r.description ? String(r.description) : null,
+        html_url: String(r.html_url || `https://github.com/${clean}/${r.name}`),
+        language: r.language ? String(r.language) : null,
+        topics: Array.isArray(r.topics) ? r.topics : [],
+        stargazers_count: Number(r.stargazers_count || 0),
+        forks_count: Number(r.forks_count || 0),
+        fork: Boolean(r.fork),
+        private: Boolean(r.private),
+        archived: Boolean(r.archived),
+        isTemplate: Boolean(r.is_template),
+        isEmpty: Boolean(r.size === 0),
+        diskUsage: Number(r.size || 0),
+        license: r.license?.spdx_id || r.license?.name || null,
+        default_branch: r.default_branch ? String(r.default_branch) : undefined,
+        created_at: r.created_at ? String(r.created_at) : undefined,
+        updated_at: r.updated_at ? String(r.updated_at) : undefined,
+        pushed_at: r.pushed_at ? String(r.pushed_at) : undefined,
+        homepage: r.homepage ? String(r.homepage) : null,
+      }));
+
+      repos.push(...normalized);
       if (pageRepos.length < perPage || repos.length >= maxRepos) break;
       page++;
-      if (page > MAX_REPO_PAGES) break;
     }
 
-    return { success: true, repos: repos.slice(0, maxRepos) };
+    return { success: true, repos: repos.slice(0, maxRepos), isComplete: true };
   } catch {
     return { success: false, repos, error: "Could not fetch repositories from GitHub." };
   }
@@ -306,10 +350,13 @@ export async function fetchRepositoryManifestsAndReadme(
     "requirements.txt",
     "pyproject.toml",
     "Pipfile",
+    "poetry.lock",
     "Dockerfile",
     "docker-compose.yml",
     "go.mod",
     "Cargo.toml",
+    "pom.xml",
+    "build.gradle",
   ];
 
   // All requests for one repo run concurrently: done serially, a 6-repo sync
@@ -370,7 +417,8 @@ export function mapRawRepoToProject(
     languages?: Record<string, number>;
     manifests?: Record<string, string>;
     observedFiles?: string[];
-  }
+  },
+  userLogin?: string
 ): DiscoveredGitHubProject {
   const manifests = deepInspection?.manifests || repo.manifests || {};
   const languages = deepInspection?.languages || repo.languages || {};
@@ -391,8 +439,31 @@ export function mapRawRepoToProject(
   // 2. Classify AI/ML domains
   const aiMlCategories = classifyRepositoryAiMl(techFindings, repo.topics || [], repo.description || "");
 
+  // 3. Classify repository nature (original, fork, contributed, tutorial, experiment, etc.)
+  const [ownerLogin] = (repo.full_name || "").split("/");
+  const projectClassification = repo.projectClassification || classifyRepositoryType({
+    isFork: repo.fork,
+    isArchived: repo.archived,
+    isEmpty: repo.isEmpty || (repo.diskUsage === 0),
+    isTemplate: repo.isTemplate,
+    ownerLogin,
+    userLogin,
+    name: repo.name,
+    description: repo.description,
+    topics: repo.topics,
+    aiMlCategories,
+  });
+
   const checksum = calculateProjectChecksum(repo, techNames);
   const isPrivate = Boolean(repo.private);
+
+  // Progressive analysis stage
+  let analysisStage: "metadata" | "manifest_verified" | "deep_inspected" = "metadata";
+  if (deepInspection?.manifests && Object.keys(deepInspection.manifests).length > 0) {
+    analysisStage = "deep_inspected";
+  } else if (deepInspection?.readme || detectedManifestsCount(manifests) > 0) {
+    analysisStage = "manifest_verified";
+  }
 
   return {
     id: `gh_${repo.id}`,
@@ -406,10 +477,15 @@ export function mapRawRepoToProject(
     technologies: techNames,
     technologyFindings: techFindings,
     aiMlCategories,
+    projectClassification,
     stars: repo.stargazers_count || 0,
     forks: repo.forks_count || 0,
     isFork: Boolean(repo.fork),
     isArchived: Boolean(repo.archived),
+    isTemplate: Boolean(repo.isTemplate),
+    isEmpty: Boolean(repo.isEmpty || repo.diskUsage === 0),
+    diskUsage: repo.diskUsage,
+    license: repo.license || null,
     isPrivate,
     sources: ["github"],
     status: "candidate",
@@ -420,6 +496,7 @@ export function mapRawRepoToProject(
     studentContributionStatus: "UNVERIFIED",
     lastGitHubSyncAt: new Date().toISOString(),
     lastGitHubPushAt: repo.pushed_at || repo.updated_at || new Date().toISOString(),
+    analysisStage,
   };
 }
 
@@ -461,10 +538,10 @@ export async function fetchGitHubIntelligence(
 
   const profile = profileRes.profile;
 
-  // Step 2: Repository Discovery
+  // Step 2: Repository Discovery (Uncapped, complete pagination across all pages)
   const reposRes = await fetchGitHubUserRepos(clean, {
     token,
-    maxRepos: options.maxReposToDiscover,
+    maxRepos: options.maxReposToDiscover ?? Math.max(DEFAULT_MAX_REPOS, profile.public_repos),
   });
 
   if (!reposRes.success) {
@@ -492,7 +569,7 @@ export async function fetchGitHubIntelligence(
   const relevantRepos = allRepos.filter((r) => !r.private);
 
   // Step 3: Deep content inspection for priority candidate repos
-  // Prioritize active, non-fork repos with most recent pushes
+  // Prioritize active, non-fork repos with most recent pushes and AI/ML potential
   const sortedPriorityRepos = [...relevantRepos].sort((a, b) => {
     if (a.fork !== b.fork) return a.fork ? 1 : -1;
     const timeA = new Date(a.pushed_at || 0).getTime();
@@ -511,16 +588,16 @@ export async function fetchGitHubIntelligence(
     const [owner, name] = repo.full_name ? repo.full_name.split("/") : [clean, repo.name];
     const deepData = await fetchRepositoryManifestsAndReadme(owner, name, token);
     if (deepData.failure) failedRepos.push({ repo: repo.name, reason: deepData.failure });
-    const mapped = mapRawRepoToProject(repo, deepData);
+    const mapped = mapRawRepoToProject(repo, deepData, clean);
     projects.push(mapped);
     for (const f of mapped.technologyFindings) {
       if (!allFindingsMap.has(f.name)) allFindingsMap.set(f.name, f);
     }
   }
 
-  // Map remaining repos using shallow metadata
+  // Map remaining repos using metadata stage without silent drop
   for (const repo of sortedPriorityRepos.slice(maxInspect)) {
-    const mapped = mapRawRepoToProject(repo);
+    const mapped = mapRawRepoToProject(repo, undefined, clean);
     projects.push(mapped);
     for (const f of mapped.technologyFindings) {
       if (!allFindingsMap.has(f.name)) allFindingsMap.set(f.name, f);

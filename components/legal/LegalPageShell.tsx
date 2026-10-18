@@ -25,7 +25,7 @@ import {
   LEGAL_DOCUMENTS,
   getLegalNavGrouped,
   type ParsedLegalDocument,
-} from "@/lib/legal/legal-service";
+} from "@/lib/legal/legal-meta";
 import { LegalContentRenderer, formatInlineText } from "./LegalContentRenderer";
 
 export function LegalPageShell({

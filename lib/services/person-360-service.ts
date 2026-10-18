@@ -122,6 +122,10 @@ export type Person360Result = {
     technologies: string[];
     sources: string[];
     status: string;
+    repositoryUrl?: string | null;
+    demoUrl?: string | null;
+    portfolioIncluded?: boolean;
+    metadata?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
   }>;
@@ -298,6 +302,10 @@ export async function getPerson360(
       technologies: (p.technologies as string[]) || [],
       sources: (p.sources as string[]) || [],
       status: p.status,
+      repositoryUrl: p.repositoryUrl || null,
+      demoUrl: p.demoUrl || null,
+      portfolioIncluded: p.portfolioIncluded ?? false,
+      metadata: (p.metadata as Record<string, unknown>) || null,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
     })),

@@ -63,14 +63,14 @@ interface TechDefinition {
 
 export const TECHNOLOGY_REGISTRY: TechDefinition[] = [
   // --- Languages ---
-  { name: "Python", category: "Languages", manifestPackages: ["python"], configFiles: [/requirements\.txt$/i, /pyproject\.toml$/i, /pipfile$/i], readmeKeywords: [/\bpython\b/i] },
+  { name: "Python", category: "Languages", manifestPackages: ["python"], configFiles: [/requirements\.txt$/i, /pyproject\.toml$/i, /pipfile$/i, /poetry\.lock$/i], readmeKeywords: [/\bpython\b/i] },
   { name: "TypeScript", category: "Languages", manifestPackages: ["typescript", "ts-node", "tsx"], configFiles: [/tsconfig\.json$/i], readmeKeywords: [/\btypescript\b/i] },
   { name: "JavaScript", category: "Languages", manifestPackages: ["javascript"], configFiles: [/package\.json$/i], readmeKeywords: [/\bjavascript\b/i] },
   { name: "SQL", category: "Languages", manifestPackages: ["sql"], configFiles: [/\.sql$/i], readmeKeywords: [/\bsql\b/i] },
   { name: "Go", category: "Languages", manifestPackages: ["go"], configFiles: [/go\.mod$/i], readmeKeywords: [/\bgolang\b/i, /\bgo\b/i] },
   { name: "Rust", category: "Languages", manifestPackages: ["rust"], configFiles: [/cargo\.toml$/i], readmeKeywords: [/\brust\b/i] },
   { name: "C++", category: "Languages", manifestPackages: ["cpp"], configFiles: [/cmakelists\.txt$/i, /\.cpp$/i], readmeKeywords: [/\bc\+\+\b/i] },
-  { name: "Java", category: "Languages", manifestPackages: ["java"], configFiles: [/pom\.xml$/i, /build\.gradle$/i], readmeKeywords: [/\bjava\b/i] },
+  { name: "Java", category: "Languages", manifestPackages: ["java"], configFiles: [/pom\.xml$/i, /build\.gradle$/i, /build\.gradle\.kts$/i], readmeKeywords: [/\bjava\b/i] },
 
   // --- AI & ML Core ---
   { name: "PyTorch", category: "AI & ML", manifestPackages: ["torch", "torchvision", "torchaudio", "pytorch-lightning"], readmeKeywords: [/\bpytorch\b/i] },
@@ -84,16 +84,22 @@ export const TECHNOLOGY_REGISTRY: TechDefinition[] = [
   { name: "NumPy", category: "AI & ML", manifestPackages: ["numpy"], readmeKeywords: [/\bnumpy\b/i] },
   { name: "SciPy", category: "AI & ML", manifestPackages: ["scipy"], readmeKeywords: [/\bscipy\b/i] },
   { name: "ONNX", category: "AI & ML", manifestPackages: ["onnx", "onnxruntime"], readmeKeywords: [/\bonnx\b/i] },
+  { name: "Polars", category: "AI & ML", manifestPackages: ["polars"], readmeKeywords: [/\bpolars\b/i] },
 
   // --- GenAI & LLMs ---
   { name: "Transformers", category: "GenAI", manifestPackages: ["transformers", "@huggingface/transformers"], readmeKeywords: [/\btransformers\b/i] },
-  { name: "Hugging Face", category: "GenAI", manifestPackages: ["huggingface_hub", "datasets", "accelerate", "diffusers"], readmeKeywords: [/\bhugging\s*face\b/i] },
+  { name: "Hugging Face", category: "GenAI", manifestPackages: ["huggingface_hub", "datasets", "accelerate", "diffusers", "tokenizers"], readmeKeywords: [/\bhugging\s*face\b/i] },
   { name: "LangChain", category: "GenAI", manifestPackages: ["langchain", "langchain-core", "langchain-community", "@langchain/core"], readmeKeywords: [/\blangchain\b/i] },
   { name: "LangGraph", category: "GenAI", manifestPackages: ["langgraph", "@langchain/langgraph"], readmeKeywords: [/\blanggraph\b/i] },
   { name: "LlamaIndex", category: "GenAI", manifestPackages: ["llama-index", "llamaindex"], readmeKeywords: [/\bllama-?index\b/i] },
   { name: "OpenAI API", category: "GenAI", manifestPackages: ["openai"], readmeKeywords: [/\bopenai\b/i, /\bgpt-[34o]\b/i] },
   { name: "Anthropic API", category: "GenAI", manifestPackages: ["anthropic"], readmeKeywords: [/\banthropic\b/i, /\bclaude\b/i] },
   { name: "vLLM", category: "GenAI", manifestPackages: ["vllm"], readmeKeywords: [/\bvllm\b/i] },
+  { name: "Ollama", category: "GenAI", manifestPackages: ["ollama"], readmeKeywords: [/\bollama\b/i] },
+  { name: "LiteLLM", category: "GenAI", manifestPackages: ["litellm"], readmeKeywords: [/\blitellm\b/i] },
+  { name: "SentenceTransformers", category: "GenAI", manifestPackages: ["sentence-transformers"], readmeKeywords: [/\bsentence-transformers\b/i] },
+  { name: "BitsAndBytes", category: "GenAI", manifestPackages: ["bitsandbytes"], readmeKeywords: [/\bbitsandbytes\b/i] },
+  { name: "PEFT", category: "GenAI", manifestPackages: ["peft"], readmeKeywords: [/\bpeft\b/i] },
 
   // --- Vector DBs & RAG ---
   { name: "ChromaDB", category: "GenAI", manifestPackages: ["chromadb", "chroma"], readmeKeywords: [/\bchromadb?\b/i] },
@@ -120,6 +126,7 @@ export const TECHNOLOGY_REGISTRY: TechDefinition[] = [
   { name: "Flask", category: "Backend", manifestPackages: ["flask"], readmeKeywords: [/\bflask\b/i] },
   { name: "Express", category: "Backend", manifestPackages: ["express"], readmeKeywords: [/\bexpress(\.js)?\b/i] },
   { name: "NestJS", category: "Backend", manifestPackages: ["@nestjs/core"], readmeKeywords: [/\bnestjs\b/i] },
+  { name: "Spring Boot", category: "Backend", manifestPackages: ["spring-boot-starter-web", "spring-boot"], readmeKeywords: [/\bspring boot\b/i] },
   { name: "Streamlit", category: "Backend", manifestPackages: ["streamlit"], readmeKeywords: [/\bstreamlit\b/i] },
   { name: "Gradio", category: "Backend", manifestPackages: ["gradio"], readmeKeywords: [/\bgradio\b/i] },
 
@@ -128,6 +135,10 @@ export const TECHNOLOGY_REGISTRY: TechDefinition[] = [
   { name: "MongoDB", category: "Databases", manifestPackages: ["mongodb", "mongoose", "pymongo"], readmeKeywords: [/\bmongodb\b/i] },
   { name: "Redis", category: "Databases", manifestPackages: ["redis", "ioredis"], readmeKeywords: [/\bredis\b/i] },
   { name: "SQLite", category: "Databases", manifestPackages: ["sqlite3", "better-sqlite3"], readmeKeywords: [/\bsqlite\b/i] },
+  { name: "MySQL", category: "Databases", manifestPackages: ["mysql", "mysql2", "pymysql"], readmeKeywords: [/\bmysql\b/i] },
+  { name: "Supabase", category: "Databases", manifestPackages: ["@supabase/supabase-js", "supabase"], readmeKeywords: [/\bsupabase\b/i] },
+  { name: "Neon", category: "Databases", manifestPackages: ["@neondatabase/serverless"], readmeKeywords: [/\bneon(\.tech)?\b/i] },
+  { name: "DuckDB", category: "Databases", manifestPackages: ["duckdb"], readmeKeywords: [/\bduckdb\b/i] },
 
   // --- DevOps & Cloud ---
   { name: "Docker", category: "DevOps & Cloud", configFiles: [/dockerfile$/i, /docker-compose/i], readmeKeywords: [/\bdocker\b/i] },
@@ -135,6 +146,8 @@ export const TECHNOLOGY_REGISTRY: TechDefinition[] = [
   { name: "Kubernetes", category: "DevOps & Cloud", configFiles: [/\bk8s\b/i, /helm/i], readmeKeywords: [/\bkubernetes\b/i, /\bk8s\b/i] },
   { name: "GitHub Actions", category: "DevOps & Cloud", configFiles: [/\.github\/workflows/i], readmeKeywords: [/\bgithub actions\b/i] },
   { name: "Vercel", category: "DevOps & Cloud", configFiles: [/vercel\.json$/i], readmeKeywords: [/\bvercel\b/i] },
+  { name: "AWS", category: "DevOps & Cloud", manifestPackages: ["aws-sdk", "@aws-sdk/client-s3", "boto3"], readmeKeywords: [/\baws\b/i] },
+  { name: "GCP", category: "DevOps & Cloud", manifestPackages: ["@google-cloud/storage", "google-cloud-storage"], readmeKeywords: [/\bgcp\b/i, /\bgoogle cloud\b/i] },
 ];
 
 /**
@@ -175,6 +188,11 @@ export function extractManifestPackages(filename: string, content: string): stri
       for (const am of arrayMatches) {
         pkgs.push(am[1].toLowerCase());
       }
+    } else if (lowerName === "poetry.lock") {
+      const pkgMatches = [...content.matchAll(/name\s*=\s*["']([a-zA-Z0-9_\-]+)["']/g)];
+      for (const pm of pkgMatches) {
+        pkgs.push(pm[1].toLowerCase());
+      }
     } else if (lowerName === "pipfile") {
       const lines = content.split(/\r?\n/);
       for (const line of lines) {
@@ -194,9 +212,30 @@ export function extractManifestPackages(filename: string, content: string): stri
         const m = trimmed.match(/^(?:require\s+)?([a-zA-Z0-9.\-_/]+)\s+v/);
         if (m) pkgs.push(m[1].toLowerCase());
       }
+    } else if (lowerName === "pom.xml") {
+      const artifactMatches = [...content.matchAll(/<artifactId>([a-zA-Z0-9_\-]+)<\/artifactId>/gi)];
+      for (const am of artifactMatches) {
+        pkgs.push(am[1].toLowerCase());
+      }
+    } else if (lowerName === "build.gradle" || lowerName === "build.gradle.kts") {
+      const gradleMatches = [...content.matchAll(/(?:implementation|api|compileOnly|runtimeOnly)\s*\(?["'](?:[^:"']+:)??([a-zA-Z0-9_\-]+)(?::[^"']+)?["']\)?/gi)];
+      for (const gm of gradleMatches) {
+        pkgs.push(gm[1].toLowerCase());
+      }
     } else if (lowerName === "dockerfile" || lowerName.endsWith("dockerfile")) {
       if (/cuda/i.test(content)) pkgs.push("cuda");
       if (/python/i.test(content)) pkgs.push("python");
+    } else if (lowerName === "docker-compose.yml" || lowerName === "docker-compose.yaml") {
+      if (/postgres|psql/i.test(content)) pkgs.push("postgresql");
+      if (/redis/i.test(content)) pkgs.push("redis");
+      if (/mongo/i.test(content)) pkgs.push("mongodb");
+      if (/mysql/i.test(content)) pkgs.push("mysql");
+      if (/chroma/i.test(content)) pkgs.push("chromadb");
+      if (/qdrant/i.test(content)) pkgs.push("qdrant");
+      if (/weaviate/i.test(content)) pkgs.push("weaviate");
+      if (/minio/i.test(content)) pkgs.push("minio");
+      if (/rabbitmq/i.test(content)) pkgs.push("rabbitmq");
+      if (/kafka/i.test(content)) pkgs.push("kafka");
     }
   } catch {
     // Malformed manifest non-fatal
@@ -462,3 +501,88 @@ export function classifyRepositoryAiMl(
 
   return Array.from(categories);
 }
+
+export type RepositoryClassification =
+  | "original"
+  | "fork"
+  | "contributed"
+  | "learning_exercise"
+  | "template"
+  | "experiment"
+  | "archived"
+  | "empty"
+  | "ai_ml"
+  | "other";
+
+/**
+ * Deterministically classifies repository nature based on metadata, topics, and code.
+ */
+export function classifyRepositoryType(params: {
+  isFork?: boolean;
+  isArchived?: boolean;
+  isEmpty?: boolean;
+  isTemplate?: boolean;
+  diskUsage?: number;
+  ownerLogin?: string;
+  userLogin?: string;
+  name: string;
+  description?: string | null;
+  topics?: string[];
+  technologies?: string[];
+  aiMlCategories?: AiMlProjectCategory[];
+}): RepositoryClassification {
+  if (params.isEmpty || params.diskUsage === 0) return "empty";
+  if (params.isArchived) return "archived";
+  if (params.isTemplate) return "template";
+  if (params.isFork) return "fork";
+
+  // Check contributed: if owner doesn't match user
+  if (params.ownerLogin && params.userLogin && params.ownerLogin.toLowerCase() !== params.userLogin.toLowerCase()) {
+    return "contributed";
+  }
+
+  const text = `${params.name} ${params.description || ""} ${(params.topics || []).join(" ")}`.toLowerCase();
+
+  // Learning exercises / tutorials / coursework
+  if (/\b(tutorial|course|practice|exercise|exercises|100-days|100days|bootcamp|assignment|homework|study|notes|solutions|dsa|leetcode)\b/i.test(text)) {
+    return "learning_exercise";
+  }
+
+  // Experiments / sandbox
+  if (/\b(test|experiment|playground|scratch|demo-sandbox|trial|sandbox)\b/i.test(text)) {
+    return "experiment";
+  }
+
+  // AI/ML projects
+  const resolvedCategories =
+    params.aiMlCategories ||
+    (params.technologies && params.technologies.length > 0
+      ? classifyRepositoryAiMl(
+          params.technologies.map((t) =>
+            typeof t === "string"
+              ? { name: t, category: "AI & ML" as const, provenance: "SOURCE_IMPORTED" as const, confidence: 1.0 }
+              : t
+          ),
+          params.topics,
+          text
+        )
+      : []);
+
+  if (
+    resolvedCategories &&
+    resolvedCategories.some((c) => c !== "Non-AI/ML Software" && c !== "UNKNOWN")
+  ) {
+    return "ai_ml";
+  }
+
+  return "original";
+}
+
+/**
+ * Convenient helper to detect technologies from manifest files only.
+ */
+export function detectTechnologiesFromManifests(manifests: Record<string, string>): TechnologyFinding[] {
+  return detectRepositoryTechnologies({ manifests });
+}
+
+

@@ -104,7 +104,7 @@ test("Audit 1.1: Precision, Recall, and Grounding on Labeled Fixture", () => {
   // Identity verification
   assert.equal(det.profile.fullName, GROUND_TRUTH_1.fullName, "Name matches ground truth");
   assert.equal(det.profile.email, GROUND_TRUTH_1.email, "Email matches ground truth");
-  assert.equal(det.profile.mobile, GROUND_TRUTH_1.phone, "Phone matches ground truth");
+  assert.equal(det.profile.mobile, undefined, "Phone extraction strictly prohibited per V4 privacy guarantee");
 
   // Education recall
   const extractedInstitutions = det.interpretation.education.map((e) => e.institution);

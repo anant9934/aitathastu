@@ -67,7 +67,7 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
     ...data.academic,
     fullName: ap.fullName || data.academic.fullName,
     email: ap.email || data.academic.email,
-    mobile: ap.mobile || data.academic.mobile,
+    mobile: data.academic.mobile, // Preserved strictly from user account without CV overwrite
     institution: ap.institution || data.academic.institution,
     degree: ap.degree || data.academic.degree,
     department: ap.specialization || data.academic.department,
@@ -97,7 +97,7 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
     resumeCovered: covered,
     resumeReviewed,
     resumeFileName: fileName,
-    extractedResumeFields: Object.keys(ap).map((k) => (k === "specialization" ? "department" : k)),
+    extractedResumeFields: Object.keys(ap).filter((k) => k !== "mobile" && k !== "phone").map((k) => (k === "specialization" ? "department" : k)),
   };
   const patch = {
     skills, projects, experiences, achievements,

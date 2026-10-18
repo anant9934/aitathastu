@@ -12,12 +12,18 @@ async function POST_handler(req: Request) {
   if (!auth) return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
   const limit = await checkRateLimitDistributed(auth.person.id, "sync");
   if (!limit.allowed) return NextResponse.json({ error: "Too many attempts. Wait a minute." }, { status: 429 });
-  const body = (await req.json().catch(() => null)) as { email?: string; password?: string; consent?: boolean } | null;
-  if (body?.consent !== true) return NextResponse.json({ error: "Please confirm you want us to sign in to LinkedIn for you." }, { status: 400 });
-  if (!body.email || !body.password) return NextResponse.json({ error: "Enter your LinkedIn email and password." }, { status: 400 });
+  const body = (await req.json().catch(() => null)) as { email?: string; password?: string; consent?: boolean; profileUrl?: string } | null;
+  if (body?.password) {
+    return NextResponse.json({
+      error: "Automated password sign-in is disabled in compliance with LinkedIn terms and security policy. Please link your profile URL or upload your student-authorized data export archive.",
+      compliantOptions: ["profile_url", "data_export_archive", "oauth"],
+    }, { status: 400 });
+  }
+  if (body?.consent !== true) return NextResponse.json({ error: "Please confirm your consent to link your LinkedIn profile." }, { status: 400 });
+  if (!body.email && !body.profileUrl) return NextResponse.json({ error: "Enter your LinkedIn profile URL or email." }, { status: 400 });
   try {
     const requestId = req.headers.get("idempotency-key")?.trim().slice(0, 120) || undefined;
-    return NextResponse.json(await connectLinkedIn(auth.person.id, body.email, body.password, requestId));
+    return NextResponse.json(await connectLinkedIn(auth.person.id, body.email || body.profileUrl || "", undefined, requestId));
   } catch (error) {
     if (error instanceof LinkedInPolicyError) return NextResponse.json({ error: error.message, retryAt: error.retryAt?.toISOString() }, { status: 409 });
     throw error;

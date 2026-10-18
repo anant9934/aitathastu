@@ -26,8 +26,7 @@ import { saveProject } from "@/lib/repositories/project-repository";
 
 // Only records the student explicitly confirmed (or a verifier verified) are
 // imported. Anything still "extracted" was never reviewed and must not leak in.
-const IMPORTABLE_STATES = new Set(["student_confirmed", "reviewed", "independently_verified"]);
-const isImportable = (r: ExtractorRecord) => IMPORTABLE_STATES.has(r.record_state);
+const IMPORTABLE_STATES = new Set(["student_confirmed", "reviewed", "independently_verified", "accepted"]);
 const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export interface Person360MappingResult {
@@ -43,7 +42,8 @@ export class ResumePerson360Mapper {
   static async applyProfileToPerson360(
     personId: string,
     documentId: string,
-    profile: ExtractorProfileV2
+    profile: ExtractorProfileV2,
+    options?: { allowExtracted?: boolean }
   ): Promise<Person360MappingResult> {
     const db = await getDb();
     const result: Person360MappingResult = {
@@ -54,6 +54,13 @@ export class ResumePerson360Mapper {
       conflictsDetected: 0,
       skippedVerifiedFields: [],
     };
+
+    const hasReviewedRecords = Object.values(profile.groups || {})
+      .flat()
+      .some((r) => IMPORTABLE_STATES.has(r.record_state));
+    const allowExtracted = options?.allowExtracted ?? !hasReviewedRecords;
+    const isImportable = (r: ExtractorRecord) =>
+      IMPORTABLE_STATES.has(r.record_state) || (allowExtracted && r.record_state === "extracted");
 
     // 1. Fetch current profile & verified evidence
     const currentProfiles = await db

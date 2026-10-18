@@ -1,6 +1,6 @@
 """Experience, internship, projects and recognition extractors."""
 import re
-from .common import add,lines_of,years,METRIC,detect_skills,URL
+from .common import add,lines_of,years,METRIC,detect_skills,URL,normalize_url
 
 BULLET_PREFIX_RE = re.compile(r'^\s*[-•*»©°«+·◦–—]\s*')
 LOCATION_LINE_RE = re.compile(r'^\W*(?:©|Q|§)?\s*(?:united kingdom|london|seattle|rochester|bristol|suva|fiji|punjab|bihar|india|remote|hybrid|onsite|wa|ny|ri|uk|usa)\b', re.I)
@@ -159,9 +159,17 @@ def extract_experience(content,groups):
             clean_text = l.text.strip(' •*-«+»')
             if match := re.search(r'(?:at|@)\s+([\w &.\-]+)', l.text, re.I):
                 fields.setdefault('organization', (match.group(1).strip(), l, .78))
-            a, b = years(l.text)
-            if a: fields.setdefault('start_date', (a, l, .80))
-            if b: fields['end_date'] = (b, l, .80)
+            m_range = re.search(r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\s*[-–—to]+\s*(?:(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}|Present|Current|Ongoing)\b', l.text, re.I)
+            if m_range:
+                parts = re.split(r'[-–—to]+', m_range.group(0), maxsplit=1)
+                start_val = parts[0].strip()
+                end_val = parts[1].strip() if len(parts) > 1 else 'Present'
+                fields.setdefault('start_date', (start_val, l, .80))
+                if end_val: fields['end_date'] = (end_val, l, .80)
+            else:
+                a, b = years(l.text)
+                if a: fields.setdefault('start_date', (a, l, .80))
+                if b: fields['end_date'] = (b, l, .80)
             if re.search(r'\bpresent|current\b', l.text, re.I): fields['current_position'] = ('stated current', l, .80)
             if l != head and l != role_line and l != org_line and len(clean_text) > 20:
                 if not LOCATION_LINE_RE.search(clean_text) and not clean_text.startswith(('(', 'Q)', '§)')):
@@ -185,15 +193,28 @@ def extract_internships(content,groups):
             role_l = next((l for l in chunk[1:] if ROLE_KEYWORDS.search(l.text) and len(l.text.split()) <= 7), None)
             if role_l:
                 fields['role'] = (_clean_role(role_l.text), role_l, .80)
+        
+        resp_lines = []
         for l in chunk:
-            a,b=years(l.text)
-            if a: fields.setdefault('start_date',(a,l,.78))
-            if b: fields['end_date']=(b,l,.78)
+            # Check for full date range e.g. "Jul 2026 - Present"
+            m_range = re.search(r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\s*[-–—to]+\s*(?:(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}|Present|Current|Ongoing)\b', l.text, re.I)
+            if m_range:
+                parts = re.split(r'[-–—to]+', m_range.group(0), maxsplit=1)
+                start_val = parts[0].strip()
+                end_val = parts[1].strip() if len(parts) > 1 else 'Present'
+                fields.setdefault('start_date', (start_val, l, .80))
+                if end_val: fields['end_date'] = (end_val, l, .80)
+            else:
+                a,b=years(l.text)
+                if a: fields.setdefault('start_date',(a,l,.78))
+                if b: fields['end_date']=(b,l,.78)
             if m:=re.search(r'\b\d+\s*(?:weeks?|months?)\b',l.text,re.I): fields['duration']=(m.group(0),l,.89)
             if re.search(r'completed|in progress|ongoing',l.text,re.I):fields['completion_status']=(l.text,l,.68)
-            if l!=head and (not fields.get('role') or l.text!=fields['role'][0]) and len(l.text)>22:
-                fields.setdefault('responsibility',(l.text.strip(' •*-«+»'),l,.66))
+            if l!=head and (not fields.get('role') or l.text!=fields['role'][0]) and len(l.text)>20:
+                resp_lines.append(l.text.strip(' •*-«+»'))
             if skills:=detect_skills(l.text): fields['technologies']=(', '.join(skills),l,.78)
+        if resp_lines:
+            fields['responsibility'] = (' '.join(resp_lines), chunk[1] if len(chunk) > 1 else head, .70)
         add(groups,'internships',fields)
 
 def extract_projects(content,groups):
@@ -217,11 +238,16 @@ def extract_projects(content,groups):
             parts = raw_head.split(' | ')
             title, inline_desc = parts[0].strip(), parts[1].strip()
 
+        # Clean title casing e.g. "self-surveillance Car System" -> "Self-Surveillance Car System"
+        title = title.strip(' *•»«+-')
+        if title and (title[0].islower() or (len(title.split()) > 1 and title[0].islower())):
+            title = re.sub(r'(^|[\s\-])([a-z])', lambda m: m.group(1) + m.group(2).upper(), title)
+
         fields={'title':(title, head, .85)}
-        desc_line = next((l for l in chunk[1:] if len(l.text)>=22), None)
-        full_desc = ' '.join(filter(None, [inline_desc, desc_line.text if desc_line else ''])).strip()
+        desc_lines = [l.text.strip(' •*-«+»') for l in chunk[1:] if len(l.text.strip(' •*-«+»'))>=20]
+        full_desc = ' '.join(filter(None, [inline_desc] + desc_lines)).strip()
         if full_desc:
-            fields['description'] = (full_desc, desc_line or head, .70)
+            fields['description'] = (full_desc, chunk[1] if len(chunk) > 1 else head, .70)
 
         skills=[]
         for l in chunk:
@@ -233,20 +259,24 @@ def extract_projects(content,groups):
             if a:fields.setdefault('start_date',(a,l,.71))
             if b:fields['end_date']=(b,l,.71)
             for url in URL.findall(l.text):
-                if 'github.com' in url: fields['github_url']=(url,l,.92)
-                elif 'demo' in l.text.lower(): fields['demo_url']=(url,l,.84)
-                else: fields.setdefault('evidence_url',(url,l,.81))
+                norm = normalize_url(url)
+                if not norm: continue
+                if 'github.com' in norm: fields['github_url']=(norm,l,.92)
+                elif 'demo' in l.text.lower(): fields['demo_url']=(norm,l,.84)
+                else: fields.setdefault('evidence_url',(norm,l,.81))
         if skills:fields['technologies']=(', '.join(skills),head,.70)
         add(groups,'projects',fields)
 
 def extract_awards(content,groups):
     for line in lines_of(content,'awards'):
-        t=line.text.lstrip(' -•*»')
+        t=line.text.strip(' -•*»«‘°')
         if len(t)<4:continue
         fields={'name':(t,line,.78)}
         if re.search(r'participated|participant',t,re.I):fields['participation_status']=('participant',line,.85)
         elif re.search(r'won|winner|first place|1st|champion',t,re.I):fields['result']=(t,line,.82)
-        if re.search(r'rank\s*#?\d+|\b\d+(?:st|nd|rd|th)\s+place',t,re.I):fields['rank']=(t,line,.75)
+        rank_m = re.search(r'\b(?:District\s+Rank\s+\d+|Rank\s*#?\d+|\b\d+(?:st|nd|rd|th)\s+place)\b', t, re.I)
+        if rank_m:
+            fields['rank']=(rank_m.group(0),line,.85)
         a,_=years(t)
         if a: fields['date']=(a,line,.77)
         add(groups,'awards',fields)
@@ -272,6 +302,8 @@ def extract_certifications(content,groups):
         current.append(line)
     if current: chunks.append(current)
 
+    DATE_TOKEN_RE = re.compile(r'\b(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\b', re.I)
+
     for chunk in chunks:
         title_line = None
         issuer_line = None
@@ -290,7 +322,6 @@ def extract_certifications(content,groups):
                 issuer_line = l
 
         if not title_line:
-            # Fall back to first non-date line if available
             title_line = next((l for l in chunk if len(re.sub(r'[^a-zA-Z]', '', l.text)) >= 3), chunk[0])
 
         t = title_line.text.strip(' -•*©«»')
@@ -309,16 +340,29 @@ def extract_certifications(content,groups):
                     break
 
         fields = {'title': (title, title_line, .82)}
+        extracted_date = None
+
         if issuer:
-            issuer_clean = re.sub(r'\b(?:19|20)\d{2}\b', '', issuer).strip(' -•*,')
+            # Separate month + year from issuer
+            m_date = DATE_TOKEN_RE.search(issuer)
+            if m_date:
+                extracted_date = m_date.group(0).strip()
+                issuer_clean = (issuer[:m_date.start()] + issuer[m_date.end():]).strip(' -•*,|')
+            else:
+                issuer_clean = re.sub(r'\b(?:19|20)\d{2}\b', '', issuer).strip(' -•*,|')
             if issuer_clean: fields['issuer'] = (issuer_clean, issuer_line or title_line, .78)
 
         for l in chunk:
             if re.search(r'completed|earned|issued', l.text, re.I):
                 fields['completion_status'] = (l.text.strip(), l, .74)
-            a, b = years(l.text)
-            if a and 'issue_date' not in fields: fields['issue_date'] = (a, l, .75)
-            if b: fields['expiry_date'] = (b, l, .69)
+            if not extracted_date:
+                m_d = DATE_TOKEN_RE.search(l.text)
+                if m_d:
+                    extracted_date = m_d.group(0).strip()
             if skills := detect_skills(l.text):
                 fields['skills'] = (', '.join(skills), l, .72)
+
+        if extracted_date:
+            fields['issue_date'] = (extracted_date, title_line, .78)
         add(groups, 'certifications', fields)
+

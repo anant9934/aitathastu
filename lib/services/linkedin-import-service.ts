@@ -14,13 +14,12 @@
  * login attempt per 24 h, at most one import per 14 days; CAPTCHA, account
  * hold and wrong password dead-letter immediately.
  */
-import { decryptConnectionToken, encryptConnectionToken } from "@/lib/security/connection-token";
-import { disconnectConnection, getExternalConnectionByProvider, removeConnectionMetadataKeys, saveExternalConnection } from "@/lib/repositories/connection-repository";
+import { disconnectConnection, removeConnectionMetadataKeys } from "@/lib/repositories/connection-repository";
 import { writeEvidenceBatch } from "@/lib/repositories/evidence-repository";
 import { LinkedInWorker, LinkedInWorkerError, type LinkedInProfile } from "@/lib/connectors/linkedin/worker-client";
 import { SOURCE_SYNC_POLICY } from "@/lib/sync/policy";
 import {
-  claimSyncOperation, completeSyncOperation, failSyncOperation, latestSyncOperations, startSyncOperation,
+  completeSyncOperation, failSyncOperation, latestSyncOperations, startSyncOperation,
   setOperationResult, SyncError, transitionOperation, type SyncOperationRow,
 } from "@/lib/sync/sync-operation";
 import { logger } from "@/lib/logger";
@@ -66,29 +65,13 @@ export async function assertLinkedInAllowed(personId: string, now = Date.now()) 
   }
 }
 
-export async function connectLinkedIn(personId: string, email: string, password: string, requestId?: string): Promise<LinkedInStatus> {
+export async function connectLinkedIn(personId: string, _email?: string, _password?: string, _requestId?: string): Promise<LinkedInStatus> {
   await assertLinkedInAllowed(personId);
-  const prior = await getExternalConnectionByProvider(personId, "linkedin");
-  // AES-256-GCM, AAD bound to personId; the plaintext never reaches the DB or a log.
-  await saveExternalConnection({
-    personId, provider: "linkedin", externalUsername: email.trim().toLowerCase(),
-    profileUrl: prior?.profileUrl || "https://www.linkedin.com/",
-    status: "detected",
-    metadata: { ...((prior?.metadata as Record<string, unknown>) || {}), encryptedPassword: encryptConnectionToken(password, personId), sessionCookies: null },
-  });
-  const { operation } = await startSyncOperation({ personId, source: "linkedin", trigger: "user", requestId });
-  if (operation.state !== "queued") return view(operation);
-  const running = await claimSyncOperation(operation);
-  if (!running) return view(await latest(personId));
-  try {
-    const session = await LinkedInWorker.start(personId, email, password, running.correlationId);
-    const withSession = await setOperationResult(running, { workerSessionId: session.session_id });
-    logger.info("linkedin.session.started", { correlationId: running.correlationId, metadata: { operationId: running.id } });
-    return view(withSession);
-  } catch (error) {
-    const failed = await failSyncOperation(running, new SyncError(error instanceof Error ? error.message : "LinkedIn worker unavailable", "linkedin_worker_unavailable", false));
-    return view(failed);
-  }
+  // Cleanly purge any legacy stored passwords in compliance with DFI V5 security & privacy policy
+  await forgetStoredPassword(personId);
+  throw new LinkedInPolicyError(
+    "Automated password login is disabled for security and LinkedIn terms compliance. Please connect your profile via public URL or upload your student-authorized LinkedIn data export archive."
+  );
 }
 
 /** Poll: reflects the worker's state into the sync operation and persists a finished import. */
@@ -186,11 +169,10 @@ export async function disconnectLinkedIn(personId: string) {
   await disconnectConnection(personId, "linkedin");
 }
 
-/** For a scheduled 14-day refresh with the stored credentials (no OTP possible unattended: it would time out safely). */
+/** Stored passwords are permanently deprecated and never retrieved. */
 export async function storedLinkedInPassword(personId: string): Promise<string | null> {
-  const conn = await getExternalConnectionByProvider(personId, "linkedin");
-  const enc = (conn?.metadata as Record<string, unknown> | undefined)?.encryptedPassword;
-  return typeof enc === "string" ? decryptConnectionToken(enc, personId) : null;
+  await forgetStoredPassword(personId);
+  return null;
 }
 
 async function persistLinkedInProfile(personId: string, p: LinkedInProfile) {

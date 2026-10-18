@@ -32,6 +32,13 @@ export type ProjectLedgerMetadata = {
   forks?: number;
   isFork?: boolean;
   languages?: string[];
+  externalRepoId?: string | number;
+  projectClassification?: string;
+  isArchived?: boolean;
+  isTemplate?: boolean;
+  isEmpty?: boolean;
+  license?: string;
+  analysisStage?: string;
   /** The student's own role on the project, e.g. "Sole developer". */
   role?: string;
   /** Chips shown on the exported card, in order. */
@@ -43,7 +50,19 @@ export type ProjectLedgerMetadata = {
 };
 
 /** Keys an import (GitHub, Kaggle, CV) may write. Everything else is the student's. */
-export const IMPORT_METADATA_KEYS = ["stars", "forks", "isFork", "languages"] as const;
+export const IMPORT_METADATA_KEYS = [
+  "stars",
+  "forks",
+  "isFork",
+  "languages",
+  "externalRepoId",
+  "projectClassification",
+  "isArchived",
+  "isTemplate",
+  "isEmpty",
+  "license",
+  "analysisStage",
+] as const;
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : undefined);
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : undefined);
@@ -55,6 +74,13 @@ export function sanitizeLedgerMetadata(raw: unknown): ProjectLedgerMetadata {
   if (num(m.stars) !== undefined) out.stars = num(m.stars);
   if (num(m.forks) !== undefined) out.forks = num(m.forks);
   if (typeof m.isFork === "boolean") out.isFork = m.isFork;
+  if (typeof m.isArchived === "boolean") out.isArchived = m.isArchived;
+  if (typeof m.isTemplate === "boolean") out.isTemplate = m.isTemplate;
+  if (typeof m.isEmpty === "boolean") out.isEmpty = m.isEmpty;
+  if (m.externalRepoId !== undefined) out.externalRepoId = typeof m.externalRepoId === "number" ? m.externalRepoId : str(m.externalRepoId, 100);
+  if (str(m.projectClassification, 50)) out.projectClassification = str(m.projectClassification, 50);
+  if (str(m.license, 100)) out.license = str(m.license, 100);
+  if (str(m.analysisStage, 50)) out.analysisStage = str(m.analysisStage, 50);
   if (Array.isArray(m.languages)) out.languages = [...new Set(m.languages.map((l) => str(l, 40)).filter(Boolean) as string[])].slice(0, 12);
   const role = str(m.role, 80);
   if (role) out.role = role;

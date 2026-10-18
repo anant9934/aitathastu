@@ -45,7 +45,6 @@ export function buildProfileV2(params: {
     })],
     contact: [record(`ct_${documentId.slice(0, 8)}`, {
       email: field(p?.email, 0.98, "contact", p?.email, m),
-      phone: field(p?.mobile, 0.92, "contact", p?.mobile, m),
     })],
     education: x.education.map((e, i) => record(`edu_${i}`, {
       qualification: field(e.degree, 0.9, "education", e.sourceSpan, m),

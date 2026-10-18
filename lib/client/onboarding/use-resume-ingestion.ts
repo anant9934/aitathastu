@@ -24,7 +24,7 @@ export type ResumeCandidate = Omit<ReviewedResumeClaim, "category"> & {
   field?: string;
 };
 
-export type AcceptedResumeProfile = Partial<Record<"fullName" | "email" | "mobile" | "location" | "degree" | "specialization" | "institution" | "currentYear" | "expectedGraduationYear" | "gpa", string>>;
+export type AcceptedResumeProfile = Partial<Record<"fullName" | "email" | "location" | "degree" | "specialization" | "institution" | "currentYear" | "expectedGraduationYear" | "gpa", string>>;
 
 export type ResumeExtraData = {
   extractedProfile?: Record<string, unknown>;
@@ -68,7 +68,7 @@ export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: Resum
 ];
 
 export const FIELD_LABELS: Record<string, string> = {
-  fullName: "Full name", email: "Email", mobile: "Phone", location: "Location",
+  fullName: "Full name", email: "Email", location: "Location",
   institution: "Institution", degree: "Degree", specialization: "Field of study",
   expectedGraduationYear: "Graduation year", github: "GitHub", linkedin: "LinkedIn", portfolio: "Portfolio",
 };
@@ -138,12 +138,23 @@ export function useResumeIngestion({
   const applyResult = useCallback((docId: string, name: string, result: Record<string, any>, reviewed: boolean) => {
     const rows: ResumeCandidate[] = Array.isArray(result.reviewCandidates)
       ? result.reviewCandidates.flatMap((item: Record<string, unknown>) => {
-          const { category, candidateId, value, sourceSpan, field } = item ?? {};
+          const { category, candidateId, value, sourceSpan, field, recordData } = item ?? {};
           if (
             !["profile", "link", "education", "experience", "project", "skill", "certification", "achievement"].includes(String(category)) ||
             typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string"
           ) return [];
-          return [{ id: candidateId, candidateId, category: category as ResumeCandidate["category"], value, sourceSpan, documentId: docId, corrected: false, selected: false, field: typeof field === "string" ? field : undefined }];
+          return [{
+            id: candidateId,
+            candidateId,
+            category: category as ResumeCandidate["category"],
+            value,
+            sourceSpan,
+            documentId: docId,
+            corrected: false,
+            selected: false,
+            field: typeof field === "string" ? field : undefined,
+            recordData: (recordData as Record<string, any>) || undefined,
+          }];
         })
       : [];
     const structured = result.structured ?? {};
@@ -286,8 +297,8 @@ export function useResumeIngestion({
     const records = candidates.filter((c) => RECORD_CANDIDATE_ID.test(c.candidateId || c.id) && c.category !== "profile" && c.category !== "link");
     if (accepted.length === 0) return "Tick at least one detail that is right, or continue without saving the CV review.";
     if (!documentId) return "This review is no longer linked to an uploaded file. Upload the file again.";
-    const claims = accepted.filter((c) => records.includes(c)).map(({ candidateId, category, value, sourceSpan, documentId: d, corrected }) => ({
-      candidateId, category: category as ReviewedResumeClaim["category"], value: value.trim(), sourceSpan, documentId: d, corrected,
+    const claims = accepted.filter((c) => records.includes(c)).map(({ candidateId, category, value, sourceSpan, documentId: d, corrected, recordData }) => ({
+      candidateId, category: category as ReviewedResumeClaim["category"], value: value.trim(), sourceSpan, documentId: d, corrected, recordData,
     }));
     const acceptedProfile: AcceptedResumeProfile = {};
     const acceptedLinks: Partial<Record<string, string>> = {};

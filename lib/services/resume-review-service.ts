@@ -4,7 +4,10 @@ import { getDb, sourceSnapshots } from "@/lib/db";
 import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
 import type { ReviewedResumeClaim } from "@/lib/onboarding-v2";
 
-type Candidate = Pick<ReviewedResumeClaim, "category" | "value" | "sourceSpan"> & { candidateId: string };
+type Candidate = Pick<ReviewedResumeClaim, "category" | "value" | "sourceSpan"> & {
+  candidateId: string;
+  recordData?: Record<string, any>;
+};
 type ResumeSnapshot = { version: 1; candidates: Candidate[] };
 
 import { ExtractionValidator } from "./extraction-validator";
@@ -12,27 +15,43 @@ import { ExtractionValidator } from "./extraction-validator";
 export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceText?: string): Candidate[] {
   const candidates: Candidate[] = [];
   const normalizedSource = sourceText?.replace(/\s+/g, " ").trim().toLocaleLowerCase();
-  const add = (category: Candidate["category"], rows: Array<{ value: string; sourceSpan: string }>) => {
+  const add = (
+    category: Candidate["category"],
+    rows: Array<{ value: string; sourceSpan: string; recordData?: Record<string, any> }>
+  ) => {
     rows.forEach((row, index) => {
       const trimmedVal = row.value.trim();
       const trimmedSpan = row.sourceSpan.trim();
       if (!trimmedVal || !trimmedSpan) return;
       if (normalizedSource) {
         const normSpan = trimmedSpan.replace(/[\s\r\n]+/g, " ").trim().toLocaleLowerCase();
-        const words = normSpan.split(" ").filter((w) => w.length > 3);
+        const words = normSpan.split(" ").filter((w) => w.length >= 3);
         const matchesExact = normalizedSource.includes(normSpan);
         const matchesKeyWords = words.length >= 2 && words.slice(0, 3).every((w) => normalizedSource.includes(w));
-        if (!matchesExact && !matchesKeyWords) return;
+        const matchesAnyKeyWord = words.length > 0 && words.filter((w) => normalizedSource.includes(w)).length >= Math.min(2, words.length);
+        if (!matchesExact && !matchesKeyWords && !matchesAnyKeyWord && !normalizedSource.includes(trimmedVal.toLowerCase())) return;
       }
 
       if (category === "skill") {
         const valRes = ExtractionValidator.validateSkillClaim(trimmedVal, trimmedSpan);
         if (!valRes.valid) return; // Discard negated, aspirational, or unsupported claims
-        candidates.push({ candidateId: `${category}_${index}`, category, value: valRes.normalizedValue, sourceSpan: trimmedSpan });
+        candidates.push({
+          candidateId: `${category}_${index}`,
+          category,
+          value: valRes.normalizedValue,
+          sourceSpan: trimmedSpan,
+          recordData: row.recordData,
+        });
         return;
       }
 
-      candidates.push({ candidateId: `${category}_${index}`, category, value: trimmedVal, sourceSpan: trimmedSpan });
+      candidates.push({
+        candidateId: `${category}_${index}`,
+        category,
+        value: trimmedVal,
+        sourceSpan: trimmedSpan,
+        recordData: row.recordData,
+      });
     });
   };
   add(
@@ -48,6 +67,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       return {
         value: parts.join(" · ") || x.institution || "Education Entry",
         sourceSpan: x.sourceSpan,
+        recordData: x as Record<string, any>,
       };
     })
   );
@@ -62,6 +82,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       return {
         value: parts.join(" · ") || x.company || "Experience Entry",
         sourceSpan: x.sourceSpan,
+        recordData: x as Record<string, any>,
       };
     })
   );
@@ -73,10 +94,11 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       return {
         value: `${x.title}${techSnippet}${descSnippet}`,
         sourceSpan: x.sourceSpan,
+        recordData: x as Record<string, any>,
       };
     })
   );
-  add("skill", extracted.skills.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan })));
+  add("skill", extracted.skills.map((x) => ({ value: x.name, sourceSpan: x.sourceSpan, recordData: x as Record<string, any> })));
   add(
     "certification",
     extracted.certifications.map((x) => {
@@ -84,6 +106,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       return {
         value: parts.join(" · "),
         sourceSpan: x.sourceSpan,
+        recordData: x as Record<string, any>,
       };
     })
   );
@@ -99,6 +122,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
           return {
             value: `${x.title}${cat}${desc}`,
             sourceSpan: x.sourceSpan,
+            recordData: x as Record<string, any>,
           };
         })
       );
@@ -112,6 +136,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
           return {
             value: `${x.title}${cat}${desc}`,
             sourceSpan: x.sourceSpan,
+            recordData: x as Record<string, any>,
           };
         })
       );

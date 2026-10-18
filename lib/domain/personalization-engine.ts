@@ -17,6 +17,14 @@ export interface ProjectRecord {
   sources?: string[];
   status?: string;
   url?: string;
+  repositoryUrl?: string | null;
+  demoUrl?: string | null;
+  projectClassification?: string;
+  stars?: number;
+  forks?: number;
+  isFork?: boolean;
+  isArchived?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export type CanonicalInterest =
@@ -307,6 +315,7 @@ export interface StudentPersonalizationContext {
   relevantOpportunities?: Array<{ id: string; title: string; description: string; tag: string; actionLabel: string; url?: string }>;
   collaborativeProjects?: Array<{ id: string; title: string; description: string; technologies: string[]; roleNeeded: string; actionLabel: string; url?: string }>;
   githubConnected?: boolean;
+  repositoryInventory?: ProjectRecord[];
   isDemo?: boolean;
 }
 
@@ -1061,9 +1070,9 @@ export const DEMO_ECOSYSTEM_DATA = {
  * deterministically without any mock data leakage or hallucinated entities.
  */
 export function composePersonalizedDashboard(context: StudentPersonalizationContext): ComposedDashboardViewModel {
-  const primary = context.primaryInterest || "learning";
-  const secondaries = (context.secondaryInterests || []).filter((s) => s !== primary).slice(0, 2);
-  const primaryDef = CANONICAL_INTERESTS[primary];
+  const primary = normalizeInterest(context.primaryInterest);
+  const secondaries = (context.secondaryInterests || []).map(normalizeInterest).filter((s) => s !== primary).slice(0, 2);
+  const primaryDef = CANONICAL_INTERESTS[primary] || CANONICAL_INTERESTS.learning;
 
   // Resolve target role definition
   const roleDef = context.targetRoleId ? getRoleById(context.targetRoleId) : AIML_ROLE_CATALOG[0];

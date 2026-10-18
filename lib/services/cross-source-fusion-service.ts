@@ -266,4 +266,72 @@ export class CrossSourceFusionService {
 
     return fusedList;
   }
+
+  /**
+   * Universal multi-source project fusion across CV, GitHub, GitLab, Kaggle, Hugging Face, Portfolio.
+   * Matches projects by canonical repository URL, demo link, or normalized title + technology similarity.
+   * Never overwrites confirmed resume details with weaker scraped claims; combines consistent fields.
+   */
+  static fuseMultiSourceProjects(
+    allProjects: CandidateProjectMatch[]
+  ): Array<{
+    project: CandidateProjectMatch;
+    isFused: boolean;
+    allSources: string[];
+    matchResults: FusionMatchResult[];
+  }> {
+    const results: Array<{
+      project: CandidateProjectMatch;
+      isFused: boolean;
+      allSources: string[];
+      matchResults: FusionMatchResult[];
+    }> = [];
+
+    for (const incoming of allProjects) {
+      let matchedIndex = -1;
+      let matchedResult: FusionMatchResult | null = null;
+
+      for (let i = 0; i < results.length; i++) {
+        const existing = results[i].project;
+        const res = this.matchProjects(existing, incoming);
+        if (res.isMatch) {
+          matchedIndex = i;
+          matchedResult = res;
+          break;
+        }
+      }
+
+      if (matchedIndex >= 0 && matchedResult) {
+        const target = results[matchedIndex];
+        target.isFused = true;
+        target.allSources = Array.from(new Set([...target.allSources, incoming.source]));
+        target.matchResults.push(matchedResult);
+        target.project.title = matchedResult.suggestedTitle;
+        target.project.source = target.allSources.join("+");
+        target.project.repositoryUrl = target.project.repositoryUrl || incoming.repositoryUrl;
+        target.project.technologies = matchedResult.combinedTechnologies;
+        // Never overwrite accepted CV details with weaker scraped claims
+        if (!target.project.description || (incoming.source === "resume" && incoming.description)) {
+          target.project.description = incoming.description;
+        }
+      } else {
+        results.push({
+          project: { ...incoming },
+          isFused: false,
+          allSources: [incoming.source],
+          matchResults: [],
+        });
+      }
+    }
+
+    return results;
+  }
 }
+
+export function fuseMultiSourceProjects(
+  allProjects: CandidateProjectMatch[]
+) {
+  return CrossSourceFusionService.fuseMultiSourceProjects(allProjects);
+}
+
+

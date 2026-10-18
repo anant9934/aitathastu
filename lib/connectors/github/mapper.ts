@@ -31,10 +31,15 @@ export type DiscoveredGitHubProject = {
   technologies: string[];
   technologyFindings?: import("./tech-detector").TechnologyFinding[];
   aiMlCategories?: import("./tech-detector").AiMlProjectCategory[];
+  projectClassification?: import("./tech-detector").RepositoryClassification;
   stars: number;
   forks?: number;
   isFork: boolean;
   isArchived?: boolean;
+  isTemplate?: boolean;
+  isEmpty?: boolean;
+  diskUsage?: number;
+  license?: string | null;
   isPrivate: boolean;
   sources: string[];
   status: "candidate";

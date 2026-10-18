@@ -81,6 +81,14 @@ export interface ImportCandidateOutput {
     starsOrLikes?: number;
     primaryLanguage?: string | null;
     aiMlCategories?: string[];
+    externalRepoId?: string;
+    projectClassification?: string;
+    isFork?: boolean;
+    isArchived?: boolean;
+    isTemplate?: boolean;
+    isEmpty?: boolean;
+    license?: string;
+    analysisStage?: string;
   }>;
   skills: Array<{
     name: string;
@@ -678,6 +686,14 @@ export class DigitalSourceImportOrchestrator {
               starsOrLikes: p.stars,
               primaryLanguage: p.primaryLanguage,
               aiMlCategories: p.aiMlCategories,
+              externalRepoId: p.externalRepoId ? String(p.externalRepoId) : undefined,
+              projectClassification: p.projectClassification || (p.isFork ? "fork" : "original"),
+              isFork: p.isFork,
+              isArchived: p.isArchived,
+              isTemplate: p.isTemplate,
+              isEmpty: p.isEmpty,
+              license: p.license || undefined,
+              analysisStage: p.analysisStage,
             });
 
             for (const finding of p.technologyFindings) {

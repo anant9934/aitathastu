@@ -23,7 +23,6 @@ import type { ExtractedProfile, ResumeLink } from "@/lib/services/resume-extract
 // ─────────────────────────────────────────────────────────────────────────────
 
 const EMAIL_RE = /(?<![\w.\-])([\w.+\-]+@[\w.\-]+\.[a-zA-Z]{2,})(?![\w.])/gi;
-const PHONE_RE = /(?<![\w])(?:\+\d{1,3}[\s.\-]?)?(?:\(?\d{2,5}\)?[\s.\-]?)?\d{3,5}[\s.\-]?\d{3,5}(?!\w)/g;
 const YEAR_RE = /\b(?:19|20)\d{2}\b/g;
 const DATE_RANGE_RE = /(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\s*(?:–|-|to)\s*(?:(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}|Present|Current|Ongoing)/i;
 
@@ -434,27 +433,13 @@ function extractEmails(taggedLines: Array<{ text: string; section: string }>): A
   return out;
 }
 
-/** Extracts phone numbers, excluding standalone years. */
-function extractPhones(taggedLines: Array<{ text: string; section: string }>): Array<{ phone: string; sourceSpan: string }> {
-  const seen = new Set<string>();
-  const out: Array<{ phone: string; sourceSpan: string }> = [];
-
-  for (const item of taggedLines) {
-    if (item.section !== "header" && item.section !== "contact") continue;
-    const matches = item.text.match(PHONE_RE);
-    if (matches) {
-      for (const raw of matches) {
-        const digits = raw.replace(/\D/g, "");
-        if (digits.length >= 10 && digits.length <= 15 && !seen.has(digits)) {
-          if (/^(?:19|20)\d{2}$/.test(digits)) continue;
-          seen.add(digits);
-          out.push({ phone: raw.trim(), sourceSpan: item.text });
-        }
-      }
-    }
-  }
-
-  return out;
+/**
+ * NON-NEGOTIABLE PRIVACY REQUIREMENT:
+ * Mobile numbers must never be imported from CVs.
+ * Extraction returning empty array ensures no phone data is derived.
+ */
+function _extractPhones(_taggedLines: Array<{ text: string; section: string }>): Array<{ phone: string; sourceSpan: string }> {
+  return [];
 }
 
 /** Extracts location / city if explicitly labeled or present in header. */
@@ -650,11 +635,11 @@ function extractSkills(taggedLines: Array<{ text: string; section: string }>): R
     if (/@|https?:\/\//i.test(item.text)) continue;
 
     // 1. Structured category bullets: e.g. "• Languages: Python, C, JavaScript, SQL, HTML, CSS"
-    const catListMatch = item.text.match(/^[•·*◦\-–—\s]*([A-Za-z\s&/]+)\s*:\s*(.+)$/);
+    const catListMatch = item.text.match(/^[^\w\s]*\s*([A-Za-z\s&/]+)\s*:\s*(.+)$/);
     if (catListMatch && item.section === "skills") {
       const rawTokens = catListMatch[2].split(/[,;|]/).map((t) => t.trim()).filter(Boolean);
       for (const token of rawTokens) {
-        const clean = token.replace(/^[•·*◦\-–—\s]+|[•·*◦\-–—\s]+$/g, "").trim();
+        const clean = token.replace(/^[^\w+#.]+|[^\w+#.]+$/g, "").trim();
         if (clean.length < 1 || clean.length > 50) continue;
         const lower = clean.toLowerCase();
         if (seen.has(lower)) continue;
@@ -665,7 +650,11 @@ function extractSkills(taggedLines: Array<{ text: string; section: string }>): R
           seen.add(lower);
           out.push({
             name: validation.normalizedValue || clean,
-            category: /language/i.test(catListMatch[1]) ? "language" : /tool|database/i.test(catListMatch[1]) ? "tool" : "other",
+            category: /language|programming/i.test(catListMatch[1])
+              ? "language"
+              : /tool|database|development|data/i.test(catListMatch[1])
+              ? "tool"
+              : "other",
             proficiencyHint: "unknown",
             sourceSpan: item.text.slice(0, 200),
           });
@@ -869,7 +858,7 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
 
     out.push({
       company: (company || "Company").slice(0, 100),
-      role: (role || "Contributor").slice(0, 100),
+      role: (role || "").slice(0, 100),
       type: /intern/i.test(role + company) ? "internship" : /volunteer/i.test(role + company) ? "leadership" : "employment",
       startDate,
       endDate,
@@ -1000,7 +989,6 @@ export function extractResumeDeterministic(sourceText: string, hyperlinks: strin
 
   const nameResult = extractName(tagged);
   const emails = extractEmails(tagged);
-  const phones = extractPhones(tagged);
   const loc = extractLocation(tagged);
 
   const education = extractEducation(tagged);
@@ -1023,7 +1011,7 @@ export function extractResumeDeterministic(sourceText: string, hyperlinks: strin
   const profile: ExtractedProfile = {
     fullName: nameResult?.name,
     email: emails[0]?.email,
-    mobile: phones[0]?.phone,
+    mobile: undefined,
     location: loc?.location,
     institution: primaryEdu?.institution,
     degree: primaryEdu?.degree,

@@ -62,12 +62,12 @@ const PROVIDER_DOMAINS: Array<{
 }> = [
   {
     provider: "github",
-    pattern: /(?:^|\b)(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_\-\.]+)/i,
+    pattern: /(?:^|\b)(?:https?:\/\/)?(?:www\.)?(?:github[\s.]*com|gittub[\s.]*com)\/([a-zA-Z0-9_\-\.]+)/i,
     usernameRegex: /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,38})$/,
   },
   {
     provider: "linkedin",
-    pattern: /(?:^|\b)(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/(?:in|pub)\/([a-zA-Z0-9_\-\.]+)/i,
+    pattern: /(?:^|\b)(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin[\s.]*com[y]?\/(?:in|pub)\/([a-zA-Z0-9_\-\.]+)/i,
     usernameRegex: /^[a-zA-Z0-9_\-\.]{3,100}$/,
   },
   {
@@ -123,8 +123,8 @@ const LABELED_PATTERNS: Array<{
   provider: FootprintProvider;
   pattern: RegExp;
 }> = [
-  { provider: "github", pattern: /\b(?:github|gh)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "linkedin", pattern: /\blinkedin[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
+  { provider: "github", pattern: /\b(?:github|gittubs?|gh)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
+  { provider: "linkedin", pattern: /\b(?:linkedin|linked\s*in)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
   { provider: "leetcode", pattern: /\bleetcode[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
   { provider: "kaggle", pattern: /\bkaggle[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
   { provider: "huggingface", pattern: /\b(?:hugging\s*face|hf)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
@@ -205,7 +205,13 @@ export function discoverFootprintsFromResume(options: {
   const discovered: DiscoveredFootprint[] = [];
   const seenUrls = new Set<string>();
 
-  const unwrappedText = unwrapMultiLineUrls(text);
+  // Pre-clean common OCR defects
+  const preCleanedText = text
+    .replace(/linkedin[\s.]*comy/gi, "linkedin.com")
+    .replace(/gittubs?\b/gi, "github")
+    .replace(/github\s+com/gi, "github.com");
+
+  const unwrappedText = unwrapMultiLineUrls(preCleanedText);
   const lines = unwrappedText.split("\n");
 
   const addFootprint = (fp: Omit<DiscoveredFootprint, "id">) => {

@@ -601,7 +601,7 @@ function profileCandidates(extraction: ResumeExtractionResult, text: string): Re
   const out: ResumeReviewCandidate[] = [];
   const hasStructuredEdu = Boolean(extraction.extracted?.education && extraction.extracted.education.length > 0);
   const fields: Array<[string, string | number | undefined]> = [
-    ["fullName", p.fullName], ["email", p.email], ["mobile", p.mobile], ["location", p.location],
+    ["fullName", p.fullName], ["email", p.email], ["location", p.location],
   ];
   if (!hasStructuredEdu) {
     fields.push(
@@ -613,12 +613,7 @@ function profileCandidates(extraction: ResumeExtractionResult, text: string): Re
     if (value === undefined || value === "") continue;
     out.push({ candidateId: `profile_${field}`, category: "profile", field, value: String(value), sourceSpan: span(String(value)) });
   }
-  for (const link of extraction.links || []) {
-    const slug = link.url.replace(/https?:\/\//i, "").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
-    const id = `link_${link.type}_${slug}`;
-    if (out.some((c) => c.candidateId === id)) continue;
-    out.push({ candidateId: id, category: "link", field: link.type, value: link.url, sourceSpan: link.url });
-  }
+  // Digital footprint links are handed off to DFI rather than generic CV review cards
   return out;
 }
 

@@ -4,14 +4,21 @@ import React, { useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowClockwise,
+  Briefcase,
   CaretDown,
   CaretUp,
+  Certificate,
   CheckCircle,
+  Code,
   FileArrowUp,
   FileText,
+  GraduationCap,
   LockKey,
+  PencilSimple,
   ShieldCheck,
+  Sparkle,
   Trash,
+  Trophy,
 } from "@phosphor-icons/react/dist/ssr";
 import { RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { FIELD_LABELS, REVIEW_GROUPS, type ResumeIngestion } from "@/lib/client/onboarding/use-resume-ingestion";
@@ -49,6 +56,7 @@ export function CvStep({
   const [disclosureExpanded, setDisclosureExpanded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [editingCandidateId, setEditingCandidateId] = useState<string | null>(null);
   const confirm = useConfirm();
 
   const blocked = cv.serviceReady === false;
@@ -103,6 +111,26 @@ export function CvStep({
 
   const selectedCount = cv.candidates.filter((c) => c.selected).length;
 
+  const getGroupIcon = (groupId: string) => {
+    switch (groupId) {
+      case "education":
+        return <GraduationCap size={18} weight="bold" className="text-accent-warm" />;
+      case "skills":
+        return <Sparkle size={18} weight="bold" className="text-accent-warm" />;
+      case "experience":
+        return <Briefcase size={18} weight="bold" className="text-accent-warm" />;
+      case "projects":
+        return <Code size={18} weight="bold" className="text-accent-warm" />;
+      case "certifications":
+        return <Certificate size={18} weight="bold" className="text-accent-warm" />;
+      case "achievements":
+      case "publications":
+        return <Trophy size={18} weight="bold" className="text-accent-warm" />;
+      default:
+        return <FileText size={18} weight="bold" className="text-accent-warm" />;
+    }
+  };
+
   return (
     <>
       <StepHeader
@@ -112,7 +140,7 @@ export function CvStep({
       />
 
       <div data-eora-id="eora-resume-upload" className="mt-6 flex flex-col gap-6">
-        {/* Two-region layout on desktop when candidates are not yet displayed */}
+        {/* Upload Region & Privacy Box */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-8 items-start">
           {/* Left Region: Upload Dropzone Card */}
           <div className="flex flex-col gap-4">
@@ -242,6 +270,12 @@ export function CvStep({
 
             <ul className="mt-2 space-y-2.5 text-xs text-text-muted border-t border-border-medium/60 pt-3">
               <li className="flex items-start gap-2">
+                <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" />
+                <span className="font-medium text-warm-ivory">
+                  100% Privacy Protected: Mobile and phone numbers are never extracted from your CV.
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
                 <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" />
                 <span>Pre-fills college details, graduation year, and degree suggestions.</span>
               </li>
@@ -275,7 +309,7 @@ export function CvStep({
                 <div className="mt-3 rounded-md bg-deep-espresso/60 p-3 text-2xs text-text-muted space-y-2">
                   <p className="font-semibold text-warm-ivory">Candidate information parsed from your document:</p>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 list-disc list-inside">
-                    <li>Identity & contact details</li>
+                    <li>Identity & contact details (email, location)</li>
                     <li>Education & degrees</li>
                     <li>Technical skills & frameworks</li>
                     <li>Employment history</li>
@@ -388,24 +422,87 @@ export function CvStep({
             </div>
 
             {cv.advice && (
-              <p className="border-b border-border-medium bg-deep-espresso/40 px-5 py-3 text-xs text-text-muted sm:text-sm">
-                <span className="font-bold text-accent-warm">EORA guidance:</span> {cv.advice}
-              </p>
+              <div className="border-b border-border-medium bg-deep-espresso/40 px-5 py-3 text-xs text-text-muted sm:text-sm flex items-start gap-2">
+                <Sparkle size={16} weight="fill" className="mt-0.5 shrink-0 text-accent-warm" />
+                <div>
+                  <span className="font-bold text-accent-warm">EORA Guidance:</span> {cv.advice}
+                </div>
+              </div>
             )}
 
             <div className="divide-y divide-border-medium">
               {REVIEW_GROUPS.map((group) => {
                 const rows = cv.candidates.filter((c) => group.categories.includes(c.category));
                 if (!rows.length) return null;
+                const selectedInGroup = rows.filter((r) => r.selected).length;
+
+                // Special presentation for Skills: Compact Grouped Chip Grid
+                if (group.id === "skills") {
+                  return (
+                    <fieldset key={group.id} className="p-4 sm:p-5">
+                      <legend className="sr-only">{group.title}</legend>
+                      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <div className="flex items-center gap-2">
+                          {getGroupIcon(group.id)}
+                          <p className="font-display text-sm font-bold text-warm-ivory" aria-hidden="true">
+                            {group.title}
+                          </p>
+                        </div>
+                        <span className="font-mono text-2xs text-text-muted tabular">
+                          {selectedInGroup}/{rows.length}
+                        </span>
+                        <span className="ml-auto flex gap-1">
+                          <Button size="sm" variant="quiet" onClick={() => cv.setAll(group.categories, true)}>
+                            Select all ({rows.length})
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => cv.setAll(group.categories, false)}>
+                            Clear
+                          </Button>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {rows.map((c) => {
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => cv.toggle(c.id, !c.selected)}
+                              className={cn(
+                                "group inline-flex items-center gap-2 rounded-panel border px-3 py-1.5 text-xs font-medium transition-all shadow-xs cursor-pointer select-none",
+                                c.selected
+                                  ? "border-accent-warm bg-accent-warm/15 text-warm-ivory shadow-[0_0_12px_rgba(244,154,71,0.15)]"
+                                  : "border-border-medium bg-bg-surface/50 text-text-muted hover:border-border-bright hover:text-text-primary",
+                              )}
+                              title={`In CV: "${c.sourceSpan}"`}
+                            >
+                              <span
+                                className={cn(
+                                  "size-2 rounded-full transition-colors",
+                                  c.selected ? "bg-accent-warm-bright" : "bg-border-medium group-hover:bg-text-dim",
+                                )}
+                              />
+                              <span>{c.value}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+                  );
+                }
+
+                // Structured Record Cards for Education, Experience, Projects, Certifications, etc.
                 return (
                   <fieldset key={group.id} className="p-4 sm:p-5">
                     <legend className="sr-only">{group.title}</legend>
                     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <p className="font-display text-sm font-bold text-warm-ivory" aria-hidden="true">
-                        {group.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        {getGroupIcon(group.id)}
+                        <p className="font-display text-sm font-bold text-warm-ivory" aria-hidden="true">
+                          {group.title}
+                        </p>
+                      </div>
                       <span className="font-mono text-2xs text-text-muted tabular">
-                        {rows.filter((r) => r.selected).length}/{rows.length}
+                        {selectedInGroup}/{rows.length}
                       </span>
                       <span className="ml-auto flex gap-1">
                         <Button size="sm" variant="quiet" onClick={() => cv.setAll(group.categories, true)}>
@@ -416,40 +513,109 @@ export function CvStep({
                         </Button>
                       </span>
                     </div>
-                    <ul className="grid gap-2 sm:grid-cols-2">
+
+                    <ul className="grid gap-3 sm:grid-cols-2">
                       {rows.map((c) => {
                         const label = c.field ? FIELD_LABELS[c.field] || c.field : c.category;
+                        const data = (c as any).recordData || {};
+                        const isEditing = editingCandidateId === c.id;
+
                         return (
                           <li
                             key={c.id}
                             className={cn(
-                              "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                              "flex flex-col gap-2 rounded-card border p-4 transition-all duration-150 shadow-xs",
                               c.selected
-                                ? "border-accent-warm/40 bg-accent-warm/10 text-warm-ivory"
-                                : "border-border-medium bg-bg-surface/50 text-text-muted",
+                                ? "border-accent-warm/50 bg-accent-warm/[0.07] text-warm-ivory shadow-[0_0_16px_rgba(244,154,71,0.08)]"
+                                : "border-border-medium bg-bg-surface/50 text-text-muted hover:border-border-bright",
                             )}
                           >
-                            <input
-                              type="checkbox"
-                              checked={c.selected}
-                              onChange={(e) => cv.toggle(c.id, e.target.checked)}
-                              className="mt-0.5 size-4 rounded border-border-medium accent-accent-warm"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <label htmlFor={`cv-${c.id}`} className="block text-2xs font-semibold uppercase tracking-wider text-text-dim">
-                                {label}
-                              </label>
+                            <div className="flex items-start gap-3">
                               <input
-                                id={`cv-${c.id}`}
-                                value={c.value}
-                                onChange={(e) => cv.correct(c.id, e.target.value)}
-                                className="mt-0.5 w-full rounded border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium text-text-primary hover:border-border-medium focus:border-accent-warm focus:bg-bg-primary/80 focus:outline-none"
+                                type="checkbox"
+                                id={`cv-chk-${c.id}`}
+                                checked={c.selected}
+                                onChange={(e) => cv.toggle(c.id, e.target.checked)}
+                                className="mt-1 size-4 rounded border-border-medium accent-accent-warm cursor-pointer"
                               />
-                              {c.sourceSpan !== c.value && (
-                                <p className="mt-0.5 break-words px-1.5 text-2xs text-text-muted">
-                                  In CV: &ldquo;{c.sourceSpan}&rdquo;
-                                </p>
-                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <label
+                                    htmlFor={`cv-chk-${c.id}`}
+                                    className="cursor-pointer text-2xs font-bold uppercase tracking-wider text-accent-warm"
+                                  >
+                                    {label}
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCandidateId(isEditing ? null : c.id)}
+                                    className="text-text-dim hover:text-accent-warm transition-colors p-1"
+                                    title="Edit wording"
+                                  >
+                                    <PencilSimple size={14} />
+                                  </button>
+                                </div>
+
+                                {isEditing ? (
+                                  <div className="mt-1.5 flex flex-col gap-1.5">
+                                    <input
+                                      id={`cv-input-${c.id}`}
+                                      value={c.value}
+                                      onChange={(e) => cv.correct(c.id, e.target.value)}
+                                      onBlur={() => setEditingCandidateId(null)}
+                                      autoFocus
+                                      className="w-full rounded border border-accent-warm bg-bg-primary px-2 py-1 text-sm font-medium text-text-primary focus:outline-none"
+                                    />
+                                    <span className="text-3xs text-text-dim">Press Enter or click away to save edits</span>
+                                  </div>
+                                ) : (
+                                  <p
+                                    onClick={() => setEditingCandidateId(c.id)}
+                                    className="mt-0.5 text-sm font-medium text-text-primary cursor-text hover:text-warm-ivory"
+                                    title="Click to edit wording"
+                                  >
+                                    {c.value}
+                                  </p>
+                                )}
+
+                                {/* Structured Metadata badges if present */}
+                                {(data.institution || data.degree || data.role || data.company || data.issuer || data.year || data.duration || data.status) && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {data.degree && (
+                                      <span className="rounded bg-accent-warm/15 px-1.5 py-0.5 text-3xs font-medium text-accent-warm-bright">
+                                        {data.degree}
+                                      </span>
+                                    )}
+                                    {data.graduationYear && (
+                                      <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-3xs font-mono text-text-muted">
+                                        Class of {data.graduationYear}
+                                      </span>
+                                    )}
+                                    {data.type && (
+                                      <span className="rounded bg-verified/15 px-1.5 py-0.5 text-3xs font-medium text-verified capitalize">
+                                        {data.type}
+                                      </span>
+                                    )}
+                                    {data.duration && (
+                                      <span className="rounded bg-bg-elevated px-1.5 py-0.5 text-3xs font-mono text-text-muted">
+                                        {data.duration}
+                                      </span>
+                                    )}
+                                    {data.issuer && (
+                                      <span className="rounded bg-deep-espresso px-1.5 py-0.5 text-3xs text-warm-ivory">
+                                        {data.issuer}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Evidence Grounding Snippet */}
+                                {c.sourceSpan && c.sourceSpan !== c.value && (
+                                  <p className="mt-2 text-2xs text-text-dim border-t border-border-subtle pt-1.5 break-words line-clamp-2">
+                                    <span className="font-semibold text-text-muted">Document snippet:</span> &ldquo;{c.sourceSpan}&rdquo;
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </li>
                         );

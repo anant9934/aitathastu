@@ -293,7 +293,7 @@ export function toExtractedProfile(r: ResumeExtraction): ExtractedProfile {
   return {
     fullName: r.name || undefined,
     email: r.email || undefined,
-    mobile: r.phone || undefined,
+    mobile: undefined,
     location: r.location || undefined,
     institution: edu?.institution,
     degree: edu?.degree || undefined,
@@ -436,7 +436,6 @@ export function adaptRenderProfileToInterpretation(
   const fullName = tidy(idRec.full_name?.value, 80) || null;
 
   let email: string | null = null;
-  let phone: string | null = null;
   let location: string | null = tidy(idRec.location?.value, 120) || null;
 
   for (const c of groups.contact || []) {
@@ -445,12 +444,6 @@ export function adaptRenderProfileToInterpretation(
       const rawEmail = tidy(f.email.value).replace(/^mailto:/i, "");
       if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
         email = rawEmail;
-      }
-    }
-    if (!phone && f.phone?.value) {
-      const rawPhone = tidy(f.phone.value);
-      if ((rawPhone.match(/\d/g) || []).length >= 7) {
-        phone = rawPhone;
       }
     }
     if (!location && f.location?.value) {
@@ -490,9 +483,9 @@ export function adaptRenderProfileToInterpretation(
     });
   }
 
-  // 3. Experience & Internships
+  // 3. Experience, Internships & Leadership
   const experience: ResumeInterpretationOutput["experience"] = [];
-  const expRecords = [...(groups.experience || []), ...(groups.internships || [])];
+  const expRecords = [...(groups.experience || []), ...(groups.internships || []), ...(groups.leadership || [])];
   for (const rec of expRecords) {
     const f = rec.fields;
     const company = tidy(f.organization?.value || f.provider?.value || f.program?.value, 150);
@@ -500,6 +493,7 @@ export function adaptRenderProfileToInterpretation(
 
     const role = tidy(f.job_title?.value || f.role?.value, 150) || "";
     const isIntern = Boolean(groups.internships?.includes(rec) || /intern/i.test(f.employment_type?.value || role));
+    const isLeadership = Boolean(groups.leadership?.includes(rec) || /lead|coordinator|volunteer/i.test(role));
     const startDate = tidy(f.start_date?.value, 30) || undefined;
     const endDate = tidy(f.end_date?.value, 30) || undefined;
     const duration = tidy(f.duration?.value, 100) || ([startDate, endDate].filter(Boolean).join(" – ") || undefined);
@@ -516,7 +510,7 @@ export function adaptRenderProfileToInterpretation(
     experience.push({
       company,
       role,
-      type: isIntern ? "internship" : "employment",
+      type: isIntern ? "internship" : isLeadership ? "leadership" : "employment",
       startDate,
       endDate,
       duration,
@@ -572,12 +566,12 @@ export function adaptRenderProfileToInterpretation(
   const certifications: ResumeInterpretationOutput["certifications"] = [];
   for (const rec of groups.certifications || []) {
     const f = rec.fields;
-    const name = tidy(f.title?.value, 200);
+    const name = tidy(f.title?.value || f.name?.value, 200);
     if (!name || !grounded(name)) continue;
 
-    const issuer = tidy(f.issuer?.value, 150) || undefined;
-    const yr = year(f.issue_date?.value || null);
-    const sourceSpan = span(f.title?.evidence?.[0]?.snippet, name);
+    const issuer = tidy(f.issuer?.value || f.organization?.value, 150) || undefined;
+    const yr = year(f.issue_date?.value || f.date?.value || null);
+    const sourceSpan = span(f.title?.evidence?.[0]?.snippet || f.name?.evidence?.[0]?.snippet, name);
 
     certifications.push({
       name,
@@ -660,7 +654,7 @@ export function adaptRenderProfileToInterpretation(
   const extractedProfile: ExtractedProfile = {
     fullName: fullName || undefined,
     email: email || undefined,
-    mobile: phone || undefined,
+    mobile: undefined,
     location: location || undefined,
     institution: firstEdu?.institution,
     degree: firstEdu?.degree,
@@ -898,7 +892,7 @@ export function mergeExtractionResults(
   const mergedProfile: ExtractedProfile = {
     fullName: bProf.fullName || eProf.fullName,
     email: bProf.email || eProf.email,
-    mobile: bProf.mobile || eProf.mobile,
+    mobile: undefined,
     location: bProf.location || eProf.location,
     institution: bProf.institution || eProf.institution,
     degree: bProf.degree || eProf.degree,

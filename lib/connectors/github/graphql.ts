@@ -17,8 +17,21 @@ import { sanitizeTextForPrompt } from "@/lib/intelligence/prompt-defense";
 import type { GitHubUserProfile, RawGitHubRepo } from "./client";
 
 const ENDPOINT = "https://api.github.com/graphql";
-export const GITHUB_MANIFESTS = ["package.json", "requirements.txt", "pyproject.toml", "Pipfile", "Dockerfile", "docker-compose.yml", "go.mod", "Cargo.toml"] as const;
-const MAX_REPOS = 100;
+export const GITHUB_MANIFESTS = [
+  "package.json",
+  "requirements.txt",
+  "pyproject.toml",
+  "Pipfile",
+  "poetry.lock",
+  "Dockerfile",
+  "docker-compose.yml",
+  "go.mod",
+  "Cargo.toml",
+  "pom.xml",
+  "build.gradle",
+] as const;
+
+const MAX_PAGE_REPOS = 100;
 const MAX_README_CHARS = 4000;
 const MAX_MANIFEST_CHARS = 8000;
 
@@ -28,17 +41,23 @@ export class GitHubGraphQLError extends Error {
   }
 }
 
-export const METADATA_QUERY = `query($login: String!, $first: Int!) {
+export const METADATA_QUERY = `query($login: String!, $first: Int!, $after: String) {
   rateLimit { remaining resetAt cost }
   user(login: $login) {
     databaseId login name bio websiteUrl location company url avatarUrl createdAt
     followers { totalCount } following { totalCount }
-    repositories(first: $first, ownerAffiliations: OWNER, privacy: PUBLIC, orderBy: { field: PUSHED_AT, direction: DESC }) {
+    repositories(first: $first, after: $after, ownerAffiliations: [OWNER, COLLABORATOR], privacy: PUBLIC, orderBy: { field: PUSHED_AT, direction: DESC }) {
       totalCount
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       nodes {
         databaseId name nameWithOwner description url homepageUrl
-        stargazerCount forkCount isFork isPrivate isArchived pushedAt createdAt updatedAt
+        stargazerCount forkCount isFork isPrivate isArchived isTemplate isEmpty diskUsage
+        pushedAt createdAt updatedAt
         defaultBranchRef { name } primaryLanguage { name }
+        licenseInfo { spdxId name }
         repositoryTopics(first: 10) { nodes { topic { name } } }
       }
     }
@@ -95,9 +114,14 @@ export type GraphQLAcquisition = {
   unchanged: string[];
   queries: number;
   rateLimitRemaining?: number;
+  pageInfo?: { hasNextPage: boolean; endCursor: string | null };
+  isComplete: boolean;
 };
 
 /**
+ * Complete, resumable GitHub GraphQL repository discovery and batch deep inspection.
+ * Paginates until all accessible repositories are discovered or paused by quota.
+ *
  * @param previousPushedAt  nameWithOwner -> pushedAt from the last snapshot;
  *                          repos with an equal value skip deep inspection.
  */
@@ -105,91 +129,183 @@ export async function acquireGitHubViaGraphQL(params: {
   login: string;
   token: string;
   previousPushedAt?: Map<string, string>;
+  maxRepos?: number;
   maxDeep?: number;
+  cursor?: string;
   correlationId?: string;
 }): Promise<GraphQLAcquisition> {
-  const meta = await graphql(METADATA_QUERY, { login: params.login, first: MAX_REPOS }, params.token, params.correlationId);
-  const user = (meta.data?.user ?? null) as null | {
-    databaseId: number; login: string; name: string | null; bio: string | null; websiteUrl: string | null;
-    location: string | null; company: string | null; url: string; avatarUrl: string; createdAt: string;
-    followers: { totalCount: number }; following: { totalCount: number };
-    repositories: { totalCount: number; nodes: Array<{
-      databaseId: number; name: string; nameWithOwner: string; description: string | null; url: string; homepageUrl: string | null;
-      stargazerCount: number; forkCount: number; isFork: boolean; isPrivate: boolean; isArchived: boolean;
-      pushedAt: string | null; createdAt: string; updatedAt: string; defaultBranchRef: { name: string } | null;
-      primaryLanguage: { name: string } | null; repositoryTopics: { nodes: { topic: { name: string } }[] };
-    } | null> };
-  };
-  if (!user) {
-    const notFound = meta.errors?.some((e) => e.type === "NOT_FOUND");
-    throw new GitHubGraphQLError(notFound ? `GitHub user "${params.login}" not found.` : `GitHub GraphQL error: ${meta.errors?.[0]?.message ?? "no user returned"}`, notFound ? 404 : undefined);
+  const maxRepos = params.maxRepos ?? 2000;
+  let cursor: string | null = params.cursor ?? null;
+  let hasNextPage = true;
+  let queries = 0;
+  let rateLimitRemaining: number | undefined;
+
+  let profile: GitHubUserProfile | null = null;
+  let totalRepos = 0;
+  const rawNodes: any[] = [];
+
+  while (hasNextPage && rawNodes.length < maxRepos) {
+    const pageSize = Math.min(MAX_PAGE_REPOS, maxRepos - rawNodes.length);
+    const variables: Record<string, unknown> = { login: params.login, first: pageSize };
+    if (cursor) variables.after = cursor;
+
+    const res = await graphql(METADATA_QUERY, variables, params.token, params.correlationId);
+    queries++;
+    rateLimitRemaining = (res.data?.rateLimit as { remaining?: number } | undefined)?.remaining ?? rateLimitRemaining;
+
+    const user = (res.data?.user ?? null) as any;
+    if (!user) {
+      if (!profile) {
+        const notFound = res.errors?.some((e) => e.type === "NOT_FOUND");
+        throw new GitHubGraphQLError(
+          notFound ? `GitHub user "${params.login}" not found.` : `GitHub GraphQL error: ${res.errors?.[0]?.message ?? "no user returned"}`,
+          notFound ? 404 : undefined
+        );
+      }
+      break;
+    }
+
+    if (!profile) {
+      totalRepos = user.repositories?.totalCount ?? 0;
+      profile = {
+        id: user.databaseId,
+        login: user.login,
+        name: user.name,
+        bio: user.bio,
+        blog: user.websiteUrl,
+        location: user.location,
+        company: user.company,
+        html_url: user.url,
+        avatar_url: user.avatarUrl,
+        public_repos: totalRepos,
+        created_at: user.createdAt,
+        followers: user.followers?.totalCount ?? 0,
+        following: user.following?.totalCount ?? 0,
+      };
+    }
+
+    const pageInfo = user.repositories?.pageInfo;
+    const nodes = (user.repositories?.nodes ?? []).filter(Boolean);
+    rawNodes.push(...nodes);
+
+    hasNextPage = Boolean(pageInfo?.hasNextPage);
+    cursor = pageInfo?.endCursor ?? null;
+
+    if (!hasNextPage || rawNodes.length >= maxRepos) {
+      break;
+    }
   }
 
-  const profile: GitHubUserProfile = {
-    id: user.databaseId, login: user.login, name: user.name, bio: user.bio, blog: user.websiteUrl,
-    location: user.location, company: user.company, html_url: user.url, avatar_url: user.avatarUrl,
-    public_repos: user.repositories.totalCount, created_at: user.createdAt,
-    followers: user.followers.totalCount, following: user.following.totalCount,
-  };
-  const repos: RawGitHubRepo[] = user.repositories.nodes.filter((n): n is NonNullable<typeof n> => Boolean(n)).map((n) => ({
-    id: n.databaseId, name: n.name, full_name: n.nameWithOwner, description: n.description, html_url: n.url,
-    language: n.primaryLanguage?.name ?? null, topics: n.repositoryTopics.nodes.map((t) => t.topic.name),
-    stargazers_count: n.stargazerCount, forks_count: n.forkCount, fork: n.isFork, private: n.isPrivate,
-    archived: n.isArchived, default_branch: n.defaultBranchRef?.name, created_at: n.createdAt,
-    updated_at: n.updatedAt, pushed_at: n.pushedAt ?? undefined, homepage: n.homepageUrl,
+  if (!profile) {
+    throw new GitHubGraphQLError(`Could not acquire GitHub profile for "${params.login}".`);
+  }
+
+  const repos: RawGitHubRepo[] = rawNodes.map((n) => ({
+    id: n.databaseId,
+    name: n.name,
+    full_name: n.nameWithOwner,
+    description: n.description,
+    html_url: n.url,
+    language: n.primaryLanguage?.name ?? null,
+    topics: (n.repositoryTopics?.nodes ?? []).map((t: any) => t.topic.name),
+    stargazers_count: n.stargazerCount,
+    forks_count: n.forkCount,
+    fork: n.isFork,
+    private: n.isPrivate,
+    archived: n.isArchived,
+    isTemplate: Boolean(n.isTemplate),
+    isEmpty: Boolean(n.isEmpty || n.diskUsage === 0),
+    diskUsage: n.diskUsage,
+    license: n.licenseInfo?.spdxId || n.licenseInfo?.name || null,
+    default_branch: n.defaultBranchRef?.name,
+    created_at: n.createdAt,
+    updated_at: n.updatedAt,
+    pushed_at: n.pushedAt ?? undefined,
+    homepage: n.homepageUrl,
   }));
 
   const prev = params.previousPushedAt ?? new Map<string, string>();
   const changed = repos.filter((r) => !r.fork && prev.get(r.full_name) !== r.pushed_at);
   const unchanged = repos.filter((r) => !changed.includes(r)).map((r) => r.full_name);
-  const toInspect = changed.slice(0, params.maxDeep ?? 30);
+  const maxDeep = params.maxDeep ?? 100;
+  const toInspect = changed.slice(0, maxDeep);
   const deep = new Map<string, DeepRepoData>();
-  let queries = 1;
-  let rateLimitRemaining = (meta.data?.rateLimit as { remaining?: number } | undefined)?.remaining;
 
-  if (toInspect.length) {
-    const targets = toInspect.map((r) => { const [owner, name] = r.full_name.split("/"); return { owner, name }; });
-    const body = await graphql(buildDeepQuery(targets), {}, params.token, params.correlationId);
-    queries++;
-    rateLimitRemaining = (body.data?.rateLimit as { remaining?: number } | undefined)?.remaining ?? rateLimitRemaining;
-    // Errors scoped to one alias (e.g. r3) fail that repo only.
-    const failedAliases = new Map<string, string>();
-    for (const e of body.errors ?? []) if (e.path?.[0]) failedAliases.set(e.path[0], e.message.slice(0, 120));
-
-    toInspect.forEach((repo, i) => {
-      const node = body.data?.[`r${i}`] as undefined | null | Record<string, unknown>;
-      const failures: string[] = [];
-      if (failedAliases.has(`r${i}`)) failures.push(`graphql:${failedAliases.get(`r${i}`)}`);
-      if (!node) {
-        deep.set(repo.full_name, { languages: {}, manifests: {}, observedFiles: [], failure: failures.join(",") || "missing" });
-        return;
-      }
-      const languages: Record<string, number> = {};
-      for (const edge of (node.languages as { edges?: { size: number; node: { name: string } }[] } | null)?.edges ?? []) languages[edge.node.name] = edge.size;
-      const observedFiles: string[] = [];
-      const manifests: Record<string, string> = {};
-      const read = (b: Blob, file: string, max: number) => {
-        if (!b) return undefined; // absent file: not a failure
-        if (b.isBinary || b.text === null) { failures.push(`unreadable:${file}`); return undefined; }
-        observedFiles.push(file);
-        return b.text.slice(0, max);
-      };
-      const readmeRaw = read(node.readme as Blob, "README.md", MAX_README_CHARS * 2);
-      GITHUB_MANIFESTS.forEach((file, j) => {
-        const text = read(node[`m${j}`] as Blob, file, MAX_MANIFEST_CHARS);
-        if (text !== undefined) {
-          // A package.json that is not JSON would poison tech detection; skip it.
-          if (file === "package.json") { try { JSON.parse(text); } catch { failures.push("malformed:package.json"); return; } }
-          manifests[file] = text;
-        }
-      });
-      deep.set(repo.full_name, {
-        readme: readmeRaw ? sanitizeTextForPrompt(readmeRaw).slice(0, MAX_README_CHARS) : undefined,
-        languages, manifests, observedFiles,
-        failure: failures.length ? failures.join(",") : undefined,
-      });
+  // Batch changed repositories into chunks of 25 to avoid single-query complexity limits
+  const CHUNK_SIZE = 25;
+  for (let c = 0; c < toInspect.length; c += CHUNK_SIZE) {
+    const chunk = toInspect.slice(c, c + CHUNK_SIZE);
+    const targets = chunk.map((r) => {
+      const [owner, name] = r.full_name.split("/");
+      return { owner, name };
     });
+
+    try {
+      const body = await graphql(buildDeepQuery(targets), {}, params.token, params.correlationId);
+      queries++;
+      rateLimitRemaining = (body.data?.rateLimit as { remaining?: number } | undefined)?.remaining ?? rateLimitRemaining;
+
+      const failedAliases = new Map<string, string>();
+      for (const e of body.errors ?? []) if (e.path?.[0]) failedAliases.set(e.path[0], e.message.slice(0, 120));
+
+      chunk.forEach((repo, i) => {
+        const node = body.data?.[`r${i}`] as undefined | null | Record<string, unknown>;
+        const failures: string[] = [];
+        if (failedAliases.has(`r${i}`)) failures.push(`graphql:${failedAliases.get(`r${i}`)}`);
+        if (!node) {
+          deep.set(repo.full_name, { languages: {}, manifests: {}, observedFiles: [], failure: failures.join(",") || "missing" });
+          return;
+        }
+        const languages: Record<string, number> = {};
+        for (const edge of (node.languages as { edges?: { size: number; node: { name: string } }[] } | null)?.edges ?? []) languages[edge.node.name] = edge.size;
+        const observedFiles: string[] = [];
+        const manifests: Record<string, string> = {};
+        const read = (b: Blob, file: string, max: number) => {
+          if (!b) return undefined;
+          if (b.isBinary || b.text === null) { failures.push(`unreadable:${file}`); return undefined; }
+          observedFiles.push(file);
+          return b.text.slice(0, max);
+        };
+        const readmeRaw = read(node.readme as Blob, "README.md", MAX_README_CHARS * 2);
+        GITHUB_MANIFESTS.forEach((file, j) => {
+          const text = read(node[`m${j}`] as Blob, file, MAX_MANIFEST_CHARS);
+          if (text !== undefined) {
+            if (file === "package.json") { try { JSON.parse(text); } catch { failures.push("malformed:package.json"); return; } }
+            manifests[file] = text;
+          }
+        });
+        deep.set(repo.full_name, {
+          readme: readmeRaw ? sanitizeTextForPrompt(readmeRaw).slice(0, MAX_README_CHARS) : undefined,
+          languages, manifests, observedFiles,
+          failure: failures.length ? failures.join(",") : undefined,
+        });
+      });
+    } catch (err) {
+      for (const repo of chunk) {
+        deep.set(repo.full_name, {
+          languages: {},
+          manifests: {},
+          observedFiles: [],
+          failure: err instanceof Error ? err.message.slice(0, 120) : "chunk_failed",
+        });
+      }
+      if (err instanceof GitHubGraphQLError && err.rateLimited) {
+        break;
+      }
+    }
   }
 
-  return { profile, repos, totalRepos: user.repositories.totalCount, deep, unchanged, queries, rateLimitRemaining };
+  const isComplete = repos.length >= profile.public_repos && !hasNextPage;
+
+  return {
+    profile,
+    repos,
+    totalRepos: profile.public_repos,
+    deep,
+    unchanged,
+    queries,
+    rateLimitRemaining,
+    pageInfo: { hasNextPage, endCursor: cursor },
+    isComplete,
+  };
 }

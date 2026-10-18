@@ -413,4 +413,99 @@ export class EvidenceNormalizationService {
 
     return fused.map(({ titleKey: _t, repoSlug: _rs, cleanRepo: _cr, cleanDemo: _cd, ...rest }) => rest);
   }
+
+  /**
+   * Aggregates technology mentions across repositories into deduplicated canonical skills.
+   * If 15 repositories mention Python:
+   * - Shows Python once in the canonical skills inventory
+   * - Preserves 15 source associations where genuinely supported
+   * - Never duplicates Python 15 times
+   * - Never infers expertise simply from repetition
+   */
+  static aggregateSkillsAcrossRepositories(
+    findings: Array<{
+      techName: string;
+      repositoryTitle: string;
+      repositoryUrl: string;
+      sourceFile?: string;
+      confidence?: number;
+    }>
+  ): Array<{
+    canonicalName: string;
+    category: string;
+    evidenceCount: number;
+    sources: Array<{
+      repositoryTitle: string;
+      repositoryUrl: string;
+      sourceFile?: string;
+      confidence?: number;
+    }>;
+    verificationStatus: "unverified";
+    assessmentStatus: "pending_assessment";
+  }> {
+    const map = new Map<
+      string,
+      {
+        canonicalName: string;
+        category: string;
+        sources: Array<{
+          repositoryTitle: string;
+          repositoryUrl: string;
+          sourceFile?: string;
+          confidence?: number;
+        }>;
+      }
+    >();
+
+    for (const f of findings) {
+      const norm = this.normalizeSkill(f.techName);
+      const key = norm.canonical.toLowerCase();
+      const existing = map.get(key);
+
+      const sourceEntry = {
+        repositoryTitle: f.repositoryTitle,
+        repositoryUrl: f.repositoryUrl,
+        sourceFile: f.sourceFile,
+        confidence: f.confidence ?? 0.85,
+      };
+
+      if (existing) {
+        const alreadyLinked = existing.sources.some(
+          (s) => s.repositoryUrl === f.repositoryUrl && s.sourceFile === f.sourceFile
+        );
+        if (!alreadyLinked) {
+          existing.sources.push(sourceEntry);
+        }
+      } else {
+        map.set(key, {
+          canonicalName: norm.canonical,
+          category: norm.category,
+          sources: [sourceEntry],
+        });
+      }
+    }
+
+    return Array.from(map.values()).map((item) => ({
+      canonicalName: item.canonicalName,
+      category: item.category,
+      evidenceCount: item.sources.length,
+      sources: item.sources,
+      verificationStatus: "unverified" as const,
+      assessmentStatus: "pending_assessment" as const,
+    }));
+  }
 }
+
+export function aggregateSkillsAcrossRepositories(
+  findings: Array<{
+    techName: string;
+    repositoryTitle: string;
+    repositoryUrl: string;
+    sourceFile?: string;
+    confidence?: number;
+  }>
+) {
+  return EvidenceNormalizationService.aggregateSkillsAcrossRepositories(findings);
+}
+
+

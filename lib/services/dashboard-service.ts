@@ -95,50 +95,86 @@ export async function getStudentDashboardComposition(
   // Deduplicate and cap to 2
   secondaryInterests = Array.from(new Set(secondaryInterests)).slice(0, 2);
 
-  // Extract skills from evidence ledger deduplicated by normalized name (representing unique tracked skills)
-  const uniqueSkillsMap = new Map<string, { name: string; category?: string; verificationStatus: string; source?: string }>();
+  // Extract skills from evidence ledger deduplicated by normalized name (canonical skills inventory)
+  // Tracks multiple repository/evidence sources without duplicating canonical skills or inferring unverified proficiency.
+  const uniqueSkillsMap = new Map<string, { name: string; category?: string; verificationStatus: string; source?: string; evidenceCount?: number; sources?: string[] }>();
   for (const e of (person360.evidence || []).filter((e) => e.category === "skill")) {
     const rawName = (e.subject || e.value || "").trim();
     if (!rawName) continue;
     const norm = rawName.toLowerCase();
     const existing = uniqueSkillsMap.get(norm);
-    if (!existing || (e.verificationStatus === "verified" && existing.verificationStatus !== "verified")) {
+    if (!existing) {
       uniqueSkillsMap.set(norm, {
         name: rawName,
         category: e.category,
         verificationStatus: e.verificationStatus,
         source: e.source,
+        evidenceCount: 1,
+        sources: [e.source || "imported"],
       });
+    } else {
+      existing.evidenceCount = (existing.evidenceCount || 1) + 1;
+      if (e.source && existing.sources && !existing.sources.includes(e.source)) {
+        existing.sources.push(e.source);
+      }
+      if (e.verificationStatus === "verified" && existing.verificationStatus !== "verified") {
+        existing.verificationStatus = "verified";
+      }
     }
   }
 
-  // Also include skills demonstrated in confirmed projects to maintain canonical alignment with PersonGraph
-  for (const p of (person360.projects || []).filter((p) => p.status === "confirmed")) {
+  // Also include skills demonstrated in projects to maintain canonical alignment with PersonGraph
+  for (const p of (person360.projects || [])) {
     for (const tech of (p.technologies || [])) {
       const rawName = (tech || "").trim();
       if (!rawName) continue;
       const norm = rawName.toLowerCase();
-      if (!uniqueSkillsMap.has(norm)) {
+      const existing = uniqueSkillsMap.get(norm);
+      if (!existing) {
         uniqueSkillsMap.set(norm, {
           name: rawName,
           category: "project_technology",
           verificationStatus: "unverified",
-          source: "project",
+          source: (p.sources && p.sources[0]) || "project",
+          evidenceCount: 1,
+          sources: (p.sources as string[]) || ["project"],
         });
+      } else {
+        existing.evidenceCount = (existing.evidenceCount || 1) + 1;
+        for (const s of ((p.sources as string[]) || [])) {
+          if (existing.sources && !existing.sources.includes(s)) {
+            existing.sources.push(s);
+          }
+        }
       }
     }
   }
   const skills = Array.from(uniqueSkillsMap.values());
 
-  // Map projects
-  const projects: ProjectRecord[] = (person360.projects || []).map((p) => ({
-    id: p.id,
-    title: p.title,
-    description: p.description,
-    technologies: p.technologies || [],
-    sources: p.sources || ["manual"],
-    status: p.status,
-  }));
+  // Map all project records, preserving repository intelligence and distinguishing portfolio vs candidate inventory
+  const allProjectRecords: ProjectRecord[] = (person360.projects || []).map((p) => {
+    const meta = (p.metadata as Record<string, unknown>) || {};
+    return {
+      id: p.id,
+      title: p.title,
+      description: p.description || "",
+      technologies: p.technologies || [],
+      sources: p.sources || ["manual"],
+      status: p.status,
+      repositoryUrl: p.repositoryUrl || undefined,
+      demoUrl: p.demoUrl || undefined,
+      projectClassification: (meta.projectClassification as string) || (p.status === "candidate" ? "unclassified" : "original"),
+      stars: typeof meta.stars === "number" ? meta.stars : undefined,
+      forks: typeof meta.forks === "number" ? meta.forks : undefined,
+      isFork: typeof meta.isFork === "boolean" ? meta.isFork : false,
+      isArchived: typeof meta.isArchived === "boolean" ? meta.isArchived : false,
+      metadata: meta,
+    };
+  });
+
+  // Featured / portfolio projects vs complete candidate repository inventory
+  const projects = allProjectRecords.filter((p) => p.status !== "candidate" || Boolean(p.metadata?.portfolioIncluded));
+  const repositoryInventory = allProjectRecords;
 
   // Map full evidence items
   const evidenceItems: EvidenceItem[] = (person360.evidence || []).map((e) => ({
@@ -198,6 +234,7 @@ export async function getStudentDashboardComposition(
     cohort: person360.profile?.expectedGraduationYear || undefined,
     skills,
     projects,
+    repositoryInventory,
     evidenceItems,
     journeyEvents: (person360.journeySummary || []).map((event) => ({ title: event.title, description: event.description, timestamp: event.timestamp })),
     verifiedReadinessScore,

@@ -55,9 +55,10 @@ def extract_education(content,groups):
                 # Clean up trailing location or date info attached to institution
                 inst_clean = re.sub(r'\s+(?:Jun|Jul|Apr|May|Jan|Feb|Mar|Aug|Sep|Oct|Nov|Dec|\d{4})\b.*$', '', t, flags=re.I).strip(' ,;-')
                 inst_clean = re.sub(r'\bTechn\s+ology\b', 'Technology', inst_clean, flags=re.I)
+                inst_clean = re.sub(r'\bRajkiva\s+fila\b', 'Rajkiya Jila', inst_clean, flags=re.I)
                 attr.setdefault('institution',(inst_clean or t,l,.85))
                 if 'university' in t.lower(): attr['university']=(inst_clean or t,l,.85)
-                elif 'board' in t.lower(): attr['board']=(inst_clean or t,l,.80)
+                elif 'board' in t.lower() or 'bseb' in t.lower() or 'bses' in t.lower(): attr['board']=(inst_clean or t,l,.80)
             if re.match(r'^minors?\s+in\s+(.+)$', t, re.I):
                 attr['specialization'] = (t, l, .80)
             if g:=GRADE.search(t):
@@ -65,8 +66,25 @@ def extract_education(content,groups):
             elif re.search(r'\b(?:honou?rs|distinction|first class)\b',t,re.I):
                 honors_m = re.search(r'\b(?:first class honours|with honours|with honors|distinction|honours|honors)\b',t,re.I)
                 if honors_m and 'grade' not in attr: attr['grade']=(honors_m.group(0),l,.88)
-            if re.search(r'(?:AI|artificial intelligence|computer science|electrical|mechanical|information technology|electronics|data science|biochemistry|mathematics|biological science)',t,re.I):
-                attr.setdefault('specialization',(t,l,.75))
+            
+            # Clean specialization extraction instead of capturing entire line
+            if 'specialization' not in attr and re.search(r'(?:AI|artificial intelligence|computer science|electrical|mechanical|information technology|electronics|data science|biochemistry|mathematics|biological science)',t,re.I):
+                spec_m = re.search(r'\b(?:in|of|,)\s*([A-Za-z\s&()]{3,60}(?:AI\s*&\s*ML|Al\s*&\s*ML|Artificial\s*Intelligence|Computer\s*Science|Information\s*Technology|Data\s*Science|Engineering|Mathematics)[A-Za-z\s&()]*)', t, re.I)
+                if not spec_m:
+                    spec_m = re.search(r'\b(Computer\s+Science(?:\s+&\s+Engineering)?(?:\s*\([A-Za-z\s&]+\))?|Artificial\s+Intelligence(?:\s+&\s+Machine\s+Learning)?|Data\s+Science|Information\s+Technology)\b', t, re.I)
+                if spec_m:
+                    cleaned_spec = spec_m.group(1 if spec_m.lastindex else 0).strip(' ,;-')
+                    cleaned_spec = re.sub(r'\bAl\b', 'AI', cleaned_spec)
+                    attr['specialization'] = (cleaned_spec, l, .80)
+                else:
+                    attr.setdefault('specialization',(t,l,.75))
+
+            if 'degree_title' in attr and ';' in attr['degree_title'][0]:
+                clean_dt = attr['degree_title'][0].split(';')[0].strip(' •*-')
+                clean_dt = re.sub(r'\bAl\b', 'AI', clean_dt)
+                clean_dt = re.sub(r'\bBSES\b', 'BSEB', clean_dt)
+                attr['degree_title'] = (clean_dt, primary or l, .82)
+
             y1,y2=years(t)
             is_present = bool(re.search(r'\b(?:present|current|ongoing|pursuing)\b', t, re.I))
             if y1 and 'start_date' not in attr: attr['start_date']=(y1,l,.80)

@@ -42,6 +42,7 @@ export type ReviewedResumeClaim = {
   sourceSpan: string;
   documentId: string;
   corrected: boolean;
+  recordData?: Record<string, any>;
 };
 
 export type OnboardingDraft = {

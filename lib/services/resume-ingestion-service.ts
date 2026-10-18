@@ -191,8 +191,8 @@ export async function queueResumeUpload(params: {
   return { jobId, documentId };
 }
 
-/** Re-queues an already-stored document (retry without asking for the file again). */
-export async function requeueResumeDocument(personId: string, documentId: string): Promise<string | null> {
+/** Re-queues an already-stored document (retry without asking for the file again). Preserves prior AI consent scope without broadening. */
+export async function requeueResumeDocument(personId: string, documentId: string, explicitAiConsent?: boolean): Promise<string | null> {
   const db = await getDb();
   const [doc] = await db
     .select()
@@ -200,23 +200,26 @@ export async function requeueResumeDocument(personId: string, documentId: string
     .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)))
     .limit(1);
   if (!doc || doc.status === "deleted") return null;
-  return queueJobForDocument(personId, documentId, doc.filename);
+  const docMeta = (doc.metadata as Record<string, unknown>) || {};
+  const aiConsent = explicitAiConsent !== undefined ? explicitAiConsent : docMeta.aiConsent === true;
+  return queueJobForDocument(personId, documentId, doc.filename, aiConsent);
 }
 
 async function queueJobForDocument(personId: string, documentId: string, filename: string, aiConsent?: boolean): Promise<string> {
+  const isAiConsented = aiConsent === true;
   const jobId = await SourceProcessingJobService.startJob({
     personId,
     sourceId: "resume",
     stage: "acquire",
     status: "queued",
-    metadata: { documentId, filename, ...(aiConsent !== undefined ? { aiConsent } : {}) },
+    metadata: { documentId, filename, aiConsent: isAiConsented },
   });
   const db = await getDb();
   await db
     .update(resumeDocuments)
     .set({
       status: "queued",
-      metadata: sql`coalesce(${resumeDocuments.metadata}, '{}'::jsonb) || ${JSON.stringify({ jobId })}::jsonb`,
+      metadata: sql`coalesce(${resumeDocuments.metadata}, '{}'::jsonb) || ${JSON.stringify({ jobId, aiConsent: isAiConsented })}::jsonb`,
       updatedAt: new Date(),
     })
     .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));

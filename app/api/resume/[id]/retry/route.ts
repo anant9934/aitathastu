@@ -32,7 +32,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     return jsonNoStore({ ok: false, code: "NOT_RETRYABLE", error: `This document is already ${current.status}.`, jobId: current.id }, 409);
   }
 
-  const jobId = await requeueResumeDocument(personId, documentId);
+  let explicitAiConsent: boolean | undefined = undefined;
+  try {
+    const text = await _request.text();
+    if (text) {
+      const parsed = JSON.parse(text);
+      if (typeof parsed.aiConsent === "boolean") explicitAiConsent = parsed.aiConsent;
+    }
+  } catch {}
+
+  const jobId = await requeueResumeDocument(personId, documentId, explicitAiConsent);
   if (!jobId) return jsonNoStore({ ok: false, code: "NOT_FOUND", error: "Document not found." }, 404);
 
   after(async () => {

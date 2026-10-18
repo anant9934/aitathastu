@@ -21,6 +21,7 @@ import React, { useEffect, useRef, useCallback, useState } from "react";
 import Link from "next/link";
 import { openEoraChat } from "@/components/eora/EoraCompanion";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Footer } from "@/components/ui/Footer";
 
 /* ============================================================
    TYPES
@@ -1738,64 +1739,7 @@ export function Landing({ user }: LandingProps) {
       {/* ============================================================
           FOOTER
           ============================================================ */}
-      <footer>
-        <div className="wrap">
-          <div className="foot-grid">
-            <div className="foot-brand">
-              <a href="#home" className="logo">
-                <span className="logo-mark"></span> AI Tathastu
-              </a>
-              <p>
-                A learning and growth platform for AI/ML. Turn ambition into real,
-                demonstrated skill — with AI as your guide.
-              </p>
-              <div className="socials">
-                <a href="https://twitter.com" target="_blank" rel="noreferrer" aria-label="X">
-                  𝕏
-                </a>
-                <a href="https://linkedin.com" target="_blank" rel="noreferrer" aria-label="LinkedIn">
-                  in
-                </a>
-                <a href="https://github.com" target="_blank" rel="noreferrer" aria-label="GitHub">
-                  gh
-                </a>
-                <a href="https://discord.com" target="_blank" rel="noreferrer" aria-label="Discord">
-                  dc
-                </a>
-              </div>
-            </div>
-            <div className="foot-col">
-              <h5>Platform</h5>
-              <a href="#journey">Journey</a>
-              <a href="#learning">Learning</a>
-              <a href="#evidence">Evidence</a>
-              <a href="#projects">Projects</a>
-            </div>
-            <div className="foot-col">
-              <h5>Company</h5>
-              <a href="/start">About</a>
-              <a href="/start">Careers</a>
-              <a href="/start">Contact</a>
-              <a href="/start">Community</a>
-            </div>
-            <div className="foot-col">
-              <h5>Legal</h5>
-              <a href="/privacy">Privacy</a>
-              <a href="/terms">Terms</a>
-              <a href="/security">Security</a>
-              <a href="/privacy">Data Policy</a>
-            </div>
-          </div>
-          <div className="foot-bottom">
-            <span>© 2025 AI Tathastu. All rights reserved.</span>
-            <div className="links">
-              <a href="/privacy">Privacy</a>
-              <a href="/terms">Terms</a>
-              <a href="/start">Contact</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
       {/* ============================================================
           BACK TO TOP FAB

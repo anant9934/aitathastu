@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import Link from "next/link";
 import {
   ArrowClockwise,
+  CaretDown,
+  CaretUp,
   CheckCircle,
   FileArrowUp,
   FileText,
@@ -41,8 +44,9 @@ export function CvStep({
   onSkip: () => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
-  const [consent, setConsent] = useState(Boolean(cv.fileName));
-  const [aiConsent, setAiConsent] = useState(false);
+  const [cvProcessingConsent, setCvProcessingConsent] = useState(false);
+  const [aiEnrichmentConsent, setAiEnrichmentConsent] = useState(false);
+  const [disclosureExpanded, setDisclosureExpanded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const confirm = useConfirm();
@@ -51,6 +55,10 @@ export function CvStep({
   const failed = cv.state === "FAILED";
   const inReview = cv.candidates.length > 0 && !cv.reviewSaved;
   const pick = () => {
+    if (!cvProcessingConsent) {
+      toast.error("Consent required", "Please check the CV processing permission box first to allow file upload.");
+      return;
+    }
     if (!blocked && !cv.busy) fileInput.current?.click();
   };
 
@@ -119,7 +127,13 @@ export function CvStep({
               onDrop={(e) => {
                 e.preventDefault();
                 setDragging(false);
-                if (!blocked) void cv.upload(e.dataTransfer.files?.[0], consent, aiConsent);
+                if (!blocked) {
+                  if (!cvProcessingConsent) {
+                    toast.error("Consent required", "Please check the CV processing permission box first to allow extraction.");
+                    return;
+                  }
+                  void cv.upload(e.dataTransfer.files?.[0], cvProcessingConsent, aiEnrichmentConsent);
+                }
               }}
               className={cn(
                 "flex flex-col items-center justify-center gap-4 rounded-card border-2 border-dashed p-8 text-center transition-all duration-200 shadow-card min-h-[260px]",
@@ -139,7 +153,12 @@ export function CvStep({
                 tabIndex={-1}
                 aria-hidden="true"
                 onChange={(e) => {
-                  void cv.upload(e.target.files?.[0], consent, aiConsent);
+                  if (!cvProcessingConsent) {
+                    toast.error("Consent required", "Please check the CV processing permission box first to allow extraction.");
+                    e.target.value = "";
+                    return;
+                  }
+                  void cv.upload(e.target.files?.[0], cvProcessingConsent, aiEnrichmentConsent);
                   e.target.value = "";
                 }}
               />
@@ -208,33 +227,78 @@ export function CvStep({
             </div>
 
             <Checkbox
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              label="I agree to have my CV parsed for profile suggestions."
-              description="I will review and approve every extracted entry before it is saved to my profile."
+              checked={cvProcessingConsent}
+              onChange={(e) => setCvProcessingConsent(e.target.checked)}
+              label="I allow AI Tathastu to upload, store and process my CV to prepare profile suggestions."
+              description="We extract your education, skills, projects, and links using deterministic pattern matching. These are suggestions for your review, not independently verified facts. You can continue without uploading a CV."
             />
 
             <Checkbox
-              checked={aiConsent}
-              onChange={(e) => setAiConsent(e.target.checked)}
-              label="Enable external AI enrichment (Optional)."
-              description="Allows secure external AI to help extract deeper project, publication, and experience details. Deterministic parsing is used by default if unchecked."
+              checked={aiEnrichmentConsent}
+              onChange={(e) => setAiEnrichmentConsent(e.target.checked)}
+              label="Allow optional AI-assisted CV analysis."
+              description="A currently eligible and approved model provider may receive selected resume text to improve complex suggestions. Basic extraction does not require this."
             />
 
             <ul className="mt-2 space-y-2.5 text-xs text-text-muted border-t border-border-medium/60 pt-3">
               <li className="flex items-start gap-2">
                 <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" />
-                <span>Pre-fills college details, graduation year, and degree.</span>
+                <span>Pre-fills college details, graduation year, and degree suggestions.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" />
-                <span>Identifies GitHub, Kaggle, LinkedIn, and paper links.</span>
+                <span>Identifies GitHub, Kaggle, LinkedIn, and paper links for review (does not auto-fetch).</span>
               </li>
               <li className="flex items-start gap-2">
                 <LockKey size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" />
-                <span>Never shared with third parties or used for public AI training.</span>
+                <span>Stored securely in your private account; never sold to third parties or used for unconsented public AI training.</span>
               </li>
             </ul>
+
+            {/* Expandable Disclosure: What information may be extracted? */}
+            <div className="border-t border-border-medium/60 pt-3">
+              <button
+                type="button"
+                onClick={() => setDisclosureExpanded((prev: boolean) => !prev)}
+                className="flex w-full items-center justify-between text-left text-xs font-medium text-accent-warm hover:text-accent-warm-bright transition-colors"
+                aria-expanded={disclosureExpanded}
+              >
+                <span>What information may be extracted?</span>
+                {disclosureExpanded ? (
+                  <CaretUp size={14} aria-hidden="true" />
+                ) : (
+                  <CaretDown size={14} aria-hidden="true" />
+                )}
+              </button>
+
+              {disclosureExpanded && (
+                <div className="mt-3 rounded-md bg-deep-espresso/60 p-3 text-2xs text-text-muted space-y-2">
+                  <p className="font-semibold text-warm-ivory">Candidate information parsed from your document:</p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 list-disc list-inside">
+                    <li>Identity & contact details</li>
+                    <li>Education & degrees</li>
+                    <li>Technical skills & frameworks</li>
+                    <li>Employment history</li>
+                    <li>Internships & industrial training</li>
+                    <li>Leadership & activities</li>
+                    <li>Technical projects & repos</li>
+                    <li>Certifications & licenses</li>
+                    <li>Honors & achievements</li>
+                    <li>Research & publications</li>
+                    <li>Patents & authored books</li>
+                    <li>Digital profile URLs</li>
+                  </ul>
+                  <div className="pt-2 flex flex-wrap gap-3 text-2xs border-t border-border-subtle">
+                    <Link href="/privacy/resume-processing" className="text-accent-warm underline hover:text-accent-warm-bright">
+                      Resume Processing Notice
+                    </Link>
+                    <Link href="/privacy" className="text-text-dim underline hover:text-text-primary">
+                      Privacy Policy
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -276,7 +340,7 @@ export function CvStep({
                       size="sm"
                       variant="secondary"
                       icon={<ArrowClockwise size={16} aria-hidden="true" />}
-                      onClick={() => void cv.retry(consent, aiConsent)}
+                      onClick={() => void cv.retry(cvProcessingConsent, aiEnrichmentConsent)}
                     >
                       Retry
                     </Button>

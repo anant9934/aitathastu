@@ -76,5 +76,6 @@ backups/
 .impeccable/
 .next-prodtest/
 private-fixtures/
-audit-output/
+audit-output/*
+!audit-output/*.md
 *.traineddata.gz

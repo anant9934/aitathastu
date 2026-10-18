@@ -255,7 +255,10 @@ export function useResumeIngestion({
     const docId = retryDocumentId;
     setError(null);
     setState("QUEUED");
-    const res = await requestJson<{ jobId?: string }>(`/api/resume/${docId}/retry`, { method: "POST" });
+    const res = await requestJson<{ jobId?: string }>(`/api/resume/${docId}/retry`, {
+      method: "POST",
+      json: { aiConsent: Boolean(aiConsent) },
+    });
     if (!res.ok || !res.data?.jobId) { fail(res.ok ? "The retry didn't start. Try again." : describeError(res.error), res.ok ? null : res.error.code ?? null, docId); return; }
     await poll(docId, res.data.jobId, fileName || selectedFile.current?.name || "CV");
   };

@@ -23,9 +23,11 @@ import {
   Trash,
   X,
 } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import { requestJson, describeError } from "@/lib/client/api";
 import { Button } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
+import { Dialog } from "@/components/ui/Overlay";
 import { StepHeader, StepFooter } from "../OnboardingShell";
 import { useEoraStepEvents } from "@/lib/client/eora/step-events";
 import type { OnboardingFlow } from "@/lib/client/onboarding/use-onboarding-flow";
@@ -306,6 +308,7 @@ export function FootprintIntelligenceStep({
   const [importedProviders, setImportedProviders] = useState<Set<FootprintProvider>>(new Set());
   // Batch sync
   const [syncingAll, setSyncingAll] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
 
   // Set of dismissed providers
   const dismissedSet = useMemo(
@@ -693,7 +696,7 @@ export function FootprintIntelligenceStep({
                 icon={<ArrowsClockwise size={15} aria-hidden="true" />}
                 loading={syncingAll}
                 loadingLabel="Syncing all…"
-                onClick={handleSyncAll}
+                onClick={() => setShowBatchModal(true)}
               >
                 Confirm & Sync All ({unconfirmedDetectedProviders.length})
               </Button>
@@ -1069,6 +1072,68 @@ export function FootprintIntelligenceStep({
           </Button>
         }
       />
+
+      {/* Batch Sync Authorization Dialog */}
+      <Dialog
+        open={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        title="Authorize Digital Footprint Sync"
+        description="Review the platforms discovered in your CV before public data retrieval begins."
+        size="md"
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/privacy/digital-sources"
+              target="_blank"
+              className="text-xs text-accent-warm underline hover:text-accent-warm-bright"
+            >
+              Digital Sources Notice
+            </Link>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowBatchModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={syncingAll}
+                loadingLabel="Syncing all…"
+                onClick={async () => {
+                  setShowBatchModal(false);
+                  await handleSyncAll();
+                }}
+              >
+                Authorize and fetch ({unconfirmedDetectedProviders.length})
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-4 text-xs text-text-muted">
+          <p>
+            You are authorizing AI Tathastu to query public metadata from the following student-confirmed profile links.
+            Each provider will be independently authorized:
+          </p>
+          <div className="max-h-60 overflow-y-auto space-y-2 rounded-md border border-border-medium bg-bg-surface p-3">
+            {unconfirmedDetectedProviders.map((prov) => {
+              const meta = PROVIDER_METADATA[prov];
+              const cand = detectedCandidates[prov];
+              return (
+                <div key={prov} className="flex flex-col gap-0.5 border-b border-border-subtle/40 pb-2 last:border-0 last:pb-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-warm-ivory">{meta.name}</span>
+                    <span className="font-mono text-2xs text-text-dim truncate max-w-[200px]">{cand?.url}</span>
+                  </div>
+                  <span className="text-2xs text-text-muted">{meta.hint}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-2xs text-text-dim">
+            Guarantees: We only read public profiles and permitted APIs. No passwords or private tokens are accessed. Imported entries remain review candidates until you accept them into your profile.
+          </p>
+        </div>
+      </Dialog>
     </>
   );
 }

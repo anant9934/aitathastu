@@ -21,6 +21,7 @@ import {
   Timer,
   UserCircle,
   ChatsCircle,
+  ShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { Logo } from "@/components/ui/Logo";
@@ -46,6 +47,7 @@ export const NAV_SECONDARY: NavItem[] = [
   { href: "/student/journey", label: "Journey", icon: Timer },
   { href: "/student/assessments", label: "Assessments", icon: ListChecks },
   { href: "/student/interviews", label: "Interviews", icon: ChatsCircle },
+  { href: "/student/privacy", label: "Privacy & Data", icon: ShieldCheck },
 ];
 
 function isActive(pathname: string, item: NavItem) {

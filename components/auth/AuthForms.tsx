@@ -188,16 +188,30 @@ export function SignUpForm() {
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
 
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next: typeof errors = {};
     if (!name.trim()) next.name = "Enter your name.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = "Enter a valid email address.";
     if (password.length < 6) next.password = "Use at least 6 characters.";
+    if (!agreeTerms) next.form = "Please agree to the Terms of Use and Privacy Policy to create your account.";
+    if (!ageConfirmed) next.form = "Please confirm that you meet the age eligibility requirement or have guardian consent.";
     setErrors(next);
     if (Object.keys(next).length) return;
     setBusy(true);
-    const res = await requestJson("/api/auth/sign-up", { method: "POST", json: { displayName: name.trim(), email: email.trim(), password } });
+    const res = await requestJson("/api/auth/sign-up", {
+      method: "POST",
+      json: {
+        displayName: name.trim(),
+        email: email.trim(),
+        password,
+        termsAccepted: true,
+        ageConfirmed: true,
+      },
+    });
     if (!res.ok) {
       setBusy(false);
       setErrors({ form: describeError(res.error) });
@@ -226,6 +240,11 @@ export function SignUpForm() {
         <GoogleLogo size={18} aria-hidden="true" />
         Continue with Google
       </a>
+      <p className="mt-1.5 text-center text-2xs text-text-dim">
+        Signing in with Google confirms your agreement to our{" "}
+        <Link href="/terms" target="_blank" className="underline hover:text-text-primary">Terms</Link> and{" "}
+        <Link href="/privacy" target="_blank" className="underline hover:text-text-primary">Privacy Policy</Link>.
+      </p>
 
       <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wider text-text-dim" aria-hidden="true">
         <span className="h-px flex-1 bg-border-subtle" />
@@ -237,6 +256,45 @@ export function SignUpForm() {
         <TextField label="Full name" autoComplete="name" value={name} error={errors.name} onChange={(e) => setName(e.target.value)} />
         <TextField label="Email" type="email" inputMode="email" autoComplete="email" value={email} error={errors.email} onChange={(e) => setEmail(e.target.value)} />
         <PasswordField value={password} onChange={setPassword} error={errors.password} autoComplete="new-password" hint="At least 6 characters." />
+
+        <div className="flex flex-col gap-2 pt-1 text-xs">
+          <label className="flex items-start gap-2.5 cursor-pointer text-text-muted">
+            <input
+              type="checkbox"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+              className="mt-0.5 size-4 rounded border-border-interactive bg-input-background text-accent-primary focus:ring-focus-ring"
+            />
+            <span>
+              I agree to the{" "}
+              <Link href="/terms" target="_blank" className="text-accent-warm underline hover:text-accent-warm-bright">
+                Terms of Use
+              </Link>{" "}
+              and acknowledge the{" "}
+              <Link href="/privacy" target="_blank" className="text-accent-warm underline hover:text-accent-warm-bright">
+                Privacy Policy
+              </Link>
+              . Optional features like external AI enrichment and public footprint syncing require separate, explicit permissions and are never enabled automatically.
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer text-text-muted">
+            <input
+              type="checkbox"
+              checked={ageConfirmed}
+              onChange={(e) => setAgeConfirmed(e.target.checked)}
+              className="mt-0.5 size-4 rounded border-border-interactive bg-input-background text-accent-primary focus:ring-focus-ring"
+            />
+            <span>
+              I confirm I am 18 years or older, or have parent/guardian authorization (
+              <Link href="/privacy/children" target="_blank" className="text-accent-warm underline hover:text-accent-warm-bright">
+                Children &amp; Guardian Notice
+              </Link>
+              ).
+            </span>
+          </label>
+        </div>
+
         {errors.form && <Banner kind="danger">{errors.form}</Banner>}
         <Button type="submit" variant="primary" size="md" loading={busy} loadingLabel="Creating account…">
           Create account

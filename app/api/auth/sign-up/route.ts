@@ -5,11 +5,12 @@ import { createSession, SESSION_COOKIE_NAME, SESSION_DURATION_MS } from "@/lib/a
 import { createUser, findUserByEmail } from "@/lib/repositories/user-repository";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { getFeatureFlags, isValidPilotInviteCode } from "@/lib/config/feature-flags";
+import { ConsentService } from "@/lib/services/consent-service";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, displayName, name, inviteCode } = body;
+    const { email, password, displayName, name, inviteCode, termsAccepted, ageConfirmed } = body;
 
     // Rate Limiting (auth tier: 10 req/min)
     const ip = req.headers.get("x-forwarded-for") || "client";
@@ -49,6 +50,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
     }
 
+    if (termsAccepted !== true) {
+      return NextResponse.json(
+        { error: "You must review and agree to the Terms of Use and Privacy Policy to create an account." },
+        { status: 400 }
+      );
+    }
+
+    if (ageConfirmed !== true) {
+      return NextResponse.json(
+        { error: "You must confirm that you meet the age eligibility requirement or have guardian authorization." },
+        { status: 400 }
+      );
+    }
+
     const existing = await findUserByEmail(email);
     if (existing) {
       return NextResponse.json(
@@ -65,6 +80,17 @@ export async function POST(req: Request) {
     });
 
     await mergeGuestOnSignIn({ userId: created.userId, personId: created.personId });
+
+    // Record registration consent decision in the ledger
+    await ConsentService.recordConsent({
+      personId: created.personId,
+      purpose: "account_registration_terms",
+      scope: "terms_and_privacy_policy",
+      status: "granted",
+      sourceUI: "signup_form",
+      metadata: { email: created.email, ageConfirmed: true },
+    }).catch((e) => console.warn("[sign-up] consent record warning", e));
+
     const { token, expiresAt } = await createSession(created.userId);
 
     const response = NextResponse.json({

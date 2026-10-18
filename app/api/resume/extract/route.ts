@@ -17,6 +17,7 @@ import { queueResumeUpload, processResumeJob } from "@/lib/services/resume-inges
 import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { jsonNoStore } from "@/lib/api/resume-route-helpers";
 import { contentIdempotencyKey, requestIdempotencyKey, withIdempotency } from "@/lib/sync/idempotency";
+import { ConsentService } from "@/lib/services/consent-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -53,10 +54,11 @@ export async function POST(request: Request) {
     let aiConsent = false;
     try {
       const form = await request.formData();
-      const hasParsingConsent = form.get("consent") === "true" || form.get("aiConsent") === "true";
-      if (!hasParsingConsent) {
-        return fail("CONSENT_REQUIRED", "Confirm that your resume may be processed.", 400);
+      const cvProcessingConsent = form.get("consent") === "true";
+      if (!cvProcessingConsent) {
+        return fail("CONSENT_REQUIRED", "Your permission to upload, store and process your CV is required to proceed.", 400);
       }
+      // Missing or unselected optional consent strictly equals false
       aiConsent = form.get("aiConsent") === "true";
       const candidate = form.get("resume");
       if (!(candidate instanceof File)) return fail("MISSING_FILE", "Choose a PDF or DOCX file first.", 400);
@@ -96,6 +98,34 @@ export async function POST(request: Request) {
       });
       queued = response;
       if (replayed) console.info(JSON.stringify({ event: "resume.upload.deduplicated", requestId, documentId: response.documentId }));
+
+      // Record immutable consent decisions in the consent ledger
+      await ConsentService.recordConsent({
+        personId,
+        purpose: "cv_processing",
+        scope: file.name,
+        status: "granted",
+        sourceUI: "onboarding_cv_step",
+        metadata: { filename: file.name, size: file.size, mimeType: MIME_BY_EXTENSION[extension] },
+      }).catch((e) => console.warn("[resume-extract] consent record warning", e));
+
+      if (aiConsent) {
+        await ConsentService.recordConsent({
+          personId,
+          purpose: "cv_external_ai_enrichment",
+          scope: file.name,
+          status: "granted",
+          sourceUI: "onboarding_cv_step",
+        }).catch((e) => console.warn("[resume-extract] ai consent record warning", e));
+      } else {
+        await ConsentService.recordConsent({
+          personId,
+          purpose: "cv_external_ai_enrichment",
+          scope: file.name,
+          status: "withdrawn",
+          sourceUI: "onboarding_cv_step",
+        }).catch((e) => console.warn("[resume-extract] ai consent record warning", e));
+      }
     } catch (err) {
       console.error("[resume-extract] storing upload failed", { requestId, error: err instanceof Error ? err.message : err });
       return fail("STORAGE_FAILED", "We could not store your file. Please try again.", 503);

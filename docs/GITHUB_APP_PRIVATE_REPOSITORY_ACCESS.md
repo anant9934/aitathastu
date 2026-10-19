@@ -45,8 +45,8 @@ To configure the GitHub App in GitHub Developer Settings:
 
 Add to `.env` or Vercel Environment Variables:
 ```env
-GITHUB_APP_ID=123456
-GITHUB_APP_SLUG=ai-tathastu-candidate-reader
+GITHUB_APP_ID=5387032
+GITHUB_APP_SLUG=ai-tathastu-repository-reader
 GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
 ```
 *Note: Literal `\n` characters in `GITHUB_APP_PRIVATE_KEY` are automatically normalized into multiline PEM strings.*

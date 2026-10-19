@@ -79,3 +79,7 @@ private-fixtures/
 audit-output/*
 !audit-output/*.md
 *.traineddata.gz
+
+# test resumes & test run results containing personal candidate data
+resume for test/
+scripts/four_resumes_acceptance_results.json

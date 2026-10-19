@@ -120,9 +120,11 @@ export function sanitizeResumeExtraction(x: ResumeExtraction): { resume: ResumeE
   const projectLinks = new Set(projects.flatMap((p) => [p.link, p.repository]).filter(Boolean));
 
   const links: ResumeLink[] = [];
+  /** Strip www. prefix for dedup key so that www.github.com and github.com collapse. */
+  const dedupeKey = (u: string) => u.toLowerCase().replace(/^(https?:\/\/)www\./, "$1");
   for (const l of x.links) {
     const url = normalizeUrl(l.url);
-    if (!url || projectLinks.has(url) || links.some((e) => e.url.toLowerCase() === url.toLowerCase())) continue;
+    if (!url || projectLinks.has(url) || links.some((e) => dedupeKey(e.url) === dedupeKey(url))) continue;
     links.push({ type: linkType(url, l.type), url });
   }
 
@@ -368,19 +370,27 @@ export function extractResumeDeterministicResult(
     };
   }
 
-  // Combine discovered footprints
+  // Combine discovered footprints — deduplicate across both sources
   const fps = discoverFootprintsFromResume({ text, hyperlinks });
+  const seenLinkUrls = new Set<string>(
+    det.links.map((l) => l.url.toLowerCase().replace(/\/$/, "").replace(/^(https?:\/\/)www\./, "$1"))
+  );
   const links = [...det.links];
   const discoveredProfiles: Record<string, string> = {};
   for (const fp of fps) {
     if (fp.normalizedUrl) {
-      links.push({
-        type: linkType(fp.normalizedUrl, "portfolio"),
-        url: fp.normalizedUrl,
-      });
+      const key = fp.normalizedUrl.toLowerCase().replace(/\/$/, "").replace(/^(https?:\/\/)www\./, "$1");
+      if (!seenLinkUrls.has(key)) {
+        seenLinkUrls.add(key);
+        links.push({
+          type: linkType(fp.normalizedUrl, "portfolio"),
+          url: fp.normalizedUrl,
+        });
+      }
       discoveredProfiles[fp.provider] = fp.normalizedUrl;
     }
   }
+
 
   return {
     success: true,

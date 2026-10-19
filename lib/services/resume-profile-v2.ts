@@ -68,18 +68,27 @@ export function buildProfileV2(params: {
     certifications: x.certifications.map((c, i) => record(`cert_${i}`, {
       title: field(c.name, 0.9, "certifications", c.sourceSpan, m),
     })),
-    awards: (x.achievements || []).map((a, i) => record(`aw_${i}`, {
+    awards: (x.achievements || []).filter((a) => a.category !== "publication" && a.category !== "patent" && a.category !== "book").map((a, i) => record(`aw_${i}`, {
       name: field(a.title, 0.88, "awards", a.sourceSpan, m),
     })),
     digital_footprint: Object.entries(extraction.discoveredProfiles || {}).map(([platform, url], i) => record(`df_${i}`, {
       platform: field(platform, 0.95, "links", String(url), "hyperlink"),
       original_url: field(String(url), 0.95, "links", String(url), "hyperlink"),
     })),
-    summary: [],
+    summary: x.summary && (x.summary.text || x.summary.headline) ? [record(`sum_0`, {
+      professional_summary: field(x.summary.text || x.summary.headline, 0.9, "summary", x.summary.sourceSpan || x.summary.text || x.summary.headline || "", m),
+    })] : [],
     internships: [],
-    research: [],
-    books_patents: [],
-    leadership: [],
+    research: (x.research || []).map((r, i) => record(`res_${i}`, {
+      title: field(r.title, 0.9, "research", r.sourceSpan || r.title, m),
+    })),
+    books_patents: (x.achievements || []).filter((a) => a.category === "publication" || a.category === "patent" || a.category === "book").map((p, i) => record(`bp_${i}`, {
+      title: field(p.title, 0.9, "books_patents", p.sourceSpan, m),
+    })),
+    leadership: (x.leadership || []).map((l, i) => record(`lead_${i}`, {
+      role: field(l.role, 0.9, "leadership", l.sourceSpan || l.role, m),
+      organization: field(l.organization, 0.9, "leadership", l.sourceSpan || l.organization, m),
+    })),
     extraction_metadata: [],
   };
 

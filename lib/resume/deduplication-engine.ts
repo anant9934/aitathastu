@@ -119,6 +119,10 @@ export class ResumeDeduplicationEngine {
     for (const skill of skills) {
       const key = normalizeTextKey(skill.name);
       if (!key) continue;
+      // Discard pure numeric tokens (e.g. OCR line numbers '1', '0')
+      if (/^\d+$/.test(key)) continue;
+      // Discard single non-language characters (preserve C and R)
+      if (key.length < 2 && !/^[cr]$/i.test(key)) continue;
 
       const existing = canonicalMap.get(key);
       if (existing) {
@@ -240,12 +244,22 @@ export class ResumeDeduplicationEngine {
           return true;
         }
 
-        // Substring match where one title contains the other and Jaccard similarity is very high
-        if (
-          (existingTitle.includes(incomingTitle) || incomingTitle.includes(existingTitle)) &&
-          tokenJaccardSimilarity(existing.title, incoming.title) >= 0.85
-        ) {
-          return true;
+        // Substring match where one title contains the other and Jaccard similarity is very high,
+        // or one title is a parent heading (contains the other) and descriptions match (>15 chars)
+        const isSubstring = (existingTitle.includes(incomingTitle) || incomingTitle.includes(existingTitle)) &&
+          Math.min(existingTitle.length, incomingTitle.length) >= 4;
+
+        if (isSubstring) {
+          if (tokenJaccardSimilarity(existing.title, incoming.title) >= 0.85) return true;
+          if (
+            existing.description &&
+            incoming.description &&
+            existing.description.length > 15 &&
+            (existing.description === incoming.description ||
+              tokenJaccardSimilarity(existing.description, incoming.description) >= 0.6)
+          ) {
+            return true;
+          }
         }
 
         return false;
@@ -299,12 +313,12 @@ export class ResumeDeduplicationEngine {
 
     const normalizeLevel = (deg: string | undefined, level: string | undefined) => {
       const s = `${deg || ""} ${level || ""}`.toLowerCase();
-      if (/b\.?tech|b\.?e\.?|bachelor|undergraduate/i.test(s)) return "undergraduate";
-      if (/m\.?tech|m\.?e\.?|master|postgraduate|msc|mca|mba/i.test(s)) return "postgraduate";
-      if (/12th|senior\s+secondary|higher\s+secondary|intermediate|plus\s+two|\+2|class\s+xii/i.test(s)) return "senior_secondary";
-      if (/10th|secondary|matriculation|high\s+school|class\s+x\b/i.test(s)) return "secondary";
-      if (/diploma/i.test(s)) return "diploma";
-      if (/ph\.?d|doctorate/i.test(s)) return "doctorate";
+      if (/\b(?:b\.?tech|b\.?e\.?|bachelor|undergraduate)\b/i.test(s)) return "undergraduate";
+      if (/\b(?:m\.?tech|m\.?e\.?|master|postgraduate|msc|mca|mba)\b/i.test(s)) return "postgraduate";
+      if (/\b(?:12th|senior\s+secondary|higher\s+secondary|intermediate|plus\s+two|\+2|class\s+xii)\b/i.test(s)) return "senior_secondary";
+      if (/\b(?:10th|secondary|matriculation|high\s+school|class\s+x)\b/i.test(s)) return "secondary";
+      if (/\bdiploma\b/i.test(s)) return "diploma";
+      if (/\b(?:ph\.?d|doctorate)\b/i.test(s)) return "doctorate";
       return "other";
     };
 
@@ -321,14 +335,17 @@ export class ResumeDeduplicationEngine {
           return false;
         }
 
-        // Exact match on institution and degree/level
-        if (exInstNorm === inInstNorm && (exLevel === inLevel || !existing.degree || !incoming.degree)) {
+        // Exact match on institution and degree/level.
+        // Also match when one level is "other" (unrecognized degree string, e.g. from LLM output)
+        // so that additive enrichment (fieldOfStudy, gpa, dates) can flow into the baseline record.
+        const oneIsOther = exLevel === "other" || inLevel === "other";
+        if (exInstNorm === inInstNorm && (exLevel === inLevel || !existing.degree || !incoming.degree || oneIsOther)) {
           return true;
         }
 
         // High similarity on institution (e.g., Lovely Professional University vs Lovely Professional University Phagwara)
         const instSim = tokenJaccardSimilarity(existing.institution, incoming.institution);
-        if (instSim >= 0.45 && (exLevel === inLevel || !existing.degree || !incoming.degree)) {
+        if (instSim >= 0.45 && (exLevel === inLevel || !existing.degree || !incoming.degree || oneIsOther)) {
           return true;
         }
 
@@ -390,14 +407,25 @@ export class ResumeDeduplicationEngine {
     const out: ResumeInterpretationOutput["experience"] = [];
     const resolutions: DuplicateResolution[] = [];
     let mergedCount = 0;
+    const normalizeCompany = (c: string | null | undefined) =>
+      normalizeTextKey((c || "").replace(/^[•·*◦+~°\‘\’\s-]+/, ""));
 
     for (const incoming of experience) {
-      const inComp = normalizeTextKey(incoming.company);
+      const inComp = normalizeCompany(incoming.company);
       const inRole = normalizeTextKey(incoming.role);
 
-      // Discard or merge phantom companies (e.g. "Organization" or trailing sentence fragments)
-      if (/^(organization|company|firm|enterprise|startup|strategic partnerships\.?)$/i.test(inComp)) {
-        const matchRole = out.find((ex) => normalizeTextKey(ex.role) === inRole && inRole.length > 3);
+      // Discard or merge phantom companies or bullet points misclassified as companies
+      const isBulletFragment =
+        /^(?:organization|company|firm|enterprise|startup|strategic partnerships\.?)$/i.test(inComp) ||
+        /^(?:collected|developed|designed|implemented|conducted|building|architected|spearheaded|assisted|regularly wrote)\b/i.test(inComp) ||
+        /^\d{2,6}\/?$/.test(inComp) ||
+        (inComp.length > 50 && inComp.includes(","));
+
+      if (isBulletFragment) {
+        const matchRole = out.find((ex) =>
+          (inRole && inRole.length > 3 && (normalizeTextKey(ex.role) === inRole || ex.role.toLowerCase().includes(incoming.role.toLowerCase()))) ||
+          (incoming.startDate && ex.startDate && ex.startDate === incoming.startDate)
+        );
         if (matchRole) {
           mergedCount++;
           const existingHighlights = new Set(matchRole.highlights?.map((h) => h.toLowerCase()) || []);
@@ -409,21 +437,31 @@ export class ResumeDeduplicationEngine {
             }
           }
         }
-        continue; // Do not emit phantom company
+        continue; // Do not emit bullet fragment as a company
       }
 
+      const isGenericRole = (r: string) => /^(?:team member|contributor|employee|intern|assistant)$/i.test(r.trim());
+
       const matchIndex = out.findIndex((existing) => {
-        const exComp = normalizeTextKey(existing.company);
+        const exComp = normalizeCompany(existing.company);
         const exRole = normalizeTextKey(existing.role);
 
-        // Same company and same role -> definitely same position
-        if (exComp === inComp && exRole === inRole) return true;
-
-        // Empty role in one and same company with overlapping dates
-        if (exComp === inComp && (!exRole || !inRole)) {
-          if (existing.duration === incoming.duration || existing.startDate === incoming.startDate) {
+        // Same company
+        if (exComp === inComp) {
+          if (exRole === inRole || !exRole || !inRole || isGenericRole(existing.role) || isGenericRole(incoming.role)) {
             return true;
           }
+          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.5) return true;
+        }
+
+        // Substring / high similarity company match (e.g. "Founders Verbinden Aug" vs "Founders Verbinden")
+        const compSim = tokenJaccardSimilarity(existing.company, incoming.company);
+        const compSub = (exComp.includes(inComp) || inComp.includes(exComp)) && Math.min(exComp.length, inComp.length) > 5;
+        if (compSim >= 0.6 || compSub) {
+          if (exRole === inRole || !exRole || !inRole || isGenericRole(existing.role) || isGenericRole(incoming.role)) {
+            return true;
+          }
+          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.4) return true;
         }
 
         return false;
@@ -439,6 +477,7 @@ export class ResumeDeduplicationEngine {
           reason: "Merged duplicate role or continuation line for the same organization",
         });
 
+        if (isGenericRole(existing.role) && !isGenericRole(incoming.role)) existing.role = incoming.role;
         if (!existing.role && incoming.role) existing.role = incoming.role;
         if (!existing.duration && incoming.duration) existing.duration = incoming.duration;
         if (!existing.startDate && incoming.startDate) existing.startDate = incoming.startDate;

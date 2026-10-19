@@ -45,16 +45,34 @@ export function applyReviewDecisions(
   profile: ExtractorProfileV2,
   knownCandidateIds: Set<string>,
   decisions: ReviewDecision[]
-): { profile: ExtractorProfileV2; confirmed: number; rejected: number; unknown: string[] } {
+): {
+  profile: ExtractorProfileV2;
+  confirmed: number;
+  rejected: number;
+  pending: number;
+  domainCandidatesCount: number;
+  recordConfirmed: number;
+  recordRejected: number;
+  prunedRecords: number;
+  unknown: string[];
+} {
   const next: ExtractorProfileV2 = structuredClone(profile);
   const byRecord = new Map<ExtractorRecord, ReviewDecision>();
   const unknown: string[] = [];
 
+  // Exclude onboarding profile candidate IDs (e.g. profile_fullName) to obtain pure domain candidates
+  const domainKnownIds = new Set(
+    Array.from(knownCandidateIds).filter((id) => !id.startsWith("profile_"))
+  );
+
+  const decisionMap = new Map<string, ReviewDecision>();
   for (const d of decisions) {
     if (!knownCandidateIds.has(d.candidateId)) {
       unknown.push(d.candidateId);
       continue;
     }
+    decisionMap.set(d.candidateId, d);
+
     const parsed = parseCandidateId(d.candidateId);
     if (!parsed) continue;
 
@@ -67,21 +85,51 @@ export function applyReviewDecisions(
     }
   }
 
-  let confirmed = 0;
-  let rejected = 0;
+  // 1. Candidate-level accounting
+  let confirmedCandidates = 0;
+  let rejectedCandidates = 0;
+  let pendingCandidates = 0;
+
+  for (const candId of domainKnownIds) {
+    const dec = decisionMap.get(candId);
+    if (!dec) {
+      pendingCandidates++;
+    } else if (dec.state === "confirmed") {
+      confirmedCandidates++;
+    } else if (dec.state === "rejected") {
+      rejectedCandidates++;
+    }
+  }
+
+  // 2. Profile record-level state updates
+  let recordConfirmed = 0;
+  let recordRejected = 0;
+  let prunedRecords = 0;
+
   for (const [category, [group, valueFields]] of Object.entries(CATEGORY_GROUPS)) {
-    void category;
-    for (const record of next.groups[group] || []) {
-      if (record.record_state === "independently_verified") continue;
-      const decision = byRecord.get(record);
-      // No decision = the student never confirmed it: treat as rejected.
-      if (!decision || decision.state === "rejected") {
+    const records = next.groups[group] || [];
+    records.forEach((record, idx) => {
+      if (record.record_state === "independently_verified") return;
+      const candId = `${category}_${idx}`;
+      const decision = decisionMap.get(candId) || byRecord.get(record);
+
+      if (!decision) {
         record.record_state = "rejected";
-        rejected++;
-        continue;
+        recordRejected++;
+        if (!domainKnownIds.has(candId)) {
+          prunedRecords++;
+        }
+        return;
       }
+
+      if (decision.state === "rejected") {
+        record.record_state = "rejected";
+        recordRejected++;
+        return;
+      }
+
       record.record_state = "student_confirmed";
-      confirmed++;
+      recordConfirmed++;
       const corrected = decision.correctedValue?.trim();
       const key = valueFields.find((k) => record.fields[k]);
       if (corrected && key && record.fields[key].value !== corrected) {
@@ -97,7 +145,18 @@ export function applyReviewDecisions(
         f.value = corrected;
         f.review_state = "student_confirmed";
       }
-    }
+    });
   }
-  return { profile: next, confirmed, rejected, unknown };
+
+  return {
+    profile: next,
+    confirmed: confirmedCandidates,
+    rejected: rejectedCandidates,
+    pending: pendingCandidates,
+    domainCandidatesCount: domainKnownIds.size,
+    recordConfirmed,
+    recordRejected,
+    prunedRecords,
+    unknown,
+  };
 }

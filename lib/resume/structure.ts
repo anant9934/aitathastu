@@ -10,6 +10,7 @@
 
 import { defaultIntelligenceRouter, StructuredCompletionError, type IntelligenceRouter, type StructuredAttempt } from "@/lib/intelligence/router";
 import { RESUME_EXTRACTION_JSON_SCHEMA, ResumeExtractionSchema, type ResumeExtraction } from "./schema";
+import { sanitizeTextForModel } from "@/lib/intelligence/context-firewall";
 
 /** Long enough for a dense two-page CV; longer input is truncated, never split across calls. */
 const MAX_INPUT_CHARS = 24_000;
@@ -45,7 +46,9 @@ export async function structureResumeText(
   router: IntelligenceRouter = defaultIntelligenceRouter
 ): Promise<{ data: ResumeExtraction; model: string; provider: string; truncated: boolean; attempts: StructuredAttempt[] }> {
   const truncated = text.length > MAX_INPUT_CHARS;
-  const input = truncated ? text.slice(0, MAX_INPUT_CHARS) : text;
+  // Truncate first (preserves the character budget), then redact PII so phones/emails
+  // never enter any LLM provider prompt, retry payload, or repair turn.
+  const input = sanitizeTextForModel(truncated ? text.slice(0, MAX_INPUT_CHARS) : text);
   try {
     const result = await router.completeStructured(
       {

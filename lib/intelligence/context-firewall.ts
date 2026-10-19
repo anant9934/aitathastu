@@ -1,13 +1,62 @@
+/**
+ * AI TATHASTU — CONTEXT FIREWALL
+ *
+ * Strips PII (phone, email, salary) from text before it enters any LLM prompt.
+ * Called by structureResumeText (resume LLM path) and any other context builder
+ * that passes user-supplied text to an external model.
+ *
+ * Phone-redaction strategy — two regex passes:
+ *   Pass 1 — labelled patterns: "Mobile: +91 7209536120", "Ph: 555-1234"
+ *   Pass 2 — bare numbers: Indian 10-digit (6-9 prefix), E.164, NANP, EU long mobiles
+ *
+ * Deterministic extraction (extractMobile in deterministic-extractor.ts) reads the
+ * ORIGINAL text BEFORE this function is called, so legitimate phone capture for
+ * local/onboarding purposes is unaffected.
+ */
+
+/** Pass 1 — explicitly labelled phone fields. */
+const PHONE_LABEL_RE =
+  /(?:mobile|phone|tel|ph|cell|contact|whatsapp|mob)\s*[:\-#]?\s*\+?[\d][\d\s\-.()+]{7,}/gi;
+
+/**
+ * Pass 2 — bare phone numbers.
+ * Covers:
+ *   - Indian 10-digit mobiles (6-9 prefix), with optional +91 / 0091 prefix and separators
+ *   - E.164: +<1-3 digit cc> <subscriber digits with separators>
+ *   - NANP (US/CA): (NXX) NXX-XXXX and variants
+ *   - European long mobiles (+44 7911 123456, +49 151 23456789)
+ * Uses negative lookbehind/lookahead to avoid matching CGPA (≤ 4 digits after dot)
+ * or year ranges.
+ */
+const PHONE_BARE_RE =
+  // Indian 10-digit: optional +91/0091/91 then [6-9] then 9 more digits, separators allowed
+  /(?:\+?(?:00)?91[\s\-.]?)?(?<![.\d])[6-9]\d[\s\-.]?\d{4}[\s\-.]?\d{4,5}(?!\d)/g;
+
+/** International: + or 00 followed by 1-3 digit country code, 4-15 subscriber digits. */
+const PHONE_INTL_RE =
+  /(?:\+|00)\d{1,3}[\s\-.(]?\(?\d{1,4}\)?[\s\-.]?\d{3,5}[\s\-.]?\d{4,6}(?!\d)/g;
+
+/** NANP without country code: (NXX) NXX-XXXX or NXX-NXX-XXXX. */
+const PHONE_NANP_RE =
+  /\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}(?!\d)/g;
+
 export function sanitizeTextForModel(text: string): string {
   if (!text) return "";
 
-  // 1. Strip phone numbers (Indian and international formats)
-  let sanitized = text.replace(/(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/g, "[PHONE_REDACTED]");
+  let sanitized = text
+    // Pass 1: labelled
+    .replace(PHONE_LABEL_RE, "[PHONE_REDACTED]")
+    // Pass 2: Indian bare
+    .replace(PHONE_BARE_RE, "[PHONE_REDACTED]")
+    // Pass 3: international E.164
+    .replace(PHONE_INTL_RE, "[PHONE_REDACTED]")
+    // Pass 4: NANP bare
+    .replace(PHONE_NANP_RE, "[PHONE_REDACTED]");
 
-  // 2. Strip email addresses
+  // Email addresses
   sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[EMAIL_REDACTED]");
 
-  // 3. Strip compensation / salary mentions
+  // Compensation / salary mentions
   sanitized = sanitized.replace(/(₹|\$|INR|USD)\s*\d+([,\d]+)*(\s*(LPA|k|lakhs?|per annum))?/gi, "[COMPENSATION_REDACTED]");
   sanitized = sanitized.replace(/\b\d+(\.\d+)?\s*(LPA|CTC)\b/gi, "[COMPENSATION_REDACTED]");
 

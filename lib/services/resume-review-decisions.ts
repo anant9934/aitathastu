@@ -22,16 +22,21 @@ export type ReviewDecision = {
 const CATEGORY_GROUPS: Record<string, [string, string[]]> = {
   skill: ["skills", ["canonical_name", "original_wording"]],
   project: ["projects", ["title"]],
-  education: ["education", []],
-  experience: ["experience", []],
+  education: ["education", ["degree_title", "qualification"]],
+  experience: ["experience", ["job_title", "organization"]],
   certification: ["certifications", ["title"]],
   achievement: ["awards", ["name"]],
+  leadership: ["leadership", ["role", "organization"]],
+  research: ["research", ["title"]],
+  publication: ["books_patents", ["title"]],
+  digitalFootprint: ["digital_footprint", ["normalized_url", "original_url"]],
+  summary: ["summary", ["professional_summary"]],
 };
 
 export const REVIEWABLE_GROUPS = Object.values(CATEGORY_GROUPS).map(([g]) => g);
 
 export function parseCandidateId(candidateId: string): { category: string; index: number } | null {
-  const m = /^([a-z]+)_(\d+)$/.exec(candidateId);
+  const m = /^([a-zA-Z]+)_(\d+)$/.exec(candidateId);
   if (!m || !(m[1] in CATEGORY_GROUPS)) return null;
   return { category: m[1], index: Number(m[2]) };
 }
@@ -46,13 +51,20 @@ export function applyReviewDecisions(
   const unknown: string[] = [];
 
   for (const d of decisions) {
-    const parsed = knownCandidateIds.has(d.candidateId) ? parseCandidateId(d.candidateId) : null;
-    const record = parsed ? next.groups[CATEGORY_GROUPS[parsed.category][0]]?.[parsed.index] : undefined;
-    if (!record) {
+    if (!knownCandidateIds.has(d.candidateId)) {
       unknown.push(d.candidateId);
       continue;
     }
-    byRecord.set(record, d);
+    const parsed = parseCandidateId(d.candidateId);
+    if (!parsed) continue;
+
+    const groupConfig = CATEGORY_GROUPS[parsed.category];
+    if (!groupConfig) continue;
+
+    const record = next.groups[groupConfig[0]]?.[parsed.index];
+    if (record) {
+      byRecord.set(record, d);
+    }
   }
 
   let confirmed = 0;

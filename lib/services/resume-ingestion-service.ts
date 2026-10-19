@@ -601,7 +601,7 @@ function profileCandidates(extraction: ResumeExtractionResult, text: string): Re
   const out: ResumeReviewCandidate[] = [];
   const hasStructuredEdu = Boolean(extraction.extracted?.education && extraction.extracted.education.length > 0);
   const fields: Array<[string, string | number | undefined]> = [
-    ["fullName", p.fullName], ["email", p.email], ["location", p.location],
+    ["fullName", p.fullName], ["email", p.email], ["mobile", p.mobile], ["location", p.location],
   ];
   if (!hasStructuredEdu) {
     fields.push(

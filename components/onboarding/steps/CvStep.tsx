@@ -61,7 +61,7 @@ export function CvStep({
   const [disclosureExpanded, setDisclosureExpanded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [editingCandidateId, setEditingCandidateId] = useState<string | null>(null);
+  const [editingCandidate, setEditingCandidate] = useState<{ id: string; draft: string } | null>(null);
   const confirm = useConfirm();
 
   const blocked = cv.serviceReady === false;
@@ -480,27 +480,94 @@ export function CvStep({
                       </div>
                       <div className="flex flex-wrap gap-2 pt-1">
                         {rows.map((c) => {
+                          const isEditingSkill = editingCandidate?.id === c.id;
+                          if (isEditingSkill) {
+                            return (
+                              <div key={c.id} className="inline-flex items-center gap-1.5 rounded-panel border border-accent-warm bg-bg-surface px-2 py-1 shadow-xs">
+                                <input
+                                  id={`cv-input-${c.id}`}
+                                  value={editingCandidate.draft}
+                                  onChange={(e) => setEditingCandidate({ id: c.id, draft: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      const val = editingCandidate.draft.trim();
+                                      if (val) cv.correct(c.id, val);
+                                      setEditingCandidate(null);
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      setEditingCandidate(null);
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="w-28 rounded bg-bg-primary px-1.5 py-0.5 text-xs text-text-primary focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const val = editingCandidate.draft.trim();
+                                    if (val) cv.correct(c.id, val);
+                                    setEditingCandidate(null);
+                                  }}
+                                  className="text-verified hover:text-verified-bright text-xs font-bold px-1 cursor-pointer"
+                                  title="Save edit"
+                                  aria-label="Save"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCandidate(null);
+                                  }}
+                                  className="text-text-dim hover:text-text-primary text-xs px-1 cursor-pointer"
+                                  title="Cancel edit"
+                                  aria-label="Cancel"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            );
+                          }
                           return (
-                            <button
+                            <div
                               key={c.id}
-                              type="button"
-                              onClick={() => cv.toggle(c.id, !c.selected)}
                               className={cn(
-                                "group inline-flex items-center gap-2 rounded-panel border px-3 py-1.5 text-xs font-medium transition-all shadow-xs cursor-pointer select-none",
+                                "group inline-flex items-center gap-1.5 rounded-panel border px-3 py-1.5 text-xs font-medium transition-all shadow-xs select-none",
                                 c.selected
                                   ? "border-accent-warm bg-accent-warm/15 text-warm-ivory shadow-[0_0_12px_rgba(244,154,71,0.15)]"
                                   : "border-border-medium bg-bg-surface/50 text-text-muted hover:border-border-bright hover:text-text-primary",
                               )}
-                              title={`In CV: "${c.sourceSpan}"`}
                             >
-                              <span
-                                className={cn(
-                                  "size-2 rounded-full transition-colors",
-                                  c.selected ? "bg-accent-warm-bright" : "bg-border-medium group-hover:bg-text-dim",
-                                )}
-                              />
-                              <span>{c.value}</span>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => cv.toggle(c.id, !c.selected)}
+                                className="inline-flex items-center gap-2 cursor-pointer"
+                                title={`In CV: "${c.sourceSpan}"`}
+                              >
+                                <span
+                                  className={cn(
+                                    "size-2 rounded-full transition-colors",
+                                    c.selected ? "bg-accent-warm-bright" : "bg-border-medium group-hover:bg-text-dim",
+                                  )}
+                                />
+                                <span>{c.value}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCandidate({ id: c.id, draft: c.value });
+                                }}
+                                className="ml-1 opacity-0 group-hover:opacity-100 hover:text-accent-warm text-text-dim transition-opacity cursor-pointer p-0.5"
+                                title="Edit skill wording"
+                                aria-label={`Edit ${c.value}`}
+                              >
+                                <PencilSimple size={12} />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
@@ -536,7 +603,7 @@ export function CvStep({
                       {rows.map((c) => {
                         const label = c.field ? FIELD_LABELS[c.field] || c.field : c.category;
                         const data = (c as any).recordData || {};
-                        const isEditing = editingCandidateId === c.id;
+                        const isEditing = editingCandidate?.id === c.id;
 
                         return (
                           <li
@@ -566,31 +633,69 @@ export function CvStep({
                                   </label>
                                   <button
                                     type="button"
-                                    onClick={() => setEditingCandidateId(isEditing ? null : c.id)}
-                                    className="text-text-dim hover:text-accent-warm transition-colors p-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingCandidate(isEditing ? null : { id: c.id, draft: c.value });
+                                    }}
+                                    className="text-text-dim hover:text-accent-warm transition-colors p-1 rounded hover:bg-bg-primary/50 cursor-pointer"
                                     title="Edit wording"
+                                    aria-label={`Edit ${label}`}
                                   >
                                     <PencilSimple size={14} />
                                   </button>
                                 </div>
 
                                 {isEditing ? (
-                                  <div className="mt-1.5 flex flex-col gap-1.5">
+                                  <div className="mt-1.5 flex flex-col gap-2 rounded border border-accent-warm/60 bg-bg-primary/80 p-2.5">
                                     <input
                                       id={`cv-input-${c.id}`}
-                                      value={c.value}
-                                      onChange={(e) => cv.correct(c.id, e.target.value)}
-                                      onBlur={() => setEditingCandidateId(null)}
+                                      value={editingCandidate.draft}
+                                      onChange={(e) => setEditingCandidate({ id: c.id, draft: e.target.value })}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                          e.preventDefault();
+                                          const val = editingCandidate.draft.trim();
+                                          if (val) cv.correct(c.id, val);
+                                          setEditingCandidate(null);
+                                        } else if (e.key === "Escape") {
+                                          e.preventDefault();
+                                          setEditingCandidate(null);
+                                        }
+                                      }}
                                       autoFocus
-                                      className="w-full rounded border border-accent-warm bg-bg-primary px-2 py-1 text-sm font-medium text-text-primary focus:outline-none"
+                                      className="w-full rounded border border-border-medium bg-bg-surface px-2.5 py-1.5 text-sm font-medium text-text-primary focus:border-accent-warm focus:outline-none"
                                     />
-                                    <span className="text-3xs text-text-dim">Press Enter or click away to save edits</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-3xs text-text-dim">Enter to save · Esc to cancel</span>
+                                      <div className="flex items-center gap-1.5">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingCandidate(null);
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="primary"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const val = editingCandidate.draft.trim();
+                                            if (val) cv.correct(c.id, val);
+                                            setEditingCandidate(null);
+                                          }}
+                                        >
+                                          Save
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
                                 ) : (
                                   <p
-                                    onClick={() => setEditingCandidateId(c.id)}
-                                    className="mt-0.5 text-sm font-medium text-text-primary cursor-text hover:text-warm-ivory"
-                                    title="Click to edit wording"
+                                    className="mt-0.5 text-sm font-medium text-text-primary"
                                   >
                                     {c.value}
                                   </p>

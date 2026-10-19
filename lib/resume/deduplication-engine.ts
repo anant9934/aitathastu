@@ -285,6 +285,100 @@ export class ResumeDeduplicationEngine {
   }
 
   /**
+   * Deduplicates education records while strictly preserving distinct qualifications
+   * (e.g. B.Tech vs Senior Secondary / Class XII).
+   */
+  public static deduplicateEducation(education: ResumeInterpretationOutput["education"]): {
+    education: ResumeInterpretationOutput["education"];
+    resolutions: DuplicateResolution[];
+    mergedCount: number;
+  } {
+    const out: ResumeInterpretationOutput["education"] = [];
+    const resolutions: DuplicateResolution[] = [];
+    let mergedCount = 0;
+
+    const normalizeLevel = (deg: string | undefined, level: string | undefined) => {
+      const s = `${deg || ""} ${level || ""}`.toLowerCase();
+      if (/b\.?tech|b\.?e\.?|bachelor|undergraduate/i.test(s)) return "undergraduate";
+      if (/m\.?tech|m\.?e\.?|master|postgraduate|msc|mca|mba/i.test(s)) return "postgraduate";
+      if (/12th|senior\s+secondary|higher\s+secondary|intermediate|plus\s+two|\+2|class\s+xii/i.test(s)) return "senior_secondary";
+      if (/10th|secondary|matriculation|high\s+school|class\s+x\b/i.test(s)) return "secondary";
+      if (/diploma/i.test(s)) return "diploma";
+      if (/ph\.?d|doctorate/i.test(s)) return "doctorate";
+      return "other";
+    };
+
+    for (const incoming of education) {
+      const inInstNorm = normalizeTextKey(incoming.institution);
+      const inLevel = normalizeLevel(incoming.degree, incoming.academicLevel);
+
+      const matchIndex = out.findIndex((existing) => {
+        const exInstNorm = normalizeTextKey(existing.institution);
+        const exLevel = normalizeLevel(existing.degree, existing.academicLevel);
+
+        // Different known qualification levels (e.g. B.Tech vs Senior Secondary) are NEVER duplicates!
+        if (inLevel !== "other" && exLevel !== "other" && inLevel !== exLevel) {
+          return false;
+        }
+
+        // Exact match on institution and degree/level
+        if (exInstNorm === inInstNorm && (exLevel === inLevel || !existing.degree || !incoming.degree)) {
+          return true;
+        }
+
+        // High similarity on institution (e.g., Lovely Professional University vs Lovely Professional University Phagwara)
+        const instSim = tokenJaccardSimilarity(existing.institution, incoming.institution);
+        if (instSim >= 0.45 && (exLevel === inLevel || !existing.degree || !incoming.degree)) {
+          return true;
+        }
+
+        // Same qualification level and same dates/grade
+        if (inLevel !== "other" && exLevel === inLevel) {
+          if ((existing.gpa && incoming.gpa && existing.gpa === incoming.gpa) ||
+              (existing.percentage && incoming.percentage && existing.percentage === incoming.percentage)) {
+            return true;
+          }
+          if (instSim >= 0.3) return true;
+        }
+
+        return false;
+      });
+
+      if (matchIndex >= 0) {
+        mergedCount++;
+        const existing = out[matchIndex];
+        resolutions.push({
+          recordA: `${existing.institution} (${existing.degree})`,
+          recordB: `${incoming.institution} (${incoming.degree})`,
+          status: "identical_merged",
+          reason: "Merged duplicate education record for same qualification level and institution",
+        });
+
+        // Retain richer/cleaner fields
+        if ((!existing.degree || existing.degree.length < (incoming.degree || "").length) && incoming.degree) {
+          existing.degree = incoming.degree;
+        }
+        if (!existing.fieldOfStudy && incoming.fieldOfStudy) {
+          existing.fieldOfStudy = incoming.fieldOfStudy;
+        }
+        if (!existing.gpa && incoming.gpa) existing.gpa = incoming.gpa;
+        if (!existing.percentage && incoming.percentage) existing.percentage = incoming.percentage;
+        if (!existing.startDate && incoming.startDate) existing.startDate = incoming.startDate;
+        if (!existing.endDate && incoming.endDate) existing.endDate = incoming.endDate;
+        if (!existing.graduationYear && incoming.graduationYear) existing.graduationYear = incoming.graduationYear;
+        // Prefer clean institution without trailing dates
+        if (existing.institution.length > incoming.institution.length && /jun|jul|apr|2022|2024/i.test(existing.institution)) {
+          existing.institution = incoming.institution;
+        }
+      } else {
+        out.push({ ...incoming });
+      }
+    }
+
+    return { education: out, resolutions, mergedCount };
+  }
+
+  /**
    * Deduplicates experience / leadership records.
    * Prevents splitting positions across bullet chunks while keeping separate roles distinct.
    */
@@ -300,6 +394,23 @@ export class ResumeDeduplicationEngine {
     for (const incoming of experience) {
       const inComp = normalizeTextKey(incoming.company);
       const inRole = normalizeTextKey(incoming.role);
+
+      // Discard or merge phantom companies (e.g. "Organization" or trailing sentence fragments)
+      if (/^(organization|company|firm|enterprise|startup|strategic partnerships\.?)$/i.test(inComp)) {
+        const matchRole = out.find((ex) => normalizeTextKey(ex.role) === inRole && inRole.length > 3);
+        if (matchRole) {
+          mergedCount++;
+          const existingHighlights = new Set(matchRole.highlights?.map((h) => h.toLowerCase()) || []);
+          for (const h of incoming.highlights || []) {
+            if (!existingHighlights.has(h.toLowerCase())) {
+              matchRole.highlights = matchRole.highlights || [];
+              matchRole.highlights.push(h);
+              existingHighlights.add(h.toLowerCase());
+            }
+          }
+        }
+        continue; // Do not emit phantom company
+      }
 
       const matchIndex = out.findIndex((existing) => {
         const exComp = normalizeTextKey(existing.company);
@@ -357,6 +468,10 @@ export class ResumeDeduplicationEngine {
     const allResolutions: DuplicateResolution[] = [];
     let totalMerged = 0;
 
+    const eduResult = this.deduplicateEducation(interpretation.education);
+    allResolutions.push(...eduResult.resolutions);
+    totalMerged += eduResult.mergedCount;
+
     const skillResult = this.deduplicateSkills(interpretation.skills);
     totalMerged += skillResult.mergedCount;
 
@@ -375,6 +490,7 @@ export class ResumeDeduplicationEngine {
     return {
       interpretation: {
         ...interpretation,
+        education: eduResult.education,
         skills: skillResult.skills,
         certifications: certResult.certifications,
         projects: projResult.projects,

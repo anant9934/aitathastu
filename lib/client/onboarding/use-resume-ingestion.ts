@@ -24,7 +24,7 @@ export type ResumeCandidate = Omit<ReviewedResumeClaim, "category"> & {
   field?: string;
 };
 
-export type AcceptedResumeProfile = Partial<Record<"fullName" | "email" | "location" | "degree" | "specialization" | "institution" | "currentYear" | "expectedGraduationYear" | "gpa", string>>;
+export type AcceptedResumeProfile = Partial<Record<"fullName" | "email" | "mobile" | "location" | "degree" | "specialization" | "institution" | "currentYear" | "expectedGraduationYear" | "gpa", string>>;
 
 export type ResumeExtraData = {
   extractedProfile?: Record<string, unknown>;
@@ -75,7 +75,7 @@ export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: Resum
 ];
 
 export const FIELD_LABELS: Record<string, string> = {
-  fullName: "Full name", email: "Email", location: "Location",
+  fullName: "Full name", email: "Email", mobile: "Phone number", location: "Location",
   institution: "Institution", degree: "Degree", specialization: "Field of study",
   expectedGraduationYear: "Graduation year", github: "GitHub", linkedin: "LinkedIn", portfolio: "Portfolio",
 };

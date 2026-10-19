@@ -180,17 +180,27 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
     );
   }
   if (Array.isArray(extracted.research) && extracted.research.length > 0) {
-    add(
-      "research",
-      extracted.research.map((x) => {
-        const parts = [x.title, x.type, x.publisher, x.date].filter(Boolean);
-        return {
-          value: (x as any).displayText || parts.join(" · ") || x.title || "Research Entry",
-          sourceSpan: x.sourceSpan || x.title || "",
-          recordData: x as Record<string, any>,
-        };
-      })
-    );
+    const pubs = (extracted.achievements || []).filter((x) => x.category === "publication" || x.category === "patent" || x.category === "book");
+    const distinctResearch = extracted.research.filter((r) => {
+      const normR = r.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      return !pubs.some((p) => {
+        const normP = p.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        return normP === normR || (normR.length > 10 && normP.includes(normR)) || (normP.length > 10 && normR.includes(normP));
+      });
+    });
+    if (distinctResearch.length > 0) {
+      add(
+        "research",
+        distinctResearch.map((x) => {
+          const parts = [x.title, x.type, x.publisher, x.date].filter(Boolean);
+          return {
+            value: (x as any).displayText || parts.join(" · ") || x.title || "Research Entry",
+            sourceSpan: x.sourceSpan || x.title || "",
+            recordData: x as Record<string, any>,
+          };
+        })
+      );
+    }
   }
   if (Array.isArray(extracted.hackathons) && extracted.hackathons.length > 0) {
     add(
@@ -245,9 +255,16 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
     );
   }
   if (Array.isArray(extracted.digitalFootprints) && extracted.digitalFootprints.length > 0) {
+    const seenUrls = new Set<string>();
+    const distinctFootprints = extracted.digitalFootprints.filter((df) => {
+      const normU = df.url.toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/\/+$/, "");
+      if (seenUrls.has(normU)) return false;
+      seenUrls.add(normU);
+      return true;
+    });
     add(
       "digitalFootprint",
-      extracted.digitalFootprints.map((x) => {
+      distinctFootprints.map((x) => {
         const parts = [x.platform, x.url, x.handle ? `@${x.handle}` : undefined].filter(Boolean);
         return {
           value: (x as any).displayText || parts.join(" · ") || x.url,

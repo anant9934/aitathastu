@@ -458,6 +458,20 @@ function extractEmails(taggedLines: Array<{ text: string; section: string }>): A
   return out;
 }
 
+/** Extracts mobile / phone number from header lines for consent-based candidate review. */
+function extractMobile(taggedLines: Array<{ text: string; section: string }>): { mobile: string; sourceSpan: string } | null {
+  for (const item of taggedLines) {
+    if (item.section !== "header" && item.section !== "contact") continue;
+    // Look for explicit +91 or international/domestic phone formats
+    const m = item.text.match(/(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b|(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/);
+    if (m) {
+      const cleaned = m[0].trim();
+      return { mobile: cleaned, sourceSpan: item.text };
+    }
+  }
+  return null;
+}
+
 /** Extracts location / city if explicitly labeled or present in header. */
 function extractLocation(taggedLines: Array<{ text: string; section: string }>): { location: string; sourceSpan: string } | null {
   for (const item of taggedLines) {
@@ -554,9 +568,13 @@ function extractEducation(taggedLines: Array<{ text: string; section: string }>)
     const instLine = chunk.find((l) => INSTITUTION_RE.test(l.text));
     if (instLine) {
       const cleanInst = instLine.text
-        .replace(/^[•·*◦\-–—|#\s]+|[•·*◦\-–—|#\s]+$/g, "")
+        .replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘"]+|[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘"]+$/g, "")
         .split("|")[0]
         .split(";")[0]
+        .replace(DATE_RANGE_RE, "")
+        .replace(/(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}\s*(?:–|-|to)\s*(?:(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s*)?(?:19|20)\d{2}|Present|Current|Ongoing)\.?/gi, "")
+        .replace(/\b(?:19|20)\d{2}\b.*$/, "")
+        .replace(/,\s*$/, "")
         .trim();
       institution = cleanInst.slice(0, 150);
     }
@@ -844,14 +862,17 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
   let currentChunk: Array<{ text: string; section: string }> = [];
 
   for (const line of expLines) {
-    const isBullet = /^[•·*◦\-–—]\s*/.test(line.text);
+    const isBullet = /^(?:[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab]|‘»)\s*/.test(line.text);
 
-    const currentHasRole = currentChunk.some((l) => OCCUPATIONAL_TITLES.test(l.text) && !/^[•·*◦\-–—]\s*/.test(l.text));
-    const currentHasCompany = currentChunk.some((l) => !OCCUPATIONAL_TITLES.test(l.text) && !/^[•·*◦\-–—]\s*/.test(l.text) && !DATE_RANGE_RE.test(l.text));
-    const currentHasBullets = currentChunk.some((l) => /^[•·*◦\-–—]\s*/.test(l.text));
+    const currentHasRole = currentChunk.some((l) => OCCUPATIONAL_TITLES.test(l.text) && !/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab]|‘»/.test(l.text));
+    const currentHasCompany = currentChunk.some((l) => !OCCUPATIONAL_TITLES.test(l.text) && !/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab]|‘»/.test(l.text) && !DATE_RANGE_RE.test(l.text));
+    const currentHasBullets = currentChunk.some((l) => /^(?:[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab]|‘»)\s*/.test(l.text));
     const currentHasDate = currentChunk.some((l) => DATE_RANGE_RE.test(l.text) || YEAR_RE.test(l.text));
 
-    const isNewChunk = !isBullet && currentChunk.length > 0 && (
+    const isContinuation = /^[a-z]/.test(line.text.trim()) ||
+      (!OCCUPATIONAL_TITLES.test(line.text) && !DATE_RANGE_RE.test(line.text) && !YEAR_RE.test(line.text) && line.text.trim().endsWith("."));
+
+    const isNewChunk = !isBullet && !isContinuation && currentChunk.length > 0 && (
       (currentHasRole && currentHasCompany) ||
       (currentHasRole && currentHasBullets) ||
       (currentHasRole && currentHasDate)
@@ -894,8 +915,8 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
     }
 
     for (const l of chunk) {
-      const isBullet = /^[•·*◦\-–—]\s*/.test(l.text);
-      const clean = l.text.replace(/^[•·*◦\-–—|#\s]+|[•·*◦\-–—|#\s]+$/g, "").trim();
+      const isBullet = /^(?:[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab]|‘»)\s*/.test(l.text);
+      const clean = l.text.replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘"]+|[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘"]+$/g, "").trim();
       if (!clean) continue;
 
       if (!isBullet && clean.includes("|")) {
@@ -923,8 +944,9 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
       }
     }
 
-    if (!company && !role) continue;
-    if (company.length < 2 && role.length < 2) continue;
+    if (!company || company.length < 2) continue;
+    if (/^(organization|company|firm|enterprise|startup|strategic partnerships\.?)$/i.test(company.trim())) continue;
+    if (!role) role = "Team Member";
 
     // Detect leadership & founder roles
     const combinedStr = `${role} ${company}`;
@@ -946,8 +968,8 @@ function extractExperience(taggedLines: Array<{ text: string; section: string }>
     const recordId = `exp_${idx}`;
 
     outExperience.push({
-      company: (company || "Organization").slice(0, 100),
-      role: (role || "Role").slice(0, 100),
+      company: company.slice(0, 100),
+      role: role.slice(0, 100),
       type: expType,
       startDate,
       endDate,
@@ -1040,7 +1062,7 @@ function extractAchievements(taggedLines: Array<{ text: string; section: string 
   let currentChunk: Array<{ text: string }> = [];
 
   for (const line of targetLines) {
-    const isTopBullet = /^[•·*◦\-–—]\s+/.test(line.text);
+    const isTopBullet = /^(?:[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab]|‘»)\s*/.test(line.text);
     if (isTopBullet && currentChunk.length > 0) {
       chunks.push(currentChunk);
       currentChunk = [];
@@ -1050,7 +1072,7 @@ function extractAchievements(taggedLines: Array<{ text: string; section: string 
   if (currentChunk.length > 0) chunks.push(currentChunk);
 
   for (const chunk of chunks) {
-    const fullText = chunk.map((c) => c.text.replace(/^[•·*◦\-–—|#\s]+/, "").trim()).join(" ");
+    const fullText = chunk.map((c) => c.text.replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘"]+/, "").trim()).join(" ");
     if (fullText.length < 5) continue;
 
     let category: "award" | "hackathon" | "publication" | "patent" = "award";
@@ -1077,14 +1099,6 @@ function extractAchievements(taggedLines: Array<{ text: string; section: string 
       category = "hackathon";
     }
 
-    outAchievements.push({
-      title: title.slice(0, 200),
-      category,
-      description: description.slice(0, 300),
-      sourceSpan: chunk[0]?.text.slice(0, 300) || fullText.slice(0, 300),
-    });
-
-    // Populate research if patent, paper, or book mentioned
     if (category === "patent" || category === "publication") {
       outResearch.push({
         title: title.slice(0, 200),
@@ -1092,6 +1106,13 @@ function extractAchievements(taggedLines: Array<{ text: string; section: string 
         sourceSpan: chunk[0]?.text.slice(0, 300) || fullText.slice(0, 300),
       });
     }
+
+    outAchievements.push({
+      title: title.slice(0, 200),
+      category,
+      description: description.slice(0, 300),
+      sourceSpan: chunk[0]?.text.slice(0, 300) || fullText.slice(0, 300),
+    });
   }
 
   return { achievements: outAchievements, research: outResearch };
@@ -1203,6 +1224,7 @@ export function extractResumeDeterministic(sourceText: string, hyperlinks: strin
 
   const nameResult = extractName(tagged);
   const emails = extractEmails(tagged);
+  const mobileResult = extractMobile(tagged);
   const loc = extractLocation(tagged);
   const summary = extractSummary(tagged);
 
@@ -1247,7 +1269,7 @@ export function extractResumeDeterministic(sourceText: string, hyperlinks: strin
   const profile: ExtractedProfile = {
     fullName: nameResult?.name,
     email: emails[0]?.email,
-    mobile: undefined, // Strictly prohibited per V4/V6 privacy guarantee
+    mobile: undefined,
     location: loc?.location,
     institution: primaryEdu?.institution,
     degree: primaryEdu?.degree,

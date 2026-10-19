@@ -67,7 +67,7 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
     ...data.academic,
     fullName: ap.fullName || data.academic.fullName,
     email: ap.email || data.academic.email,
-    mobile: data.academic.mobile, // Preserved strictly from user account without CV overwrite
+    mobile: data.academic.mobile || (ap as any).mobile || "",
     institution: ap.institution || data.academic.institution,
     degree: ap.degree || data.academic.degree,
     department: ap.specialization || data.academic.department,

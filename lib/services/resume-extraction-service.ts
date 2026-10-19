@@ -79,6 +79,8 @@ const DOMAIN_TYPES: Array<[RegExp, ResumeLink["type"]]> = [
 function normalizeUrl(raw: string | null | undefined): string | null {
   let u = tidy(raw, 500).replace(/^<|>$/g, "");
   if (!u || /^mailto:/i.test(u) || /@/.test(u.split("/")[0])) return null;
+  // Fix OCR typos in TLD (e.g. linkedin.comy -> linkedin.com)
+  u = u.replace(/\.comy(?=\/|$)/gi, ".com").replace(/\.coim(?=\/|$)/gi, ".com").replace(/\.con(?=\/|$)/gi, ".com");
   if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
   try {
     const url = new URL(u);
@@ -458,7 +460,9 @@ export function adaptRenderProfileToInterpretation(
   for (const rec of rawEducation) {
     const f = rec.fields;
     const institution = tidy(f.institution?.value || f.university?.value || f.board?.value, 200);
-    if (!institution || !grounded(institution)) continue;
+    const instSnippet = f.institution?.evidence?.[0]?.snippet;
+    const isInstGrounded = !norm || grounded(institution) || (instSnippet && isGrounded(norm, instSnippet)) || (institution && isGrounded(norm, institution.split(",")[0]));
+    if (!institution || !isInstGrounded) continue;
 
     const degree = tidy(f.degree_title?.value || f.qualification?.value, 100);
     const fieldOfStudy = tidy(f.specialization?.value || f.department?.value, 100) || undefined;
@@ -554,7 +558,10 @@ export function adaptRenderProfileToInterpretation(
       continue;
     }
     const name = tidy(f.canonical_name?.value || f.original_wording?.value, 100);
-    if (!name || !grounded(name)) continue;
+    const orig = tidy(f.original_wording?.value, 100);
+    const skillSnippet = f.canonical_name?.evidence?.[0]?.snippet || f.original_wording?.evidence?.[0]?.snippet;
+    const isSkillGrounded = !norm || grounded(name) || (orig && grounded(orig)) || (skillSnippet && isGrounded(norm, skillSnippet));
+    if (!name || !isSkillGrounded) continue;
 
     const cat = (f.category?.value || "").toLowerCase();
     const validCats = ["language", "framework", "library", "tool", "concept", "other"] as const;
@@ -637,12 +644,15 @@ export function adaptRenderProfileToInterpretation(
   for (const c of groups.contact || []) {
     if (c.fields.website?.value) {
       const u = normalizeUrl(c.fields.website.value);
-      if (u && !links.some((l) => l.url === u)) {
-        links.push({
-          type: linkType(u, "portfolio"),
-          url: u,
-        });
-        if (!digitalFootprints.some((df) => df.url.toLowerCase() === u.toLowerCase())) {
+      if (u) {
+        // If this URL is actually a LinkedIn or GitHub profile that we already have, ignore duplicate
+        const isKnownProfile = (u.includes("linkedin.com") && digitalFootprints.some((df) => df.platform === "LinkedIn")) ||
+          (u.includes("github.com") && digitalFootprints.some((df) => df.platform === "GitHub"));
+        if (!isKnownProfile && !links.some((l) => l.url.toLowerCase() === u.toLowerCase()) && !digitalFootprints.some((df) => df.url.toLowerCase() === u.toLowerCase())) {
+          links.push({
+            type: linkType(u, "portfolio"),
+            url: u,
+          });
           digitalFootprints.push({
             platform: "Portfolio",
             url: u,
@@ -679,11 +689,23 @@ export function adaptRenderProfileToInterpretation(
     };
   }
 
+  let phone: string | undefined = undefined;
+  for (const c of groups.contact || []) {
+    if (c.fields.phone?.value) {
+      phone = tidy(c.fields.phone.value);
+      break;
+    }
+  }
+  if (!phone && text) {
+    const phoneMatch = text.match(/(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}\b|(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/);
+    if (phoneMatch) phone = phoneMatch[0].trim();
+  }
+
   const firstEdu = education[0];
   const extractedProfile: ExtractedProfile = {
     fullName: fullName || undefined,
     email: email || undefined,
-    mobile: undefined,
+    mobile: phone || undefined,
     location: location || undefined,
     institution: firstEdu?.institution,
     degree: firstEdu?.degree,
@@ -783,53 +805,19 @@ export function mergeExtractionOutputs(
   const norm = normalizeForGrounding(rawText);
   const grounded = (v: string | null | undefined) => isGrounded(norm, v);
 
-  // 1. Education (Deterministic precedence)
-  const education = [...baseline.education];
+  // 1. Education (Deterministic deduplication & precedence)
+  const mergedEduRaw = [...baseline.education];
   for (const enEdu of enriched.education || []) {
-    const normInst = normalizeForGrounding(enEdu.institution).trim();
-    const existing = education.find((b) => normalizeForGrounding(b.institution).trim() === normInst);
-    if (existing) {
-      if (!existing.fieldOfStudy && enEdu.fieldOfStudy && grounded(enEdu.fieldOfStudy)) {
-        existing.fieldOfStudy = enEdu.fieldOfStudy;
-      }
-      if (!existing.gpa && enEdu.gpa && grounded(enEdu.gpa)) {
-        existing.gpa = enEdu.gpa;
-      }
-      if (!existing.percentage && enEdu.percentage && grounded(enEdu.percentage)) {
-        existing.percentage = enEdu.percentage;
-      }
-      if (!existing.graduationYear && enEdu.graduationYear && grounded(enEdu.graduationYear)) {
-        existing.graduationYear = enEdu.graduationYear;
-      }
-    } else if (grounded(enEdu.institution)) {
-      education.push(enEdu);
-    }
+    if (grounded(enEdu.institution)) mergedEduRaw.push(enEdu);
   }
+  const education = ResumeDeduplicationEngine.deduplicateEducation(mergedEduRaw).education;
 
-  // 2. Experience (Deterministic precedence)
-  const experience = [...baseline.experience];
+  // 2. Experience (Deterministic deduplication & precedence)
+  const mergedExpRaw = [...baseline.experience];
   for (const enExp of enriched.experience || []) {
-    const normComp = normalizeForGrounding(enExp.company).trim();
-    const existing = experience.find((b) => normalizeForGrounding(b.company).trim() === normComp);
-    if (existing) {
-      const existingHighlights = new Set(existing.highlights?.map((h) => h.toLowerCase()) || []);
-      for (const h of enExp.highlights || []) {
-        if (!existingHighlights.has(h.toLowerCase()) && grounded(h.slice(0, 40))) {
-          existing.highlights = existing.highlights || [];
-          existing.highlights.push(h);
-        }
-      }
-      const existingTech = new Set(existing.technologies?.map((t) => t.toLowerCase()) || []);
-      for (const t of enExp.technologies || []) {
-        if (!existingTech.has(t.toLowerCase()) && grounded(t)) {
-          existing.technologies = existing.technologies || [];
-          existing.technologies.push(t);
-        }
-      }
-    } else if (grounded(enExp.company)) {
-      experience.push(enExp);
-    }
+    if (grounded(enExp.company)) mergedExpRaw.push(enExp);
   }
+  const experience = ResumeDeduplicationEngine.deduplicateExperience(mergedExpRaw).experience;
 
   // 3. Projects (Deterministic precedence)
   const projects = [...baseline.projects];
@@ -1025,7 +1013,7 @@ export function mergeExtractionResults(
   const mergedProfile: ExtractedProfile = {
     fullName: bProf.fullName || eProf.fullName,
     email: bProf.email || eProf.email,
-    mobile: undefined,
+    mobile: bProf.mobile || eProf.mobile,
     location: bProf.location || eProf.location,
     institution: bProf.institution || eProf.institution,
     degree: bProf.degree || eProf.degree,

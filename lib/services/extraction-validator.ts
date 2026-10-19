@@ -116,7 +116,13 @@ export class ExtractionValidator {
     }
     const coursework = COURSEWORK_PATTERNS.some((p) => p.test(span));
     const lower = span.toLowerCase();
-    if (!lower.includes(skillName.toLowerCase()) && !lower.includes(norm.toLowerCase())) {
+    const hasAliasMatch = Object.entries(TECH_NORMALIZATION).some(([alias, canonical]) => {
+      if (canonical.toLowerCase() !== norm.toLowerCase()) return false;
+      const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|[^a-z0-9+#])${escaped}([^a-z0-9+#]|$)`, "i").test(lower);
+    });
+
+    if (!lower.includes(skillName.toLowerCase()) && !lower.includes(norm.toLowerCase()) && !hasAliasMatch) {
       return { valid: false, confidence: 0.1, flag: "unsupported", reason: `Source excerpt does not mention '${skillName}'.`, normalizedValue: norm };
     }
     return { valid: true, confidence: coursework ? 0.5 : 0.85, flag: coursework ? "coursework_only" : undefined, normalizedValue: norm };

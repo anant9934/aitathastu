@@ -711,14 +711,23 @@ async function finalize(
     documentId,
   });
 
+  const isInvalidRootUrl = (u?: string | null) =>
+    !u ||
+    /^https?:\/\/(?:www\.)?github\.com(?:\/github)?\/?$/i.test(u) ||
+    /^https?:\/\/(?:www\.)?linkedin\.com(?:\/in|\/pub)?\/?$/i.test(u);
+
+  if (extraction.links) {
+    extraction.links = extraction.links.filter((l) => !isInvalidRootUrl(l.url));
+  }
+
   const mergedDiscoveredProfiles: Record<string, string> = {};
   if (extraction.discoveredProfiles) {
     for (const [k, v] of Object.entries(extraction.discoveredProfiles)) {
-      if (v) mergedDiscoveredProfiles[k] = v;
+      if (v && !isInvalidRootUrl(v)) mergedDiscoveredProfiles[k] = v;
     }
   }
   for (const fp of deterministicFootprints) {
-    if (!mergedDiscoveredProfiles[fp.provider] && fp.normalizedUrl) {
+    if ((!mergedDiscoveredProfiles[fp.provider] || isInvalidRootUrl(mergedDiscoveredProfiles[fp.provider])) && fp.normalizedUrl && !isInvalidRootUrl(fp.normalizedUrl)) {
       mergedDiscoveredProfiles[fp.provider] = fp.normalizedUrl;
     }
   }
@@ -726,6 +735,11 @@ async function finalize(
   const extractedInterpretation = extraction.extracted;
   if (!extractedInterpretation) {
     throw new PipelineFailure("EXTRACTION_FAILED", "Extracted output is empty");
+  }
+  if (extractedInterpretation.digitalFootprints) {
+    extractedInterpretation.digitalFootprints = extractedInterpretation.digitalFootprints.filter(
+      (df) => !isInvalidRootUrl(df.url)
+    );
   }
 
   // 5. Review Candidates

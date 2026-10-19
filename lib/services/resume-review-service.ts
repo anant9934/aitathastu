@@ -11,6 +11,7 @@ type Candidate = Pick<ReviewedResumeClaim, "category" | "value" | "sourceSpan"> 
 type ResumeSnapshot = { version: 1; candidates: Candidate[] };
 
 import { ExtractionValidator } from "./extraction-validator";
+import { normalizeTextKey, tokenJaccardSimilarity } from "@/lib/resume/deduplication-engine";
 
 export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceText?: string): Candidate[] {
   const candidates: Candidate[] = [];
@@ -146,11 +147,33 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
     }
   }
   if (Array.isArray(extracted.leadership) && extracted.leadership.length > 0) {
+    const cleanOrgName = (s: string) =>
+      (s || "")
+        .replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+/g, "")
+        .replace(/[\s,‘'’"`]+$/, "")
+        .replace(/\s+[‘'’"]?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|[0-9]{4})\b.*$/i, "")
+        .trim();
+
+    const seenLeadKeys = new Set<string>();
     const distinctLeadership = extracted.leadership.filter((l) => {
-      return !extracted.experience.some((e) =>
-        e.company.toLowerCase().trim() === l.organization.toLowerCase().trim() &&
-        e.role.toLowerCase().trim() === l.role.toLowerCase().trim()
-      );
+      const lOrg = normalizeTextKey(cleanOrgName(l.organization));
+      const lRole = normalizeTextKey(l.role);
+      const leadKey = `${lOrg}::${lRole}`;
+      if (seenLeadKeys.has(leadKey)) return false;
+      seenLeadKeys.add(leadKey);
+
+      return !(extracted.experience || []).some((e) => {
+        const eOrg = normalizeTextKey(cleanOrgName(e.company));
+        const eRole = normalizeTextKey(e.role);
+        if (eOrg === lOrg) {
+          if (eRole === lRole || !eRole || !lRole || eRole.includes(lRole) || lRole.includes(eRole)) return true;
+          if (tokenJaccardSimilarity(e.role, l.role) >= 0.5) return true;
+        }
+        if (eOrg && lOrg && (eOrg.includes(lOrg) || lOrg.includes(eOrg)) && Math.min(eOrg.length, lOrg.length) > 4) {
+          if (eRole === lRole || tokenJaccardSimilarity(e.role, l.role) >= 0.4) return true;
+        }
+        return false;
+      });
     });
     if (distinctLeadership.length > 0) {
       add(

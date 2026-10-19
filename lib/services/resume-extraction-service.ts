@@ -592,10 +592,10 @@ export function adaptRenderProfileToInterpretation(
   for (const rec of groups.certifications || []) {
     const f = rec.fields;
     const rawName = tidy(f.title?.value || f.name?.value, 200);
-    const name = rawName.replace(/^[•·*◦\-–—|#©«»°+‘“"'\s]+|[•·*◦\-–—|#©«»°+‘“"'\s]+$/g, "").trim();
+    const name = rawName.replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+|[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+$/g, "").trim();
     if (!name || !grounded(name)) continue;
 
-    const issuer = tidy(f.issuer?.value || f.organization?.value, 150) || undefined;
+    const issuer = tidy(f.issuer?.value || f.organization?.value, 150)?.replace(/[\s,‘'’"`]+$/, "").replace(/\s+[‘'’"]?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b.*$/i, "").trim() || undefined;
     const yr = year(f.issue_date?.value || f.date?.value || null);
     const sourceSpan = span(f.title?.evidence?.[0]?.snippet || f.name?.evidence?.[0]?.snippet, name);
 
@@ -612,7 +612,8 @@ export function adaptRenderProfileToInterpretation(
   const achRecords = [...(groups.awards || []), ...(groups.research || []), ...(groups.books_patents || [])];
   for (const rec of achRecords) {
     const f = rec.fields;
-    const title = tidy(f.name?.value || f.title?.value, 250);
+    const rawTitle = tidy(f.name?.value || f.title?.value, 250);
+    const title = rawTitle.replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+|[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+$/g, "").trim();
     if (!title || !grounded(title.slice(0, 40))) continue;
 
     const typeVal = (f.type?.value || "").toLowerCase();
@@ -637,6 +638,9 @@ export function adaptRenderProfileToInterpretation(
     const f = rec.fields;
     const u = normalizeUrl(f.normalized_url?.value || f.original_url?.value);
     if (!u) continue;
+    if (/^https?:\/\/(?:www\.)?github\.com(?:\/github)?\/?$/i.test(u) || /^https?:\/\/(?:www\.)?linkedin\.com(?:\/in|\/pub)?\/?$/i.test(u)) {
+      continue;
+    }
     links.push({
       type: linkType(u, "portfolio"),
       url: u,
@@ -891,37 +895,25 @@ export function mergeExtractionOutputs(
   }
 
   // 5. Certifications
-  const certifications = [...baseline.certifications];
-  const seenCerts = new Set(certifications.map((c) => c.name.toLowerCase()));
+  const mergedCertsRaw = [...baseline.certifications];
   for (const enCert of enriched.certifications || []) {
-    const key = enCert.name.toLowerCase();
-    if (!seenCerts.has(key) && grounded(enCert.name)) {
-      seenCerts.add(key);
-      certifications.push(enCert);
-    }
+    if (grounded(enCert.name)) mergedCertsRaw.push(enCert);
   }
+  const certifications = ResumeDeduplicationEngine.deduplicateCertifications(mergedCertsRaw).certifications;
 
   // 6. Achievements
-  const achievements = [...baseline.achievements];
-  const seenAch = new Set(achievements.map((a) => a.title.toLowerCase()));
+  const mergedAchRaw = [...baseline.achievements];
   for (const enAch of enriched.achievements || []) {
-    const key = enAch.title.toLowerCase();
-    if (!seenAch.has(key) && grounded(enAch.title.slice(0, 40))) {
-      seenAch.add(key);
-      achievements.push(enAch);
-    }
+    if (grounded(enAch.title.slice(0, 40))) mergedAchRaw.push(enAch);
   }
+  const achievements = ResumeDeduplicationEngine.deduplicateAchievements(mergedAchRaw).achievements;
 
   // 7. Leadership
-  const leadership = [...(baseline.leadership || [])];
-  const seenLead = new Set(leadership.map((l) => `${l.role.toLowerCase()}:${l.organization.toLowerCase()}`));
+  const mergedLeadRaw = [...(baseline.leadership || [])];
   for (const enLead of enriched.leadership || []) {
-    const key = `${enLead.role.toLowerCase()}:${enLead.organization.toLowerCase()}`;
-    if (!seenLead.has(key) && grounded(enLead.organization)) {
-      seenLead.add(key);
-      leadership.push(enLead);
-    }
+    if (grounded(enLead.organization)) mergedLeadRaw.push(enLead);
   }
+  const leadership = ResumeDeduplicationEngine.deduplicateLeadership(mergedLeadRaw).leadership;
 
   // 8. Research
   const research = [...(baseline.research || [])];
@@ -1059,17 +1051,25 @@ export function mergeExtractionResults(
   const seenUrls = new Set<string>();
   const mergedLinks: ResumeLink[] = [];
   for (const l of [...(baseline.links || []), ...(enriched.links || [])]) {
-    const u = l.url.toLowerCase();
+    const u = l.url.toLowerCase().replace(/\/$/, "");
+    if (/^https?:\/\/(?:www\.)?github\.com(?:\/github)?$/i.test(u) || /^https?:\/\/(?:www\.)?linkedin\.com(?:\/in|\/pub)?$/i.test(u)) {
+      continue;
+    }
     if (!seenUrls.has(u)) {
       seenUrls.add(u);
       mergedLinks.push(l);
     }
   }
 
-  const mergedDiscoveredProfiles = {
+  const mergedDiscoveredProfiles: Record<string, string | undefined> = {
     ...(enriched.discoveredProfiles || {}),
     ...(baseline.discoveredProfiles || {}),
   };
+  for (const [k, v] of Object.entries(mergedDiscoveredProfiles)) {
+    if (v && (/^https?:\/\/(?:www\.)?github\.com(?:\/github)?\/?$/i.test(v) || /^https?:\/\/(?:www\.)?linkedin\.com(?:\/in|\/pub)?\/?$/i.test(v))) {
+      delete mergedDiscoveredProfiles[k];
+    }
+  }
 
   return {
     success: true,

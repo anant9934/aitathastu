@@ -1163,8 +1163,8 @@ function extractDigitalFootprints(
     const src = rawSrc.trim();
     if (!src) continue;
 
-    // 1. GitHub matching (including OCR typos like 'gittub', 'github com', or spaced handle 'shiviii5 165')
-    const ghMatch = src.match(/(?:https?:\/\/)?(?:www\.)?(?:github|gittub|gittubs)[\s.:/]+(?:github[\s.]*com[\s/]*)?([a-zA-Z0-9_-]+)/i);
+    // 1. GitHub matching (including OCR typos like 'gittub', 'github, com', or spaced handle 'shiviii5 165')
+    const ghMatch = src.match(/(?:https?:\/\/)?(?:www\.)?(?:github|gittub|gittubs)[\s.:/,]+(?:github[\s.,]*com[\s/]*)?([a-zA-Z0-9_-]+)/i);
     if (ghMatch) {
       let handle = ghMatch[1].trim();
       const afterMatch = src.slice((ghMatch.index || 0) + ghMatch[0].length).trim();

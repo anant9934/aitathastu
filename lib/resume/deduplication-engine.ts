@@ -42,7 +42,7 @@ export function normalizeTextKey(text: string | null | undefined): string {
   if (!text) return "";
   return text
     .toLowerCase()
-    .replace(/[•·*◦\-–—|#[\]():,;/\\]+/g, " ")
+    .replace(/[•·*◦\-–—|#[\]():,;/\s\\®©¢™°~§«»‘'’"“”`]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -171,23 +171,33 @@ export class ResumeDeduplicationEngine {
     const resolutions: DuplicateResolution[] = [];
     let mergedCount = 0;
 
+    const cleanName = (n: string) => n.replace(/^[•·*◦\-–—|#©®¢«»°+‘“"'~§\s]+|[•·*◦\-–—|#©®¢«»°+‘“"'~§\s]+$/g, "").trim();
+    const cleanIssuer = (i?: string) => i ? i.replace(/[\s,‘'"`]+$/, "").replace(/\s+[‘'"]?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b.*$/i, "").trim() : undefined;
+
     for (const incoming of certs) {
-      const incomingTitleKey = normalizeTextKey(incoming.name);
-      const incomingIssuerKey = normalizeTextKey(incoming.issuer);
+      const incCleanName = cleanName(incoming.name);
+      const incCleanIssuer = cleanIssuer(incoming.issuer);
+      const incomingTitleKey = normalizeTextKey(incCleanName);
+      const incomingIssuerKey = normalizeTextKey(incCleanIssuer);
 
       const matchIndex = out.findIndex((existing) => {
-        const existingTitleKey = normalizeTextKey(existing.name);
-        const existingIssuerKey = normalizeTextKey(existing.issuer);
+        const exCleanName = cleanName(existing.name);
+        const exCleanIssuer = cleanIssuer(existing.issuer);
+        const existingTitleKey = normalizeTextKey(exCleanName);
+        const existingIssuerKey = normalizeTextKey(exCleanIssuer);
 
-        // 1. Exact match on title and issuer
-        if (existingTitleKey === incomingTitleKey && existingIssuerKey === incomingIssuerKey) {
-          return true;
+        // 1. Exact match on normalized title (if issuers match, or one is missing/subset)
+        if (existingTitleKey === incomingTitleKey) {
+          if (!existingIssuerKey || !incomingIssuerKey) return true;
+          if (existingIssuerKey === incomingIssuerKey) return true;
+          if (existingIssuerKey.includes(incomingIssuerKey) || incomingIssuerKey.includes(existingIssuerKey)) return true;
         }
 
-        // 2. High similarity on title (>0.92) AND same issuer
-        if (existingIssuerKey && incomingIssuerKey && existingIssuerKey === incomingIssuerKey) {
-          const sim = tokenJaccardSimilarity(existing.name, incoming.name);
-          if (sim >= 0.92) return true;
+        // 2. High similarity on title (>=0.85) AND compatible issuer
+        const sim = tokenJaccardSimilarity(exCleanName, incCleanName);
+        if (sim >= 0.85) {
+          if (!existingIssuerKey || !incomingIssuerKey) return true;
+          if (existingIssuerKey === incomingIssuerKey || existingIssuerKey.includes(incomingIssuerKey) || incomingIssuerKey.includes(existingIssuerKey)) return true;
         }
 
         return false;
@@ -203,13 +213,26 @@ export class ResumeDeduplicationEngine {
           reason: `Merged identical certification from issuer: ${incoming.issuer || "unknown"}`,
         });
 
+        // Retain cleanest name without leading OCR bullet artifacts
+        if (/^[a-zA-Z0-9]/.test(incCleanName) && !/^[a-zA-Z0-9]/.test(existing.name)) {
+          existing.name = incCleanName;
+        } else {
+          existing.name = cleanName(existing.name);
+        }
+        if (!existing.issuer && incCleanIssuer) existing.issuer = incCleanIssuer;
+        else if (existing.issuer) existing.issuer = cleanIssuer(existing.issuer);
+
         // Enrich missing fields if incoming has them
         if (!existing.year && incoming.year) existing.year = incoming.year;
         if (!existing.issueDate && incoming.issueDate) existing.issueDate = incoming.issueDate;
         if (!existing.credentialId && incoming.credentialId) existing.credentialId = incoming.credentialId;
         if (!existing.credentialUrl && incoming.credentialUrl) existing.credentialUrl = incoming.credentialUrl;
       } else {
-        out.push({ ...incoming });
+        out.push({
+          ...incoming,
+          name: incCleanName,
+          issuer: incCleanIssuer,
+        });
       }
     }
 
@@ -407,11 +430,20 @@ export class ResumeDeduplicationEngine {
     const out: ResumeInterpretationOutput["experience"] = [];
     const resolutions: DuplicateResolution[] = [];
     let mergedCount = 0;
+
+    const cleanCompanyName = (c: string | null | undefined) =>
+      (c || "")
+        .replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+/g, "")
+        .replace(/[\s,‘'’"`]+$/, "")
+        .replace(/\s+[‘'’"]?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|[0-9]{4})\b.*$/i, "")
+        .trim();
+
     const normalizeCompany = (c: string | null | undefined) =>
-      normalizeTextKey((c || "").replace(/^[•·*◦+~°\‘\’\s-]+/, ""));
+      normalizeTextKey(cleanCompanyName(c));
 
     for (const incoming of experience) {
-      const inComp = normalizeCompany(incoming.company);
+      const incCleanComp = cleanCompanyName(incoming.company) || incoming.company;
+      const inComp = normalizeCompany(incCleanComp);
       const inRole = normalizeTextKey(incoming.role);
 
       // Discard or merge phantom companies or bullet points misclassified as companies
@@ -443,7 +475,8 @@ export class ResumeDeduplicationEngine {
       const isGenericRole = (r: string) => /^(?:team member|contributor|employee|intern|assistant)$/i.test(r.trim());
 
       const matchIndex = out.findIndex((existing) => {
-        const exComp = normalizeCompany(existing.company);
+        const exCleanComp = cleanCompanyName(existing.company) || existing.company;
+        const exComp = normalizeCompany(exCleanComp);
         const exRole = normalizeTextKey(existing.role);
 
         // Same company
@@ -451,17 +484,19 @@ export class ResumeDeduplicationEngine {
           if (exRole === inRole || !exRole || !inRole || isGenericRole(existing.role) || isGenericRole(incoming.role)) {
             return true;
           }
-          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.5) return true;
+          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.33) return true;
+          // Corrupted OCR role or bullet point run-on under the same company
+          if (incoming.role.length > 35 || existing.role.length > 35) return true;
         }
 
         // Substring / high similarity company match (e.g. "Founders Verbinden Aug" vs "Founders Verbinden")
-        const compSim = tokenJaccardSimilarity(existing.company, incoming.company);
+        const compSim = tokenJaccardSimilarity(exCleanComp, incCleanComp);
         const compSub = (exComp.includes(inComp) || inComp.includes(exComp)) && Math.min(exComp.length, inComp.length) > 5;
         if (compSim >= 0.6 || compSub) {
           if (exRole === inRole || !exRole || !inRole || isGenericRole(existing.role) || isGenericRole(incoming.role)) {
             return true;
           }
-          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.4) return true;
+          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.33) return true;
         }
 
         return false;
@@ -477,7 +512,16 @@ export class ResumeDeduplicationEngine {
           reason: "Merged duplicate role or continuation line for the same organization",
         });
 
+        if (cleanCompanyName(existing.company)) {
+          existing.company = cleanCompanyName(existing.company);
+        } else if (incCleanComp) {
+          existing.company = incCleanComp;
+        }
+
         if (isGenericRole(existing.role) && !isGenericRole(incoming.role)) existing.role = incoming.role;
+        else if (existing.role.length > 35 && incoming.role.length < existing.role.length && incoming.role.length >= 3) {
+          existing.role = incoming.role;
+        }
         if (!existing.role && incoming.role) existing.role = incoming.role;
         if (!existing.duration && incoming.duration) existing.duration = incoming.duration;
         if (!existing.startDate && incoming.startDate) existing.startDate = incoming.startDate;
@@ -493,7 +537,10 @@ export class ResumeDeduplicationEngine {
           }
         }
       } else {
-        out.push({ ...incoming });
+        out.push({
+          ...incoming,
+          company: incCleanComp,
+        });
       }
     }
 
@@ -519,13 +566,18 @@ export class ResumeDeduplicationEngine {
     const out: ResumeInterpretationOutput["achievements"] = [];
     const resolutions: DuplicateResolution[] = [];
     let mergedCount = 0;
-    const seenTitles = new Set<string>();
+
+    const cleanAchTitle = (t: string) =>
+      (t || "")
+        .replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+|[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+$/g, "")
+        .trim();
 
     const expCompanies = (context?.experience || []).map((e) => normalizeTextKey(e.company)).filter(Boolean);
     const researchTitles = (context?.research || []).map((r) => normalizeTextKey(r.title)).filter(Boolean);
 
     for (const incoming of achievements) {
-      const normTitle = normalizeTextKey(incoming.title);
+      const incClean = cleanAchTitle(incoming.title);
+      const normTitle = normalizeTextKey(incClean);
       if (!normTitle) continue;
 
       // 1. Cross-source: drop if title matches a research item (it belongs in research, not duplicate award)
@@ -541,7 +593,7 @@ export class ResumeDeduplicationEngine {
       }
 
       // 2. Cross-source: drop if summary restating experience leadership
-      if (/^leadership\b/i.test(incoming.title) && expCompanies.some((c) => normTitle.includes(c))) {
+      if (/^leadership\b/i.test(incClean) && expCompanies.some((c) => normTitle.includes(c))) {
         mergedCount++;
         resolutions.push({
           recordA: incoming.title,
@@ -552,23 +604,105 @@ export class ResumeDeduplicationEngine {
         continue;
       }
 
-      // 3. Within-category deduplication
-      if (seenTitles.has(normTitle)) {
+      // 3. Within-category deduplication with OCR bullet resilience
+      const matchIndex = out.findIndex((existing) => {
+        const exClean = cleanAchTitle(existing.title);
+        const exNorm = normalizeTextKey(exClean);
+        if (exNorm === normTitle) return true;
+        if (tokenJaccardSimilarity(exClean, incClean) >= 0.85) return true;
+        if ((exNorm.includes(normTitle) || normTitle.includes(exNorm)) && Math.min(exNorm.length, normTitle.length) >= 15) return true;
+        return false;
+      });
+
+      if (matchIndex >= 0) {
         mergedCount++;
+        const existing = out[matchIndex];
         resolutions.push({
-          recordA: incoming.title,
+          recordA: existing.title,
           recordB: incoming.title,
           status: "identical_merged",
           reason: "Duplicate achievement claim",
         });
+        if (/^[a-zA-Z0-9]/.test(incClean) && !/^[a-zA-Z0-9]/.test(existing.title)) {
+          existing.title = incClean;
+        } else {
+          existing.title = cleanAchTitle(existing.title);
+        }
+        if (!existing.description && incoming.description) existing.description = incoming.description;
         continue;
       }
 
-      seenTitles.add(normTitle);
-      out.push({ ...incoming });
+      out.push({
+        ...incoming,
+        title: incClean,
+      });
     }
 
     return { achievements: out, resolutions, mergedCount };
+  }
+
+  /**
+   * Deduplicates leadership records and normalizes organization names.
+   */
+  public static deduplicateLeadership(leadership: NonNullable<ResumeInterpretationOutput["leadership"]> = []): {
+    leadership: NonNullable<ResumeInterpretationOutput["leadership"]>;
+    resolutions: DuplicateResolution[];
+    mergedCount: number;
+  } {
+    const out: NonNullable<ResumeInterpretationOutput["leadership"]> = [];
+    const resolutions: DuplicateResolution[] = [];
+    let mergedCount = 0;
+
+    const cleanOrg = (o: string) =>
+      (o || "")
+        .replace(/^[•·*◦\-–—»«›‹\u2022\u2023\u25cf\u25cb\u25b8\u25aa\u25ab|#\s‘'’"©®¢~§°+]+/g, "")
+        .replace(/[\s,‘'’"`]+$/, "")
+        .replace(/\s+[‘'’"]?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|[0-9]{4})\b.*$/i, "")
+        .trim();
+
+    for (const incoming of leadership) {
+      const incCleanOrg = cleanOrg(incoming.organization) || incoming.organization;
+      const incOrgKey = normalizeTextKey(incCleanOrg);
+      const incRoleKey = normalizeTextKey(incoming.role);
+
+      const matchIndex = out.findIndex((existing) => {
+        const exCleanOrg = cleanOrg(existing.organization) || existing.organization;
+        const exOrgKey = normalizeTextKey(exCleanOrg);
+        const exRoleKey = normalizeTextKey(existing.role);
+
+        if (exOrgKey === incOrgKey) {
+          if (exRoleKey === incRoleKey || !exRoleKey || !incRoleKey || exRoleKey.includes(incRoleKey) || incRoleKey.includes(exRoleKey)) return true;
+          if (tokenJaccardSimilarity(existing.role, incoming.role) >= 0.5) return true;
+        }
+        if (exOrgKey && incOrgKey && (exOrgKey.includes(incOrgKey) || incOrgKey.includes(exOrgKey)) && Math.min(exOrgKey.length, incOrgKey.length) > 4) {
+          if (exRoleKey === incRoleKey || tokenJaccardSimilarity(existing.role, incoming.role) >= 0.5) return true;
+        }
+        return false;
+      });
+
+      if (matchIndex >= 0) {
+        mergedCount++;
+        const existing = out[matchIndex];
+        resolutions.push({
+          recordA: `${existing.organization} - ${existing.role}`,
+          recordB: `${incoming.organization} - ${incoming.role}`,
+          status: "identical_merged",
+          reason: "Merged duplicate leadership entry for the same organization",
+        });
+        if (/^[a-zA-Z0-9]/.test(incCleanOrg) && !/^[a-zA-Z0-9]/.test(existing.organization)) {
+          existing.organization = incCleanOrg;
+        } else {
+          existing.organization = cleanOrg(existing.organization);
+        }
+      } else {
+        out.push({
+          ...incoming,
+          organization: incCleanOrg,
+        });
+      }
+    }
+
+    return { leadership: out, resolutions, mergedCount };
   }
 
   /**
@@ -640,6 +774,10 @@ export class ResumeDeduplicationEngine {
     allResolutions.push(...expResult.resolutions);
     totalMerged += expResult.mergedCount;
 
+    const leadResult = this.deduplicateLeadership(interpretation.leadership || []);
+    allResolutions.push(...leadResult.resolutions);
+    totalMerged += leadResult.mergedCount;
+
     const researchResult = this.deduplicateResearch(interpretation.research || []);
     allResolutions.push(...researchResult.resolutions);
     totalMerged += researchResult.mergedCount;
@@ -660,6 +798,7 @@ export class ResumeDeduplicationEngine {
         certifications: certResult.certifications,
         projects: projResult.projects,
         experience: expResult.experience,
+        leadership: leadResult.leadership,
         research: researchResult.research,
         achievements: achResult.achievements,
       },

@@ -62,12 +62,12 @@ const PROVIDER_DOMAINS: Array<{
 }> = [
   {
     provider: "github",
-    pattern: /(?:^|\b)(?:https?:\/\/)?(?:www\.)?(?:github[\s.]*com|gittub[\s.]*com)\/([a-zA-Z0-9_\-\.]+)/i,
+    pattern: /(?:^|\b)(?:https?:\/\/)?(?:www\.)?(?:github[\s.,]*com|gittub[\s.,]*com)\/([a-zA-Z0-9_\-\.]+)/i,
     usernameRegex: /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,38})$/,
   },
   {
     provider: "linkedin",
-    pattern: /(?:^|\b)(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin[\s.]*com[y]?\/(?:in|pub)\/([a-zA-Z0-9_\-\.]+)/i,
+    pattern: /(?:^|\b)(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin[\s.,]*com[y]?\/(?:in|pub)\/([a-zA-Z0-9_\-\.]+)/i,
     usernameRegex: /^[a-zA-Z0-9_\-\.]{3,100}$/,
   },
   {
@@ -214,9 +214,9 @@ export function discoverFootprintsFromResume(options: {
 
   // Pre-clean common OCR defects
   const preCleanedText = text
-    .replace(/linkedin[\s.]*comy/gi, "linkedin.com")
+    .replace(/linkedin[\s.,]*comy?/gi, "linkedin.com")
     .replace(/gittubs?\b/gi, "github")
-    .replace(/github\s+com/gi, "github.com");
+    .replace(/github[\s.,]+com/gi, "github.com");
 
   const unwrappedText = unwrapMultiLineUrls(preCleanedText);
   const lines = unwrappedText.split("\n");
@@ -382,7 +382,7 @@ function checkHandleConfidence(username: string): { validationResult: "valid" | 
           !isMonth &&
           !isDomain &&
           !hasUrlPath &&
-          !/^(none|na|n\/a|yes|no|link|url|profile|http|https|www)$/i.test(candidate) &&
+          !/^(none|na|n\/a|yes|no|link|url|profile|http|https|www|github|linkedin|leetcode|codechef|hackerrank)$/i.test(candidate) &&
           !candidate.startsWith("http://") &&
           !candidate.startsWith("https://") &&
           !candidate.includes("/")

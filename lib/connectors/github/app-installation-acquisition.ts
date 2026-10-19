@@ -1,5 +1,6 @@
 import { listGitHubInstallationRepositories, type InstallationRepository } from "@/lib/connectors/github/app-auth";
 import { GITHUB_MANIFESTS, type DeepRepoData } from "@/lib/connectors/github/graphql";
+import { sanitizeTextForPrompt } from "@/lib/intelligence/prompt-defense";
 
 const API = "https://api.github.com";
 const UA = "AI-Tathastu-Private-GitHub-Access";
@@ -86,7 +87,7 @@ export async function acquireSelectedInstallationRepositories(token: string): Pr
           const value = read(node[`m${j}`], path, 8000);
           if (value !== undefined) manifests[path] = value;
         });
-        deep.set(repo.full_name, { readme, languages, manifests, observedFiles });
+        deep.set(repo.full_name, { readme: readme ? sanitizeTextForPrompt(readme).slice(0, 4000) : undefined, languages, manifests, observedFiles });
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message.slice(0, 140) : "private_repository_query_failed";

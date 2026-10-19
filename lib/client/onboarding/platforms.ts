@@ -19,9 +19,9 @@ export interface PlatformConfig {
 export const PLATFORMS: PlatformConfig[] = [
   {
     id: "github", name: "GitHub", monogram: "GH", placeholder: "Username or profile URL, e.g. torvalds", type: "PUBLIC_API",
-    actionLabel: "Import public data", capability: "Public repositories and languages",
-    dataCollected: ["Public profile, followers and public repositories", "Manifests such as package.json, requirements.txt, pyproject.toml, Dockerfile", "Languages and declared frameworks", "Likely AI/ML project structures"],
-    guarantees: ["Public repositories only.", "No private code without your explicit GitHub authorisation.", "Read-only metadata; no code is run.", "Everything imported waits for your review."],
+    actionLabel: "Import public data", capability: "Public repositories; optional selected private repositories",
+    dataCollected: ["Public profile and repositories", "Repositories you explicitly select in the GitHub App installation", "README and dependency manifests such as package.json, requirements.txt, pyproject.toml and Dockerfile", "Languages, declared frameworks and likely AI/ML project structures"],
+    guarantees: ["Private repositories are accessed only after you install the GitHub App and select repository access.", "GitHub App access is limited to read-only Metadata and Contents permissions.", "No commits are pushed, files changed, or code executed.", "Imported evidence is unverified and waits for your review."],
   },
   {
     id: "linkedin", name: "LinkedIn", monogram: "IN", placeholder: "Profile URL or handle, e.g. in/anant-kumar", type: "EXPORT_REQUIRED",

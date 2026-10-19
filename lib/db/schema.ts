@@ -824,3 +824,322 @@ export const idempotencyKeys = pgTable("idempotency_keys", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 });
+
+// ============================================================================
+// GITHUB INTELLIGENCE & DATA PERSISTENCE ENGINE SCHEMA
+// ============================================================================
+
+export const githubProfiles = pgTable(
+  "github_profiles",
+  {
+    id: text("id").primaryKey(), // e.g. `ghp_${personId}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    githubUserId: integer("github_user_id").notNull(),
+    username: text("username").notNull(),
+    displayName: text("display_name"),
+    bio: text("bio"),
+    avatarUrl: text("avatar_url"),
+    profileUrl: text("profile_url").notNull(),
+    email: text("email"),
+    company: text("company"),
+    location: text("location"),
+    blog: text("blog"),
+    twitterUsername: text("twitter_username"),
+    publicRepos: integer("public_repos").default(0).notNull(),
+    publicGists: integer("public_gists").default(0).notNull(),
+    followers: integer("followers").default(0).notNull(),
+    following: integer("following").default(0).notNull(),
+    githubCreatedAt: timestamp("github_created_at", { withTimezone: true }),
+    githubUpdatedAt: timestamp("github_updated_at", { withTimezone: true }),
+    profileReadme: text("profile_readme"),
+    organizations: jsonb("organizations").default([]).notNull(), // Array<{ login, id, avatarUrl, description }>
+    activitySummary: jsonb("activity_summary").default({}).notNull(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_profiles_person").on(table.personId),
+    index("idx_github_profiles_user_id").on(table.githubUserId),
+    index("idx_github_profiles_username").on(table.username),
+  ]
+);
+
+export const githubProfileSnapshots = pgTable(
+  "github_profile_snapshots",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    profileId: text("profile_id").notNull().references(() => githubProfiles.id, { onDelete: "cascade" }),
+    snapshotData: jsonb("snapshot_data").notNull(),
+    metrics: jsonb("metrics").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_gh_prof_snap_person").on(table.personId),
+    index("idx_gh_prof_snap_profile").on(table.profileId),
+  ]
+);
+
+export const githubRepositories = pgTable(
+  "github_repositories",
+  {
+    id: text("id").primaryKey(), // e.g. `ghr_${personId}_${githubRepoId}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    githubRepoId: integer("github_repo_id").notNull(),
+    name: text("name").notNull(),
+    fullName: text("full_name").notNull(),
+    ownerLogin: text("owner_login").notNull(),
+    description: text("description"),
+    canonicalUrl: text("canonical_url").notNull(),
+    homepage: text("homepage"),
+    isPrivate: boolean("is_private").default(false).notNull(),
+    isFork: boolean("is_fork").default(false).notNull(),
+    isArchived: boolean("is_archived").default(false).notNull(),
+    isTemplate: boolean("is_template").default(false).notNull(),
+    isEmpty: boolean("is_empty").default(false).notNull(),
+    defaultBranch: text("default_branch").default("main").notNull(),
+    primaryLanguage: text("primary_language"),
+    languages: jsonb("languages").default({}).notNull(),
+    stars: integer("stars").default(0).notNull(),
+    forks: integer("forks").default(0).notNull(),
+    watchers: integer("watchers").default(0).notNull(),
+    openIssues: integer("open_issues").default(0).notNull(),
+    diskUsageKb: integer("disk_usage_kb").default(0).notNull(),
+    license: text("license"),
+    topics: jsonb("topics").default([]).notNull(),
+    parentRepo: jsonb("parent_repo"),
+    branches: jsonb("branches").default([]).notNull(),
+    tags: jsonb("tags").default([]).notNull(),
+    workflows: jsonb("workflows").default([]).notNull(),
+    fileStructure: jsonb("file_structure").default([]).notNull(),
+    manifests: jsonb("manifests").default({}).notNull(),
+    readmeContent: text("readme_content"),
+    projectClassification: text("project_classification"),
+    aiMlCategories: jsonb("ai_ml_categories").default([]).notNull(),
+    checksum: text("checksum").notNull(),
+    firstCommitAt: timestamp("first_commit_at", { withTimezone: true }),
+    lastPushAt: timestamp("last_push_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).defaultNow().notNull(),
+    availabilityStatus: text("availability_status").default("available").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_repos_person_repo_id").on(table.personId, table.githubRepoId),
+    index("idx_github_repos_person").on(table.personId),
+    index("idx_github_repos_full_name").on(table.fullName),
+  ]
+);
+
+export const githubRepositorySnapshots = pgTable(
+  "github_repository_snapshots",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    stars: integer("stars").notNull(),
+    forks: integer("forks").notNull(),
+    openIssues: integer("open_issues").notNull(),
+    description: text("description"),
+    defaultBranch: text("default_branch"),
+    checksum: text("checksum").notNull(),
+    diffSummary: jsonb("diff_summary").default({}).notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_gh_repo_snap_person").on(table.personId),
+    index("idx_gh_repo_snap_repo").on(table.repositoryId),
+  ]
+);
+
+export const githubCommits = pgTable(
+  "github_commits",
+  {
+    id: text("id").primaryKey(), // e.g. `ghc_${repositoryId}_${sha}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    sha: text("sha").notNull(),
+    message: text("message").notNull(),
+    authorName: text("author_name"),
+    authorEmail: text("author_email"),
+    authorLogin: text("author_login"),
+    authorDate: timestamp("author_date", { withTimezone: true }).notNull(),
+    committerName: text("committer_name"),
+    committerEmail: text("committer_email"),
+    committerLogin: text("committer_login"),
+    committerDate: timestamp("committer_date", { withTimezone: true }).notNull(),
+    parents: jsonb("parents").default([]).notNull(),
+    additions: integer("additions").default(0).notNull(),
+    deletions: integer("deletions").default(0).notNull(),
+    totalChanges: integer("total_changes").default(0).notNull(),
+    isAttributedToCandidate: boolean("is_attributed_to_candidate").default(false).notNull(),
+    attributionMethod: text("attribution_method").default("unattributed").notNull(),
+    commitUrl: text("commit_url").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_commits_repo_sha").on(table.repositoryId, table.sha),
+    index("idx_github_commits_person").on(table.personId),
+    index("idx_github_commits_date").on(table.authorDate),
+  ]
+);
+
+export const githubPullRequests = pgTable(
+  "github_pull_requests",
+  {
+    id: text("id").primaryKey(), // e.g. `ghpr_${repositoryId}_${number}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    title: text("title").notNull(),
+    state: text("state").notNull(), // 'open' | 'closed' | 'merged'
+    body: text("body"),
+    htmlUrl: text("html_url").notNull(),
+    authorLogin: text("author_login").notNull(),
+    isCandidateAuthor: boolean("is_candidate_author").default(false).notNull(),
+    headRef: text("head_ref"),
+    baseRef: text("base_ref"),
+    merged: boolean("merged").default(false).notNull(),
+    mergedAt: timestamp("merged_at", { withTimezone: true }),
+    mergedByLogin: text("merged_by_login"),
+    reviewCommentsCount: integer("review_comments_count").default(0).notNull(),
+    commitsCount: integer("commits_count").default(0).notNull(),
+    additions: integer("additions").default(0).notNull(),
+    deletions: integer("deletions").default(0).notNull(),
+    changedFiles: integer("changed_files").default(0).notNull(),
+    labels: jsonb("labels").default([]).notNull(),
+    reviews: jsonb("reviews").default([]).notNull(),
+    createdAtGitHub: timestamp("created_at_github", { withTimezone: true }).notNull(),
+    updatedAtGitHub: timestamp("updated_at_github", { withTimezone: true }).notNull(),
+    closedAtGitHub: timestamp("closed_at_github", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_prs_repo_number").on(table.repositoryId, table.number),
+    index("idx_github_prs_person").on(table.personId),
+  ]
+);
+
+export const githubIssues = pgTable(
+  "github_issues",
+  {
+    id: text("id").primaryKey(), // e.g. `ghi_${repositoryId}_${number}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    number: integer("number").notNull(),
+    title: text("title").notNull(),
+    state: text("state").notNull(), // 'open' | 'closed'
+    body: text("body"),
+    htmlUrl: text("html_url").notNull(),
+    authorLogin: text("author_login").notNull(),
+    isCandidateAuthor: boolean("is_candidate_author").default(false).notNull(),
+    commentsCount: integer("comments_count").default(0).notNull(),
+    labels: jsonb("labels").default([]).notNull(),
+    assignees: jsonb("assignees").default([]).notNull(),
+    createdAtGitHub: timestamp("created_at_github", { withTimezone: true }).notNull(),
+    updatedAtGitHub: timestamp("updated_at_github", { withTimezone: true }).notNull(),
+    closedAtGitHub: timestamp("closed_at_github", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_issues_repo_number").on(table.repositoryId, table.number),
+    index("idx_github_issues_person").on(table.personId),
+  ]
+);
+
+export const githubReleases = pgTable(
+  "github_releases",
+  {
+    id: text("id").primaryKey(), // e.g. `ghrel_${repositoryId}_${githubReleaseId}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    githubReleaseId: integer("github_release_id").notNull(),
+    tagName: text("tag_name").notNull(),
+    name: text("name"),
+    body: text("body"),
+    htmlUrl: text("html_url").notNull(),
+    isPrerelease: boolean("is_prerelease").default(false).notNull(),
+    isDraft: boolean("is_draft").default(false).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_releases_repo_rel_id").on(table.repositoryId, table.githubReleaseId),
+    index("idx_github_releases_person").on(table.personId),
+  ]
+);
+
+export const githubTechnologies = pgTable(
+  "github_technologies",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    category: text("category").notNull(), // 'language' | 'framework' | 'library' | 'database' | 'tool' | 'cloud' | 'ai_ml'
+    detectionMethod: text("detection_method").notNull(), // 'manifest_declared' | 'language_stat' | 'readme_documented' | 'file_observed'
+    sourceFile: text("source_file"),
+    version: text("version"),
+    confidence: doublePrecision("confidence").notNull(),
+    lastObservedAt: timestamp("last_observed_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_tech_repo_name_method").on(table.repositoryId, table.name, table.detectionMethod),
+    index("idx_github_tech_person").on(table.personId),
+    index("idx_github_tech_name").on(table.name),
+  ]
+);
+
+export const githubResumeMatches = pgTable(
+  "github_resume_matches",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    repositoryId: text("repository_id").notNull().references(() => githubRepositories.id, { onDelete: "cascade" }),
+    resumeProjectId: text("resume_project_id"),
+    resumeProjectTitle: text("resume_project_title").notNull(),
+    matchScore: doublePrecision("match_score").notNull(),
+    matchReasons: jsonb("match_reasons").default([]).notNull(), // string[]
+    matchedTechnologies: jsonb("matched_technologies").default([]).notNull(), // string[]
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_github_resume_matches_person_repo_proj").on(table.personId, table.repositoryId, table.resumeProjectTitle),
+    index("idx_github_resume_matches_person").on(table.personId),
+  ]
+);
+
+export const githubSyncRuns = pgTable(
+  "github_sync_runs",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    username: text("username").notNull(),
+    trigger: text("trigger").notNull(), // 'user_refresh' | 'onboarding' | 'scheduled' | 'api'
+    status: text("status").notNull(), // 'queued' | 'running' | 'completed' | 'partial' | 'failed'
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    discoveredReposCount: integer("discovered_repos_count").default(0).notNull(),
+    processedReposCount: integer("processed_repos_count").default(0).notNull(),
+    skippedReposCount: integer("skipped_repos_count").default(0).notNull(),
+    failedReposCount: integer("failed_repos_count").default(0).notNull(),
+    totalCommitsFetched: integer("total_commits_fetched").default(0).notNull(),
+    totalPrsFetched: integer("total_prs_fetched").default(0).notNull(),
+    totalIssuesFetched: integer("total_issues_fetched").default(0).notNull(),
+    rateLimitRemaining: integer("rate_limit_remaining"),
+    rateLimitResetAt: timestamp("rate_limit_reset_at", { withTimezone: true }),
+    failedResources: jsonb("failed_resources").default([]).notNull(),
+    apiCoverage: jsonb("api_coverage").default({}).notNull(),
+    checkpoints: jsonb("checkpoints").default({}).notNull(),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_github_sync_runs_person").on(table.personId),
+    index("idx_github_sync_runs_status").on(table.status),
+  ]
+);
+

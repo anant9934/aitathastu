@@ -18,6 +18,7 @@ import { Banner } from "@/components/ui/Banner";
 import { StatusChip, Tag, type Tone } from "@/components/ui/StatusChip";
 import { useConfirm, toast } from "@/components/ui/Feedback";
 import { SourceMark } from "./SourceMark";
+import { GitHubPrivateAccessControls } from "./GitHubPrivateAccessControls";
 
 export const STATUS_VIEW: Record<FootprintStatus, { label: string; tone: Tone }> = {
   not_connected: { label: "Not connected", tone: "neutral" },
@@ -161,6 +162,8 @@ function ConnectorDrawer({ id, api, returnTo, onClose }: { id: string; api: Conn
             </a>
           </div>
         )}
+
+        {id === "github" && connected && <GitHubPrivateAccessControls />}
 
         <TextField
           ref={input}

@@ -39,6 +39,8 @@ export type ProjectLedgerMetadata = {
   isEmpty?: boolean;
   license?: string;
   analysisStage?: string;
+  isPrivate?: boolean;
+  accessMethod?: string;
   /** The student's own role on the project, e.g. "Sole developer". */
   role?: string;
   /** Chips shown on the exported card, in order. */
@@ -62,6 +64,8 @@ export const IMPORT_METADATA_KEYS = [
   "isEmpty",
   "license",
   "analysisStage",
+  "isPrivate",
+  "accessMethod",
 ] as const;
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : undefined);
@@ -81,6 +85,8 @@ export function sanitizeLedgerMetadata(raw: unknown): ProjectLedgerMetadata {
   if (str(m.projectClassification, 50)) out.projectClassification = str(m.projectClassification, 50);
   if (str(m.license, 100)) out.license = str(m.license, 100);
   if (str(m.analysisStage, 50)) out.analysisStage = str(m.analysisStage, 50);
+  if (typeof m.isPrivate === "boolean") out.isPrivate = m.isPrivate;
+  if (str(m.accessMethod, 50)) out.accessMethod = str(m.accessMethod, 50);
   if (Array.isArray(m.languages)) out.languages = [...new Set(m.languages.map((l) => str(l, 40)).filter(Boolean) as string[])].slice(0, 12);
   const role = str(m.role, 80);
   if (role) out.role = role;

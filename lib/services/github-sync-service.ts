@@ -64,8 +64,14 @@ export async function connectGitHubAccount(params: {
 
 export async function disconnectGitHubAccount(personId: string) {
   const connection = await getExternalConnectionByProvider(personId, "github");
-  const encrypted = (connection?.metadata as Record<string, unknown> | null)?.encryptedAccessToken;
+  const metadata = (connection?.metadata as Record<string, unknown> | null) || {};
+  const encrypted = metadata?.encryptedAccessToken;
+  const installationId = metadata?.githubAppInstallationId;
+
   let providerRevoked = false;
+  let appUninstalled = false;
+
+  // 1. Revoke OAuth application token if configured
   if (typeof encrypted === "string" && process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
     try {
       const token = decryptConnectionToken(encrypted, personId);
@@ -83,16 +89,30 @@ export async function disconnectGitHubAccount(personId: string) {
       });
       providerRevoked = response.status === 204;
     } catch {
-      // Local access is still removed; the student must revoke the grant in GitHub settings.
+      // Local access is still removed
     }
   }
+
+  // 2. Revoke GitHub App installation on GitHub side if configured
+  if (typeof installationId === "string" && /^\d+$/.test(installationId)) {
+    try {
+      const { deleteGitHubAppInstallation } = await import("../connectors/github/app-auth");
+      appUninstalled = await deleteGitHubAppInstallation(installationId);
+    } catch {
+      // Handled gracefully; local metadata will still be cleared
+    }
+  }
+
+  // 3. Clear local connection status and metadata
   await disconnectConnection(personId, "github");
+
   return {
     success: true,
     providerRevoked,
-    message: providerRevoked
-      ? "GitHub access revoked and local connection disconnected."
-      : "Local GitHub access removed. Revoke this app in GitHub settings to ensure provider access is removed.",
+    appUninstalled,
+    message: providerRevoked || appUninstalled
+      ? "GitHub OAuth and App authorizations were removed and local connection disconnected."
+      : "Local GitHub connection removed. To fully revoke access, ensure you remove AI Tathastu from GitHub Settings > Applications.",
   };
 }
 
@@ -298,6 +318,23 @@ export async function importGitHubRepositories(params: {
       personId, provider: "github", externalUsername: params.login, profileUrl: params.profileUrl, status: "connected",
       metadata: { ...params.metadata, lastSyncedAt: new Date().toISOString(), repositoryCount: acq.repos.length, recordsChanged },
     });
+
+    // Trigger deep intelligence extraction asynchronously so normalized tables are populated
+    import("./github-intelligence-service")
+      .then(({ executeFullGitHubExtraction }) =>
+        executeFullGitHubExtraction({
+          personId,
+          username: params.login,
+          token: params.token,
+          trigger: "user_refresh",
+        })
+      )
+      .catch((err) => {
+        ctx.log.warn("github.intelligence.background_failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
     const summary: GitHubImportSummary = {
       syncRunId: syncRun.id, recordsFetched: acq.repos.length, recordsChanged, unchanged: unchanged.size, failedRepos, queries: acq.queries,
     };

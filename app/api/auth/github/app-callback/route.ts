@@ -42,6 +42,9 @@ export async function GET(req: Request) {
     if (installation.suspended_at) {
       return NextResponse.redirect(new URL("/student/connections?error=github_app_suspended", baseUrl));
     }
+    if (!["read", "write"].includes(installation.permissions?.contents || "") || !["read", "write"].includes(installation.permissions?.metadata || "")) {
+      return NextResponse.redirect(new URL("/student/connections?error=github_app_read_permissions_missing", baseUrl));
+    }
 
     const existing = await getExternalConnectionByProvider(auth.person.id, "github");
     const existingMetadata = (existing?.metadata || {}) as Record<string, unknown>;

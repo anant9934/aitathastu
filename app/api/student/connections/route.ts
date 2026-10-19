@@ -15,9 +15,9 @@ const VALID_PROVIDERS: Record<string, { host: string; title: string; category: s
     host: "github.com",
     title: "GitHub",
     category: "Code & Projects",
-    description: "Public repositories, READMEs, manifests, and personal project contributions.",
-    connectionMethod: "GitHub OAuth (public repositories)",
-    privacyNote: "Repository metadata is source-detected evidence. Private code is not imported.",
+    description: "Public repositories plus private repositories explicitly selected in a read-only GitHub App installation.",
+    connectionMethod: "GitHub OAuth for identity; optional GitHub App installation for selected private repositories",
+    privacyNote: "Private repositories are imported only after the student installs the GitHub App and chooses repository access. Metadata and contents are read-only; no code is executed or changed.",
   },
   portfolio: {
     host: "",

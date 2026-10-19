@@ -462,6 +462,120 @@ export class ResumeDeduplicationEngine {
   }
 
   /**
+   * Deduplicates achievement entries and filters out summary statements that duplicate
+   * existing experience, education, or research entries.
+   */
+  public static deduplicateAchievements(
+    achievements: ResumeInterpretationOutput["achievements"] = [],
+    context?: {
+      experience?: ResumeInterpretationOutput["experience"];
+      research?: ResumeInterpretationOutput["research"];
+      education?: ResumeInterpretationOutput["education"];
+    }
+  ): {
+    achievements: ResumeInterpretationOutput["achievements"];
+    resolutions: DuplicateResolution[];
+    mergedCount: number;
+  } {
+    const out: ResumeInterpretationOutput["achievements"] = [];
+    const resolutions: DuplicateResolution[] = [];
+    let mergedCount = 0;
+    const seenTitles = new Set<string>();
+
+    const expCompanies = (context?.experience || []).map((e) => normalizeTextKey(e.company)).filter(Boolean);
+    const researchTitles = (context?.research || []).map((r) => normalizeTextKey(r.title)).filter(Boolean);
+
+    for (const incoming of achievements) {
+      const normTitle = normalizeTextKey(incoming.title);
+      if (!normTitle) continue;
+
+      // 1. Cross-source: drop if title matches a research item (it belongs in research, not duplicate award)
+      if (researchTitles.some((rt) => rt === normTitle || (rt.length > 8 && normTitle.includes(rt)))) {
+        mergedCount++;
+        resolutions.push({
+          recordA: incoming.title,
+          recordB: "research entry",
+          status: "identical_merged",
+          reason: "Achievement is already represented as a dedicated research/patent/publication entry",
+        });
+        continue;
+      }
+
+      // 2. Cross-source: drop if summary restating experience leadership
+      if (/^leadership\b/i.test(incoming.title) && expCompanies.some((c) => normTitle.includes(c))) {
+        mergedCount++;
+        resolutions.push({
+          recordA: incoming.title,
+          recordB: "experience entry",
+          status: "identical_merged",
+          reason: "Achievement is a summary restatement of extracted experience role",
+        });
+        continue;
+      }
+
+      // 3. Within-category deduplication
+      if (seenTitles.has(normTitle)) {
+        mergedCount++;
+        resolutions.push({
+          recordA: incoming.title,
+          recordB: incoming.title,
+          status: "identical_merged",
+          reason: "Duplicate achievement claim",
+        });
+        continue;
+      }
+
+      seenTitles.add(normTitle);
+      out.push({ ...incoming });
+    }
+
+    return { achievements: out, resolutions, mergedCount };
+  }
+
+  /**
+   * Deduplicates research entries (papers, patents, books).
+   */
+  public static deduplicateResearch(
+    research: NonNullable<ResumeInterpretationOutput["research"]> = []
+  ): {
+    research: NonNullable<ResumeInterpretationOutput["research"]>;
+    resolutions: DuplicateResolution[];
+    mergedCount: number;
+  } {
+    const out: NonNullable<ResumeInterpretationOutput["research"]> = [];
+    const resolutions: DuplicateResolution[] = [];
+    let mergedCount = 0;
+    const seen = new Set<string>();
+
+    for (const incoming of research) {
+      const normTitle = normalizeTextKey(incoming.title);
+      if (!normTitle) continue;
+
+      // Drop summary lines that masquerade as individual research
+      if (/^publications\s*:\s*author/i.test(incoming.title) || /author\/co-author of \d+ books/i.test(incoming.title)) {
+        mergedCount++;
+        continue;
+      }
+
+      if (seen.has(normTitle)) {
+        mergedCount++;
+        resolutions.push({
+          recordA: incoming.title,
+          recordB: incoming.title,
+          status: "identical_merged",
+          reason: "Duplicate research/publication/patent entry",
+        });
+        continue;
+      }
+
+      seen.add(normTitle);
+      out.push({ ...incoming });
+    }
+
+    return { research: out, resolutions, mergedCount };
+  }
+
+  /**
    * Executes complete multi-tier deduplication on the entire interpretation output.
    */
   public static deduplicateAll(interpretation: ResumeInterpretationOutput): DeduplicationResult {
@@ -487,6 +601,18 @@ export class ResumeDeduplicationEngine {
     allResolutions.push(...expResult.resolutions);
     totalMerged += expResult.mergedCount;
 
+    const researchResult = this.deduplicateResearch(interpretation.research || []);
+    allResolutions.push(...researchResult.resolutions);
+    totalMerged += researchResult.mergedCount;
+
+    const achResult = this.deduplicateAchievements(interpretation.achievements || [], {
+      experience: expResult.experience,
+      research: researchResult.research,
+      education: eduResult.education,
+    });
+    allResolutions.push(...achResult.resolutions);
+    totalMerged += achResult.mergedCount;
+
     return {
       interpretation: {
         ...interpretation,
@@ -495,6 +621,8 @@ export class ResumeDeduplicationEngine {
         certifications: certResult.certifications,
         projects: projResult.projects,
         experience: expResult.experience,
+        research: researchResult.research,
+        achievements: achResult.achievements,
       },
       resolutions: allResolutions,
       totalDuplicatesMerged: totalMerged,

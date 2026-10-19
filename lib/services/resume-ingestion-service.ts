@@ -653,7 +653,7 @@ async function finalize(
   // 2. Evaluate Optional AI Enrichment
   const m = meta(job);
   const userConsent = m.aiConsent === true;
-  const decision = shouldEnrichWithLLM(baseline.extracted, { consent: userConsent });
+  const decision = shouldEnrichWithLLM(baseline.extracted, { consent: userConsent, rawText: input.text });
 
   let extraction: ResumeExtractionResult = baseline;
   let llmEnrichmentAttempted = false;

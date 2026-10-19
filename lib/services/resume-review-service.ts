@@ -25,11 +25,14 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       if (!trimmedVal || !trimmedSpan) return;
       if (normalizedSource) {
         const normSpan = trimmedSpan.replace(/[\s\r\n]+/g, " ").trim().toLocaleLowerCase();
+        const cleanSpanUrl = normSpan.replace(/^https?:\/\/(www\.)?/, "").replace(/\/+$/, "");
         const words = normSpan.split(" ").filter((w) => w.length >= 3);
-        const matchesExact = normalizedSource.includes(normSpan);
+        const matchesExact = normalizedSource.includes(normSpan) || (cleanSpanUrl.length >= 4 && normalizedSource.includes(cleanSpanUrl));
         const matchesKeyWords = words.length >= 2 && words.slice(0, 3).every((w) => normalizedSource.includes(w));
         const matchesAnyKeyWord = words.length > 0 && words.filter((w) => normalizedSource.includes(w)).length >= Math.min(2, words.length);
-        if (!matchesExact && !matchesKeyWords && !matchesAnyKeyWord && !normalizedSource.includes(trimmedVal.toLowerCase())) return;
+        const cleanValUrl = trimmedVal.toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/\/+$/, "");
+        const matchesVal = normalizedSource.includes(trimmedVal.toLowerCase()) || (cleanSpanUrl.length >= 4 && trimmedVal.toLowerCase().includes(cleanSpanUrl)) || (cleanValUrl.length >= 4 && normalizedSource.includes(cleanValUrl));
+        if (!matchesExact && !matchesKeyWords && !matchesAnyKeyWord && !matchesVal) return;
       }
 
       if (category === "skill") {

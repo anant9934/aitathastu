@@ -17,6 +17,7 @@ import { structureResumeText, RESUME_PROMPT_VERSION, ResumeStructuringError } fr
 import { extractResumeDeterministic } from "@/lib/resume/deterministic-extractor";
 import { ResumeDeduplicationEngine } from "@/lib/resume/deduplication-engine";
 import { discoverFootprintsFromResume } from "./digital-footprint-discovery";
+import { CvQualityEvaluator, type SourceCoverageReport } from "@/lib/resume/quality-evaluator";
 import type { ExtractorProfileV2 } from "./extractor-service-client";
 
 export type ResumeLink = { type: (typeof LINK_TYPES)[number]; url: string };
@@ -736,6 +737,8 @@ export interface EnrichmentDecisionOptions {
   consent?: boolean;
   aiFeatureEnabled?: boolean;
   quotaAllowed?: boolean;
+  rawText?: string;
+  sourceReport?: SourceCoverageReport;
 }
 
 export interface EnrichmentDecision {
@@ -750,7 +753,7 @@ export interface EnrichmentDecision {
  * 1. AI is disabled via environment variables (CORE_DISABLE_LIVE_LLM)
  * 2. User has explicitly declined AI consent
  * 3. Daily or monthly quota is exhausted
- * 4. Deterministic baseline already captures high-coverage structured data
+ * 4. Deterministic baseline already captures high-coverage structured data with no critical gaps
  */
 export function shouldEnrichWithLLM(
   baseline: ResumeInterpretationOutput | null | undefined,
@@ -772,13 +775,34 @@ export function shouldEnrichWithLLM(
     return { shouldEnrich: true, reason: "missing_deterministic_baseline" };
   }
 
+  // 1. Source coverage evaluation if rawText is provided
+  if (options.rawText) {
+    const report = options.sourceReport || CvQualityEvaluator.evaluateSourceCoverage(baseline, options.rawText);
+    if (!report.isSufficient || report.criticalGaps.length > 0) {
+      return {
+        shouldEnrich: true,
+        reason: report.criticalGaps[0] || "source_coverage_gap",
+      };
+    }
+  }
+
   const eduCount = baseline.education?.length ?? 0;
   const skillCount = baseline.skills?.length ?? 0;
   const projCount = baseline.projects?.length ?? 0;
   const expCount = baseline.experience?.length ?? 0;
 
+  // 2. Do not suppress recovery if projects are present but lack technologies
+  if (projCount > 0 && baseline.projects.some((p) => !p.technologies || p.technologies.length === 0)) {
+    return { shouldEnrich: true, reason: "project_technologies_sparse" };
+  }
+
+  // 3. Do not suppress recovery if composite blob claims remain
+  if (baseline.achievements?.some((a) => a.title.length > 150 || /^(?:leadership|publications)\s*:/i.test(a.title))) {
+    return { shouldEnrich: true, reason: "composite_claims_need_structuring" };
+  }
+
   // If education is present, 5+ skills are extracted, and 2+ projects (or 1 project + 1 experience)
-  // are extracted with detailed descriptions, deterministic coverage is already sufficient.
+  // are extracted with detailed descriptions and verified technologies, deterministic coverage is sufficient.
   const hasSubstantialProjects = projCount >= 2 || (projCount >= 1 && expCount >= 1);
   const descriptionsAreDetailed = projCount > 0 && baseline.projects.every((p) => (p.description?.trim().length ?? 0) >= 25);
 

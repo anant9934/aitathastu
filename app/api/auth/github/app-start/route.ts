@@ -1,8 +1,8 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
+import { isGitHubAppConfigured, createGitHubAppStateToken } from "@/lib/connectors/github/app-auth";
 
 export async function GET(req: Request) {
   const baseUrl = getCanonicalOrigin(req);
@@ -16,11 +16,11 @@ export async function GET(req: Request) {
   }
 
   const slug = process.env.GITHUB_APP_SLUG?.trim();
-  if (!slug || !process.env.GITHUB_APP_ID?.trim() || !process.env.GITHUB_APP_PRIVATE_KEY?.trim()) {
+  if (!slug || !isGitHubAppConfigured()) {
     return NextResponse.redirect(new URL("/student/connections?error=github_app_not_configured", baseUrl));
   }
 
-  const state = crypto.randomBytes(32).toString("hex");
+  const state = createGitHubAppStateToken(auth.person.id);
   const installUrl = new URL(`https://github.com/apps/${encodeURIComponent(slug)}/installations/new`);
   installUrl.searchParams.set("state", state);
 

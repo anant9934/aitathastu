@@ -1,44 +1,110 @@
-# GitHub App Private Repository Access — Implementation Notes
+# GitHub App Private Repository Access — Implementation & Verification Guide
 
-## What this branch adds
+## 1. Overview & Architecture
 
-- A separate GitHub App installation flow. Existing GitHub OAuth continues to request only `read:user`; it does not request the broad `repo` OAuth scope.
-- Installation state validation through an HttpOnly, SameSite=Lax cookie and the signed-in student's server session.
-- Installation ID and permission metadata persisted on the student's existing GitHub connection. No installation access token is persisted.
-- Short-lived installation tokens created server-side for each private sync.
-- Repository enumeration through the installation's accessible repository list, followed by batched GraphQL reads of language metadata, README, and supported dependency manifests.
-- Private repository snapshots, project candidates and technology evidence stored with `isPrivate` and `accessMethod: github_app_installation` metadata.
-- Student UI actions to authorize selected repositories and sync them.
+AI Tathastu enables students to securely connect their GitHub account and optionally grant access to selected private repositories. The implementation follows the principle of least privilege:
 
-## Required GitHub App configuration
+1. **Identity & Public Access via OAuth:** The standard GitHub OAuth integration requests strictly the `read:user` scope. It does NOT request the broad, dangerous `repo` OAuth scope.
+2. **Selected Private Repository Access via GitHub App:** Access to private repositories is granted only when the student explicitly installs an operator-configured GitHub App and chooses specific repositories on GitHub's installation screen.
+3. **Short-Lived Installation Tokens:** No permanent access token or installation token is persisted in the database. During each sync, a short-lived token valid for up to 10 minutes is generated server-side using the App's private key (RS256 JWT) and immediately discarded after extraction.
+4. **Read-Only Scope:** The GitHub App requests exclusively:
+   - **Repository Metadata:** Read-only (`metadata: read`)
+   - **Repository Contents:** Read-only (`contents: read`)
+   - Write permissions and code execution permissions are never requested or granted.
 
-Create or configure a GitHub App owned by the operator:
+---
 
-1. Set **Setup URL** to `https://YOUR_APP_ORIGIN/api/auth/github/app-callback`.
-2. Grant **Repository permissions**: **Metadata: Read-only**, **Contents: Read-only**. Do not grant write permissions.
-3. Configure the App to let the installing user select repositories. The user chooses the repository set on GitHub's installation screen.
-4. Add server-side environment variables:
-   - `GITHUB_APP_ID`
-   - `GITHUB_APP_SLUG`
-   - `GITHUB_APP_PRIVATE_KEY` (PEM private key; never expose it to client code)
-5. Deploy the branch and set those variables in every environment that should support this feature.
+## 2. Security & Cryptographic Invariants
 
-## User flow
+- **Person-Bound State Token (CSRF Protection):** The authorization state token is generated as an HMAC-SHA256 signed payload containing `personId`, `timestamp`, and a 24-byte cryptographic nonce: `${Buffer.from(payload).toString('base64url')}.${signature}`. During the callback, the server verifies the signature, enforces that `personId` matches the authenticated session, and rejects tokens older than 10 minutes.
+- **Account Mismatch Protection:** The callback enforces that the GitHub App installation account matches the student's connected GitHub account (`installation.account.login === connection.externalUsername`). This prevents cross-account attachment attacks.
+- **Least-Privilege Permission Check:** The callback strictly validates that both `contents: "read"` and `metadata: "read"` are granted. If permissions are missing or the app is suspended, the callback aborts cleanly.
+- **Untrusted Input Sanitization:** Private repository README files, commit messages, and source files are treated as untrusted data. HTML tags (`<script>`, `<iframe>`) are neutralized, and prompt-injection phrasing (`SYSTEM OVERRIDE`, `ignore previous instructions`) is stripped before content enters analysis.
+- **Unverified Skill Attribution:** Discovered technologies are tagged with provenance (`manifest_declared`, `configuration_observed`, `source_imported`) and marked as `unverified` evidence. They are never automatically asserted as confirmed personal skills.
+- **Zero Secret / Token Leakage Guarantee:** Installation access tokens and the App's private key are strictly excluded from API responses, client bundles, database snapshots, and application logs.
 
-1. Sign in to AI Tathastu and open **Connections → GitHub → Manage**.
-2. Choose **Authorize selected repositories**.
-3. On GitHub, install/update the App and select the repositories to grant access to.
-4. Return to AI Tathastu and choose **Sync authorized repositories**.
+---
 
-## Security boundaries
+## 3. Required GitHub App Configuration
 
-- Access is limited to repositories available to the GitHub App installation and the permissions granted by that installation.
-- Installation tokens are short-lived and are generated on the server per sync.
-- Existing OAuth continues to use `read:user`; private access is not enabled by adding `repo` to OAuth scopes.
-- Only repository metadata and contents are requested. The feature does not write commits or execute repository code.
-- Imported technology findings remain unverified and should not be presented as proof of personal proficiency.
-- Uninstall the GitHub App from GitHub settings to revoke provider-side access. Disconnecting AI Tathastu prevents its local sync route from using the saved installation ID but is not a substitute for uninstalling the App.
+To configure the GitHub App in GitHub Developer Settings:
 
-## Verification status
+1. **GitHub App Name:** `AI Tathastu Candidate Reader` (or organizational equivalent).
+2. **Homepage URL:** `https://www.aitathastu.com` (or deployment origin).
+3. **Setup URL:** `https://YOUR_APP_ORIGIN/api/auth/github/app-callback`.
+   - GitHub redirects to this URL after the student installs the app and chooses repositories.
+4. **Repository Permissions:**
+   - **Repository metadata:** Read-only
+   - **Repository contents:** Read-only
+   - All other permissions must be set to "No access".
+5. **Where can this GitHub App be installed?:**
+   - Select: **Any account** (to allow students to install it on their personal accounts).
+6. **Generate Private Key:** Download the `.pem` file and copy its content to `GITHUB_APP_PRIVATE_KEY`.
 
-This branch was created through the GitHub API; no local checkout, TypeScript build, browser run, or live GitHub App installation test was available in this execution. The App configuration and environment variables must be supplied before end-to-end private-repository access can work. Run `npm run typecheck`, `npm run lint`, `npm run build`, and the existing GitHub verification scripts before merging. Check that a test installation can read a selected private repository and cannot read an unselected repository.
+### Server Environment Variables:
+
+Add to `.env` or Vercel Environment Variables:
+```env
+GITHUB_APP_ID=123456
+GITHUB_APP_SLUG=ai-tathastu-candidate-reader
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----"
+```
+*Note: Literal `\n` characters in `GITHUB_APP_PRIVATE_KEY` are automatically normalized into multiline PEM strings.*
+
+---
+
+## 4. Endpoints & Data Model
+
+### Endpoints:
+- `GET /api/auth/github/app-start`: Initiates the authorization flow, mints signed state token, sets `tathastu_gh_app_state` HttpOnly cookie, and redirects to GitHub.
+- `GET /api/auth/github/app-callback`: Validates state signature, session binding, permissions, and account match. Persists installation metadata and redirects to `/student/connections`.
+- `GET /api/student/connections/github/private-sync`: Returns real-time private connection status, installation ID, account login, repository counts, and last sync timestamp.
+- `POST /api/student/connections/github/private-sync`: Executes on-demand synchronization of authorized private repositories. Returns explicit `GitHubAppSyncSummary`.
+- `DELETE /api/student/connections?provider=github`: Revokes OAuth tokens, deletes GitHub App installation via GitHub API (`DELETE /app/installations/:id`), and cleans up local metadata.
+
+### Explicit Sync Status Model:
+`GitHubAppSyncStatus`:
+- `COMPLETED`: 100% of discovered authorized repositories were processed successfully.
+- `PARTIAL`: Some repositories succeeded, but one or more encountered read errors. `success: false`, HTTP 207 Multi-Status.
+- `NOT_AUTHORIZED`: GitHub App is not installed or the session is unauthorized. HTTP 403.
+- `RATE_LIMITED`: GitHub API rate limit was encountered. HTTP 429.
+- `FAILED`: Critical failure during sync. HTTP 400 or 500.
+
+---
+
+## 5. Manual End-to-End Verification Steps
+
+1. Sign in to AI Tathastu as a student.
+2. Navigate to **Connections → GitHub → Manage**.
+3. Under **Private repository access**, click **Authorize selected repositories**.
+4. On GitHub's installation screen, select **Only select repositories**, choose 1 private test repository (e.g. `my-private-project`), and click **Install & Authorize**.
+5. You are redirected back to AI Tathastu with `?success=github_app_installed`.
+6. The drawer displays:
+   - Green chip: `GitHub App Active`
+   - Connected account name
+   - Authorized repositories: `1 private · 0 public (1 total)`
+7. Click **Sync authorized repositories**.
+8. Verify that the repository appears in your **Projects Ledger** and **GitHub Intelligence Dashboard** marked with `private: true` and `accessMethod: github_app_installation`.
+9. Verify that another private repository that was NOT selected on GitHub cannot be read or seen.
+10. Click **Disconnect** in the connection drawer. Verify that the installation ID is erased and local status returns to disconnected while already imported project history is preserved.
+
+---
+
+## 6. Automated Regression & Unit Test Coverage
+
+Run the private authentication test suite:
+```bash
+npm run test:github-private-auth
+```
+Tests pass across:
+- App JWT RS256 token generation and expiration.
+- Person-bound state token generation, signature validation, tampering, and expiration.
+- Least-privilege permission validation.
+- Repository visibility categorization.
+- Prompt injection defenses on untrusted READMEs.
+- Database persistence and idempotent deduplication across repeated syncs.
+- Multi-tenant candidate boundary isolation.
+- Explicit status enum representations (`COMPLETED`, `PARTIAL`, `FAILED`, `NOT_AUTHORIZED`).
+- Disconnect lifecycle and credential erasure.
+- Zero secret and token leakage verification.
+

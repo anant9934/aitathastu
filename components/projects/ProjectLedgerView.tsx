@@ -26,6 +26,7 @@ import { LoadingRegion, Skeleton } from "@/components/ui/Skeleton";
 import { toast, useConfirm } from "@/components/ui/Feedback";
 import { sourceLabel } from "@/components/review/EntryList";
 import { cn } from "@/lib/client/cn";
+import { GitHubIntelligenceDashboard } from "@/components/github/GitHubIntelligenceDashboard";
 
 const CHIP_LABEL: Record<HighlightOption, string> = { stars: "Stars", forks: "Forks", languages: "Languages", role: "My role" };
 
@@ -79,7 +80,11 @@ export function ProjectLedgerView() {
       </>}
     >
       <Tabs label="Ledger sections" idBase="ledger" value={tab} onChange={setTab} className="mb-4 border-b border-border-medium"
-        items={[{ id: "projects", label: "Projects", badge: <span className="font-mono text-2xs text-text-muted tabular">{ledger.projects.length}</span> }, { id: "publications", label: "Research and publications", badge: <span className="font-mono text-2xs text-text-muted tabular">{ledger.publications.length}</span> }]} />
+        items={[
+          { id: "projects", label: "Projects", badge: <span className="font-mono text-2xs text-text-muted tabular">{ledger.projects.length}</span> },
+          { id: "github_intel", label: "GitHub Intelligence", badge: <span className="font-mono text-2xs text-champagne tabular">Live</span> },
+          { id: "publications", label: "Research and publications", badge: <span className="font-mono text-2xs text-text-muted tabular">{ledger.publications.length}</span> },
+        ]} />
 
       {tab === "projects" ? (
         <section aria-label="Projects" role="tabpanel" id="ledger-panel-projects" aria-labelledby="ledger-tab-projects">
@@ -107,6 +112,10 @@ export function ProjectLedgerView() {
               {visible.map((p) => <ProjectCard key={p.id} project={p} onChange={replace} onArchived={drop} />)}
             </ul>
           )}
+        </section>
+      ) : tab === "github_intel" ? (
+        <section aria-label="GitHub Intelligence" role="tabpanel" id="ledger-panel-github" aria-labelledby="ledger-tab-github">
+          <GitHubIntelligenceDashboard />
         </section>
       ) : (
         <Publications ledger={ledger} onChange={(pubs) => setLedger({ ...ledger, publications: pubs })} />

@@ -3,7 +3,7 @@ import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { getExternalConnectionByProvider, saveExternalConnection } from "@/lib/repositories/connection-repository";
-import { getGitHubAppInstallation } from "@/lib/connectors/github/app-auth";
+import { getGitHubAppInstallation, verifyGitHubAppStateToken, validateInstallationPermissions } from "@/lib/connectors/github/app-auth";
 
 export const runtime = "nodejs";
 
@@ -30,23 +30,49 @@ export async function GET(req: Request) {
   const match = cookieHeader.match(/tathastu_gh_app_state=([^;]+)/);
   const cookieState = match ? decodeURIComponent(match[1]) : null;
 
-  if (!installationId || !/^\d+$/.test(installationId) || !returnedState || !cookieState || returnedState !== cookieState) {
-    return NextResponse.redirect(new URL("/student/connections?error=github_app_state_invalid", baseUrl));
+  const errorRedirect = (errorParam: string) => {
+    const res = NextResponse.redirect(new URL(`/student/connections?error=${errorParam}`, baseUrl));
+    res.cookies.delete("tathastu_gh_app_state");
+    return res;
+  };
+
+  if (!returnedState || !cookieState || returnedState !== cookieState) {
+    return errorRedirect("github_app_state_invalid");
   }
+
+  const stateVerification = verifyGitHubAppStateToken(returnedState, auth.person.id);
+  if (!stateVerification.valid) {
+    return errorRedirect(stateVerification.reason === "expired_state" ? "github_app_state_expired" : "github_app_state_invalid");
+  }
+
+  if (!installationId || !/^\d+$/.test(installationId)) {
+    return errorRedirect("github_app_state_invalid");
+  }
+
   if (setupAction !== "install" && setupAction !== "update") {
-    return NextResponse.redirect(new URL("/student/connections?error=github_app_setup_cancelled", baseUrl));
+    return errorRedirect("github_app_setup_cancelled");
   }
 
   try {
     const installation = await getGitHubAppInstallation(installationId);
     if (installation.suspended_at) {
-      return NextResponse.redirect(new URL("/student/connections?error=github_app_suspended", baseUrl));
+      return errorRedirect("github_app_suspended");
     }
-    if (!["read", "write"].includes(installation.permissions?.contents || "") || !["read", "write"].includes(installation.permissions?.metadata || "")) {
-      return NextResponse.redirect(new URL("/student/connections?error=github_app_read_permissions_missing", baseUrl));
+
+    const permCheck = validateInstallationPermissions(installation.permissions);
+    if (!permCheck.valid) {
+      return errorRedirect("github_app_read_permissions_missing");
     }
 
     const existing = await getExternalConnectionByProvider(auth.person.id, "github");
+
+    // Guard against account mismatch: if student has a linked GitHub username, ensure the app was installed for that same user
+    if (existing?.externalUsername && installation.account?.login) {
+      if (existing.externalUsername.toLowerCase() !== installation.account.login.toLowerCase()) {
+        return errorRedirect("github_app_account_mismatch");
+      }
+    }
+
     const existingMetadata = (existing?.metadata || {}) as Record<string, unknown>;
     await saveExternalConnection({
       personId: auth.person.id,
@@ -73,6 +99,6 @@ export async function GET(req: Request) {
     return response;
   } catch (error) {
     console.error("[GitHub App Setup Callback]", error);
-    return NextResponse.redirect(new URL("/student/connections?error=github_app_setup_failed", baseUrl));
+    return errorRedirect("github_app_setup_failed");
   }
 }

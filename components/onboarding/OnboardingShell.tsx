@@ -119,7 +119,7 @@ export function OnboardingShell({
   const widthClass = WIDTH_CLASSES[width] || WIDTH_CLASSES.default;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-bg-primary text-text-primary">
+    <div className="at-onboarding-shell flex min-h-dvh flex-col bg-bg-primary text-text-primary">
       {/* Accessible Skip Navigation Link */}
       <a
         href="#onboarding-main"

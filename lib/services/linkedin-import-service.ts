@@ -65,13 +65,32 @@ export async function assertLinkedInAllowed(personId: string, now = Date.now()) 
   }
 }
 
-export async function connectLinkedIn(personId: string, _email?: string, _password?: string, _requestId?: string): Promise<LinkedInStatus> {
-  await assertLinkedInAllowed(personId);
-  // Cleanly purge any legacy stored passwords in compliance with DFI V5 security & privacy policy
-  await forgetStoredPassword(personId);
-  throw new LinkedInPolicyError(
-    "Automated password login is disabled for security and LinkedIn terms compliance. Please connect your profile via public URL or upload your student-authorized LinkedIn data export archive."
-  );
+export async function connectLinkedIn(personId: string, urlOrHandle?: string, _password?: string, _requestId?: string): Promise<LinkedInStatus> {
+  if (_password) {
+    throw new LinkedInPolicyError(
+      "Automated password login is disabled for security and LinkedIn terms compliance. Please connect your profile via public URL or upload your student-authorised LinkedIn data export archive."
+    );
+  }
+  if (!urlOrHandle) {
+    throw new LinkedInPolicyError("Enter your LinkedIn profile URL to link your account.");
+  }
+  const { validateLinkedInUrl } = await import("@/lib/connectors/linkedin/client");
+  const ref = validateLinkedInUrl(urlOrHandle);
+  if (!ref.valid) {
+    throw new LinkedInPolicyError(ref.error || "Enter a valid LinkedIn profile URL (e.g. linkedin.com/in/yourname).");
+  }
+  const { saveExternalConnection } = await import("@/lib/repositories/connection-repository");
+  await saveExternalConnection({
+    personId,
+    provider: "linkedin",
+    externalUsername: ref.username,
+    profileUrl: ref.normalizedUrl,
+    status: "reference_only",
+    metadata: { linkedAt: new Date().toISOString() },
+  });
+  const { writeOnboardingDraft } = await import("@/lib/services/onboarding-v2-service");
+  await writeOnboardingDraft(personId, { profiles: { linkedin: ref.normalizedUrl } }, { origin: "system" });
+  return { state: "succeeded" };
 }
 
 /** Poll: reflects the worker's state into the sync operation and persists a finished import. */

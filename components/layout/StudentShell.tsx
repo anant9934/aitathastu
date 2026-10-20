@@ -90,7 +90,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
   const tabs = NAV_PRIMARY.slice(0, 4);
 
   return (
-    <div className="min-h-dvh bg-bg-primary text-text-primary">
+    <div className="at-workspace-shell min-h-dvh bg-bg-primary text-text-primary">
       {/* Desktop rail */}
       <aside
         data-eora-id="eora-sidebar"

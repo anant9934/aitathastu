@@ -164,13 +164,14 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
     });
     setExtractionBusy(false);
     if (!res.ok) {
-      const st = res.data?.status;
+      const errData = res.data as { status?: string; message?: string } | undefined;
+      const st = errData?.status;
       if (st === "not_configured") {
         setExtractionConfigured(false);
         setExtractionError("Apify extraction is not configured on this server.");
       } else {
         setExtractionState("failed");
-        setExtractionError(res.data?.message ?? describeError(res.error));
+        setExtractionError(errData?.message ?? describeError(res.error));
       }
       return;
     }
@@ -215,7 +216,7 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
         <h3 id="li-title" className="font-display text-base font-semibold text-text-primary">LinkedIn</h3>
         <StatusChip tone="neutral" icon={null}>Optional</StatusChip>
         {(urlDone || importDone || extractionState === "synced" || extractionState === "partial") && (
-          <StatusChip tone="verified" icon={<CheckCircle size={12} aria-hidden="true" />}>Connected</StatusChip>
+          <StatusChip tone="verified" icon={CheckCircle}>Connected</StatusChip>
         )}
       </div>
       <p className="mt-2 max-w-[62ch] text-sm text-text-muted">

@@ -55,7 +55,7 @@ export function Footer({ className }: { className?: string }) {
 
           {/* Product & Platform */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Product &amp; Platform
             </h5>
             <Link href="/onboarding" className="text-xs text-text-muted hover:text-text-primary transition-colors">
@@ -80,7 +80,7 @@ export function Footer({ className }: { className?: string }) {
 
           {/* Core Legal Policies */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Legal &amp; Policies
             </h5>
             <Link href="/privacy" className="text-xs text-text-muted hover:text-text-primary transition-colors">
@@ -105,7 +105,7 @@ export function Footer({ className }: { className?: string }) {
 
           {/* Your Data & Privacy */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Your Data
             </h5>
             <Link href="/privacy/your-rights" className="text-xs text-text-muted hover:text-text-primary transition-colors">
@@ -136,7 +136,7 @@ export function Footer({ className }: { className?: string }) {
 
           {/* Trust, Security & Redressal */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Trust &amp; Redressal
             </h5>
             <Link href="/security" className="text-xs text-text-muted hover:text-text-primary transition-colors">

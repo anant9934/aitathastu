@@ -93,7 +93,7 @@ export function DashboardView() {
   const first = (model.studentName ?? settings?.name ?? "").split(" ")[0];
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-4 pb-16 sm:px-6 lg:px-8">
+    <div className="at-dashboard mx-auto w-full max-w-[1240px] px-4 pb-16 sm:px-6 lg:px-8">
       <JumpNav items={nav} />
 
       <section id="overview" aria-labelledby="overview-title" data-eora-id="eora-overview" className="scroll-mt-28 pt-6 lg:scroll-mt-16">

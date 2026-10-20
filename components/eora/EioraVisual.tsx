@@ -8,7 +8,6 @@ type EioraVisualProps = {
   state?: EioraVisualState;
   className?: string;
   size?: number;
-  label?: string;
 };
 
 /**
@@ -20,7 +19,6 @@ export function EioraVisual({
   state = "idle",
   className,
   size = 260,
-  label = "Eiora, AI Tathastu's companion",
 }: EioraVisualProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
@@ -198,8 +196,8 @@ export function EioraVisual({
       aria-hidden="true"
       role="presentation"
       className={className}
-      style={{ width: size, height: size, display: "block", pointerEvents: "auto" }}
-      aria-label={label}
+      data-size={size}
+      style={{ width: "100%", height: "100%", display: "block", pointerEvents: "auto" }}
     />
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Banner } from "@/components/ui/Banner";
 import { useEoraStepEvents } from "@/lib/client/eora/step-events";
 import { StepFooter, StepHeader } from "../OnboardingShell";
+import { EioraVisual } from "@/components/eora/EioraVisual";
 
 /** The last step: what goes onto the profile, then one honest attempt to save it all. */
 export function FinishStep({ data, guide, submitting, onBack, onFinish }: {
@@ -41,6 +42,17 @@ export function FinishStep({ data, guide, submitting, onBack, onFinish }: {
         description="This is what goes onto your profile. You can edit any of it later, and your edits always win over a source."
         guide={guide}
       />
+
+      {submitting && (
+        <div className="at-finish-synthesis" role="status" aria-live="polite">
+          <div className="at-finish-synthesis-orb"><EioraVisual size={108} state="extracting" /></div>
+          <div>
+            <p className="at-cv-overline">EIORA / SYNTHESIS</p>
+            <h2>Bringing your profile together.</h2>
+            <p>Saving the choices you confirmed and preparing your workspace. This step follows the real save request; you can stay here while it completes.</p>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-col gap-6">
         {/* Stat Cards Grid: 6 Real Metrics */}

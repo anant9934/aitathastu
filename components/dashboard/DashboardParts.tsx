@@ -4,7 +4,7 @@
  * Dashboard building blocks: the stat row, the priority hero (shaped by the
  * #1 priority, Task 2.3.1) and next actions with their "why".
  */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CaretDown, Info } from "@phosphor-icons/react/dist/ssr";
 import type { ComposedDashboardViewModel, NextBestAction } from "@/lib/domain/personalization-engine";
@@ -104,14 +104,45 @@ export function PriorityHero({ hero }: { hero: HeroWidget }) {
       body = <p className="text-sm text-text-muted">{hero.linkedinConnected ? "LinkedIn is connected." : "LinkedIn isn't connected; it's optional."} <span className="font-mono text-text-primary tabular">{hero.sharedProjects}</span> project{hero.sharedProjects === 1 ? "" : "s"} on GitHub others can see.</p>;
       break;
   }
+
+  const spotlightInfo = useMemo(() => {
+    switch (hero.kind) {
+      case "readiness":
+        return { portal: "Avasar Spotlight", desc: "Matched Roles & Internships", accent: "#D4AF37" };
+      case "project_workbench":
+      case "network":
+        return { portal: "Collaborate Spotlight", desc: "Peer Matches & Active Builds", accent: "#E05A47" };
+      case "learning_path":
+        return { portal: "Learn Spotlight", desc: "Personalized Roadmap & Modules", accent: "#C48A5A" };
+      case "research_profile":
+        return { portal: "Research Ledger", desc: "Citations & Methodology Proof", accent: "#4CD3E3" };
+      default:
+        return { portal: "Priority Focus", desc: "Active Milestone", accent: "#D4AF37" };
+    }
+  }, [hero.kind]);
+
   return (
-    <section aria-labelledby="hero-title" data-hero-kind={hero.kind} data-eora-id="eora-active-goal" className="flex min-w-0 flex-col rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 id="hero-title" className="font-display text-lg font-bold text-text-primary">{hero.title}</h2>
+    <section
+      aria-labelledby="hero-title"
+      data-hero-kind={hero.kind}
+      data-eora-id="eora-active-goal"
+      className="flex min-w-0 flex-col rounded-card border border-[#D4AF37]/30 bg-bg-elevated/90 backdrop-blur-md p-5 shadow-card transition-all hover:border-[#D4AF37]/50"
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle pb-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#141413] dark:bg-white/10 px-2.5 py-0.5 border border-border-medium">
+            <span className="size-1.5 rounded-full animate-ping" style={{ backgroundColor: spotlightInfo.accent }} />
+            <span className="font-mono text-2xs uppercase tracking-wider font-bold" style={{ color: spotlightInfo.accent }}>
+              {spotlightInfo.portal}
+            </span>
+          </span>
+          <span className="hidden sm:inline font-mono text-3xs text-text-muted">· {spotlightInfo.desc}</span>
+        </div>
         <Tag>Your #1 priority</Tag>
       </div>
+      <h2 id="hero-title" className="font-editorial text-2xl font-bold text-text-primary mb-3">{hero.title}</h2>
       <div className="flex-1">{body}</div>
-      <div className="mt-5">
+      <div className="mt-5 pt-3 border-t border-border-subtle">
         <LinkButton href={hero.cta.href} variant="primary" size="sm">{hero.cta.label}<ArrowRight size={16} aria-hidden="true" /></LinkButton>
       </div>
     </section>

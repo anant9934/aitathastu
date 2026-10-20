@@ -149,7 +149,7 @@ export function GitHubConnectCard({ returnTo, beforeLeave, cvLogin, authorizatio
   const showList = overview && (overview.account.verified || overview.installation.installed) && state !== "revoked";
 
   return (
-    <section aria-labelledby="github-card-title" className="rounded-card border border-border-medium bg-bg-elevated p-4 shadow-card sm:p-5">
+    <section data-testid="card-github" aria-labelledby="github-card-title" className="rounded-card border border-border-medium bg-bg-elevated p-4 shadow-card sm:p-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <GithubLogo size={22} aria-hidden="true" className="text-text-primary" />
         <h4 id="github-card-title" className="font-display text-base font-semibold text-text-primary">GitHub</h4>

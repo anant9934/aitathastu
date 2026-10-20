@@ -93,8 +93,8 @@ export function DirectionStep({
   return (
     <>
       <StepHeader
-        title="Where are you heading in AI and ML?"
-        description="Pick the role you're working toward. We use it to show which skills you've already proven and which ones are still gaps. You can change it any time."
+        title="What are we building toward today?"
+        description="Pick the role you're working toward. Eora uses it to highlight your proven skills and map your next step. You can change it anytime."
         guide={guide}
       />
 

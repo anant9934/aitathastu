@@ -32,11 +32,11 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Field";
 import { Banner } from "@/components/ui/Banner";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm, toast } from "@/components/ui/Feedback";
 import { useEoraStepEvents } from "@/lib/client/eora/step-events";
 import { cn } from "@/lib/client/cn";
 import { StepFooter, StepHeader } from "../OnboardingShell";
+import { CvExtractionAssembly } from "@/components/onboarding/CvExtractionAssembly";
 
 export function CvStep({
   cv,
@@ -362,23 +362,17 @@ export function CvStep({
         )}
 
         {cv.busy && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center gap-3 rounded-card border border-accent-warm/40 bg-bg-elevated p-4 text-sm shadow-card"
-          >
-            <Spinner size={20} className="text-accent-warm-bright" />
-            <span className="font-medium text-text-primary">
-              {cv.state === "UPLOADING"
-                ? "Uploading your CV securely…"
+          <CvExtractionAssembly
+            fileName={cv.fileName}
+            stage={
+              cv.state === "UPLOADING"
+                ? "Uploading your CV document securely…"
                 : cv.state === "SAVING"
-                ? "Saving reviewed details to your draft…"
-                : `${cv.stage}…`}
-            </span>
-            <span className="ml-auto hidden text-xs font-mono text-text-dim sm:inline">
-              Processing server stream
-            </span>
-          </div>
+                ? "Saving reviewed claims to your draft…"
+                : `${cv.stage}…`
+            }
+            state={cv.state}
+          />
         )}
 
         {cv.error && (

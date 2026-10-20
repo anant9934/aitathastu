@@ -303,15 +303,17 @@ export function SourcesStep({ flow, guide, onCandidates }: {
             exclude={["linkedin", "github"]}
             groupSlots={{
               development: (
-                <GitHubConnectCard
-                  returnTo="/onboarding"
-                  beforeLeave={leaveGuard}
-                  cvLogin={cvLogin}
-                  authorizationFailed={notice?.code === "github_cancelled" || notice?.code === "github_authorization_failed"}
-                  onCandidates={onCandidates}
-                  onProfileLinked={linkGitHubProfile}
-                  onPublicOnly={(username) => connectorApi.importFrom("github", username)}
-                />
+                <div data-testid="card-github">
+                  <GitHubConnectCard
+                    returnTo="/onboarding"
+                    beforeLeave={leaveGuard}
+                    cvLogin={cvLogin}
+                    authorizationFailed={notice?.code === "github_cancelled" || notice?.code === "github_authorization_failed"}
+                    onCandidates={onCandidates}
+                    onProfileLinked={linkGitHubProfile}
+                    onPublicOnly={(username) => connectorApi.importFrom("github", username)}
+                  />
+                </div>
               ),
             }}
           />

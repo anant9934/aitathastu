@@ -93,7 +93,7 @@ export function ProjectDetailView({ id }: { id: string }) {
             <EvidenceStrip className="mb-3" showCounts label={`${p.title} sources`} segments={[{ tier: p.sources.length >= 2 ? "corroborated" : "evidenced", count: Math.max(1, p.sources.length), label: "sources" }]} />
             <div className="flex flex-wrap gap-1.5">{p.sources.map((s) => <Tag key={s}>{sourceLabel(s)}</Tag>)}</div>
           </Panel>
-          <Panel aria-labelledby="pev-title">
+          <Panel aria-labelledby="pev-title" data-eora-id="eora-project-detail-architecture" id="eora-project-detail-architecture">
             <PanelHeader id="pev-title" title="Evidence records" />
             {evidence.length === 0 ? <p className="text-sm text-text-muted">No evidence records yet.</p> : (
               <ul className="divide-y divide-border-medium">

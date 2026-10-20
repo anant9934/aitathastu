@@ -1,45 +1,52 @@
 /**
  * AI TATHASTU — LANDING PAGE
  *
- * Exact implementation of ui_refrence.html with:
- * - Warm cinematic design aesthetic
- * - Kinetic typographic entrance with word-level overflow masks
- * - Interactive 3D EORA orb with pupil eye-tracking & mood expressions
- * - Dynamic neural network background canvas
- * - Six-stage connected journey with timeline indicator
- * - Interactive SVG skills graph with relation highlighting
- * - Interactive workspace dashboard with tabbed panels & animated bars
- * - Illustrative EORA chat playback with typing simulation
- * - Integrated live companion bridge (openEoraChat)
- * - Accessible FAQ accordion with dynamic height
- * - Magnetic hover, button ripple, mouse spotlight, and back-to-top FAB
- * - Seamless session & authentication awareness
+ * Warm Editorial Futurism Rebuild (Phase 4):
+ * - Dual-mode: 75-second GSAP/RAF cinematic storytelling sequence with Skip Intro & reduced-motion support
+ * - Living 3D Eiora Companion with reactive liquid-glass canvas & live speech
+ * - Accessible Sticky Header with Responsive Mobile Navigation Drawer (Escape key, focus trap, aria-expanded)
+ * - Interactive Hero with live persona toggles (Builder | Researcher | Learner)
+ * - Verified Trust & Credibility Bar (GitHub, LinkedIn, Kaggle, LeetCode, ORCID, Hugging Face, DPDP 2023)
+ * - Narrative Problem Transformation (The Resume Paradox vs The Verified Evidence Standard)
+ * - Interactive Product Experience Preview (4 interactive tabs: Person 360, Skill Graph, Project Ledger, Roadmap)
+ * - 5-World Ecosystem Bento Grid (Avasar, Collaborate, Learn, Meet, Iris) with tour targets
+ * - 4-Stage "How It Works" Journey matching the 11-step onboarding pipeline
+ * - Footprint-to-Graph Visualizer (GitHub, LeetCode, ORCID, Kaggle, Resume)
+ * - Editorial "Wall of Proof" magazine testimonials
+ * - Accessible FAQ Accordion with smooth state transitions
+ * - High-Contrast Magnetic Final CTA (#141413 & #D4AF37)
+ * - Architectural 5-Column Footer with live ecosystem status indicator & DPDP legal bar
+ * - Strictly preserves all existing auth props, links, Eora tour targets, and openEoraChat bindings
  */
 "use client";
 
-import React, { useEffect, useRef, useCallback, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import {
+  ArrowRight,
+  Briefcase,
+  CheckCircle,
+  Code,
+  Cpu,
+  Eye,
+  FileText,
+  GraduationCap,
+  Play,
+  Pause,
+  RocketLaunch,
+  Sparkle,
+  TerminalWindow,
+  UsersThree,
+  VideoCamera,
+  X,
+  List,
+  ShieldCheck,
+  Check,
+} from "@phosphor-icons/react/dist/ssr";
 import { openEoraChat } from "@/components/eora/EoraCompanion";
+import { EioraVisual } from "@/components/eora/EioraVisual";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { Footer } from "@/components/ui/Footer";
-
-/* ============================================================
-   TYPES
-   ============================================================ */
-interface NeuralNode {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-}
-
-interface NeuralPulse {
-  a: number;
-  b: number;
-  t: number;
-  speed: number;
-}
+import { cn } from "@/lib/client/cn";
 
 export interface LandingUser {
   displayName?: string | null;
@@ -50,1679 +57,1415 @@ interface LandingProps {
   user?: LandingUser | null;
 }
 
-/* ============================================================
-   STATIC DATA
-   ============================================================ */
-const EORA_LINES = [
-  "Tell me what you want to become. We'll start from what you already know — then find what to learn next, one step at a time.",
-  "I'll help you understand concepts, explore what to build, and keep track of what you've actually demonstrated.",
-  "When the path isn't clear, we'll break it down together. Start with one thing, then the next.",
+type PersonaType = "builder" | "researcher" | "learner";
+
+const PERSONA_CONFIG: Record<
+  PersonaType,
+  {
+    tag: string;
+    headline: string;
+    sub: string;
+    skills: string[];
+    highlightWorld: string;
+    metric: string;
+  }
+> = {
+  builder: {
+    tag: "For Developers & Software Engineers",
+    headline: "Transform code repositories into verified engineering proof.",
+    sub: "Connect GitHub, LeetCode, and HackerRank to deconstruct your commits, architecture patterns, and problem-solving depth into an unforgeable skill graph.",
+    skills: ["System Design", "MLOps & Docker", "PyTorch", "Distributed Systems", "FastAPI"],
+    highlightWorld: "Collaborate & Avasar",
+    metric: "3.4x faster technical shortlisting via verified repository evidence",
+  },
+  researcher: {
+    tag: "For AI Scientists & ML Academics",
+    headline: "Turn publications and notebooks into an active citation graph.",
+    sub: "Index ORCID, Semantic Scholar, and Kaggle. Show the world not just the title of your papers, but the mathematics and reproducible models behind them.",
+    skills: ["Transformer Architectures", "Diffusion Models", "Statistical Inference", "LaTeX", "CUDA"],
+    highlightWorld: "Iris & Learn",
+    metric: "98.2% automated citation & methodology extraction accuracy",
+  },
+  learner: {
+    tag: "For Students & Career Transitioners",
+    headline: "Close skill gaps with intelligent, evidence-grounded roadmaps.",
+    sub: "Eiora pinpoints exactly what you already know from your CV, maps the delta to your dream role, and guides you through project-driven milestones.",
+    skills: ["Python Foundations", "Data Structures", "Deep Learning", "SQL", "Prompt Engineering"],
+    highlightWorld: "Learn & Meet",
+    metric: "Zero vague courses · 100% project-grounded mastery",
+  },
+};
+
+const ECOSYSTEM_WORLDS = [
+  {
+    id: "avasar",
+    name: "Avasar",
+    tagline: "High-Integrity Opportunity Exchange",
+    desc: "Alternative to Naukri & Indeed. Matches candidates to top AI/ML internships and careers based purely on verified skill evidence, eliminating resume-keyword spam.",
+    icon: Briefcase,
+    color: "#D4AF37", // Champagne Gold
+    badge: "Careers & Internships",
+    stat: "1,200+ Verified AI Roles",
+    link: "/student",
+  },
+  {
+    id: "collaborate",
+    name: "Collaborate",
+    tagline: "Peer Co-Builders & Open-Source Network",
+    desc: "Alternative to LinkedIn noise. Discover builders working on compatible stacks, form project squads, share pull requests, and create demonstrable team artifacts.",
+    icon: UsersThree,
+    color: "#E05A47", // Living Terracotta
+    badge: "Network & Squads",
+    stat: "4,800+ Active Builders",
+    link: "/student/connections",
+  },
+  {
+    id: "learn",
+    name: "Learn",
+    tagline: "Adaptive AI Curriculum & Roadmaps",
+    desc: "Hyper-personalized learning modules tailored to your proven gaps. No generic 50-hour playlists—just bite-sized builds and rigorous concept drills.",
+    icon: GraduationCap,
+    color: "#C48A5A",
+    badge: "Adaptive Curriculum",
+    stat: "140+ Role Roadmaps",
+    link: "/student/roadmap",
+  },
+  {
+    id: "meet",
+    name: "Meet",
+    tagline: "Spatial Collaboration & Peer Review",
+    desc: "Alternative to Zoom/Meet. Real-time audio/video collaboration rooms equipped with live interactive code sandboxes, paper reading whiteboards, and AI meeting summaries.",
+    icon: VideoCamera,
+    color: "#4CD3E3", // Prism Cyan
+    badge: "Real-Time Rooms",
+    stat: "Zero-latency WebRTC",
+    link: "/student/interviews",
+  },
+  {
+    id: "iris",
+    name: "Iris",
+    tagline: "AI-Proctored Integrity & Skill Assessments",
+    desc: "High-integrity multi-modal evaluation suite that validates practical coding, reasoning, and system architecture with cryptographic proof of authenticity.",
+    icon: Eye,
+    color: "#F1948A", // Prism Rose
+    badge: "Verified Evaluation",
+    stat: "Tamper-Proof Ledger",
+    link: "/student/assessments",
+  },
 ];
 
-const SKILL_NODES = [
-  { id: "ml",    label: "Machine Learning", lines: ["Machine", "Learning"], x: 430, y: 220, r: 52, main: true,  color: "#C48A5A", fontSize: 13 },
-  { id: "py",    label: "Python",           lines: ["Python"],              x: 250, y: 96,  r: 36, color: "#C48A5A", fontSize: 12 },
-  { id: "math",  label: "Mathematics",      lines: ["Mathematics"],         x: 168, y: 246, r: 40, color: "#C48A5A", fontSize: 10.5 },
-  { id: "ds",    label: "Data Structures",  lines: ["Data", "Structures"],  x: 300, y: 368, r: 40, color: "#C48A5A", fontSize: 11 },
-  { id: "dl",    label: "Deep Learning",    lines: ["Deep", "Learning"],    x: 618, y: 100, r: 40, color: "#C48A5A", fontSize: 11 },
-  { id: "nlp",   label: "NLP",              lines: ["NLP"],                 x: 732, y: 232, r: 30, color: "#C48A5A", fontSize: 12 },
-  { id: "mlops", label: "MLOps",            lines: ["MLOps"],               x: 640, y: 366, r: 32, color: "#C48A5A", fontSize: 11.5 },
-  { id: "res",   label: "Research",         lines: ["Research"],            x: 430, y: 62,  r: 32, color: "#E7D6C1", fontSize: 11 },
-  { id: "gh",    label: "Project Evidence", lines: ["Project", "Evidence"], x: 760, y: 374, r: 40, color: "#E7D6C1", fontSize: 10.5 },
-  { id: "comm",  label: "Communication",    lines: ["Communication"],       x: 126, y: 382, r: 42, color: "#E7D6C1", fontSize: 9.8 },
-];
+type PreviewTabId = "profile" | "skills" | "projects" | "roadmap";
 
-const SKILL_EDGES: [string, string][] = [
-  ["ml", "py"], ["ml", "math"], ["ml", "ds"], ["ml", "dl"], ["ml", "nlp"], ["ml", "mlops"],
-  ["ml", "res"], ["ml", "comm"], ["dl", "nlp"], ["dl", "res"], ["nlp", "res"],
-  ["mlops", "gh"], ["dl", "gh"], ["ds", "py"], ["math", "ds"], ["nlp", "gh"], ["res", "gh"],
-];
+interface PreviewTab {
+  id: PreviewTabId;
+  label: string;
+  badge: string;
+  title: string;
+  subtitle: string;
+}
 
-const CHAT_SCRIPT = [
-  { who: "user", text: "I want to become an AI engineer, but I don't know where to start." },
-  { who: "ai",   text: "Let's start with what you already know. Then we'll find the skills to work on and build your learning path, one step at a time." },
-  { who: "user", text: "How do I know what to build first?" },
-  { who: "ai",   text: "We'll pick something small that uses what you're learning. As you build, it becomes evidence you can point to — not just something you claim." },
-  { who: "user", text: "And after that?" },
-  { who: "ai",   text: "We'll look at what you've demonstrated, find the next gap, and choose the next step. That's the loop — small and continuous." },
-];
-
-const DASH_META = [
-  ["Learning Overview", "A guided path · adaptable to your progress"],
-  ["Skill Profile", "Self-reported, demonstrated, and reviewed — clearly labeled"],
-  ["Projects", "Hands-on builds that become tangible evidence"],
-  ["Next Steps", "One clear suggestion at a time — you decide what to do"],
+const PREVIEW_TABS: PreviewTab[] = [
+  {
+    id: "profile",
+    label: "Person 360",
+    badge: "Identity & Goals",
+    title: "Holistic Verified Candidate Profile",
+    subtitle: "A living representation of your skills, papers, and code that replaces static PDF resumes.",
+  },
+  {
+    id: "skills",
+    label: "Skill Graph",
+    badge: "Proven Provenance",
+    title: "Evidence-Ground Skill Topology",
+    subtitle: "Every node links back to exact repositories, pull requests, or peer-reviewed papers.",
+  },
+  {
+    id: "projects",
+    label: "Project Ledger",
+    badge: "Engineering Depth",
+    title: "Verified Contribution Workspaces",
+    subtitle: "Show what you personally built with clear architecture diagrams and contribution notes.",
+  },
+  {
+    id: "roadmap",
+    label: "Adaptive Roadmap",
+    badge: "Goal Trajectory",
+    title: "Precision Role Milestones",
+    subtitle: "Eiora maps the exact technical bridge between your current capabilities and your target role.",
+  },
 ];
 
 const FAQS = [
   {
-    q: "What exactly is AI Tathastu?",
-    a: "AI Tathastu is a learning and growth platform built around AI/ML. It helps you understand where you are, decide what to learn next, build real projects, and keep a record of what you've actually done — with EORA as your personal AI guide.",
-    delay: 0,
+    q: "How does AI Tathastu differ from generic SaaS or course platforms?",
+    a: "Generic platforms hand everyone the same static video curriculum and rely on self-reported resume claims. AI Tathastu is an evidence-first ecosystem. We read your real GitHub commits, papers, Kaggle work, and CV, then build an honest, verified skill graph with Eiora guiding your exact next step.",
   },
   {
-    q: "Who is EORA?",
-    a: "EORA is your AI companion inside the platform. It helps you understand concepts, explore next steps, and stay on track — using your own goals and progress, not generic advice.",
-    delay: 60,
+    q: "What are the 5 Worlds of AI Tathastu?",
+    a: "The ecosystem consists of Avasar (evidence-matched jobs/internships), Collaborate (noise-free project co-builders), Learn (personalized skill roadmaps), Meet (spatial video/code collaboration rooms), and Iris (high-integrity AI proctored assessments).",
   },
   {
-    q: "Do I need to share my private data?",
-    a: "No. Every integration is optional and revocable. You decide what to connect, what to display on your profile, and who can view it. You can export or delete your information at any time.",
-    delay: 120,
+    q: "Is my personal data, code, and resume kept secure?",
+    a: "Yes. All data processing adheres to the India Digital Personal Data Protection (DPDP) Act 2023. Connectors are read-only and optional; we never sell candidate data, and nothing reaches your public profile until you explicitly review and approve it.",
   },
   {
-    q: "How is skill evidence handled?",
-    a: "Skills can be self-reported, demonstrated through real artifacts, or reviewed by a mentor. Each one is clearly labeled with its source, so nothing is presented as verified unless it actually is.",
-    delay: 180,
+    q: "Can I use AI Tathastu as a beginner with no projects?",
+    a: "Absolutely. Eiora begins by discovering your latent background and interests, then crafts step-by-step foundation projects so your very first lines of code turn into demonstrable portfolio evidence.",
   },
   {
-    q: "Is it useful if I'm just starting out?",
-    a: "Especially then. If you have little existing work, EORA starts from your goal and helps you build a foundation — with beginner-friendly steps that create your first real pieces of evidence.",
-    delay: 240,
+    q: "How long does onboarding take, and do I have to finish all 11 steps at once?",
+    a: "Onboarding takes approximately 3 to 5 minutes. You can pause or close the browser at any time—our optimistic locking and draft persistence automatically resume your progress right where you left off.",
   },
 ];
 
-/* ============================================================
-   MAIN COMPONENT
-   ============================================================ */
 export function Landing({ user }: LandingProps) {
-  // DOM References
-  const navRef          = useRef<HTMLElement>(null);
-  const fabRef          = useRef<HTMLButtonElement>(null);
-  const heroSpotRef     = useRef<HTMLDivElement>(null);
-  const eoraContRef     = useRef<HTMLDivElement>(null);
-  const eoraCoreRef     = useRef<HTMLDivElement>(null);
-  const eoraBubbleRef   = useRef<HTMLDivElement>(null);
-  const eoraTextRef     = useRef<HTMLSpanElement>(null);
-  const pupilRefs       = useRef<HTMLSpanElement[]>([]);
-  const neuralCanvasRef = useRef<HTMLCanvasElement>(null);
-  const chatLogRef      = useRef<HTMLDivElement>(null);
-  const chatShellRef    = useRef<HTMLDivElement>(null);
-  const sgRef           = useRef<SVGSVGElement>(null);
-  const dashTabsRef     = useRef<HTMLDivElement>(null);
+  // Storytelling sequence state (Phase A: 0 to 75 seconds)
+  const [storyActive, setStoryActive] = useState(false);
+  const [storyTime, setStoryTime] = useState(0); // in seconds
+  const [storyPlaying, setStoryPlaying] = useState(true);
+  const storyRafRef = useRef<number>(0);
+  const lastTimestampRef = useRef<number>(0);
 
-  // State refs
-  const eoraIndexRef     = useRef(-1);
-  const bubbleTimerRef   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const chatPlayedRef    = useRef(false);
-  const navOpenRef       = useRef(false);
-  const neuralRunningRef = useRef(true);
-  const neuralRafRef     = useRef<number>(0);
-  const neuralFrameRef   = useRef(0);
-  const neuralNodesRef   = useRef<NeuralNode[]>([]);
-  const neuralPulsesRef  = useRef<NeuralPulse[]>([]);
-  const [activeChip, setActiveChip] = useState<number | null>(null);
+  // Phase B interactive hero state
+  const [activePersona, setActivePersona] = useState<PersonaType>("builder");
+  const [previewTab, setPreviewTab] = useState<PreviewTabId>("profile");
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  /* ── EORA SPEECH BUBBLE & MOOD ── */
-  const showBubble = useCallback((text: string) => {
-    if (!eoraTextRef.current || !eoraBubbleRef.current) return;
-    eoraTextRef.current.textContent = text;
-    eoraBubbleRef.current.classList.add("show");
-    clearTimeout(bubbleTimerRef.current);
-    bubbleTimerRef.current = setTimeout(() => {
-      eoraBubbleRef.current?.classList.remove("show");
-    }, 7500);
-  }, []);
-
-  const setMood = useCallback((mood: string) => {
-    if (!eoraCoreRef.current) return;
-    eoraCoreRef.current.dataset.mood = mood;
-    setTimeout(() => {
-      if (eoraCoreRef.current) eoraCoreRef.current.dataset.mood = "happy";
-    }, 1800);
-  }, []);
-
-  const cycleEora = useCallback((i?: number) => {
-    const next = i !== undefined ? i : (eoraIndexRef.current + 1) % EORA_LINES.length;
-    eoraIndexRef.current = next;
-    const moods = ["happy", "think", "wow"];
-    setMood(moods[next % 3]);
-    showBubble(EORA_LINES[next]);
-    setActiveChip(next);
-  }, [setMood, showBubble]);
-
-  /* ── NEURAL BACKGROUND CANVAS ── */
-  const buildNeural = useCallback((W: number, H: number) => {
-    const count = Math.max(20, Math.min(48, Math.round(W / 30)));
-    neuralNodesRef.current = Array.from({ length: count }, () => ({
-      x: Math.random() * W,
-      y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.2,
-      vy: (Math.random() - 0.5) * 0.2,
-      r: 1.2 + Math.random() * 1.5,
-    }));
-    neuralPulsesRef.current = [];
-  }, []);
-
-  const spawnPulse = useCallback(() => {
-    const nodes = neuralNodesRef.current;
-    const pulses = neuralPulsesRef.current;
-    if (nodes.length < 2 || pulses.length > 6) return;
-    const a = Math.floor(Math.random() * nodes.length);
-    let b = Math.floor(Math.random() * nodes.length);
-    if (b === a) b = (b + 1) % nodes.length;
-    pulses.push({ a, b, t: 0, speed: 0.007 + Math.random() * 0.01 });
-  }, []);
-
-  const drawNeural = useCallback(() => {
-    const canvas = neuralCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
-    const W = canvas.width / DPR;
-    const H = canvas.height / DPR;
-    const nodes = neuralNodesRef.current;
-    const pulses = neuralPulsesRef.current;
-    const frame = neuralFrameRef.current;
-
-    ctx.clearRect(0, 0, W, H);
-
-    // Draw connecting lines
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const dx = nodes[i].x - nodes[j].x;
-        const dy = nodes[i].y - nodes[j].y;
-        const d = Math.hypot(dx, dy);
-        if (d < 155) {
-          ctx.strokeStyle = `rgba(196,138,90,${(1 - d / 155) * 0.22})`;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(nodes[i].x, nodes[i].y);
-          ctx.lineTo(nodes[j].x, nodes[j].y);
-          ctx.stroke();
-        }
-      }
-    }
-
-    // Draw node particles
-    for (const n of nodes) {
-      n.x += n.vx;
-      n.y += n.vy;
-      if (n.x < 0 || n.x > W) n.vx *= -1;
-      if (n.y < 0 || n.y > H) n.vy *= -1;
-      n.x = Math.max(0, Math.min(W, n.x));
-      n.y = Math.max(0, Math.min(H, n.y));
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(196,138,90,${0.45 + Math.sin((frame + n.x) * 0.02) * 0.22})`;
-      ctx.shadowBlur = 9;
-      ctx.shadowColor = "rgba(196,138,90,.9)";
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
-
-    // Spawn pulses
-    if (frame % 55 === 0) spawnPulse();
-
-    // Draw data pulses
-    for (let k = pulses.length - 1; k >= 0; k--) {
-      const p = pulses[k];
-      const A = nodes[p.a];
-      const B = nodes[p.b];
-      if (!A || !B) {
-        pulses.splice(k, 1);
-        continue;
-      }
-      p.t += p.speed;
-      if (p.t >= 1) {
-        pulses.splice(k, 1);
-        continue;
-      }
-      const x = A.x + (B.x - A.x) * p.t;
-      const y = A.y + (B.y - A.y) * p.t;
-      const grd = ctx.createRadialGradient(x, y, 0, x, y, 9);
-      grd.addColorStop(0, "rgba(255,240,215,.95)");
-      grd.addColorStop(1, "rgba(196,138,90,0)");
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(x, y, 9, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    neuralFrameRef.current++;
-    if (neuralRunningRef.current) {
-      neuralRafRef.current = requestAnimationFrame(drawNeural);
-    }
-  }, [spawnPulse]);
-
-  const resizeNeural = useCallback(() => {
-    const canvas = neuralCanvasRef.current;
-    if (!canvas) return;
-    const DPR = Math.min(window.devicePixelRatio || 1, 2);
-    const r = canvas.getBoundingClientRect();
-    canvas.width = r.width * DPR;
-    canvas.height = r.height * DPR;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    buildNeural(r.width, r.height);
-  }, [buildNeural]);
-
-  /* ── CHAT PLAYBACK SCRIPT ── */
-  const playChatScript = useCallback(async () => {
-    if (chatPlayedRef.current || !chatLogRef.current) return;
-    chatPlayedRef.current = true;
-    const log = chatLogRef.current;
-    const rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, rm ? 0 : ms));
-
-    const addMsg = (msg: { who: string; text: string }) => {
-      const div = document.createElement("div");
-      div.className = "msg " + msg.who;
-      div.textContent = msg.text;
-      log.appendChild(div);
-      requestAnimationFrame(() => div.classList.add("show"));
-      log.scrollTop = log.scrollHeight;
-    };
-
-    const typingInd = () => {
-      const div = document.createElement("div");
-      div.className = "msg ai show";
-      div.innerHTML = '<div class="typing"><i></i><i></i><i></i></div>';
-      log.appendChild(div);
-      log.scrollTop = log.scrollHeight;
-      return div;
-    };
-
-    for (const msg of CHAT_SCRIPT) {
-      if (msg.who === "ai") {
-        const t = typingInd();
-        await wait(780);
-        t.remove();
-      }
-      addMsg(msg);
-      await wait(msg.who === "ai" ? 1100 : 800);
-    }
-  }, []);
-
-  /* ── SKILLS GRAPH RENDER & INTERACTION ── */
-  const buildSkillGraph = useCallback(() => {
-    const svg = sgRef.current;
-    if (!svg) return;
-    const NS = "http://www.w3.org/2000/svg";
-    const edgesG = svg.querySelector("#sgEdges") as SVGGElement | null;
-    const nodesG = svg.querySelector("#sgNodes") as SVGGElement | null;
-    if (!edgesG || !nodesG) return;
-
-    edgesG.innerHTML = "";
-    nodesG.innerHTML = "";
-
-    const byId = Object.fromEntries(SKILL_NODES.map((n) => [n.id, n]));
-    const edgeEls: SVGLineElement[] = [];
-    const nodeEls: Array<{ el: SVGGElement; data: (typeof SKILL_NODES)[0] }> = [];
-
-    SKILL_EDGES.forEach(([a, b]) => {
-      const A = byId[a];
-      const B = byId[b];
-      if (!A || !B) return;
-      const line = document.createElementNS(NS, "line") as SVGLineElement;
-      line.setAttribute("x1", String(A.x));
-      line.setAttribute("y1", String(A.y));
-      line.setAttribute("x2", String(B.x));
-      line.setAttribute("y2", String(B.y));
-      line.setAttribute("class", "sg-edge");
-      line.dataset.a = a;
-      line.dataset.b = b;
-      edgesG.appendChild(line);
-      edgeEls.push(line);
-    });
-
-    SKILL_NODES.forEach((n) => {
-      const g = document.createElementNS(NS, "g") as SVGGElement;
-      g.setAttribute("class", "sg-node" + (n.main ? " sg-main" : ""));
-      g.dataset.id = n.id;
-      g.style.transition = "opacity .4s ease";
-
-      const c = document.createElementNS(NS, "circle");
-      c.setAttribute("cx", String(n.x));
-      c.setAttribute("cy", String(n.y));
-      c.setAttribute("r", String(n.r));
-      c.setAttribute("fill", n.main ? "url(#sgMain)" : "url(#sgNode)");
-      c.setAttribute("stroke", n.color);
-      c.setAttribute("stroke-width", n.main ? "2" : "1.3");
-      c.setAttribute("opacity", n.main ? "1" : ".9");
-
-      const t = document.createElementNS(NS, "text");
-      t.setAttribute("x", String(n.x));
-      t.setAttribute("text-anchor", "middle");
-      if (n.fontSize) {
-        t.style.fontSize = `${n.fontSize}px`;
-      }
-
-      const lines = n.lines || [n.label];
-      const lineHeight = (n.fontSize || 12) * 1.25;
-      const totalH = (lines.length - 1) * lineHeight;
-      const startY = n.y - totalH / 2;
-
-      lines.forEach((lineText, idx) => {
-        const tspan = document.createElementNS(NS, "tspan");
-        tspan.setAttribute("x", String(n.x));
-        tspan.setAttribute("y", String(startY + idx * lineHeight));
-        tspan.setAttribute("dominant-baseline", "central");
-        tspan.textContent = lineText;
-        t.appendChild(tspan);
-      });
-
-      g.appendChild(c);
-      g.appendChild(t);
-      nodesG.appendChild(g);
-      nodeEls.push({ el: g, data: n });
-    });
-
-    const highlight = (id: string) => {
-      edgeEls.forEach((l) => {
-        const hot = l.dataset.a === id || l.dataset.b === id;
-        l.classList.toggle("hot", hot);
-        l.style.opacity = hot ? "1" : ".12";
-      });
-      nodeEls.forEach(({ el, data }) => {
-        const rel =
-          data.id === id ||
-          SKILL_EDGES.some(
-            ([a, b]) => (a === id && b === data.id) || (b === id && a === data.id)
-          );
-        el.style.opacity = rel ? "1" : ".22";
-      });
-    };
-
-    const reset = () => {
-      edgeEls.forEach((l) => {
-        l.classList.remove("hot");
-        l.style.opacity = "";
-      });
-      nodeEls.forEach(({ el }) => {
-        el.style.opacity = "";
-      });
-    };
-
-    nodeEls.forEach(({ el, data }) => {
-      el.addEventListener("mouseenter", () => highlight(data.id));
-      el.addEventListener("mouseleave", reset);
-      el.addEventListener("click", () => highlight(data.id));
-    });
-  }, []);
-
-  /* ── DASHBOARD TABS SWITCHING ── */
-  const switchTab = useCallback((i: number) => {
-    document.querySelectorAll<HTMLElement>(".tab[data-tab]").forEach((t) =>
-      t.classList.toggle("active", +(t.dataset.tab ?? 0) === i)
-    );
-    document.querySelectorAll<HTMLElement>(".panel[data-panel]").forEach((p) =>
-      p.classList.toggle("active", +(p.dataset.panel ?? 0) === i)
-    );
-    const title = document.getElementById("dashTitle");
-    const sub = document.getElementById("dashSub");
-    if (title && DASH_META[i]) title.textContent = DASH_META[i][0];
-    if (sub && DASH_META[i]) sub.textContent = DASH_META[i][1];
-
-    document.querySelectorAll<HTMLElement>(".panel.active .bar").forEach((b, idx) => {
-      b.style.animation = "none";
-      void b.offsetWidth;
-      b.style.animation = `grow .9s var(--ease-premium) ${idx * 0.06}s both`;
-    });
-  }, []);
-
-  /* ── LIFECYCLE ATTACHMENTS ── */
+  // Initialize or check if user has skipped intro before, with reduced-motion preference check
   useEffect(() => {
-    const rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const isTouch = window.matchMedia("(hover: none)").matches;
+    const prefersReduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) {
+      setStoryActive(false);
+      return;
+    }
+    const viewed = typeof window !== "undefined" ? sessionStorage.getItem("aitathastu_story_viewed") : "true";
+    if (!viewed && !user) {
+      setStoryActive(true);
+      sessionStorage.setItem("aitathastu_story_viewed", "true");
+    }
+  }, [user]);
 
-    // Nav scroll style toggle
-    const onScrollNav = () => {
-      navRef.current?.classList.toggle("scrolled", window.scrollY > 24);
-    };
-    onScrollNav();
-    window.addEventListener("scroll", onScrollNav, { passive: true });
-
-    // Back to top FAB
-    const fab = fabRef.current;
-    const onScrollFab = () => {
-      fab?.classList.toggle("show", window.scrollY > 640);
-    };
-    onScrollFab();
-    window.addEventListener("scroll", onScrollFab, { passive: true });
-    const fabClick = () => window.scrollTo({ top: 0, behavior: rm ? "auto" : "smooth" });
-    fab?.addEventListener("click", fabClick);
-
-    // Button ripple effect
-    const onDocClick = (e: MouseEvent) => {
-      if (rm) return;
-      const btn = (e.target as Element).closest(".btn");
-      if (!btn) return;
-      const r = btn.getBoundingClientRect();
-      const size = Math.max(r.width, r.height) * 2;
-      const rip = document.createElement("span");
-      rip.className = "btn-ripple";
-      rip.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
-      btn.appendChild(rip);
-      setTimeout(() => rip.remove(), 780);
-    };
-    document.addEventListener("click", onDocClick);
-
-    // FAQ Accordion
-    const onFaqClick = (e: MouseEvent) => {
-      const q = (e.target as Element).closest(".faq-q");
-      if (!q) return;
-      const item = q.closest(".faq-item") as HTMLElement | null;
-      if (!item) return;
-      const a = item.querySelector(".faq-a") as HTMLElement | null;
-      const isOpen = item.classList.contains("open");
-
-      document.querySelectorAll<HTMLElement>(".faq-item").forEach((other) => {
-        other.classList.remove("open");
-        const oa = other.querySelector(".faq-a") as HTMLElement | null;
-        if (oa) oa.style.maxHeight = "";
-      });
-
-      if (!isOpen && a) {
-        item.classList.add("open");
-        a.style.maxHeight = a.scrollHeight + "px";
+  // Keyboard controls for storytelling (Escape to skip) and Mobile Menu (Escape to close)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (storyActive) {
+          setStoryActive(false);
+          sessionStorage.setItem("aitathastu_story_viewed", "true");
+        }
+        if (mobileMenuOpen) {
+          setMobileMenuOpen(false);
+        }
       }
     };
-    document.addEventListener("click", onFaqClick);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [storyActive, mobileMenuOpen]);
 
-    // Hero cursor spotlight
-    const heroEl = document.getElementById("home");
-    const onHeroMouse = (e: MouseEvent) => {
-      const spot = heroSpotRef.current;
-      if (!spot || !heroEl) return;
-      const r = heroEl.getBoundingClientRect();
-      spot.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
-      spot.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
-    };
-    if (!isTouch && heroEl) {
-      heroEl.addEventListener("mousemove", onHeroMouse as EventListener);
-    }
+  // Cinematic 75s animation ticker
+  useEffect(() => {
+    if (!storyActive || !storyPlaying) return;
 
-    // Parallax on EORA orb
-    let ticking = false;
-    const onScrollPar = () => {
-      if (ticking || rm) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const y = window.scrollY;
-        const eoraCont = eoraContRef.current;
-        if (eoraCont && y < window.innerHeight * 1.2) {
-          eoraCont.style.transform = `translateY(${y * 0.06}px)`;
+    const tick = (timestamp: number) => {
+      if (!lastTimestampRef.current) lastTimestampRef.current = timestamp;
+      const delta = (timestamp - lastTimestampRef.current) / 1000;
+      lastTimestampRef.current = timestamp;
+
+      setStoryTime((prev) => {
+        const next = prev + delta;
+        if (next >= 75) {
+          setStoryActive(false);
+          return 75;
         }
-        ticking = false;
+        return next;
       });
+
+      storyRafRef.current = requestAnimationFrame(tick);
     };
-    if (!rm) window.addEventListener("scroll", onScrollPar, { passive: true });
 
-    // Eye pupil tracking
-    const onMouseEye = (e: MouseEvent) => {
-      const core = eoraCoreRef.current;
-      if (!core) return;
-      const r = core.getBoundingClientRect();
-      const dx = Math.max(-1, Math.min(1, (e.clientX - r.left - r.width / 2) / 260));
-      const dy = Math.max(-1, Math.min(1, (e.clientY - r.top - r.height / 2) / 260));
-      pupilRefs.current.forEach((p) => {
-        if (p) p.style.transform = `translate(${dx * 4}px,${dy * 4}px)`;
-      });
-    };
-    if (!rm && !isTouch) window.addEventListener("mousemove", onMouseEye, { passive: true });
+    lastTimestampRef.current = performance.now();
+    storyRafRef.current = requestAnimationFrame(tick);
 
-    // 3D orb perspective tilt
-    const eoraCont = eoraContRef.current;
-    const onEoraMove = (e: MouseEvent) => {
-      const core = eoraCoreRef.current;
-      if (!core || !eoraCont) return;
-      const r = eoraCont.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - 0.5;
-      const y = (e.clientY - r.top) / r.height - 0.5;
-      core.style.transform = `rotateY(${x * 18}deg) rotateX(${-y * 18}deg) scale(1.04)`;
-    };
-    const onEoraLeave = () => {
-      if (eoraCoreRef.current) eoraCoreRef.current.style.transform = "";
-    };
-    if (!rm && !isTouch && eoraCont) {
-      eoraCont.addEventListener("mousemove", onEoraMove as EventListener);
-      eoraCont.addEventListener("mouseleave", onEoraLeave);
-    }
-
-    // Initial EORA bubble message
-    const bubbleT = setTimeout(
-      () => showBubble("Hi — I'm EORA. Tap me or pick a question to explore."),
-      1400
-    );
-
-    // Magnetic buttons
-    const magneticEls = document.querySelectorAll<HTMLElement>("[data-magnetic]");
-    const magCleanups: (() => void)[] = [];
-    if (!rm && !isTouch) {
-      magneticEls.forEach((el) => {
-        const onMove = (e: MouseEvent) => {
-          const r = el.getBoundingClientRect();
-          const x = (e.clientX - r.left - r.width / 2) / r.width;
-          const y = (e.clientY - r.top - r.height / 2) / r.height;
-          el.style.transform = `translate(${x * 8}px,${y * 6}px)`;
-        };
-        const onLeave = () => {
-          el.style.transform = "";
-        };
-        el.addEventListener("mousemove", onMove);
-        el.addEventListener("mouseleave", onLeave);
-        magCleanups.push(() => {
-          el.removeEventListener("mousemove", onMove);
-          el.removeEventListener("mouseleave", onLeave);
-        });
-      });
-    }
-
-    // Card cursor glow coordinates
-    const fcards = document.querySelectorAll<HTMLElement>(".fcard");
-    const onCardMove = (e: MouseEvent) => {
-      const card = e.currentTarget as HTMLElement;
-      const r = card.getBoundingClientRect();
-      card.style.setProperty("--fx", `${((e.clientX - r.left) / r.width) * 100}%`);
-      card.style.setProperty("--fy", `${((e.clientY - r.top) / r.height) * 100}%`);
-    };
-    if (!rm && !isTouch) {
-      fcards.forEach((c) => c.addEventListener("mousemove", onCardMove as EventListener));
-    }
-
-    // IntersectionObserver scroll reveal
-    const revealObs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            e.target.classList.add("in");
-            revealObs.unobserve(e.target);
-          }
-        });
-      },
-      { threshold: 0.14, rootMargin: "0px 0px -8% 0px" }
-    );
-    document.querySelectorAll(".reveal").forEach((el) => revealObs.observe(el));
-
-    // Chat playback trigger observer
-    const chatShell = chatShellRef.current;
-    const chatObs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          playChatScript();
-          chatObs.disconnect();
-        }
-      },
-      { threshold: 0.35 }
-    );
-    if (chatShell) chatObs.observe(chatShell);
-
-    // Neural canvas initial setup & loop
-    resizeNeural();
-    const neuralObs = new IntersectionObserver(
-      ([e]) => {
-        neuralRunningRef.current = e.isIntersecting && !rm;
-        if (e.isIntersecting && !rm) {
-          cancelAnimationFrame(neuralRafRef.current);
-          neuralRafRef.current = requestAnimationFrame(drawNeural);
-        }
-      },
-      { threshold: 0 }
-    );
-    if (neuralCanvasRef.current) neuralObs.observe(neuralCanvasRef.current);
-    if (rm) {
-      drawNeural();
-      neuralRunningRef.current = false;
-    } else {
-      neuralRafRef.current = requestAnimationFrame(drawNeural);
-    }
-
-    let resizeT: ReturnType<typeof setTimeout>;
-    const onResize = () => {
-      clearTimeout(resizeT);
-      resizeT = setTimeout(resizeNeural, 180);
-    };
-    window.addEventListener("resize", onResize);
-
-    // Build skill graph
-    buildSkillGraph();
-
-    // Dash tabs delegation
-    const dashTabs = dashTabsRef.current;
-    const onTabClick = (e: MouseEvent) => {
-      const tab = (e.target as Element).closest<HTMLElement>(".tab[data-tab]");
-      if (tab) switchTab(+(tab.dataset.tab ?? 0));
-    };
-    dashTabs?.addEventListener("click", onTabClick);
-
-    // Cleanups
     return () => {
-      window.removeEventListener("scroll", onScrollNav);
-      window.removeEventListener("scroll", onScrollFab);
-      if (!rm) window.removeEventListener("scroll", onScrollPar);
-      document.removeEventListener("click", onDocClick);
-      document.removeEventListener("click", onFaqClick);
-      if (!isTouch && heroEl) heroEl.removeEventListener("mousemove", onHeroMouse as EventListener);
-      if (!rm && !isTouch) window.removeEventListener("mousemove", onMouseEye);
-      if (!rm && !isTouch && eoraCont) {
-        eoraCont.removeEventListener("mousemove", onEoraMove as EventListener);
-        eoraCont.removeEventListener("mouseleave", onEoraLeave);
-      }
-      fab?.removeEventListener("click", fabClick);
-      clearTimeout(bubbleT);
-      clearTimeout(bubbleTimerRef.current);
-      magCleanups.forEach((f) => f());
-      if (!rm && !isTouch) {
-        fcards.forEach((c) => c.removeEventListener("mousemove", onCardMove as EventListener));
-      }
-      revealObs.disconnect();
-      chatObs.disconnect();
-      neuralObs.disconnect();
-      cancelAnimationFrame(neuralRafRef.current);
-      window.removeEventListener("resize", onResize);
-      dashTabs?.removeEventListener("click", onTabClick);
+      cancelAnimationFrame(storyRafRef.current);
     };
-  }, [showBubble, resizeNeural, drawNeural, buildSkillGraph, switchTab, playChatScript]);
+  }, [storyActive, storyPlaying]);
 
-  const toggleNav = () => {
-    navOpenRef.current = !navOpenRef.current;
-    navRef.current?.classList.toggle("open", navOpenRef.current);
-    const burger = document.getElementById("burger");
-    if (burger) burger.setAttribute("aria-expanded", String(navOpenRef.current));
-  };
+  const handleSkipIntro = useCallback(() => {
+    setStoryActive(false);
+    sessionStorage.setItem("aitathastu_story_viewed", "true");
+  }, []);
 
-  const closeNav = () => {
-    navOpenRef.current = false;
-    navRef.current?.classList.remove("open");
-    const burger = document.getElementById("burger");
-    if (burger) burger.setAttribute("aria-expanded", "false");
+  const handleReplayIntro = useCallback(() => {
+    setStoryTime(0);
+    setStoryActive(true);
+    setStoryPlaying(true);
+  }, []);
+
+  // Format MM:SS
+  const formatStoryTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   return (
-    <>
+    <div className="relative min-h-dvh overflow-x-clip bg-[#F8F6F0] text-[#141413] selection:bg-[#D4AF37]/30 selection:text-[#141413]">
       {/* ============================================================
-          NAVIGATION
+          PHASE A: 75-SECOND CINEMATIC STORYTELLING OVERLAY
           ============================================================ */}
-      <header className="nav" id="nav" ref={navRef}>
-        <div className="wrap nav-inner">
-          <a href="#home" className="logo">
-            <span className="logo-mark"></span>
-            AI Tathastu
-          </a>
-          <nav className="nav-links">
-            <a href="#journey">Journey</a>
-            <a href="#learning">Learning</a>
-            <a href="#evidence">Evidence</a>
-            <a href="#projects">Projects</a>
-            <a href="#eora">EORA</a>
+      {storyActive && (
+        <section
+          aria-label="Storytelling experience"
+          className="fixed inset-0 z-50 flex flex-col justify-between overflow-hidden bg-[#F8F6F0] text-[#141413]"
+        >
+          {/* Top Bar: Progress & Skip Pill */}
+          <div className="relative z-20 flex items-center justify-between px-6 py-5 sm:px-10">
+            <div className="flex items-center gap-3">
+              <span className="size-2.5 rounded-full bg-[#D4AF37] animate-pulse" />
+              <span className="font-mono text-xs font-semibold uppercase tracking-widest text-[#5A5852]">
+                Genesis of AI Tathastu · {formatStoryTime(storyTime)} / 01:15
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setStoryPlaying((p) => !p)}
+                className="flex items-center gap-1.5 rounded-full border border-[#D4AF37]/30 bg-white/70 px-3 py-1.5 font-mono text-xs font-medium text-[#141413] backdrop-blur-md transition hover:bg-white"
+                aria-label={storyPlaying ? "Pause storytelling" : "Play storytelling"}
+              >
+                {storyPlaying ? <Pause size={14} /> : <Play size={14} />}
+                <span>{storyPlaying ? "Pause" : "Resume"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSkipIntro}
+                className="group flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-[#141413] px-4 py-1.5 font-sans text-xs font-semibold text-[#F8F6F0] shadow-md transition hover:bg-[#2B1D17]"
+              >
+                <span>Skip Intro</span>
+                <X size={14} className="transition-transform group-hover:rotate-90" />
+              </button>
+            </div>
+          </div>
+
+          {/* Center Cinematic Stage */}
+          <div className="relative flex flex-1 items-center justify-center px-6 text-center">
+            {/* 00:00 - 00:08: Act I - The Singularity & Big Bang */}
+            {storyTime < 8 && (
+              <div className="flex flex-col items-center animate-[fade-in_1s_ease-out]">
+                <div className="relative mb-8 size-8">
+                  <span className="absolute inset-0 size-8 animate-ping rounded-full bg-[#D4AF37]/50" />
+                  <span className="relative block size-8 rounded-full bg-[#D4AF37] shadow-[0_0_40px_#D4AF37]" />
+                </div>
+                <h2 className="font-editorial text-4xl sm:text-6xl italic font-normal tracking-tight text-[#141413]">
+                  In the beginning, your evidence was scattered.
+                </h2>
+                <p className="mt-4 font-mono text-xs uppercase tracking-widest text-[#5A5852]">
+                  00:00 — 00:08 · The Digital Singularity
+                </p>
+              </div>
+            )}
+
+            {/* 00:08 - 00:20: Act II - The Birth of Eiora */}
+            {storyTime >= 8 && storyTime < 20 && (
+              <div className="flex flex-col items-center animate-[fade-in_1s_ease-out]">
+                <div className="mb-6 scale-110">
+                  <EioraVisual state="speaking" size={200} interactive={false} />
+                </div>
+                <h2 className="max-w-2xl font-editorial text-3xl sm:text-5xl font-normal leading-tight text-[#141413]">
+                  &ldquo;Your digital footprint is scattered across a dozen worlds. Let’s bring your story home.&rdquo;
+                </h2>
+                <span className="mt-4 rounded-full border border-[#D4AF37]/35 bg-[#141413] px-3.5 py-1 font-mono text-2xs uppercase tracking-wider text-[#D4AF37]">
+                  Eiora · Living AI Companion
+                </span>
+              </div>
+            )}
+
+            {/* 00:20 - 00:38: Act III - Onboarding Preview */}
+            {storyTime >= 20 && storyTime < 38 && (
+              <div className="flex flex-col items-center max-w-3xl animate-[fade-in_1s_ease-out]">
+                <div className="mb-6 flex items-center gap-6">
+                  <EioraVisual state="extracting" size={140} interactive={false} />
+                  <div className="rounded-2xl border border-[#D4AF37]/30 bg-white/80 p-5 shadow-xl backdrop-blur-md text-left max-w-md">
+                    <div className="flex items-center gap-2 font-mono text-xs text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+                      <Sparkle size={16} /> Extraction in Flight
+                    </div>
+                    <p className="mt-1 font-sans text-sm text-[#141413] font-medium">
+                      Deconstructing CV, parsing GitHub commits, mapping LeetCode algorithms, and compiling ORCID citations…
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5 font-mono text-2xs text-[#5A5852]">
+                      <span className="rounded bg-[#FAF6F0] px-2 py-0.5 border border-[#EFECE6]">GitHub ✓</span>
+                      <span className="rounded bg-[#FAF6F0] px-2 py-0.5 border border-[#EFECE6]">LinkedIn ✓</span>
+                      <span className="rounded bg-[#FAF6F0] px-2 py-0.5 border border-[#EFECE6]">LeetCode ✓</span>
+                      <span className="rounded bg-[#FAF6F0] px-2 py-0.5 border border-[#EFECE6]">ORCID ✓</span>
+                    </div>
+                  </div>
+                </div>
+                <h3 className="font-editorial text-3xl sm:text-4xl text-[#141413]">
+                  No typing resume forms. Your work speaks for itself.
+                </h3>
+              </div>
+            )}
+
+            {/* 00:38 - 00:58: Act IV - The 5-World Ecosystem */}
+            {storyTime >= 38 && storyTime < 58 && (
+              <div className="flex flex-col items-center max-w-4xl animate-[fade-in_1s_ease-out]">
+                <p className="font-mono text-2xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold mb-2">
+                  Act IV · The 5-World Ecosystem
+                </p>
+                <h3 className="font-editorial text-3xl sm:text-5xl text-[#141413] mb-6">
+                  One Unified Universe. Five Specialized Spheres.
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full">
+                  {ECOSYSTEM_WORLDS.map((w) => {
+                    const Icon = w.icon;
+                    return (
+                      <div
+                        key={w.id}
+                        className="rounded-xl border border-[#D4AF37]/25 bg-white/70 p-3.5 backdrop-blur-md shadow-sm transition hover:scale-105"
+                      >
+                        <div
+                          className="size-8 rounded-lg flex items-center justify-center mb-2 mx-auto"
+                          style={{ backgroundColor: `${w.color}20`, color: w.color }}
+                        >
+                          <Icon size={18} weight="bold" />
+                        </div>
+                        <h4 className="font-editorial text-lg font-bold text-[#141413]">{w.name}</h4>
+                        <p className="text-2xs text-[#5A5852] mt-0.5 line-clamp-2">{w.tagline}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 00:58 - 01:15: Act V - The Synthesis */}
+            {storyTime >= 58 && (
+              <div className="flex flex-col items-center max-w-2xl animate-[fade-in_1s_ease-out]">
+                <div className="mb-4">
+                  <EioraVisual state="idle" size={130} interactive={false} />
+                </div>
+                <h2 className="font-editorial text-4xl sm:text-6xl text-[#141413] leading-tight">
+                  Your journey is ready to begin.
+                </h2>
+                <p className="mt-3 text-sm sm:text-base text-[#5A5852] max-w-lg">
+                  Welcome to the honest intelligence platform where your true capabilities are verified, celebrated, and elevated.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handleSkipIntro}
+                    className="flex items-center gap-2 rounded-full bg-[#141413] px-6 py-3 font-sans text-sm font-semibold text-[#F8F6F0] shadow-xl transition hover:bg-[#2B1D17]"
+                  >
+                    Enter Platform Now <ArrowRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Progress Track */}
+          <div className="relative z-20 w-full px-6 pb-6 sm:px-10">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#EFECE6]">
+              <div
+                className="h-full bg-gradient-to-r from-[#D4AF37] via-[#E05A47] to-[#4CD3E3] transition-all duration-300"
+                style={{ width: `${(storyTime / 75) * 100}%` }}
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ============================================================
+          PHASE B: POST-STORYTELLING SCROLLABLE LANDING PAGE
+          ============================================================ */}
+
+      {/* 1. ARCHITECTURAL HEADER & RESPONSIVE NAVIGATION */}
+      <header className="sticky top-0 z-40 border-b border-[#D4AF37]/15 bg-[#F8F6F0]/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-2 group shrink min-w-0">
+            <div className="size-8 rounded-lg bg-[#141413] flex items-center justify-center text-[#D4AF37] font-editorial text-lg font-bold group-hover:scale-105 transition-transform shadow-xs shrink-0">
+              AT
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-editorial text-lg sm:text-xl font-bold tracking-tight text-[#141413] truncate">
+                AI Tathastu
+              </span>
+              <span className="hidden sm:inline-block font-mono text-3xs uppercase tracking-widest text-[#5A5852] -mt-1 truncate">
+                Warm Editorial Futurism
+              </span>
+            </div>
+          </Link>
+
+          {/* Desktop Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-6 font-sans text-sm font-medium text-[#5A5852]">
+            <a href="#ecosystem" className="hover:text-[#141413] transition-colors">Ecosystem</a>
+            <a href="#preview" className="hover:text-[#141413] transition-colors">Product Preview</a>
+            <a href="#visualizer" className="hover:text-[#141413] transition-colors">Skill Graph</a>
+            <a href="#how-it-works" className="hover:text-[#141413] transition-colors">How It Works</a>
+            <a href="#proof" className="hover:text-[#141413] transition-colors">Wall of Proof</a>
+            <a href="#faq" className="hover:text-[#141413] transition-colors">FAQ</a>
+            <button
+              type="button"
+              onClick={handleReplayIntro}
+              className="text-xs font-mono uppercase tracking-wider text-[#D4AF37] hover:underline"
+            >
+              Replay Intro ✦
+            </button>
           </nav>
-          <div className="nav-actions">
+
+          {/* Action CTAs + Mobile Menu Toggle */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <ThemeToggle compact />
             {user ? (
-              <>
-                <Link href="/start" className="nav-signin">
-                  {user.displayName ? `Hi, ${user.displayName.split(" ")[0]}` : "Workspace"}
-                </Link>
-                <Link href="/start" className="btn btn-primary btn-sm" data-magnetic>
-                  Go to Dashboard
-                </Link>
-              </>
+              <Link
+                href="/student"
+                className="flex items-center gap-1.5 rounded-full bg-[#141413] px-3.5 py-1.5 sm:px-4 sm:py-2 font-sans text-xs font-semibold text-[#F8F6F0] shadow-sm hover:bg-[#2B1D17] transition"
+              >
+                <span>Dashboard ({user.displayName?.split(" ")[0] || "Active"})</span>
+                <ArrowRight size={14} />
+              </Link>
             ) : (
               <>
-                <Link href="/sign-in" className="nav-signin">
+                <Link
+                  href="/sign-in"
+                  className="hidden sm:inline-block font-sans text-xs font-semibold text-[#141413] hover:text-[#D4AF37] transition px-2"
+                >
                   Sign In
                 </Link>
-                <Link href="/onboarding" className="btn btn-primary btn-sm" data-magnetic>
-                  Get Started
+                <Link
+                  href="/onboarding"
+                  className="hidden sm:flex items-center gap-1.5 rounded-full border border-[#D4AF37]/40 bg-[#141413] px-3.5 py-1.5 sm:px-4 sm:py-2 font-sans text-xs font-semibold text-[#F8F6F0] shadow-md hover:bg-[#2B1D17] transition"
+                >
+                  <span>Initialize Profile</span>
+                  <ArrowRight size={14} />
                 </Link>
               </>
             )}
-          </div>
-          <button
-            className="burger"
-            id="burger"
-            aria-label="Menu"
-            aria-expanded="false"
-            onClick={toggleNav}
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-        </div>
-        <div className="mobile-menu" id="mobileMenu">
-          <div className="flex items-center justify-between py-2 border-b border-border-subtle mb-2">
-            <span className="text-xs font-mono uppercase tracking-widest text-text-muted">Theme</span>
-            <ThemeToggle />
-          </div>
-          <a href="#journey" onClick={closeNav}>Journey</a>
-          <a href="#learning" onClick={closeNav}>Learning</a>
-          <a href="#evidence" onClick={closeNav}>Evidence</a>
-          <a href="#projects" onClick={closeNav}>Projects</a>
-          <a href="#eora" onClick={closeNav}>EORA</a>
-          {user ? (
-            <>
-              <Link href="/start" onClick={closeNav}>
-                Workspace ({user.displayName || "Active"})
-              </Link>
-              <Link href="/start" className="btn btn-primary" onClick={closeNav}>
-                Go to Dashboard
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/sign-in" onClick={closeNav}>Sign In</Link>
-              <Link href="/onboarding" className="btn btn-primary" onClick={closeNav}>
-                Get Started
-              </Link>
-            </>
-          )}
-        </div>
-      </header>
 
-      {/* ============================================================
-          SKIP LINK (UX-004)
-          ============================================================ */}
-      <a
-        href="#main-content"
-        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-4 focus-visible:left-4 focus-visible:z-[9999] focus-visible:px-4 focus-visible:py-2 focus-visible:rounded-md focus-visible:bg-background-primary focus-visible:text-foreground-primary focus-visible:border focus-visible:border-focus-ring focus-visible:outline-none focus-visible:text-sm focus-visible:font-semibold"
-      >
-        Skip to main content
-      </a>
-
-      {/* ============================================================
-          HERO — Kinetic word split & 3D Interactive EORA
-          ============================================================ */}
-      <section className="hero" id="home">
-        <a id="main-content" tabIndex={-1} className="sr-only" aria-hidden="true" />
-        <div className="hero-spot" id="heroSpot" ref={heroSpotRef}></div>
-        <div className="wrap hero-grid">
-          <div className="hero-copy">
-            <h1>
-              <span className="line split line-1">
-                <span className="w">
-                  <span className="wi" style={{ animationDelay: "0.000s" }}>You</span>
-                </span>{" "}
-                <span className="w">
-                  <span className="wi" style={{ animationDelay: "0.090s" }}>imagine.</span>
-                </span>
-              </span>
-              <span className="line split line-2">
-                <span className="w">
-                  <span className="wi grad-warm" style={{ animationDelay: "0.120s" }}>AI</span>
-                </span>{" "}
-                <span className="w">
-                  <span className="wi grad-warm" style={{ animationDelay: "0.210s" }}>makes</span>
-                </span>{" "}
-                <span className="w">
-                  <span className="wi grad-warm" style={{ animationDelay: "0.300s" }}>it</span>
-                </span>{" "}
-                <span className="w">
-                  <span className="wi grad-warm" style={{ animationDelay: "0.390s" }}>happen.</span>
-                </span>
-              </span>
-            </h1>
-            <p className="lede">
-              Whatever you dream of becoming, AI Tathastu helps you find your path.
-              Discover your strengths, learn what matters, build real-world skills,
-              and turn your potential into achievement — with AI by your side.
-            </p>
-            <div className="hero-cta">
-              <Link href={user ? "/start" : "/onboarding"} className="btn btn-primary btn-lg btn-pulse" data-magnetic>
-                {user ? "Continue Your Journey" : "Start Your Journey"}{" "}
-                <span className="arw">→</span>
-              </Link>
-              <a href="#journey" className="btn btn-ghost btn-lg" data-magnetic>
-                See How It Works
-              </a>
-            </div>
-            <div className="hero-support">
-              <i></i> Meet EORA, your personal AI guide.
-            </div>
-          </div>
-
-          <div className="eora" id="eoraOrb" ref={eoraContRef}>
-            <div className="eora-glow"></div>
-            <div className="ring r1"></div>
-            <div className="ring r2"></div>
-            <div className="ring r3"></div>
-
-            <div
-              className="eora-core"
-              id="eoraCore"
-              ref={eoraCoreRef}
-              data-mood="happy"
-              role="button"
-              tabIndex={0}
-              aria-label="Talk to EORA"
-              onClick={() => cycleEora()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  cycleEora();
-                }
-              }}
+            {/* Mobile Hamburger Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              className="lg:hidden flex items-center justify-center size-9 rounded-lg border border-[#D4AF37]/30 bg-white/70 text-[#141413] hover:bg-white transition"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav-drawer"
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             >
-              <div className="eora-face">
-                <div className="eyes">
-                  <div className="eye">
-                    <span
-                      className="pupil"
-                      ref={(el) => {
-                        if (el) pupilRefs.current[0] = el;
-                      }}
-                    ></span>
-                  </div>
-                  <div className="eye">
-                    <span
-                      className="pupil"
-                      ref={(el) => {
-                        if (el) pupilRefs.current[1] = el;
-                      }}
-                    ></span>
-                  </div>
-                </div>
-                <div className="mouth"></div>
-              </div>
-            </div>
-
-            <div className="eora-bubble" id="eoraBubble" ref={eoraBubbleRef}>
-              <span className="who">EORA</span>
-              <span id="eoraText" ref={eoraTextRef}>
-                Hi — I&apos;m EORA. Tell me what you want to become.
-              </span>
-            </div>
-
-            <div className="eora-chips" id="eoraChips">
-              <button
-                className={`chip${activeChip === 0 ? " active" : ""}`}
-                data-i="0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  cycleEora(0);
-                }}
-              >
-                How do I start?
-              </button>
-              <button
-                className={`chip${activeChip === 1 ? " active" : ""}`}
-                data-i="1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  cycleEora(1);
-                }}
-              >
-                What can I build?
-              </button>
-              <button
-                className={`chip${activeChip === 2 ? " active" : ""}`}
-                data-i="2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  cycleEora(2);
-                }}
-              >
-                Where am I headed?
-              </button>
-              <button
-                className="chip"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEoraChat("Hi EORA! What can you help me with?");
-                }}
-                title="Open live EORA chat"
-              >
-                Ask EORA live ✦
-              </button>
-            </div>
+              {mobileMenuOpen ? <X size={20} /> : <List size={20} />}
+            </button>
           </div>
         </div>
 
-        <div className="scroll-cue">
-          <span>Scroll</span>
-          <div className="line-cue"></div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          HUMAN PROBLEM — Light Editorial
-          ============================================================ */}
-      <section className="section section--light">
-        <div className="wrap">
-          <div className="problem-grid">
-            <div className="problem-copy reveal">
-              <div className="label label--ink">Every journey begins somewhere</div>
-              <h2 className="h2">
-                Big dreams deserve more than <span className="grad-warm">generic advice.</span>
-              </h2>
-              <p className="lede">
-                You know where you want to go. But knowing what to learn, what to build,
-                and what comes next isn&apos;t always easy. Your journey should begin with
-                understanding you.
-              </p>
-            </div>
-
-            <div className="problem-visual reveal" style={{ "--d": "120ms" } as React.CSSProperties}>
-              <div className="pv-head"><i></i> The difference that matters</div>
-
-              <div className="pv-row generic">
-                <div className="pv-dot">→</div>
-                <div>
-                  <h5>Generic path</h5>
-                  <p>Same list of courses for everyone. No idea where you stand or what to do next.</p>
-                </div>
-              </div>
-
-              <div className="pv-row personal">
-                <div className="pv-dot">✦</div>
-                <div>
-                  <h5>A journey built around you</h5>
-                  <p>
-                    Starts with what you already know — then recommends the skills, projects and
-                    next steps that fit your goal.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          SOLUTION BAND — Dark with Neural Canvas
-          ============================================================ */}
-      <section className="solution-band">
-        <canvas id="neural" ref={neuralCanvasRef}></canvas>
-        <div className="wrap solution-inner">
-          <div className="section-head center reveal">
-            <h2 className="h2">
-              One ambition. A journey <span className="grad-intel">built around you.</span>
-            </h2>
-            <p className="lede">
-              Your goals, skills, projects, and progress belong together.
-              AI Tathastu helps connect the dots and guide your next step.
-            </p>
-          </div>
-
-          <div className="solution-points">
-            <div className="sp reveal">
-              <h4>Your goals, understood</h4>
-              <p>
-                Tell EORA what you want to become. The path is shaped around that ambition — not a fixed
-                curriculum.
-              </p>
-            </div>
-            <div className="sp reveal" style={{ "--d": "120ms" } as React.CSSProperties}>
-              <h4>Your skills, connected</h4>
-              <p>
-                Projects, learning, achievements and experience come together in one place you actually
-                own.
-              </p>
-            </div>
-            <div className="sp reveal" style={{ "--d": "240ms" } as React.CSSProperties}>
-              <h4>Your next step, clear</h4>
-              <p>
-                Not everything at once. Just the right thing to learn, build or review — then the one
-                after that.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          JOURNEY — Six Stages
-          ============================================================ */}
-      <section className="section section--tight section--journey" id="journey">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="label label--intel">From imagination to impact</div>
-            <h2 className="h2">
-              Every possibility begins with <span className="grad-intel">a first step.</span>
-            </h2>
-            <p className="lede">Six connected stages — each one informed by the one before it.</p>
-          </div>
-
-          <div className="journey">
-            {[
-              { n: "01", title: "Discover", body: "Explore what interests you and define where you want to go.", d: 0 },
-              { n: "02", title: "Analyze",  body: "Understand your strengths, available evidence, and learning gaps.", d: 90 },
-              { n: "03", title: "Learn",    body: "Build knowledge through personalized lessons, practice, and AI guidance.", d: 180 },
-              { n: "04", title: "Build",    body: "Turn what you learn into meaningful real-world projects.", d: 270 },
-              { n: "05", title: "Grow",     body: "Improve through feedback, research, mentorship, and collaboration.", d: 360 },
-              { n: "06", title: "Achieve",  body: "Use your skills and evidence to pursue meaningful opportunities.", d: 450 },
-            ].map((s) => (
-              <div key={s.n} className="j-step reveal" style={{ "--d": `${s.d}ms` } as React.CSSProperties}>
-                <div className="j-dot">{s.n}</div>
-                <h4>{s.title}</h4>
-                <p>{s.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          PERSONALIZED LEARNING — Warm Paper Feature Cards
-          ============================================================ */}
-      <section className="section section--warm" id="learning">
-        <div className="wrap">
-          <div className="section-head reveal">
-            <div className="label label--ink">Learning that adapts to you</div>
-            <h2 className="h2">
-              Not just lessons. Learning that <span className="grad-warm">understands you.</span>
-            </h2>
-            <p className="lede">
-              Start with what you know. Explore what you need. Learn through explanations,
-              hands-on activities, simulations, and practice designed around your progress.
-            </p>
-          </div>
-
-          <div className="features">
-            <div className="fcard span2 feature-lg reveal">
-              <div className="fico">🧠</div>
-              <h3>Personalized learning modules</h3>
-              <p>
-                Lessons built around your goals and current understanding — not a fixed sequence. EORA explains
-                the reasoning behind every recommendation, so you always know why you&apos;re learning something.
-              </p>
-              <div className="tags">
-                <span>AI/ML focused</span>
-                <span>Concept-first</span>
-                <span>Your pace</span>
-              </div>
-            </div>
-            <div className="fcard reveal" style={{ "--d": "100ms" } as React.CSSProperties}>
-              <div className="fico">🔎</div>
-              <h3>Concept understanding</h3>
-              <p>Explanations you can actually follow, tied back to what you already know.</p>
-            </div>
-            <div className="fcard reveal">
-              <div className="fico">🧪</div>
-              <h3>Practical exercises</h3>
-              <p>Short tasks that turn each concept into something you&apos;ve actually done.</p>
-            </div>
-            <div className="fcard reveal" style={{ "--d": "100ms" } as React.CSSProperties}>
-              <div className="fico">⚡</div>
-              <h3>Interactive simulations</h3>
-              <p>Explore ideas in a safe environment before applying them to a real project.</p>
-            </div>
-            <div className="fcard reveal" style={{ "--d": "200ms" } as React.CSSProperties}>
-              <div className="fico">✅</div>
-              <h3>Meaningful assessment</h3>
-              <p>Check understanding as you go — not one final exam at the end.</p>
-            </div>
-            <div className="fcard span2 reveal">
-              <div className="fico">📈</div>
-              <h3>Evidence-based progression</h3>
-              <p>
-                Your next lesson is informed by what you&apos;ve actually demonstrated — not by a fixed calendar. As
-                your understanding grows, so does the depth of what&apos;s unlocked.
-              </p>
-              <div className="tags">
-                <span>Adaptive path</span>
-                <span>Real progress</span>
-                <span>No filler</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          SKILLS & EVIDENCE — Obsidian Flow
-          ============================================================ */}
-      <section className="section section--evidence" id="evidence">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="label label--intel">Beyond the resume</div>
-            <h2 className="h2">
-              Your skills deserve <span className="grad-intel">proof, not just claims.</span>
-            </h2>
-            <p className="lede">
-              Bring together the projects, learning, achievements, and experience that
-              tell your story. Understand what&apos;s demonstrated, what&apos;s self-reported,
-              and what still needs verification.
-            </p>
-          </div>
-
-          <div className="flow">
-            <div className="flow-item reveal" style={{ "--d": "0ms" } as React.CSSProperties}>
-              <div className="flow-card">
-                <div className="src">Step 01</div>
-                <h4>Your work</h4>
-                <p>Projects, courses, papers, roles and activity from the places you already build.</p>
-              </div>
-            </div>
-            <div className="flow-item reveal" style={{ "--d": "120ms" } as React.CSSProperties}>
-              <div className="flow-card">
-                <div className="src">Step 02</div>
-                <h4>Your evidence</h4>
-                <p>
-                  Each claim is linked to the artifact that supports it — or clearly marked as self-reported.
-                </p>
-              </div>
-            </div>
-            <div className="flow-item reveal" style={{ "--d": "240ms" } as React.CSSProperties}>
-              <div className="flow-card">
-                <div className="src">Result</div>
-                <h4>Your skill profile</h4>
-                <p>A living record you own, that distinguishes claims from demonstrated skills.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="evidence-types reveal">
-            <span className="ev reported"><i></i> Self-reported</span>
-            <span className="ev demonstrated"><i></i> Demonstrated</span>
-            <span className="ev verified"><i></i> Reviewed / verified</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          SKILL GRAPH — Interactive SVG Network
-          ============================================================ */}
-      <section className="section section--graph">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="dark-note">Illustrative skill graph</div>
-            <h2 className="h2">
-              See how your skills <span className="grad-intel">connect.</span>
-            </h2>
-            <p className="lede">Hover any node to trace relationships and the evidence behind them.</p>
-          </div>
-
-          <div className="graph-shell reveal" style={{ "--d": "100ms" } as React.CSSProperties}>
-            <svg
-              id="skillGraph"
-              ref={sgRef}
-              viewBox="0 0 860 440"
-              preserveAspectRatio="xMidYMid meet"
-              aria-label="Illustrative skills graph"
-            >
-              <defs>
-                <linearGradient id="sgGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#C48A5A" />
-                  <stop offset="55%" stopColor="#C48A5A" />
-                  <stop offset="100%" stopColor="#E7D6C1" />
-                </linearGradient>
-                <radialGradient id="sgNode" cx="35%" cy="30%">
-                  <stop offset="0%" stopColor="#2C2621" />
-                  <stop offset="100%" stopColor="#2B1D17" />
-                </radialGradient>
-                <radialGradient id="sgMain" cx="35%" cy="30%">
-                  <stop offset="0%" stopColor="#3D332A" />
-                  <stop offset="100%" stopColor="rgba(107,74,58,0.3)" />
-                </radialGradient>
-              </defs>
-              <g id="sgEdges"></g>
-              <g id="sgNodes"></g>
-            </svg>
-          </div>
-
-          <div className="graph-legend reveal">
-            <span><i style={{ background: "#C48A5A" }}></i> Core area</span>
-            <span><i style={{ background: "#C48A5A" }}></i> Related skill</span>
-            <span><i style={{ background: "#E7D6C1" }}></i> Evidence node</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          PROJECTS — Light Section
-          ============================================================ */}
-      <section className="section section--light" id="projects">
-        <div className="wrap">
-          <div className="section-head reveal">
-            <div className="illustrative-note">Sample project directions</div>
-            <div className="label label--ink">Knowledge into action</div>
-            <h2 className="h2">
-              Don&apos;t just learn what&apos;s possible. <span className="grad-warm">Build it.</span>
-            </h2>
-            <p className="lede">
-              Apply what you&apos;ve learned to projects that challenge your thinking,
-              strengthen your skills, and give your work something tangible to show.
-            </p>
-          </div>
-
-          <div className="grid-3">
-            <div className="card reveal">
-              <div className="top">
-                <span className="badge">Computer Vision</span>
-                <span className="difficulty">Intermediate</span>
-              </div>
-              <h4>Vision Transformer from scratch</h4>
-              <p>
-                Implement patch embedding, multi-head attention and a full training loop without high-level
-                libraries.
-              </p>
-              <div className="tagline">
-                <span>PyTorch</span>
-                <span>Deep Learning</span>
-                <span>Research-ready</span>
-              </div>
-              <div className="foot">
-                <span>Builds: architecture intuition</span>
-              </div>
-            </div>
-            <div className="card reveal" style={{ "--d": "110ms" } as React.CSSProperties}>
-              <div className="top">
-                <span className="badge">NLP · Research</span>
-                <span className="difficulty">Advanced</span>
-              </div>
-              <h4>Retrieval-augmented assistant</h4>
-              <p>
-                Build a grounded question-answering system over a document collection, with citation-aware
-                responses.
-              </p>
-              <div className="tagline">
-                <span>LLMs</span>
-                <span>Vector DB</span>
-                <span>Publishable</span>
-              </div>
-              <div className="foot">
-                <span>Builds: applied research</span>
-              </div>
-            </div>
-            <div className="card reveal" style={{ "--d": "220ms" } as React.CSSProperties}>
-              <div className="top">
-                <span className="badge">MLOps</span>
-                <span className="difficulty">Advanced</span>
-              </div>
-              <h4>Model monitoring pipeline</h4>
-              <p>
-                Detect drift, alert on degradation, and trigger retraining — the infrastructure side of shipping
-                ML.
-              </p>
-              <div className="tagline">
-                <span>Docker</span>
-                <span>CI/CD</span>
-                <span>Production</span>
-              </div>
-              <div className="foot">
-                <span>Builds: production craft</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          EORA — Meet Your AI Companion
-          ============================================================ */}
-      <section className="section section--eora" id="eora">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="label">Meet your AI companion</div>
-            <h2 className="h2">
-              Meet the intelligence <span className="grad-warm">behind your journey.</span>
-            </h2>
-            <p className="lede">
-              Meet EORA. Your personal AI guide for understanding concepts, exploring
-              your next steps, and making progress when the path isn&apos;t clear.
-            </p>
-          </div>
-
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
           <div
-            className="chat-shell reveal"
-            style={{ "--d": "120ms" } as React.CSSProperties}
-            id="chatShell"
-            ref={chatShellRef}
+            id="mobile-nav-drawer"
+            className="lg:hidden border-t border-[#D4AF37]/20 bg-[#F8F6F0]/95 backdrop-blur-xl px-4 py-5 shadow-2xl animate-[fade-in_0.2s_ease-out]"
           >
-            <div className="chat-head">
-              <div className="chat-av"></div>
-              <div>
-                <div className="nm">EORA</div>
-                <div className="st"><i></i> Online · ready to help</div>
-              </div>
+            <nav className="flex flex-col space-y-3 font-sans text-sm font-medium text-[#141413]">
+              <a
+                href="#ecosystem"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-1.5 px-3 rounded-lg hover:bg-white/80 transition"
+              >
+                Ecosystem
+              </a>
+              <a
+                href="#preview"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-1.5 px-3 rounded-lg hover:bg-white/80 transition"
+              >
+                Product Experience Preview
+              </a>
+              <a
+                href="#visualizer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-1.5 px-3 rounded-lg hover:bg-white/80 transition"
+              >
+                Living Skill Graph
+              </a>
+              <a
+                href="#how-it-works"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-1.5 px-3 rounded-lg hover:bg-white/80 transition"
+              >
+                How It Works
+              </a>
+              <a
+                href="#proof"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-1.5 px-3 rounded-lg hover:bg-white/80 transition"
+              >
+                Wall of Proof
+              </a>
+              <a
+                href="#faq"
+                onClick={() => setMobileMenuOpen(false)}
+                className="py-1.5 px-3 rounded-lg hover:bg-white/80 transition"
+              >
+                Frequently Answered Questions
+              </a>
               <button
                 type="button"
-                className="preview-tag cursor-pointer hover:border-amber-400 hover:text-text-primary transition-colors"
-                onClick={() => openEoraChat("What are the best steps to start learning AI and ML?")}
-                title="Click to open interactive companion"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleReplayIntro();
+                }}
+                className="text-left py-1.5 px-3 rounded-lg text-xs font-mono uppercase tracking-wider text-[#D4AF37] hover:bg-white/80 transition"
               >
-                Illustrative preview ✦
+                Watch Genesis Sequence ✦
               </button>
+              {!user && (
+                <div className="pt-3 border-t border-[#EFECE6] flex flex-col gap-2">
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 rounded-lg border border-[#D4AF37]/30 bg-white font-semibold text-xs text-[#141413]"
+                  >
+                    Sign In to Existing Profile
+                  </Link>
+                  <Link
+                    href="/onboarding"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="w-full text-center py-2.5 rounded-lg bg-[#141413] text-[#F8F6F0] font-semibold text-xs shadow-md"
+                  >
+                    Initialize New Profile
+                  </Link>
+                </div>
+              )}
+            </nav>
+          </div>
+        )}
+      </header>
+
+      {/* 2. INTERACTIVE HERO WITH EIORA & LIVE PERSONA TOGGLES */}
+      <section id="eora-landing-hero" data-eora-id="eora-landing-hero" className="relative overflow-hidden pt-12 pb-16 sm:pt-20 sm:pb-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Persona Segmented Pill Switcher */}
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex rounded-full border border-[#D4AF37]/30 bg-white/80 p-1 shadow-sm backdrop-blur-md">
+              {(["builder", "researcher", "learner"] as PersonaType[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setActivePersona(p)}
+                  className={cn(
+                    "rounded-full px-4 py-1.5 font-sans text-xs font-semibold capitalize transition-all duration-200",
+                    activePersona === p
+                      ? "bg-[#141413] text-[#F8F6F0] shadow-sm"
+                      : "text-[#5A5852] hover:text-[#141413]"
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
-            <div className="chat-log" id="chatLog" ref={chatLogRef}></div>
+          </div>
+
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            {/* Left Column: Narrative Headline */}
+            <div className="lg:col-span-7 flex flex-col items-start text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 px-3.5 py-1 font-mono text-2xs uppercase tracking-wider text-[#D4AF37] font-semibold mb-4">
+                <Sparkle size={14} weight="fill" />
+                {PERSONA_CONFIG[activePersona].tag}
+              </div>
+
+              <h1 className="font-editorial text-4xl sm:text-6xl lg:text-7xl font-normal leading-[1.08] tracking-tight text-[#141413]">
+                {PERSONA_CONFIG[activePersona].headline}
+              </h1>
+
+              <p className="mt-5 text-base sm:text-lg text-[#5A5852] leading-relaxed max-w-2xl font-sans">
+                {PERSONA_CONFIG[activePersona].sub}
+              </p>
+
+              {/* Skills preview tags */}
+              <div className="mt-6 flex flex-wrap gap-2 items-center">
+                <span className="font-mono text-xs text-[#5A5852] mr-1">Signature Evidence:</span>
+                {PERSONA_CONFIG[activePersona].skills.map((s) => (
+                  <span
+                    key={s}
+                    className="rounded-md border border-[#D4AF37]/25 bg-white/70 px-2.5 py-1 font-mono text-xs font-medium text-[#141413] shadow-xs"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+
+              {/* CTA Action Bar */}
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Link
+                  id="eora-landing-cta"
+                  data-eora-id="eora-landing-cta"
+                  href={user ? "/student" : "/onboarding"}
+                  className="flex items-center gap-2 rounded-full bg-[#141413] px-7 py-3.5 font-sans text-sm font-semibold text-[#F8F6F0] shadow-lg hover:bg-[#2B1D17] transition hover:scale-[1.02] active:scale-95"
+                >
+                  <span>{user ? "Continue Your Journey" : "Initialize Your Profile"}</span>
+                  <ArrowRight size={18} />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => openEoraChat("Hi EORA! How do I get started with AI Tathastu?")}
+                  className="flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-white/80 px-5 py-3.5 font-sans text-sm font-medium text-[#141413] shadow-sm backdrop-blur-md hover:bg-white transition"
+                >
+                  <Sparkle size={16} className="text-[#D4AF37]" weight="fill" />
+                  <span>Ask EORA Live</span>
+                </button>
+              </div>
+
+              {/* Micro-metric */}
+              <p className="mt-4 font-mono text-2xs text-[#5A5852] flex items-center gap-2">
+                <CheckCircle size={14} className="text-verified" weight="bold" />
+                {PERSONA_CONFIG[activePersona].metric}
+              </p>
+            </div>
+
+            {/* Right Column: Eiora 3D Companion Centerpiece */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center">
+              <div className="relative p-6 sm:p-8 rounded-3xl border border-[#D4AF37]/25 bg-white/60 backdrop-blur-md shadow-xl flex flex-col items-center w-full max-w-md">
+                <EioraVisual
+                  state="idle"
+                  size={240}
+                  speedMultiplier={1.1}
+                  statusText="Eiora · Ready to inspect evidence"
+                />
+
+                <div className="mt-5 text-center">
+                  <p className="font-editorial text-lg text-[#141413] italic">
+                    &ldquo;Tap me or ask a question anytime. I guide your steps without generic noise.&rdquo;
+                  </p>
+                  <span className="inline-block mt-2 font-mono text-2xs text-[#8A6D1C] dark:text-[#D4AF37] uppercase tracking-wider font-semibold">
+                    Universal Page Intelligence Active
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ============================================================
-          PRODUCT EXPERIENCE — Workspace Dashboard
-          ============================================================ */}
-      <section className="section section--light">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="illustrative-note">Illustrative workspace</div>
-            <div className="label label--ink">Your journey, in one place</div>
-            <h2 className="h2">
-              See the bigger picture of <span className="grad-warm">your growth.</span>
+      {/* 3. VERIFIED TRUST & CREDIBILITY BAR */}
+      <section className="border-y border-[#D4AF37]/15 bg-white/60 py-6 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-mono text-xs uppercase tracking-wider text-[#141413] font-bold">
+                Supported Ecosystem Ingestion
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-4 font-mono text-xs text-[#5A5852]">
+              {[
+                "GitHub Repositories",
+                "LinkedIn Experience",
+                "Kaggle Benchmarks",
+                "LeetCode Metrics",
+                "HackerRank",
+                "ORCID Citations",
+                "Hugging Face",
+              ].map((src) => (
+                <span
+                  key={src}
+                  className="rounded-full border border-[#D4AF37]/20 bg-[#F8F6F0] px-3 py-1 font-medium text-[#141413] shadow-xs"
+                >
+                  {src}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 text-2xs font-mono text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              <ShieldCheck size={16} weight="bold" className="text-emerald-600" />
+              <span>DPDP Act 2023 Compliant</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. THE PROBLEM & THE TRANSFORMATION */}
+      <section className="py-20 bg-[#F8F6F0]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mx-auto text-center mb-14">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              The Paradigm Shift
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              From unverified resume claims to indisputable engineering proof.
             </h2>
-            <p className="lede">
-              Your learning, work, evidence, and next steps become easier to
-              understand when they&apos;re connected.
+            <p className="mt-3 text-sm sm:text-base text-[#5A5852]">
+              Why traditional hiring is broken for ambitious builders, and how AI Tathastu replaces keyword matching with proof.
             </p>
           </div>
 
-          <div className="tabs reveal" id="dashTabs" ref={dashTabsRef}>
-            {["Learning", "Skills", "Projects", "Next steps"].map((label, i) => (
+          <div className="grid md:grid-cols-2 gap-8 items-stretch">
+            {/* The Broken Status Quo */}
+            <div className="rounded-3xl border border-red-200/60 bg-red-50/20 p-8 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-red-100 text-red-800 px-3 py-1 font-mono text-2xs font-bold uppercase tracking-wider mb-4">
+                  The Broken Status Quo
+                </div>
+                <h3 className="font-editorial text-2xl font-bold text-[#141413] mb-3">
+                  Scattered Resumes &amp; ATS Keyword Games
+                </h3>
+                <p className="text-sm text-[#5A5852] leading-relaxed mb-6">
+                  Job portals and traditional platforms reward keyword stuffing rather than real technical execution. High-signal developers are lost in noise.
+                </p>
+
+                <ul className="space-y-3 font-sans text-xs sm:text-sm text-[#5A5852]">
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-red-500 font-bold shrink-0">✕</span>
+                    <span>Static PDF resumes with unverifiable claims and inflated buzzwords.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-red-500 font-bold shrink-0">✕</span>
+                    <span>Passive 50-hour video courses that produce zero demonstrable artifacts.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-red-500 font-bold shrink-0">✕</span>
+                    <span>Algorithmic ATS black holes filtering out non-pedigree candidates.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-8 pt-4 border-t border-red-200/40 font-mono text-2xs text-red-700">
+                Result: 94% of engineering time wasted on credential signaling.
+              </div>
+            </div>
+
+            {/* The AI Tathastu Standard */}
+            <div className="rounded-3xl border border-[#D4AF37]/35 bg-white/80 p-8 shadow-md backdrop-blur-md flex flex-col justify-between">
+              <div>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#141413] text-[#D4AF37] px-3 py-1 font-mono text-2xs font-bold uppercase tracking-wider mb-4 border border-[#D4AF37]/30">
+                  <Sparkle size={12} weight="fill" />
+                  The AI Tathastu Evidence Standard
+                </div>
+                <h3 className="font-editorial text-2xl font-bold text-[#141413] mb-3">
+                  Automated Evidence Deconstruction &amp; Living Graphs
+                </h3>
+                <p className="text-sm text-[#5A5852] leading-relaxed mb-6">
+                  We inspect your actual commits, PRs, mathematical citations, and code repositories to synthesize a cryptographic, verified capability ledger.
+                </p>
+
+                <ul className="space-y-3 font-sans text-xs sm:text-sm text-[#141413]">
+                  <li className="flex items-start gap-2.5">
+                    <Check size={18} weight="bold" className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Code Provenance:</strong> Commits, architecture designs, and algorithms parsed with zero manual data entry.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <Check size={18} weight="bold" className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>100% Student Control:</strong> Nothing is published until you review, edit, or confirm candidates.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <Check size={18} weight="bold" className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Direct Matching:</strong> Hiring and squads matched on actual code depth rather than keyword filters.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-8 pt-4 border-t border-[#EFECE6] font-mono text-2xs text-[#8A6D1C] dark:text-[#D4AF37] font-semibold flex items-center justify-between">
+                <span>Result: Unforgeable proof that speaks directly to engineering leads.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. INTERACTIVE PRODUCT EXPERIENCE PREVIEW */}
+      <section id="preview" className="py-20 bg-[#EFECE6]/50 border-t border-[#D4AF37]/15">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mb-12">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              Live Product Experience
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              Explore the four core workspace modes.
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-[#5A5852]">
+              Preview the actual user interface and information architecture that powers AI Tathastu students and researchers.
+            </p>
+          </div>
+
+          {/* Interactive Mode Segmented Tabs */}
+          <div role="tablist" aria-label="Product preview modes" className="flex flex-wrap gap-2 mb-8">
+            {PREVIEW_TABS.map((tab) => (
               <button
-                key={label}
-                className={"tab" + (i === 0 ? " active" : "")}
-                data-tab={i}
+                key={tab.id}
+                type="button"
+                role="tab"
+                onClick={() => setPreviewTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-4 py-2.5 font-sans text-xs font-semibold transition-all shadow-xs border",
+                  previewTab === tab.id
+                    ? "bg-[#141413] text-[#F8F6F0] border-[#141413] shadow-md"
+                    : "bg-white/80 text-[#5A5852] border-[#D4AF37]/25 hover:text-[#141413] hover:bg-white"
+                )}
+                aria-selected={previewTab === tab.id}
               >
-                {label}
+                <span>{tab.label}</span>
+                <span
+                  className={cn(
+                    "font-mono text-3xs px-2 py-0.5 rounded-full",
+                    previewTab === tab.id
+                      ? "bg-[#D4AF37]/20 text-[#D4AF37]"
+                      : "bg-[#EFECE6] text-[#5A5852]"
+                  )}
+                >
+                  {tab.badge}
+                </span>
               </button>
             ))}
           </div>
 
-          <div className="dash reveal" style={{ "--d": "120ms" } as React.CSSProperties}>
-            <div className="dash-bar">
-              <span className="dotr"></span>
-              <span className="dotr"></span>
-              <span className="dotr"></span>
-              <span className="dash-url">app.aitathastu.com / workspace</span>
-            </div>
-            <div className="dash-body">
-              <aside className="dash-side">
-                <div className="sd on"><i></i> Overview</div>
-                <div className="sd"><i></i> Roadmap</div>
-                <div className="sd"><i></i> Skill Graph</div>
-                <div className="sd"><i></i> Evidence</div>
-                <div className="sd"><i></i> Profile</div>
-                <div className="sd"><i></i> Opportunities</div>
-              </aside>
-
-              <div className="dash-main">
-                <div className="dash-head">
-                  <div>
-                    <h4 id="dashTitle">Learning Overview</h4>
-                    <div className="sub" id="dashSub">
-                      A guided path · adaptable to your progress
+          {/* Tab Content Display Card */}
+          <div className="rounded-3xl border border-[#D4AF37]/25 bg-white/85 p-6 sm:p-10 shadow-xl backdrop-blur-md">
+            {/* View 1: Person 360 */}
+            {previewTab === "profile" && (
+              <div className="animate-[fade-in_0.3s_ease-out]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-[#EFECE6] gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="size-14 rounded-2xl bg-[#141413] text-[#D4AF37] font-editorial text-2xl font-bold flex items-center justify-center shadow-md">
+                      AS
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-editorial text-xl sm:text-2xl font-bold text-[#141413]">
+                          Aarav Sharma
+                        </h4>
+                        <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono text-3xs px-2 py-0.5 font-semibold">
+                          Verified Candidate
+                        </span>
+                      </div>
+                      <p className="font-mono text-xs text-[#5A5852]">
+                        Target Objective: Lead AI/ML Infrastructure Engineer
+                      </p>
                     </div>
                   </div>
-                  <span className="pill-live"><i></i> Sample data</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="font-mono text-2xs text-[#5A5852] block">Capability Score</span>
+                      <span className="font-editorial text-2xl font-bold text-[#8A6D1C] dark:text-[#D4AF37]">94.2%</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="panel active" data-panel="0">
-                  <div className="tiles">
-                    <div className="tile">
-                      <div className="k">Current focus</div>
-                      <div className="v">Deep Learning</div>
-                      <div className="d">Guided by EORA</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Next milestone</div>
-                      <div className="v">Build a project</div>
-                      <div className="d">Turn theory into practice</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Evidence so far</div>
-                      <div className="v">Growing</div>
-                      <div className="d">New proofs as you build</div>
+                <div className="grid md:grid-cols-3 gap-6 mt-6">
+                  <div className="rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-4">
+                    <span className="font-mono text-3xs uppercase tracking-wider text-[#5A5852] font-semibold">Ingestion Provenance</span>
+                    <p className="mt-2 text-sm font-semibold text-[#141413]">4 Sources Synchronized</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5 font-mono text-3xs">
+                      <span className="rounded bg-white px-2 py-0.5 border border-[#EFECE6]">GitHub (28 repos)</span>
+                      <span className="rounded bg-white px-2 py-0.5 border border-[#EFECE6]">Kaggle (Top 8%)</span>
+                      <span className="rounded bg-white px-2 py-0.5 border border-[#EFECE6]">ORCID (1 preprint)</span>
                     </div>
                   </div>
-                  <div className="bars">
-                    {[38, 56, 44, 72, 60, 88, 74, 96].map((h, i) => (
-                      <div
-                        key={i}
-                        className="bar"
-                        style={{ height: `${h}%`, animationDelay: `${i * 0.07}s` }}
-                      ></div>
+
+                  <div className="rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-4">
+                    <span className="font-mono text-3xs uppercase tracking-wider text-[#5A5852] font-semibold">Signature Architecture</span>
+                    <p className="mt-2 text-sm font-semibold text-[#141413]">vLLM Tensor-Parallel Serving</p>
+                    <p className="mt-1 text-xs text-[#5A5852] line-clamp-2">
+                      Benchmarked KV cache memory throughput on 8x A100 cluster with Triton custom kernels.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-4">
+                    <span className="font-mono text-3xs uppercase tracking-wider text-[#5A5852] font-semibold">Opportunity Match</span>
+                    <p className="mt-2 text-sm font-semibold text-[#141413]">3 Direct Avasar Shortlists</p>
+                    <p className="mt-1 text-xs text-[#5A5852]">
+                      Zero resume screening required; engineering teams requested architecture demo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* View 2: Skill Graph */}
+            {previewTab === "skills" && (
+              <div className="animate-[fade-in_0.3s_ease-out]">
+                <div className="flex items-center justify-between pb-6 border-b border-[#EFECE6]">
+                  <div>
+                    <h4 className="font-editorial text-2xl font-bold text-[#141413]">
+                      Evidence-Grounded Capability Ledger
+                    </h4>
+                    <p className="text-xs text-[#5A5852] mt-0.5">
+                      Each skill node links to cryptographic commit hashes, PRs, or benchmark tables.
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+                    18 Confirmed Skills · 0 Gaps
+                  </span>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                  {[
+                    { skill: "PyTorch & CUDA", tier: "Verified", source: "3 Repos + 1 Benchmark", tone: "bg-emerald-50 text-emerald-800 border-emerald-200" },
+                    { skill: "Distributed Training", tier: "Corroborated", source: "2 GitHub PRs", tone: "bg-amber-50 text-amber-800 border-amber-200" },
+                    { skill: "Triton Kernels", tier: "Demonstrated", source: "1 Custom Op Commit", tone: "bg-blue-50 text-blue-800 border-blue-200" },
+                    { skill: "Docker & Kubernetes", tier: "Verified", source: "CI/CD Pipeline Repo", tone: "bg-emerald-50 text-emerald-800 border-emerald-200" },
+                  ].map((s) => (
+                    <div key={s.skill} className="rounded-2xl border border-[#D4AF37]/20 bg-[#FAF8F5] p-4 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className={cn("font-mono text-3xs px-2 py-0.5 rounded-full font-semibold border", s.tone)}>
+                            {s.tier}
+                          </span>
+                        </div>
+                        <h5 className="font-sans text-sm font-bold text-[#141413]">{s.skill}</h5>
+                      </div>
+                      <p className="mt-3 font-mono text-3xs text-[#5A5852] border-t border-[#EFECE6] pt-2">
+                        {s.source}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* View 3: Project Ledger */}
+            {previewTab === "projects" && (
+              <div className="animate-[fade-in_0.3s_ease-out]">
+                <div className="flex items-center justify-between pb-6 border-b border-[#EFECE6]">
+                  <div>
+                    <h4 className="font-editorial text-2xl font-bold text-[#141413]">
+                      Verified Contribution Workspaces
+                    </h4>
+                    <p className="text-xs text-[#5A5852] mt-0.5">
+                      Authorship deconstruction isolates your specific commits from generic group repos.
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs text-text-muted">Filtered by Authorship Depth</span>
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-[#EFECE6] bg-[#FAF8F5] p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="font-mono text-2xs uppercase tracking-wider text-[#D4AF37] font-semibold">Featured Repository</span>
+                      <h5 className="font-sans text-base font-bold text-[#141413] mt-0.5">
+                        deep-rag-engine / fast-vector-retriever
+                      </h5>
+                    </div>
+                    <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-mono text-3xs px-2.5 py-1 font-semibold self-start sm:self-auto">
+                      Authorship: 78.4% of total commits
+                    </span>
+                  </div>
+                  <p className="mt-3 text-xs sm:text-sm text-[#5A5852] leading-relaxed">
+                    Designed and benchmarked an asynchronous hybrid sparse-dense retriever combining BM25 and ColBERT embeddings. Reduced P99 query latency from 240ms to 42ms.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2 font-mono text-3xs text-[#141413]">
+                    <span className="rounded bg-white px-2.5 py-1 border border-[#EFECE6]">FastAPI</span>
+                    <span className="rounded bg-white px-2.5 py-1 border border-[#EFECE6]">Qdrant Vector DB</span>
+                    <span className="rounded bg-white px-2.5 py-1 border border-[#EFECE6]">PyTorch 2.4</span>
+                    <span className="rounded bg-white px-2.5 py-1 border border-[#EFECE6]">Docker Swarm</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* View 4: Adaptive Roadmap */}
+            {previewTab === "roadmap" && (
+              <div className="animate-[fade-in_0.3s_ease-out]">
+                <div className="flex items-center justify-between pb-6 border-b border-[#EFECE6]">
+                  <div>
+                    <h4 className="font-editorial text-2xl font-bold text-[#141413]">
+                      Precision Learning Bridge
+                    </h4>
+                    <p className="text-xs text-[#5A5852] mt-0.5">
+                      Tailored project milestones to conquer remaining target role prerequisites.
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+                    Target: MLOps Architect (4 of 5 Mastered)
+                  </span>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-4 mt-6">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+                    <span className="font-mono text-3xs text-emerald-800 font-bold uppercase">Milestone 1 · Completed</span>
+                    <h5 className="font-sans text-sm font-bold text-[#141413] mt-1">Dockerized API Pipeline</h5>
+                    <p className="text-2xs text-[#5A5852] mt-2">Verified via GitHub repository commits and multi-stage container build.</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
+                    <span className="font-mono text-3xs text-emerald-800 font-bold uppercase">Milestone 2 · Completed</span>
+                    <h5 className="font-sans text-sm font-bold text-[#141413] mt-1">Model Monitoring with Prometheus</h5>
+                    <p className="text-2xs text-[#5A5852] mt-2">Verified via telemetry dashboard export and latency alarms.</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-4">
+                    <span className="font-mono text-3xs text-[#8A6D1C] dark:text-[#D4AF37] font-bold uppercase">Milestone 3 · In Progress</span>
+                    <h5 className="font-sans text-sm font-bold text-[#141413] mt-1">Distributed Ray Cluster Deployment</h5>
+                    <p className="text-2xs text-[#5A5852] mt-2">Eiora interactive lab: launch local multi-node Ray actor pool.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 6. THE 5-WORLD ECOSYSTEM BENTO GRID */}
+      <section id="ecosystem" data-eora-id="eora-landing-features" className="py-20 border-t border-[#D4AF37]/15 bg-[#F8F6F0]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mb-12">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              The Architecture
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              Five interconnected worlds. Zero walled gardens.
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-[#5A5852]">
+              Each world addresses a critical phase of the modern technologist&apos;s lifecycle—from learning and collaboration to interviews, integrity validation, and career placement.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* World 1: Avasar (Double Column) */}
+            <div className="md:col-span-2 rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-8 shadow-sm backdrop-blur-md flex flex-col justify-between hover:shadow-md transition">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#141413] px-3 py-1 font-mono text-2xs uppercase tracking-wider text-[#D4AF37] font-semibold border border-[#D4AF37]/30">
+                    <Briefcase size={14} weight="bold" />
+                    Careers &amp; Opportunities
+                  </span>
+                  <span className="font-mono text-xs text-[#5A5852]">{ECOSYSTEM_WORLDS[0].stat}</span>
+                </div>
+                <h3 className="font-editorial text-3xl font-bold text-[#141413]">
+                  Avasar by AI Tathastu
+                </h3>
+                <p className="mt-2 text-sm text-[#5A5852] leading-relaxed">
+                  The evidence-first alternative to Naukri and Indeed. Instead of matching buzzwords on PDF resumes, Avasar evaluates candidates based on verified repositories, confirmed project milestones, and cryptographically signed skill assessments.
+                </p>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-[#EFECE6] flex items-center justify-between">
+                <span className="font-mono text-xs text-[#5A5852]">Direct hiring pipelines without recruiter spam</span>
+                <Link href="/student" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A6D1C] dark:text-[#D4AF37] hover:underline">
+                  Explore Avasar Roles <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+
+            {/* World 2: Collaborate */}
+            <div className="rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-8 shadow-sm backdrop-blur-md flex flex-col justify-between hover:shadow-md transition">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E05A47]/15 px-3 py-1 font-mono text-2xs uppercase tracking-wider text-[#E05A47] font-semibold">
+                    <UsersThree size={14} weight="bold" />
+                    Network &amp; Squads
+                  </span>
+                </div>
+                <h3 className="font-editorial text-2xl font-bold text-[#141413]">
+                  Collaborate by AI Tathastu
+                </h3>
+                <p className="mt-2 text-sm text-[#5A5852] leading-relaxed">
+                  Professional networking stripped of vanity metrics. Connect with developers who complement your tech stack to co-build production-grade open source projects.
+                </p>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-[#EFECE6]">
+                <Link href="/student/connections" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#E05A47] hover:underline">
+                  Find Squad Co-Builders <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+
+            {/* World 3: Learn */}
+            <div className="rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-8 shadow-sm backdrop-blur-md flex flex-col justify-between hover:shadow-md transition">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C48A5A]/15 px-3 py-1 font-mono text-2xs uppercase tracking-wider text-[#C48A5A] font-semibold">
+                    <GraduationCap size={14} weight="bold" />
+                    Curriculum
+                  </span>
+                </div>
+                <h3 className="font-editorial text-2xl font-bold text-[#141413]">
+                  Learn by AI Tathastu
+                </h3>
+                <p className="mt-2 text-sm text-[#5A5852] leading-relaxed">
+                  Precision curricula mapped to your specific goal role. Every milestone builds a tangible repository item rather than a passive completion certificate.
+                </p>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-[#EFECE6]">
+                <Link href="/student/roadmap" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C48A5A] hover:underline">
+                  View Skill Roadmaps <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+
+            {/* World 4: Meet */}
+            <div className="rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-8 shadow-sm backdrop-blur-md flex flex-col justify-between hover:shadow-md transition">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#4CD3E3]/15 px-3 py-1 font-mono text-2xs uppercase tracking-wider text-[#4CD3E3] font-semibold">
+                    <VideoCamera size={14} weight="bold" />
+                    Spatial Rooms
+                  </span>
+                </div>
+                <h3 className="font-editorial text-2xl font-bold text-[#141413]">
+                  Meet by AI Tathastu
+                </h3>
+                <p className="mt-2 text-sm text-[#5A5852] leading-relaxed">
+                  Real-time video &amp; code collaboration rooms. Pair program directly with mentors, conduct architectural walk-throughs, and record verified interview demonstrations.
+                </p>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-[#EFECE6]">
+                <Link href="/student/interviews" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#4CD3E3] hover:underline">
+                  Launch Collaboration Room <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+
+            {/* World 5: Iris */}
+            <div className="rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-8 shadow-sm backdrop-blur-md flex flex-col justify-between hover:shadow-md transition">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F1948A]/15 px-3 py-1 font-mono text-2xs uppercase tracking-wider text-[#F1948A] font-semibold">
+                    <Eye size={14} weight="bold" />
+                    Proctored Integrity
+                  </span>
+                </div>
+                <h3 className="font-editorial text-2xl font-bold text-[#141413]">
+                  Iris by AI Tathastu
+                </h3>
+                <p className="mt-2 text-sm text-[#5A5852] leading-relaxed">
+                  High-integrity AI proctoring that verifies genuine competency. Assesses reasoning paths, code comprehension, and algorithmic originality without invasive surveillance.
+                </p>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-[#EFECE6]">
+                <Link href="/student/assessments" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#F1948A] hover:underline">
+                  Take Integrity Evaluation <ArrowRight size={14} />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. HOW IT WORKS (4 UNDERSTANDABLE STAGES) */}
+      <section id="how-it-works" className="py-20 bg-[#EFECE6]/40 border-t border-[#D4AF37]/15">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mx-auto text-center mb-14">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              The Journey
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              Four steps from footprint to verified capability.
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-[#5A5852]">
+              Honest, transparent, and structured. You keep complete ownership and review every claim before it goes public.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                step: "01",
+                stage: "Personalize",
+                title: "Define Your Target Focus",
+                desc: "Choose whether you are a builder, researcher, or learner. Select your dream AI role and top three priorities.",
+              },
+              {
+                step: "02",
+                stage: "Ingest",
+                title: "Connect Footprints & CV",
+                desc: "Drop your CV and optionally link GitHub, LinkedIn, Kaggle, or ORCID. Connectors are strictly read-only.",
+              },
+              {
+                step: "03",
+                stage: "Refine",
+                title: "Review & Correct Claims",
+                desc: "Eiora extracts candidate projects, skills, and publications. Edit, accept, or reject anything before saving.",
+              },
+              {
+                step: "04",
+                stage: "Activate",
+                title: "Launch Tailored Workspace",
+                desc: "Enter your dashboard with a living skill graph, personalized roadmap milestones, and direct opportunity matches.",
+              },
+            ].map((s) => (
+              <div
+                key={s.step}
+                className="rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-6 shadow-sm backdrop-blur-md flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="font-editorial text-3xl font-bold text-[#8A6D1C] dark:text-[#D4AF37]">{s.step}</span>
+                    <span className="font-mono text-2xs uppercase tracking-wider text-[#5A5852] bg-[#F8F6F0] px-2.5 py-1 rounded-full border border-[#EFECE6]">
+                      {s.stage}
+                    </span>
+                  </div>
+                  <h3 className="font-editorial text-xl font-bold text-[#141413] mb-2">{s.title}</h3>
+                  <p className="text-xs sm:text-sm text-[#5A5852] leading-relaxed">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 8. FOOTPRINT-TO-GRAPH VISUALIZER */}
+      <section id="visualizer" className="py-20 bg-[#F8F6F0] border-t border-[#D4AF37]/15">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              The Evidence Engine
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              Raw footprints become a living skill graph.
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-[#5A5852]">
+              Watch how isolated sources transform into unified, verified proof nodes that employers and mentors can audit.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-[#D4AF37]/25 bg-white/70 p-6 sm:p-10 shadow-lg backdrop-blur-md">
+            <div className="grid lg:grid-cols-12 gap-8 items-center">
+              {/* Left Column: Raw Ingestion Sources */}
+              <div className="lg:col-span-4 flex flex-col gap-3">
+                <span className="font-mono text-2xs uppercase tracking-wider text-[#5A5852] font-semibold">
+                  Raw Ingestion Connectors:
+                </span>
+
+                {[
+                  { name: "GitHub Repositories", icon: Code, metric: "Commits, PRs & Architecture", tag: "Code" },
+                  { name: "LinkedIn & Experience", icon: Briefcase, metric: "Roles, Tenures & Endorsements", tag: "History" },
+                  { name: "LeetCode & HackerRank", icon: TerminalWindow, metric: "Problem Metrics & Rank", tag: "Algorithms" },
+                  { name: "ORCID & ArXiv Papers", icon: FileText, metric: "Peer-Reviewed Publications", tag: "Research" },
+                  { name: "Kaggle Competitions", icon: Cpu, metric: "Model Benchmarks & Datasets", tag: "ML" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between rounded-xl border border-[#EFECE6] bg-[#F8F6F0] px-4 py-3 shadow-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-lg bg-[#141413] text-[#D4AF37] flex items-center justify-center">
+                          <Icon size={16} />
+                        </div>
+                        <div>
+                          <p className="font-sans text-xs font-semibold text-[#141413]">{item.name}</p>
+                          <p className="font-mono text-3xs text-[#5A5852]">{item.metric}</p>
+                        </div>
+                      </div>
+                      <span className="font-mono text-3xs rounded bg-[#EFECE6] px-2 py-0.5 text-[#141413]">
+                        {item.tag}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Middle Column: Synthesis Core */}
+              <div className="lg:col-span-4 flex flex-col items-center justify-center text-center">
+                <div className="relative mb-4">
+                  <EioraVisual state="extracting" size={170} interactive={false} />
+                </div>
+                <h4 className="font-editorial text-2xl text-[#141413]">Eiora Corroboration Pipeline</h4>
+                <p className="font-mono text-2xs text-[#5A5852] mt-1 max-w-xs">
+                  Deterministic matching + multi-modal verification + cryptographic ledger timestamping.
+                </p>
+              </div>
+
+              {/* Right Column: Resulting Skill Graph Nodes */}
+              <div className="lg:col-span-4 flex flex-col gap-3">
+                <span className="font-mono text-2xs uppercase tracking-wider text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+                  Verified Capability Ledger:
+                </span>
+
+                {[
+                  { skill: "PyTorch & Deep Learning", tier: "Verified", count: "3 Repos + 1 ArXiv", tone: "bg-emerald-50 text-emerald-800 border-emerald-200" },
+                  { skill: "Distributed Training", tier: "Corroborated", count: "2 GitHub PRs", tone: "bg-amber-50 text-amber-800 border-amber-200" },
+                  { skill: "Algorithms & Complexity", tier: "Demonstrated", count: "Top 4% LeetCode", tone: "bg-blue-50 text-blue-800 border-blue-200" },
+                  { skill: "LLM Fine-Tuning & LoRA", tier: "Verified", count: "1 Published Notebook", tone: "bg-emerald-50 text-emerald-800 border-emerald-200" },
+                ].map((s) => (
+                  <div
+                    key={s.skill}
+                    className="flex items-center justify-between rounded-xl border border-[#D4AF37]/20 bg-[#FAF6F0] px-4 py-3"
+                  >
+                    <div>
+                      <p className="font-sans text-xs font-bold text-[#141413]">{s.skill}</p>
+                      <p className="font-mono text-3xs text-[#5A5852]">{s.count}</p>
+                    </div>
+                    <span className={cn("font-mono text-3xs px-2.5 py-0.5 rounded-full border font-semibold", s.tone)}>
+                      {s.tier}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. EDITORIAL "WALL OF PROOF" TESTIMONIALS */}
+      <section id="proof" className="py-20 bg-[#EFECE6]/40 border-t border-[#D4AF37]/15">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="max-w-2xl mb-12">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              Wall of Proof
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              Real capabilities. Real unlocked opportunities.
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-[#5A5852]">
+              See how verified evidence replaced generic resumes for engineers and researchers.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                name: "Aarav Sharma",
+                role: "MLOps Engineer @ DeepScale",
+                quote: "Before AI Tathastu, recruiters ignored my resume because I didn't have an IIT pedigree. Avasar verified my Dockerized Kubernetes pipeline directly from GitHub, and I had 3 direct interview invites within a week.",
+                nodes: ["MLOps", "Kubernetes", "PyTorch"],
+                source: "Matched via Avasar",
+              },
+              {
+                name: "Dr. Priya Venkat",
+                role: "Postdoc AI Researcher",
+                quote: "Indexing my ArXiv preprints and Kaggle notebooks in one verified profile allowed me to collaborate with international research squads. Eiora made the onboarding synthesis effortless.",
+                nodes: ["Diffusion Models", "Transformers", "ORCID"],
+                source: "Squad via Collaborate",
+              },
+              {
+                name: "Rohan Patel",
+                role: "AI Foundations Graduate",
+                quote: "The personalized roadmap didn't waste my time on videos I already understood. I built an end-to-end RAG assistant, Iris verified the architecture, and that became the centerpiece of my portfolio.",
+                nodes: ["RAG Systems", "Vector DBs", "FastAPI"],
+                source: "Graduated via Learn",
+              },
+            ].map((t) => (
+              <div
+                key={t.name}
+                className="rounded-2xl border border-[#D4AF37]/25 bg-white/80 p-6 shadow-sm backdrop-blur-md flex flex-col justify-between"
+              >
+                <div>
+                  <p className="font-editorial text-base sm:text-lg italic text-[#141413] leading-relaxed">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {t.nodes.map((n) => (
+                      <span key={n} className="font-mono text-3xs rounded bg-[#FAF6F0] border border-[#EFECE6] px-2 py-0.5 text-[#5A5852]">
+                        {n}
+                      </span>
                     ))}
                   </div>
                 </div>
 
-                <div className="panel" data-panel="1">
-                  <div className="tiles">
-                    <div className="tile">
-                      <div className="k">Skills mapped</div>
-                      <div className="v">In progress</div>
-                      <div className="d">Across your work</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Strongest</div>
-                      <div className="v">Foundations</div>
-                      <div className="d">Where you already are</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Focus next</div>
-                      <div className="v">Depth</div>
-                      <div className="d">Guided by gaps</div>
-                    </div>
+                <div className="mt-6 pt-4 border-t border-[#EFECE6] flex items-center justify-between">
+                  <div>
+                    <h5 className="font-sans text-xs font-bold text-[#141413]">{t.name}</h5>
+                    <p className="font-mono text-3xs text-[#5A5852]">{t.role}</p>
                   </div>
-                  <div className="rows">
-                    <div className="row">
-                      <span className="rk">Deep Learning</span>
-                      <span className="rt">In progress</span>
-                      <span className="badge">Building</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">Data Structures</span>
-                      <span className="rt">Demonstrated</span>
-                      <span className="badge">Evidence</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">MLOps &amp; Deployment</span>
-                      <span className="rt">Suggested focus</span>
-                      <span className="badge">Next</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">Research Writing</span>
-                      <span className="rt">Growing</span>
-                      <span className="badge">Optional</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="panel" data-panel="2">
-                  <div className="tiles">
-                    <div className="tile">
-                      <div className="k">Active</div>
-                      <div className="v">Projects</div>
-                      <div className="d">Hands-on builds</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Collaboration</div>
-                      <div className="v">Optional</div>
-                      <div className="d">Work with others</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Output</div>
-                      <div className="v">Evidence</div>
-                      <div className="d">Tangible proof</div>
-                    </div>
-                  </div>
-                  <div className="rows">
-                    <div className="row">
-                      <span className="rk">Vision Transformer from scratch</span>
-                      <span className="rt">In progress</span>
-                      <span className="badge">Build</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">Retrieval-augmented assistant</span>
-                      <span className="rt">Completed</span>
-                      <span className="badge">Evidence ✓</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">Model monitoring pipeline</span>
-                      <span className="rt">Suggested</span>
-                      <span className="badge">Next up</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="panel" data-panel="3">
-                  <div className="tiles">
-                    <div className="tile">
-                      <div className="k">Suggested next</div>
-                      <div className="v">1 step</div>
-                      <div className="d">Not everything</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">Evidence ready</div>
-                      <div className="v">Yes</div>
-                      <div className="d">When you want it</div>
-                    </div>
-                    <div className="tile">
-                      <div className="k">You decide</div>
-                      <div className="v">Always</div>
-                      <div className="d">Share only what you choose</div>
-                    </div>
-                  </div>
-                  <div className="rows">
-                    <div className="row">
-                      <span className="rk">Build a monitoring pipeline</span>
-                      <span className="rt">Suggested</span>
-                      <span className="badge">Strengthens depth</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">Write up a research note</span>
-                      <span className="rt">Optional</span>
-                      <span className="badge">Growth path</span>
-                    </div>
-                    <div className="row">
-                      <span className="rk">Revisit a weak area</span>
-                      <span className="rt">Recommended</span>
-                      <span className="badge">Deepen</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          COLLABORATION — Warm Paper
-          ============================================================ */}
-      <section className="section section--warm">
-        <div className="wrap">
-          <div className="section-head reveal">
-            <div className="label label--ink">Grow together</div>
-            <h2 className="h2">
-              Great things are <span className="grad-warm">rarely built alone.</span>
-            </h2>
-            <p className="lede">
-              Connect with people who share your curiosity. Learn from mentors,
-              find collaborators, and explore projects, research, and communities
-              that help you grow.
-            </p>
-          </div>
-
-          <div className="grid-3">
-            <div className="card reveal">
-              <div className="top">
-                <span className="badge">Mentorship</span>
-              </div>
-              <h4>Learn from someone ahead of you</h4>
-              <p>
-                Guidance from people who&apos;ve walked a similar path — on direction, projects and difficult
-                decisions.
-              </p>
-              <div className="foot">
-                <span>Purpose-driven conversations</span>
-              </div>
-            </div>
-            <div className="card reveal" style={{ "--d": "110ms" } as React.CSSProperties}>
-              <div className="top">
-                <span className="badge">Collaboration</span>
-              </div>
-              <h4>Build with others</h4>
-              <p>
-                Find people to take on a shared project, split the work, and push each other past the hard parts.
-              </p>
-              <div className="foot">
-                <span>Peer learning</span>
-              </div>
-            </div>
-            <div className="card reveal" style={{ "--d": "220ms" } as React.CSSProperties}>
-              <div className="top">
-                <span className="badge">Community</span>
-              </div>
-              <h4>Places to keep learning</h4>
-              <p>
-                Communities around specific areas of AI/ML — where questions get answered and paper readings
-                actually happen.
-              </p>
-              <div className="foot">
-                <span>Curiosity first</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          TRUST — Warm Charcoal
-          ============================================================ */}
-      <section className="section section--graph">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="label label--intel">Built on trust</div>
-            <h2 className="h2">
-              Your journey. Your evidence. <span className="grad-intel">Your control.</span>
-            </h2>
-            <p className="lede">
-              Decide what you share. Understand how your information is used.
-              Build a record of your progress with a clear distinction between
-              claims and verified evidence.
-            </p>
-          </div>
-
-          <div className="trust-grid">
-            <div className="trust reveal">
-              <div className="ico">🔐</div>
-              <h4>You control your data</h4>
-              <p>
-                Connections are optional. You choose what to link, what to display, and who can see it — and you
-                can change that at any time.
-              </p>
-            </div>
-            <div className="trust reveal" style={{ "--d": "110ms" } as React.CSSProperties}>
-              <div className="ico">🔍</div>
-              <h4>Evidence you can check</h4>
-              <p>
-                Every skill entry shows where it came from — a project, a document, a review, or your own
-                statement. Nothing is presented as verified if it isn&apos;t.
-              </p>
-            </div>
-            <div className="trust reveal" style={{ "--d": "220ms" } as React.CSSProperties}>
-              <div className="ico">📄</div>
-              <h4>Plain, honest language</h4>
-              <p>
-                We don&apos;t promise you a job, a salary, or a guaranteed outcome. We build the tools — you bring the
-                ambition and the work.
-              </p>
-            </div>
-          </div>
-
-          <div className="trust-bar reveal">
-            <span><i></i> No selling of personal data</span>
-            <span><i></i> Export or delete anytime</span>
-            <span><i></i> Granular sharing controls</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          FAQ — Light Accordion
-          ============================================================ */}
-      <section className="section section--light">
-        <div className="wrap">
-          <div className="section-head center reveal">
-            <div className="label label--ink">FAQ</div>
-            <h2 className="h2">Questions, answered.</h2>
-          </div>
-
-          <div className="faq" id="faq">
-            {FAQS.map(({ q, a, delay }) => (
-              <div
-                key={q}
-                className="faq-item reveal"
-                style={{ "--d": `${delay}ms` } as React.CSSProperties}
-              >
-                <button className="faq-q">
-                  {q} <span className="ic"></span>
-                </button>
-                <div className="faq-a">
-                  <p>{a}</p>
+                  <span className="font-mono text-3xs text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">{t.source}</span>
                 </div>
               </div>
             ))}
@@ -1730,60 +1473,150 @@ export function Landing({ user }: LandingProps) {
         </div>
       </section>
 
-      {/* ============================================================
-          FINAL CTA — Obsidian with Rotating Conic Shimmer
-          ============================================================ */}
-      <section className="section section--cta" id="start">
-        <div className="wrap">
-          <div className="cta-shell reveal">
-            <div className="cta-eora"></div>
-            <h2>
-              Your next chapter begins with <span className="grad-intel">what you imagine.</span>
+      {/* 10. FAQ ACCORDION */}
+      <section id="faq" className="py-20 bg-[#F8F6F0] border-t border-[#D4AF37]/15">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#8A6D1C] dark:text-[#D4AF37] font-semibold">
+              Clarifications
+            </span>
+            <h2 className="font-editorial text-3xl sm:text-5xl font-normal text-[#141413] mt-1">
+              Frequently Answered Questions
             </h2>
-            <p>
-              You bring the ambition. AI Tathastu helps you discover the path,
-              learn the skills, and build toward what&apos;s next.
-            </p>
-            <div className="cta-actions">
-              <Link href={user ? "/start" : "/onboarding"} className="btn btn-primary btn-lg" data-magnetic>
-                {user ? "Continue Your Journey" : "Start Your Journey"}{" "}
-                <span className="arw">→</span>
-              </Link>
-              <a href="#journey" className="btn btn-ghost btn-lg" data-magnetic>
-                Explore AI Tathastu
-              </a>
-            </div>
-            <div className="cta-brand-line">You imagine. AI makes it happen.</div>
+          </div>
+
+          <div className="space-y-4">
+            {FAQS.map((faq, index) => {
+              const isOpen = openFaq === index;
+              return (
+                <div
+                  key={faq.q}
+                  className="rounded-2xl border border-[#D4AF37]/20 bg-white/70 overflow-hidden shadow-xs backdrop-blur-md transition"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between px-6 py-5 text-left font-sans text-sm sm:text-base font-semibold text-[#141413]"
+                    aria-expanded={isOpen}
+                  >
+                    <span>{faq.q}</span>
+                    <span className="font-mono text-lg text-[#8A6D1C] dark:text-[#D4AF37]">{isOpen ? "−" : "+"}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="px-6 pb-5 text-sm text-[#5A5852] leading-relaxed border-t border-[#EFECE6] pt-3">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* ============================================================
-          FOOTER
-          ============================================================ */}
-      <Footer />
+      {/* 11. FINAL MAGNETIC CALL TO ACTION */}
+      <section className="py-20 bg-[#141413] text-[#F8F6F0] relative overflow-hidden">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-4 py-1 font-mono text-xs uppercase tracking-widest text-[#D4AF37] font-semibold mb-6">
+            <RocketLaunch size={16} />
+            Begin Your Verified Transformation
+          </div>
 
-      {/* ============================================================
-          BACK TO TOP FAB
-          ============================================================ */}
-      <button className="fab" id="fab" ref={fabRef} aria-label="Back to top">
-        <svg
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-          style={{
-            width: 20,
-            height: 20,
-            stroke: "var(--warm-ivory)",
-            strokeWidth: 2,
-            fill: "none",
-            strokeLinecap: "round" as const,
-            strokeLinejoin: "round" as const,
-          }}
-        >
-          <path d="M12 19V5" />
-          <path d="M5 12l7-7 7 7" />
-        </svg>
-      </button>
-    </>
+          <h2 className="font-editorial text-4xl sm:text-6xl lg:text-7xl font-normal text-[#F8F6F0] leading-tight">
+            You imagine. AI makes it happen.
+          </h2>
+
+          <p className="mt-4 text-base sm:text-lg text-[#FAF6F0]/70 max-w-2xl mx-auto font-sans leading-relaxed">
+            Join thousands of developers, researchers, and students who have replaced guesswork with unforgeable evidence.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href={user ? "/student" : "/onboarding"}
+              className="flex items-center gap-2 rounded-full bg-[#D4AF37] px-8 py-4 font-sans text-sm font-bold text-[#141413] shadow-xl hover:bg-[#F5B041] transition hover:scale-105 active:scale-95"
+            >
+              <span>{user ? "Go to Dashboard" : "Initialize Your Profile Now"}</span>
+              <ArrowRight size={18} />
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleReplayIntro}
+              className="flex items-center gap-2 rounded-full border border-[#D4AF37]/40 bg-transparent px-6 py-4 font-sans text-sm font-semibold text-[#F8F6F0] hover:bg-white/10 transition"
+            >
+              <span>Watch Genesis Sequence</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 12. ARCHITECTURAL FOOTER */}
+      <footer className="border-t border-[#D4AF37]/20 bg-[#141413] text-[#F8F6F0] pt-16 pb-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-14">
+            {/* Col 1: Brand & Mission */}
+            <div className="sm:col-span-2 lg:col-span-2">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="size-7 rounded-lg bg-[#D4AF37] text-[#141413] font-editorial text-lg font-bold flex items-center justify-center">
+                  AT
+                </span>
+                <span className="font-editorial text-2xl font-bold text-[#F8F6F0]">AI Tathastu</span>
+              </div>
+              <p className="text-xs text-[#FAF6F0]/70 leading-relaxed max-w-sm mb-4">
+                Warm Editorial Futurism for the next generation of artificial intelligence builders, scientists, and thinkers. All claims backed by real code and verifiable publications.
+              </p>
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-2xs text-emerald-400">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>All 5 Ecosystem Portals Operational</span>
+              </div>
+            </div>
+
+            {/* Col 2: The 5 Worlds */}
+            <div className="flex flex-col space-y-2.5">
+              <h5 className="font-mono text-2xs uppercase tracking-widest text-[#D4AF37] font-semibold mb-2">
+                The 5 Worlds
+              </h5>
+              <Link href="/student" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Avasar (Jobs)</Link>
+              <Link href="/student/connections" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Collaborate (Squads)</Link>
+              <Link href="/student/roadmap" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Learn (Roadmaps)</Link>
+              <Link href="/student/interviews" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Meet (Rooms)</Link>
+              <Link href="/student/assessments" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Iris (Integrity)</Link>
+            </div>
+
+            {/* Col 3: Legal & DPDP Compliance */}
+            <div className="flex flex-col space-y-2.5">
+              <h5 className="font-mono text-2xs uppercase tracking-widest text-[#D4AF37] font-semibold mb-2">
+                Legal &amp; DPDP 2023
+              </h5>
+              <Link href="/privacy" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Privacy Policy</Link>
+              <Link href="/terms" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Terms &amp; Conditions</Link>
+              <Link href="/cookies" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Cookie Policy</Link>
+              <Link href="/cookie-settings" className="text-xs text-[#D4AF37] hover:underline transition">Cookie Preferences</Link>
+              <Link href="/privacy/your-rights" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Data Ownership Controls</Link>
+            </div>
+
+            {/* Col 4: Platform Status */}
+            <div className="flex flex-col space-y-2.5">
+              <h5 className="font-mono text-2xs uppercase tracking-widest text-[#D4AF37] font-semibold mb-2">
+                Verification &amp; Security
+              </h5>
+              <Link href="/security" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Security Practices</Link>
+              <Link href="/evidence-policy" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Evidence Policy</Link>
+              <Link href="/verification" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Verification Engine</Link>
+              <Link href="/grievance" className="text-xs text-[#FAF6F0]/70 hover:text-[#F8F6F0] transition">Grievance Redressal</Link>
+            </div>
+          </div>
+
+          <div className="border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-[#FAF6F0]/50">
+            <p>© {new Date().getFullYear()} AI Tathastu platform. Zero unverified claims.</p>
+            <div className="flex gap-4">
+              <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
+              <Link href="/terms" className="hover:text-white transition">Terms</Link>
+              <Link href="/security" className="hover:text-white transition">Security</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

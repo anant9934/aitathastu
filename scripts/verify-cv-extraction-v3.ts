@@ -418,6 +418,42 @@ test("image upload without a configured OCR service fails clearly instead of ret
   assert.equal(s.errorCode, "OCR_SERVICE_NOT_CONFIGURED");
 });
 
+// ---------------------------------------------------------------- migration / infrastructure failures
+
+test("missing resume_extraction_runs table produces PERSIST_FAILED (not silent success or crash)", async () => {
+  // Simulates a production deployment where npm run db:migrate was never run.
+  const db = await setupTestDatabase();
+  const { queueResumeUpload, processResumeJob, getResumeJobStatus } = await import("../lib/services/resume-ingestion-service");
+  const { sql } = await import("drizzle-orm");
+  const owner = await createTestPerson("cvmigrate");
+
+  // Drop the two new tables to reproduce a missing-migration environment.
+  await (db as { execute: (q: unknown) => Promise<unknown> }).execute(sql.raw('DROP TABLE IF EXISTS "resume_extracted_records" CASCADE'));
+  await (db as { execute: (q: unknown) => Promise<unknown> }).execute(sql.raw('DROP TABLE IF EXISTS "resume_extraction_runs" CASCADE'));
+
+  const bytes = read("aarav-fresher--pdf-single.pdf");
+  const { jobId, documentId } = await queueResumeUpload({ personId: owner, filename: "aarav.pdf", mimeType: "application/pdf", bytes });
+  await processResumeJob(jobId, owner);
+  const s = await getResumeJobStatus(documentId, owner, jobId);
+
+  // The failure must be PERSIST_FAILED, not a crash, empty 200, or a
+  // different code.  The UI distinction matters: PERSIST_FAILED is retryable
+  // (after the operator applies the migration) while EXTRACTION_FAILED is not.
+  assert.equal(s.status, "failed", "job must reach failed state");
+  assert.equal(s.errorCode, "PERSIST_FAILED", "error code must be PERSIST_FAILED, not " + s.errorCode);
+  assert.equal(s.retryable, true, "PERSIST_FAILED must be retryable");
+  assert.equal(s.result, null, "failed job must not carry a review payload");
+});
+
+test("PERSIST_FAILED is distinct from EXTRACTION_FAILED in the UI contract", () => {
+  const { failureInfo } = require("../lib/services/resume-ingestion-service");
+  const pf = failureInfo("PERSIST_FAILED");
+  const ef = failureInfo("EXTRACTION_FAILED");
+  assert.ok(pf?.retryable, "PERSIST_FAILED must be retryable");
+  assert.ok(ef?.retryable, "EXTRACTION_FAILED must also be retryable");
+  assert.notEqual(pf?.message, ef?.message, "messages must differ so the UI can surface distinct guidance");
+});
+
 before(() => {
   assert.ok(fs.existsSync(path.join(FIX, "manifest.json")), "render fixtures first: python eval/cv/render.py");
 });

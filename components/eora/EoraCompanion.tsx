@@ -11,7 +11,6 @@
  * navigation commands stay on the zero-LLM engine (Tasks 1.4.1, 1.4.3).
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, ArrowRight, ChatCircleText, MapTrifold, Minus, PaperPlaneRight, Pause, Play, SpeakerHigh, SpeakerSlash, X } from "@phosphor-icons/react/dist/ssr";
 import { useEoraSafe } from "@/lib/client/eora/provider";
@@ -21,6 +20,7 @@ import { Portal } from "@/components/ui/Overlay";
 import { Button, IconButton } from "@/components/ui/Button";
 import { cn } from "@/lib/client/cn";
 import { EoraChat } from "./EoraChat";
+import { EioraVisual } from "./EioraVisual";
 
 const OPEN_CHAT = "eora:open-chat";
 
@@ -28,6 +28,8 @@ const OPEN_CHAT = "eora:open-chat";
 export function openEoraChat(seed?: string) {
   window.dispatchEvent(new CustomEvent(OPEN_CHAT, { detail: { seed } }));
 }
+
+export const openEioraChat = openEoraChat;
 
 const TOUR_FOR_ROUTE: Record<string, string> = {
   "student-home": "student-home",
@@ -73,15 +75,15 @@ export function EoraLauncher({ compact }: { compact?: boolean }) {
         if (eora.isMinimized) eora.expand();
         if (eora.isPanelOpen) eora.closePanel(); else eora.openPanel();
       }}
-      className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg text-sm transition-colors hover:bg-deep-espresso",
+      className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg text-sm transition-colors hover:bg-deep-espresso/60",
         compact ? "size-10 justify-center pointer-coarse:size-11" : "min-h-10 w-full px-3 text-text-muted hover:text-text-primary")}
       aria-label={compact ? `Ask EORA, your guide${hasTip ? " (new tip)" : ""}` : hasTip ? "Ask EORA (new tip)" : undefined}
     >
-      <span className="relative size-6 shrink-0 rounded-full border border-border-medium bg-deep-espresso">
-        <span className="absolute inset-0 overflow-hidden rounded-full"><Image src="/assets/eora/avatar.png" alt="" fill sizes="24px" className="object-cover" /></span>
+      <span className="relative size-7 shrink-0 rounded-full border border-border-medium bg-deep-espresso flex items-center justify-center">
+        <EioraVisual state="idle" size={26} interactive={false} showOrbitalParticles={false} />
         {hasTip && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-obsidian bg-soft-amber" aria-hidden="true" />}
       </span>
-      {!compact && <span>Ask EORA</span>}
+      {!compact && <span className="font-medium">Ask EORA</span>}
     </button>
   );
 }
@@ -92,10 +94,22 @@ export function EoraCompanion() {
   const [chat, setChat] = useState<{ open: boolean; seed: { text: string; nonce: number } | null }>({ open: false, seed: null });
   const [input, setInput] = useState("");
   const [corner, setCorner] = useState<"right" | "left">("right");
+  const [landingScrolled, setLandingScrolled] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const speech = useSpeech();
 
-  const hidden = pathname === "/" || pathname.startsWith("/onboarding");
+  // On landing page, show Eora docked in bottom-right corner after scrolling past hero
+  useEffect(() => {
+    if (pathname !== "/") return;
+    const onScroll = () => {
+      setLandingScrolled(window.scrollY > 480);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [pathname]);
+
+  const hidden = (pathname === "/" && !landingScrolled) || pathname.startsWith("/onboarding");
   const inWorkspace = pathname.startsWith("/student");
 
   useEffect(() => {
@@ -283,9 +297,9 @@ export function EoraCompanion() {
           </div>
         )}
 
-        <div className={cn("flex items-center gap-1.5", inWorkspace && "hidden")}>
+        <div className="flex items-center gap-2">
           {showCard && !eora.isMinimized && (
-            <IconButton label="Minimise EORA" variant="secondary" className="size-9 rounded-full bg-bg-elevated border border-border-medium pointer-coarse:size-11" onClick={eora.minimize}>
+            <IconButton label="Minimise EORA" variant="secondary" className="size-9 rounded-full bg-bg-elevated/90 border border-border-medium backdrop-blur-md pointer-coarse:size-11" onClick={eora.minimize}>
               <Minus size={16} aria-hidden="true" />
             </IconButton>
           )}
@@ -298,10 +312,15 @@ export function EoraCompanion() {
               if (eora.isMinimized) { eora.expand(); return; }
               if (eora.isPanelOpen) eora.closePanel(); else eora.openPanel();
             }}
-            className="relative size-12 cursor-pointer overflow-hidden rounded-full border border-champagne/40 bg-deep-espresso shadow-[0_0_16px_rgba(196,138,90,0.25)] transition-transform duration-150 active:scale-95"
+            className="group relative size-14 cursor-pointer rounded-full border border-champagne/40 bg-bg-elevated/80 backdrop-blur-md shadow-[0_8px_30px_rgba(212,175,55,0.28)] transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center"
           >
-            <Image src="/assets/eora/avatar.png" alt="" fill sizes="48px" className="object-cover" />
-            {eora.isMinimized && message && <span className="absolute right-1 top-1 size-2.5 rounded-full border-2 border-deep-espresso bg-soft-amber" aria-hidden="true" />}
+            <EioraVisual
+              state={speech.speaking ? "speaking" : eora.isPanelOpen ? "speaking" : eora.isMinimized ? "minimized" : "idle"}
+              size={52}
+              interactive={false}
+              showOrbitalParticles={!eora.isMinimized}
+            />
+            {message && <span className="absolute right-0 top-0 size-3 rounded-full border-2 border-deep-espresso bg-soft-amber animate-pulse" aria-hidden="true" />}
           </button>
         </div>
       </div>
@@ -309,3 +328,5 @@ export function EoraCompanion() {
     </Portal>
   );
 }
+
+export const EioraCompanion = EoraCompanion;

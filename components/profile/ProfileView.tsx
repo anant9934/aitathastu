@@ -44,7 +44,7 @@ export function ProfileView() {
       eoraId="eora-profile-header"
       title={data.person.displayName}
       description={<>{p.headline || "Add a headline so people know what you work on."}{p.institution ? <> · {[p.degree, p.institution].filter(Boolean).join(", ")}</> : null}</>}
-      actions={data.activeGoal ? <Tag className="h-7 text-sm" >{data.activeGoal.title}</Tag> : undefined}
+      actions={data.activeGoal ? <span id="eora-profile-goals" data-eora-id="eora-profile-goals"><Tag className="h-7 text-sm">{data.activeGoal.title}</Tag></span> : undefined}
     >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="flex min-w-0 flex-col gap-5">

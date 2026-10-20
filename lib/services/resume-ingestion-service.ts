@@ -669,10 +669,25 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
   try {
     // Records first: a retry re-upserts the same ids, and decided rows are left alone.
     const t1 = Date.now();
-    const persisted = await persistExtraction({
-      personId, documentId, jobId: job.id, candidates: reviewCandidates as never,
-      quality: built.extraction.quality, llmUsed: llmEnrichmentSuccess, timings: { extractMs },
-    });
+    let persisted: Awaited<ReturnType<typeof persistExtraction>>;
+    try {
+      persisted = await persistExtraction({
+        personId, documentId, jobId: job.id, candidates: reviewCandidates as never,
+        quality: built.extraction.quality, llmUsed: llmEnrichmentSuccess, timings: { extractMs },
+      });
+    } catch (persistErr) {
+      const errMsg = persistErr instanceof Error ? persistErr.message : String(persistErr);
+      const isMissingTable = /relation .* does not exist/i.test(errMsg) || /table .* doesn't exist/i.test(errMsg);
+      console.error("[resume-pipeline] persistExtraction failed", {
+        jobId: job.id, documentId, personId,
+        stage: "persist_records",
+        errorClass: persistErr instanceof Error ? persistErr.constructor.name : "unknown",
+        errorCode: (persistErr as { code?: string }).code ?? null,
+        message: errMsg,
+        hint: isMissingTable ? "resume_extraction_runs or resume_extracted_records table is missing — run: npm run db:migrate" : undefined,
+      });
+      throw persistErr;
+    }
     review.extractionMeta.persistMs = Date.now() - t1;
     review.extractionMeta.runId = persisted.runId;
     for (const c of review.reviewCandidates) {
@@ -692,7 +707,10 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
       })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)))
       .returning();
-    if (updated.length !== 1) throw new Error(`resume_documents row ${documentId} not found for owner`);
+    if (updated.length !== 1) {
+      console.error("[resume-pipeline] resume_documents update returned no rows", { jobId: job.id, documentId, personId, stage: "persist_snapshot" });
+      throw new Error(`resume_documents row ${documentId} not found for owner`);
+    }
   } catch (err) {
     throw new PipelineFailure("PERSIST_FAILED", err);
   }

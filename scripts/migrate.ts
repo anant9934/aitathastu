@@ -20,8 +20,16 @@ import { getDb, seedDefaultEntities } from "../lib/db";
 import { MIGRATION_SQL_STATEMENTS } from "../lib/db/migration-sql";
 
 async function main() {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+
+  // In a CI/preview build with no DATABASE_URL the migrate step is a no-op so
+  // the build command ("npm run db:migrate && npm run build") still succeeds.
+  if (!databaseUrl || !databaseUrl.startsWith("postgres")) {
+    console.log("No PostgreSQL DATABASE_URL found – skipping migration (set DATABASE_URL to apply schema changes).");
+    process.exit(0);
+  }
+
   console.log("Applying database migrations and seeding defaults...");
-  const databaseUrl = process.env.DATABASE_URL;
 
   if (databaseUrl && databaseUrl.startsWith("postgres")) {
     const isNeon =

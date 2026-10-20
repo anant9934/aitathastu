@@ -17,6 +17,7 @@ import { NextActions, PriorityHero, StatRow } from "./DashboardParts";
 import { DashboardSectionView } from "./Sections";
 import { FocusEditor } from "./FocusEditor";
 import { DashboardSkeleton } from "./DashboardSkeleton";
+import { UnifiedEcosystemDock } from "./UnifiedEcosystemDock";
 import type { SkillsEvidenceIndex } from "@/lib/client/evidence";
 import { SkillsMap } from "@/components/skills/SkillsMap";
 import { requiredGaps, toMapSkill, type IntelligenceSkill } from "@/lib/client/skills-map-data";
@@ -129,6 +130,9 @@ export function DashboardView() {
       <Drawer open={focusOpen} onClose={() => setFocusOpen(false)} title="Your focus" description="What this dashboard is built around. Changes apply as soon as they save.">
         <FocusEditor targetRole={model.targetRole} purposes={settings?.purposes ?? []} onSave={saveFocus} />
       </Drawer>
+
+      {/* Floating Unified 5-World Ecosystem Dock */}
+      <UnifiedEcosystemDock />
     </div>
   );
 }

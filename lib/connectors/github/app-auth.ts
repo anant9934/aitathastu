@@ -190,6 +190,12 @@ async function appRequest<T>(url: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+/** The installation was deleted (404) or suspended (403) on GitHub: access is revoked, not misconfigured. */
+export function isInstallationRevokedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /request failed \(404\)/.test(message) || (/request failed \(403\)/.test(message) && /suspend/i.test(message));
+}
+
 export type InstallationRepository = {
   id: number;
   name: string;

@@ -23,13 +23,17 @@ async function graphQL(token: string, query: string) {
   return body;
 }
 
-function queryFor(repos: InstallationRepository[]) {
+function queryFor(repos: InstallationRepository[], authorNodeId: string | null) {
+  const authored = authorNodeId
+    ? `mine: history(first: 1, author: { id: ${JSON.stringify(authorNodeId)} }) { totalCount nodes { committedDate } }`
+    : "";
   return `query {
     ${repos.map((repo, i) => {
       const [owner, name] = repo.full_name.split("/");
       const blob = (alias: string, path: string) => `${alias}: object(expression: ${JSON.stringify(`HEAD:${path}`)}) { ... on Blob { text isBinary } }`;
       return `r${i}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) {
         languages(first: 10, orderBy: { field: SIZE, direction: DESC }) { edges { size node { name } } }
+        defaultBranchRef { target { ... on Commit { all: history(first: 0) { totalCount } ${authored} } } }
         ${blob("readme", "README.md")}
         ${GITHUB_MANIFESTS.map((path, j) => blob(`m${j}`, path)).join("\n")}
       }`;
@@ -48,8 +52,22 @@ export type PrivateInstallationAcquisition = {
  * Enumerates only repositories the owner explicitly selected during GitHub App
  * installation. Reads metadata/content; it has no write permission.
  */
-export async function acquireSelectedInstallationRepositories(token: string): Promise<PrivateInstallationAcquisition> {
-  const repos = await listGitHubInstallationRepositories(token);
+export async function acquireSelectedInstallationRepositories(
+  token: string,
+  opts: { onlyRepoIds?: ReadonlySet<number>; authorLogin?: string | null } = {},
+): Promise<PrivateInstallationAcquisition> {
+  const listed = await listGitHubInstallationRepositories(token);
+  const repos = opts.onlyRepoIds ? listed.filter((r) => opts.onlyRepoIds!.has(r.id)) : listed;
+  // The student's GitHub node ID, so commit authorship is checked by GitHub rather than assumed.
+  let authorNodeId: string | null = null;
+  if (opts.authorLogin && repos.length) {
+    try {
+      const who = await graphQL(token, `query { user(login: ${JSON.stringify(opts.authorLogin)}) { id } }`);
+      authorNodeId = typeof who.data?.user?.id === "string" ? who.data.user.id : null;
+    } catch {
+      authorNodeId = null;
+    }
+  }
   const deep = new Map<string, DeepRepoData>();
   const failedRepos: { repo: string; reason: string }[] = [];
   let queries = 0;
@@ -58,7 +76,7 @@ export async function acquireSelectedInstallationRepositories(token: string): Pr
   for (let start = 0; start < repos.length; start += 20) {
     const chunk = repos.slice(start, start + 20);
     try {
-      const body = await graphQL(token, queryFor(chunk));
+      const body = await graphQL(token, queryFor(chunk, authorNodeId));
       queries++;
       for (const err of body.errors || []) {
         const alias = typeof err.path?.[0] === "string" ? err.path[0] : "";
@@ -87,7 +105,15 @@ export async function acquireSelectedInstallationRepositories(token: string): Pr
           const value = read(node[`m${j}`], path, 8000);
           if (value !== undefined) manifests[path] = value;
         });
-        deep.set(repo.full_name, { readme: readme ? sanitizeTextForPrompt(readme).slice(0, 4000) : undefined, languages, manifests, observedFiles });
+        const history = node.defaultBranchRef?.target;
+        const commitCounts = history?.all
+          ? {
+              total: Number(history.all.totalCount) || 0,
+              authored: authorNodeId && history.mine ? Number(history.mine.totalCount) || 0 : null,
+              latestAuthoredAt: history.mine?.nodes?.[0]?.committedDate ?? null,
+            }
+          : undefined;
+        deep.set(repo.full_name, { readme: readme ? sanitizeTextForPrompt(readme).slice(0, 4000) : undefined, languages, manifests, observedFiles, commitCounts });
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message.slice(0, 140) : "private_repository_query_failed";

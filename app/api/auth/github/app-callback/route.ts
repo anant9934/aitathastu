@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { GITHUB_APP_RETURN_COOKIE, readCookie, safeGitHubReturnPath } from "@/lib/auth/github-return";
+import { withInstallation } from "@/lib/connectors/github/installations";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
@@ -49,7 +50,17 @@ export async function GET(req: Request) {
   }
 
   // "request": the install needs an organization owner's approval; GitHub sends no installation yet.
-  if (setupAction === "request") return errorRedirect("github_app_approval_pending");
+  // Remember it so the student sees "Approval pending" when they come back, even after a refresh.
+  if (setupAction === "request") {
+    const pending = await getExternalConnectionByProvider(auth.person.id, "github");
+    if (pending && pending.status !== "disconnected") {
+      await saveExternalConnection({
+        personId: auth.person.id, provider: "github", externalUsername: pending.externalUsername, profileUrl: pending.profileUrl,
+        metadata: { ...((pending.metadata || {}) as Record<string, unknown>), githubAppApprovalPendingAt: new Date().toISOString() },
+      }).catch(() => {});
+    }
+    return errorRedirect("github_app_approval_pending");
+  }
 
   if (!installationId || !/^\d+$/.test(installationId)) {
     return errorRedirect("github_app_state_invalid");
@@ -72,8 +83,9 @@ export async function GET(req: Request) {
 
     const existing = await getExternalConnectionByProvider(auth.person.id, "github");
 
-    // Guard against account mismatch: if student has a linked GitHub username, ensure the app was installed for that same user
-    if (existing?.externalUsername && installation.account?.login) {
+    // Guard against account mismatch: a personal installation must be on the student's own GitHub account.
+    // An organization installation is allowed: GitHub only lets owners (or approved requests) install on an organization.
+    if (existing?.externalUsername && installation.account?.login && installation.account.type !== "Organization") {
       if (existing.externalUsername.toLowerCase() !== installation.account.login.toLowerCase()) {
         return errorRedirect("github_app_account_mismatch");
       }
@@ -89,14 +101,21 @@ export async function GET(req: Request) {
       displayName: existing?.displayName || installation.account?.login || "GitHub",
       scopes: Array.isArray(existing?.scopes) ? existing.scopes as string[] : [],
       status: "connected",
+      // Added to the student's list of installations: a personal and organisation installations coexist,
+      // and a repeated callback for the same installation only refreshes it.
       metadata: {
         ...existingMetadata,
-        githubAppInstallationId: String(installation.id),
-        githubAppAccountLogin: installation.account?.login || null,
-        githubAppAccountType: installation.account?.type || null,
-        githubAppRepositorySelection: installation.repository_selection,
+        ...withInstallation(existingMetadata, {
+          id: String(installation.id),
+          accountLogin: installation.account?.login || null,
+          accountId: installation.account?.id ? String(installation.account.id) : null,
+          accountType: installation.account?.type === "Organization" ? "Organization" : installation.account?.type === "User" ? "User" : null,
+          repositorySelection: installation.repository_selection,
+        }),
         githubAppPermissions: installation.permissions,
         githubAppConnectedAt: new Date().toISOString(),
+        // A pending organisation request is settled only by an organisation installation.
+        ...(installation.account?.type === "Organization" ? { githubAppApprovalPendingAt: null } : {}),
       },
     });
 

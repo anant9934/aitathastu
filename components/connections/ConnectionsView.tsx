@@ -6,18 +6,17 @@
  * recent sync history, and a global footprint overview summary panel.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowsClockwise, CheckCircle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
-import { requestJson, describeError } from "@/lib/client/api";
+import { CheckCircle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
+import { requestJson } from "@/lib/client/api";
 import { formatDate } from "@/lib/client/format";
 import { useFootprintConnectors } from "@/lib/client/onboarding/use-footprint-connectors";
 import { PageFrame } from "@/components/layout/StudentShell";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
-import { Button } from "@/components/ui/Button";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { toast } from "@/components/ui/Feedback";
 import { SourceProgress } from "./SourceProgress";
 import { ConnectorList } from "./ConnectorList";
 import { LinkedInConnect } from "./LinkedInConnect";
+import { GitHubConnectCard } from "./GitHubConnectCard";
 import { sourceLabel } from "@/components/review/EntryList";
 
 type ConnectorRow = {
@@ -84,8 +83,7 @@ function FootprintOverview({ connectors, runs }: { connectors: ConnectorRow[]; r
 export function ConnectionsView() {
   const [connectors, setConnectors] = useState<ConnectorRow[]>([]);
   const [runs, setRuns] = useState<SyncRun[] | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const api = useFootprintConnectors({ initialProfiles: {}, discoveredResumeProfiles: {}, onProfilesChange: () => void loadRuns(), onCandidatesDiscovered: () => undefined });
+  const api = useFootprintConnectors({ initialProfiles: {}, discoveredResumeProfiles: {}, onProfilesChange: () => void loadRuns(), onCandidatesDiscovered: () => undefined, autoImportGitHub: false });
   const loadRuns = useCallback(async () => {
     const res = await requestJson<{ connectors?: ConnectorRow[]; recentSyncRuns?: SyncRun[] }>("/api/student/connections", { cache: "no-store" });
     if (res.ok) {
@@ -97,27 +95,20 @@ export function ConnectionsView() {
   }, []);
   useEffect(() => { void loadRuns(); }, [loadRuns]);
 
-  const syncGithub = async () => {
-    setSyncing(true);
-    const res = await requestJson<{ recordsFetched?: number; recordsChanged?: number }>("/api/student/connections/github/sync", { method: "POST" });
-    setSyncing(false);
-    if (!res.ok) { toast.error("GitHub didn't sync", describeError(res.error)); return; }
-    toast.success("GitHub synced", `${res.data.recordsFetched ?? 0} repositories read, ${res.data.recordsChanged ?? 0} updated.`);
-    await loadRuns();
-  };
-
   return (
     <PageFrame
       title="Connections"
       description="Every account is optional. We read public data only, and imported items stay suggestions until you confirm them."
-      actions={api.profiles.github ? <Button variant="secondary" size="sm" icon={<ArrowsClockwise size={16} aria-hidden="true" />} loading={syncing} loadingLabel="Syncing…" onClick={() => void syncGithub()}>Sync GitHub now</Button> : undefined}
     >
       <FootprintOverview connectors={connectors} runs={runs} />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <Panel aria-labelledby="accts-title">
             <PanelHeader id="accts-title" title="Accounts" />
-            <ConnectorList api={api} returnTo="/student/connections" />
+            <div className="flex flex-col gap-4">
+              <GitHubConnectCard returnTo="/student/connections" onPublicOnly={(username) => api.importFrom("github", username)} />
+              <ConnectorList api={api} exclude={["github"]} />
+            </div>
           </Panel>
         </div>
         <div className="flex min-w-0 flex-col gap-5">

@@ -41,6 +41,8 @@ export type ProjectLedgerMetadata = {
   analysisStage?: string;
   isPrivate?: boolean;
   accessMethod?: string;
+  /** Default-branch commits; `authored` is GitHub's author filter on the student's account, null when unknown. */
+  commitEvidence?: { total: number; authored: number | null; latestAuthoredAt: string | null; authorship: "github_author_filter" };
   /** The student's own role on the project, e.g. "Sole developer". */
   role?: string;
   /** Chips shown on the exported card, in order. */
@@ -66,6 +68,7 @@ export const IMPORT_METADATA_KEYS = [
   "analysisStage",
   "isPrivate",
   "accessMethod",
+  "commitEvidence",
 ] as const;
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : undefined);
@@ -87,6 +90,15 @@ export function sanitizeLedgerMetadata(raw: unknown): ProjectLedgerMetadata {
   if (str(m.analysisStage, 50)) out.analysisStage = str(m.analysisStage, 50);
   if (typeof m.isPrivate === "boolean") out.isPrivate = m.isPrivate;
   if (str(m.accessMethod, 50)) out.accessMethod = str(m.accessMethod, 50);
+  const ce = m.commitEvidence as Record<string, unknown> | undefined;
+  if (ce && typeof ce === "object" && num(ce.total) !== undefined && ce.authorship === "github_author_filter") {
+    out.commitEvidence = {
+      total: num(ce.total)!,
+      authored: ce.authored === null ? null : num(ce.authored) ?? null,
+      latestAuthoredAt: str(ce.latestAuthoredAt, 40) ?? null,
+      authorship: "github_author_filter",
+    };
+  }
   if (Array.isArray(m.languages)) out.languages = [...new Set(m.languages.map((l) => str(l, 40)).filter(Boolean) as string[])].slice(0, 12);
   const role = str(m.role, 80);
   if (role) out.role = role;

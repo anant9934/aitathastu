@@ -133,6 +133,8 @@ export async function executeFullGitHubExtraction(params: {
   trigger?: "user_refresh" | "onboarding" | "scheduled" | "api";
   forceDeepScan?: boolean;
   maxReposToInspect?: number;
+  /** Only these GitHub repository IDs are deep-inspected (the student's selection). */
+  onlyRepoIds?: ReadonlySet<number>;
 }): Promise<GitHubExtractionResult> {
   const { personId, trigger = "user_refresh", forceDeepScan: _forceDeepScan = false, maxReposToInspect } = params;
   const username = cleanUsername(params.username);
@@ -253,7 +255,7 @@ export async function executeFullGitHubExtraction(params: {
       failedResources.push({ resource: `repos:${username}`, error: errMsg, timestamp: new Date().toISOString() });
     }
 
-    const allRepos = reposRes.repos;
+    const allRepos = params.onlyRepoIds ? reposRes.repos.filter((r) => params.onlyRepoIds!.has(Number(r.id))) : reposRes.repos;
 
     // 4. Deep Inspection with Bounded Concurrency
     let processedReposCount = 0;
@@ -274,7 +276,7 @@ export async function executeFullGitHubExtraction(params: {
         try {
           const deep = await fetchRepositoryDeepDetails(
             repo,
-            { login: profile.login, name: profile.name, email: profile.email },
+            { id: profile.id, login: profile.login, name: profile.name, email: profile.email },
             token
           );
 

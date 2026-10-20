@@ -1,4 +1,4 @@
-import { createGitHubInstallationToken } from "@/lib/connectors/github/app-auth";
+import { createGitHubInstallationToken, isInstallationRevokedError } from "@/lib/connectors/github/app-auth";
 import { acquireSelectedInstallationRepositories } from "@/lib/connectors/github/app-installation-acquisition";
 import { mapRawRepoToProject } from "@/lib/connectors/github/client";
 import {
@@ -17,6 +17,8 @@ import {
   updateGitHubSyncRun,
 } from "@/lib/repositories/github-intelligence-repository";
 import type { RepositoryDeepDetails } from "@/lib/connectors/github/deep-collector";
+import { savedGitHubSelection } from "@/lib/connectors/github/selection";
+import { activeInstallations, withInstallationRevoked } from "@/lib/connectors/github/installations";
 
 export type GitHubAppSyncStatus =
   | "PENDING"
@@ -25,7 +27,8 @@ export type GitHubAppSyncStatus =
   | "PARTIAL"
   | "RATE_LIMITED"
   | "FAILED"
-  | "NOT_AUTHORIZED";
+  | "NOT_AUTHORIZED"
+  | "REVOKED";
 
 export interface GitHubAppSyncSummary {
   success: boolean;
@@ -36,6 +39,8 @@ export interface GitHubAppSyncSummary {
   privateRepositoryCount: number;
   processedRepositoryCount: number;
   failedRepositories: Array<{ repo: string; reason: string }>;
+  /** GitHub repository IDs written in this run. */
+  importedRepositoryIds?: number[];
   recordsCreatedOrUpdated: number;
   queriesExecuted: number;
   rateLimit?: {
@@ -56,11 +61,18 @@ export type GitHubAppSyncResult = GitHubAppSyncSummary;
  * persisted. Existing OAuth credentials/metadata are preserved.
  * Persists to both Core V4 tables and GitHub Intelligence relational tables.
  */
-export async function syncGitHubAppInstallation(personId: string): Promise<GitHubAppSyncSummary> {
+export async function syncGitHubAppInstallation(
+  personId: string,
+  opts: { onlyRepoIds?: ReadonlySet<number>; installationId?: string } = {},
+): Promise<GitHubAppSyncSummary> {
   const startedAt = new Date().toISOString();
   const connection = await getExternalConnectionByProvider(personId, "github");
   const metadata = (connection?.metadata || {}) as Record<string, unknown>;
-  const installationId = metadata.githubAppInstallationId;
+  // Only one of this student's own, still-active installations may be used.
+  const active = activeInstallations(metadata);
+  const installationId = opts.installationId
+    ? active.find((i) => i.id === opts.installationId)?.id
+    : (active.find((i) => i.id === metadata.githubAppInstallationId) ?? active[0])?.id;
 
   if (!connection || connection.status === "disconnected") {
     return {
@@ -101,7 +113,11 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
 
   try {
     const token = await createGitHubInstallationToken(installationId);
-    const acquisition = await acquireSelectedInstallationRepositories(token);
+    const acquisition = await acquireSelectedInstallationRepositories(token, {
+      onlyRepoIds: opts.onlyRepoIds ?? savedGitHubSelection(metadata) ?? undefined,
+      authorLogin: connection.externalUsername,
+    });
+    const importedRepositoryIds: number[] = [];
 
     syncRun = await createSyncRun(connection.id, personId, "github");
     try {
@@ -200,6 +216,8 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
             license: project.license || undefined,
             analysisStage: project.analysisStage,
             accessMethod: "github_app_installation",
+            // Default-branch commits; "authored" is GitHub's own author filter on the student's account (null = unknown).
+            ...(deep?.commitCounts ? { commitEvidence: { ...deep.commitCounts, authorship: "github_author_filter" } } : {}),
           },
         });
 
@@ -267,12 +285,13 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
           checksum: project.checksum,
           firstCommitAt: null,
           lastPushAt: repo.pushed_at || null,
+          // Only commits GitHub links to the student's account count as theirs.
           commitAnalytics: {
-            totalAccessibleCommits: 0,
-            candidateCommits: 0,
-            otherContributorsCommits: 0,
+            totalAccessibleCommits: deep?.commitCounts?.total ?? 0,
+            candidateCommits: deep?.commitCounts?.authored ?? 0,
+            otherContributorsCommits: deep?.commitCounts && deep.commitCounts.authored !== null ? Math.max(0, deep.commitCounts.total - deep.commitCounts.authored) : 0,
             firstCommitDate: null,
-            latestCommitDate: null,
+            latestCommitDate: deep?.commitCounts?.latestAuthoredAt ?? null,
             activityLast30Days: 0,
             activityLast90Days: 0,
             activityLast365Days: 0,
@@ -292,6 +311,7 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
 
         recordsChanged++;
         processedCount++;
+        importedRepositoryIds.push(repo.id);
       } catch (error) {
         if (!failedRepos.some((item) => item.repo === repo.full_name)) {
           failedRepos.push({
@@ -365,6 +385,7 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
       privateRepositoryCount: privateCount,
       processedRepositoryCount: processedCount,
       failedRepositories: failedRepos,
+      importedRepositoryIds,
       recordsCreatedOrUpdated: recordsChanged,
       queriesExecuted: acquisition.queries,
       startedAt,
@@ -375,7 +396,18 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
     const completedAt = new Date().toISOString();
     const errMsg = error instanceof Error ? error.message : "GitHub App sync failed.";
     const isRateLimit = /rate limit/i.test(errMsg);
-    const finalStatus: GitHubAppSyncStatus = isRateLimit ? "RATE_LIMITED" : "FAILED";
+    const revoked = isInstallationRevokedError(error);
+    const finalStatus: GitHubAppSyncStatus = revoked ? "REVOKED" : isRateLimit ? "RATE_LIMITED" : "FAILED";
+    if (revoked) {
+      // Keep the account link and every imported record; only private access is gone.
+      await saveExternalConnection({
+        personId, provider: "github", externalUsername: connection.externalUsername,
+        externalAccountId: connection.externalAccountId || undefined, profileUrl: connection.profileUrl,
+        displayName: connection.displayName || undefined,
+        scopes: Array.isArray(connection.scopes) ? connection.scopes as string[] : [],
+        metadata: { ...metadata, ...withInstallationRevoked(metadata, installationId, completedAt), githubAppLastSyncStatus: "REVOKED" },
+      }).catch(() => {});
+    }
 
     if (syncRun) {
       await completeSyncRun(syncRun.id, {
@@ -407,7 +439,7 @@ export async function syncGitHubAppInstallation(personId: string): Promise<GitHu
       queriesExecuted: 0,
       startedAt,
       completedAt,
-      error: errMsg.slice(0, 220),
+      error: revoked ? "GitHub App access was removed or suspended on GitHub. Reconnect to choose repositories again." : errMsg.slice(0, 220),
     };
   }
 }

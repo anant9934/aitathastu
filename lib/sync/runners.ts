@@ -100,7 +100,7 @@ const PLAIN_REASONS: Record<string, string> = {
 };
 
 const RECONNECT_CODES = new Set(["github_auth", "not_runnable"]);
-const RECONNECT_URLS: Record<string, string> = { github: "/api/auth/github/start?returnTo=/student/connections" };
+const RECONNECT_URLS: Record<string, string> = { github: "/api/auth/github/connect?returnTo=/student/connections" };
 
 /** What the sync-status UI shows for one source. */
 export function describeOperation(op: SyncOperationRow) {

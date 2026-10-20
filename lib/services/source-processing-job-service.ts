@@ -16,7 +16,7 @@
  */
 
 import crypto from "node:crypto";
-import { eq, and, desc, lt, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, lt, ne, inArray, sql } from "drizzle-orm";
 import { getDb, sourceProcessingJobs } from "@/lib/db";
 
 export type ProcessingStage =
@@ -276,7 +276,10 @@ export class SourceProcessingJobService {
       .where(
         and(
           inArray(sourceProcessingJobs.status, IN_FLIGHT_JOB_STATUSES),
-          lt(sourceProcessingJobs.startedAt, cutoff)
+          lt(sourceProcessingJobs.startedAt, cutoff),
+          // GitHub imports legitimately run longer (batches, rate-limit pauses); they are
+          // resumed or closed by their own heartbeat in lib/services/github-import-job.ts.
+          ne(sourceProcessingJobs.sourceId, "github_import")
         )
       )
       .returning();

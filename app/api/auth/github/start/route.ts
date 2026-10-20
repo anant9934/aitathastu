@@ -12,6 +12,8 @@ export async function GET(req: Request) {
 
   // Where to land after OAuth. Only these in-app paths are allowed (no open redirect).
   const returnTo = safeGitHubReturnPath(url.searchParams.get("returnTo"));
+  // "app": the unified connect flow, which continues to the GitHub App install and lets the student choose repositories.
+  const then = url.searchParams.get("then") === "app" ? "app" : undefined;
 
   const auth = await getServerAuthContext();
   if (!auth) {
@@ -30,7 +32,7 @@ export async function GET(req: Request) {
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
   const state = crypto.randomBytes(24).toString("hex");
 
-  const statePayload = JSON.stringify({ state, personId: auth.person.id, returnTo });
+  const statePayload = JSON.stringify({ state, personId: auth.person.id, returnTo, ...(then ? { then } : {}) });
   const encodedState = Buffer.from(statePayload).toString("base64url");
 
   const ghAuthUrl = new URL("https://github.com/login/oauth/authorize");

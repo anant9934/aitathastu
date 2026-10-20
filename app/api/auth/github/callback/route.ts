@@ -4,6 +4,8 @@ import { connectGitHubAccount, syncGitHubConnection } from "@/lib/services/githu
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 import { readCookie, safeGitHubReturnPath } from "@/lib/auth/github-return";
+import { isGitHubAppConfigured } from "@/lib/connectors/github/app-auth";
+import { getExternalConnectionByProvider } from "@/lib/repositories/connection-repository";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -18,7 +20,7 @@ export async function GET(req: Request) {
   const baseUrl = getCanonicalOrigin(req);
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
-  let parsedState: { state: string; personId: string; returnTo?: string } | null = null;
+  let parsedState: { state: string; personId: string; returnTo?: string; then?: string } | null = null;
   try {
     parsedState = encodedState ? JSON.parse(Buffer.from(encodedState, "base64url").toString("utf-8")) : null;
   } catch {
@@ -106,6 +108,20 @@ export async function GET(req: Request) {
         ? tokenData.scope.split(/[\s,]+/).filter(Boolean)
         : (userRes.headers.get("x-oauth-scopes") || "").split(/[\s,]+/).filter(Boolean),
     });
+
+    // Unified connect: the student chooses repositories before anything is imported, so no
+    // sync runs here. Continue to the GitHub App install unless private access is already set up.
+    if (parsedState.then === "app") {
+      const connection = await getExternalConnectionByProvider(auth.person.id, "github");
+      const meta = (connection?.metadata || {}) as Record<string, unknown>;
+      const hasInstallation = typeof meta.githubAppInstallationId === "string" && !meta.githubAppRevokedAt;
+      const next = isGitHubAppConfigured() && !hasInstallation
+        ? `/api/auth/github/app-start?returnTo=${encodeURIComponent(returnPath)}`
+        : `${returnPath}?success=github_connected&flow=unified`;
+      const response = NextResponse.redirect(new URL(next, baseUrl));
+      response.cookies.delete("tathastu_gh_oauth_state");
+      return response;
+    }
 
     // Awaited, never fire-and-forget: on serverless platforms (e.g. Vercel) a detached
     // promise is frozen or killed once the response is sent, silently dropping the sync.

@@ -103,6 +103,11 @@ export type DeepRepoData = {
   manifests: Record<string, string>;
   observedFiles: string[];
   failure?: string;
+  /**
+   * Default-branch commit counts. `authored` counts only commits GitHub links to the
+   * student's account (null when that account is unknown), so nothing is attributed by guess.
+   */
+  commitCounts?: { total: number; authored: number | null; latestAuthoredAt: string | null };
 };
 
 export type GraphQLAcquisition = {
@@ -133,6 +138,8 @@ export async function acquireGitHubViaGraphQL(params: {
   maxDeep?: number;
   cursor?: string;
   correlationId?: string;
+  /** Only these GitHub repository IDs are returned and deep-read (the student's selection). */
+  onlyRepoIds?: ReadonlySet<number>;
 }): Promise<GraphQLAcquisition> {
   const maxRepos = params.maxRepos ?? 2000;
   let cursor: string | null = params.cursor ?? null;
@@ -200,7 +207,7 @@ export async function acquireGitHubViaGraphQL(params: {
     throw new GitHubGraphQLError(`Could not acquire GitHub profile for "${params.login}".`);
   }
 
-  const repos: RawGitHubRepo[] = rawNodes.map((n) => ({
+  const allRepos: RawGitHubRepo[] = rawNodes.map((n) => ({
     id: n.databaseId,
     name: n.name,
     full_name: n.nameWithOwner,
@@ -223,6 +230,7 @@ export async function acquireGitHubViaGraphQL(params: {
     pushed_at: n.pushedAt ?? undefined,
     homepage: n.homepageUrl,
   }));
+  const repos = params.onlyRepoIds ? allRepos.filter((r) => params.onlyRepoIds!.has(Number(r.id))) : allRepos;
 
   const prev = params.previousPushedAt ?? new Map<string, string>();
   const changed = repos.filter((r) => !r.fork && prev.get(r.full_name) !== r.pushed_at);

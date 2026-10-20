@@ -132,7 +132,7 @@ export interface ExtractedCommit {
   deletions: number;
   totalChanges: number;
   isAttributedToCandidate: boolean;
-  attributionMethod: "login_match" | "email_match" | "name_match" | "unattributed" | "unknown" | "ambiguous";
+  attributionMethod: "login_match" | "email_match" | "name_match" | "unattributed" | "unknown" | "ambiguous" | "merge_commit" | "bot";
   commitUrl: string;
 }
 
@@ -591,9 +591,37 @@ const SECRET_FILE_PATTERNS = [
 /**
  * 3. Deep Per-Repository Extraction
  */
+/**
+ * Whether a commit is the student's. Only GitHub's own link from the commit's
+ * AUTHOR to the student's account counts (user ID when known, which survives a
+ * renamed login; otherwise login). Not counted, conservatively:
+ *   - merge commits (combining work is not authoring it) and bot commits;
+ *   - a matching committer only (rebasing or cherry-picking someone else's work);
+ *   - a matching email or display name without that link: anyone can write
+ *     any name or email into a commit, so these are "ambiguous", never credited.
+ */
+export function attributeCommit(
+  c: { authorId: number | null; authorLogin: string | null; authorType: string | null; authorName: string | null; authorEmail: string | null; committerLogin: string | null; parentCount: number },
+  candidate: { id?: number | null; login: string; name?: string | null; email?: string | null },
+): { isAttributed: boolean; attributionMethod: ExtractedCommit["attributionMethod"] } {
+  const login = candidate.login.toLowerCase();
+  if (c.authorType === "Bot" || /\[bot\]$/i.test(c.authorLogin ?? "")) return { isAttributed: false, attributionMethod: "bot" };
+  const linked = candidate.id && c.authorId ? c.authorId === candidate.id : Boolean(c.authorLogin && c.authorLogin.toLowerCase() === login);
+  if (linked) {
+    return c.parentCount > 1 ? { isAttributed: false, attributionMethod: "merge_commit" } : { isAttributed: true, attributionMethod: "login_match" };
+  }
+  const email = candidate.email?.toLowerCase().trim();
+  const name = candidate.name?.toLowerCase().trim();
+  const looksLikeCandidate =
+    (c.committerLogin && c.committerLogin.toLowerCase() === login) ||
+    (email && c.authorEmail?.toLowerCase() === email) ||
+    (name && name.length > 2 && c.authorName?.toLowerCase().trim() === name);
+  return { isAttributed: false, attributionMethod: looksLikeCandidate ? "ambiguous" : "unattributed" };
+}
+
 export async function fetchRepositoryDeepDetails(
   repo: RawDiscoveredRepo,
-  candidateProfile: { login: string; name?: string | null; email?: string | null },
+  candidateProfile: { id?: number | null; login: string; name?: string | null; email?: string | null },
   token?: string
 ): Promise<RepositoryDeepDetails> {
   const [owner, name] = repo.full_name.split("/");
@@ -781,8 +809,6 @@ export async function fetchRepositoryDeepDetails(
   const commits: ExtractedCommit[] = [];
   const observedShas = new Set<string>();
 
-  const candidateNameLower = candidateProfile.name ? candidateProfile.name.toLowerCase().trim() : null;
-  const candidateEmailLower = candidateProfile.email ? candidateProfile.email.toLowerCase().trim() : null;
 
   let candidateCommitsCount = 0;
   let otherCommitsCount = 0;
@@ -818,32 +844,11 @@ export async function fetchRepositoryDeepDetails(
       const committerEmail = committer?.email ? String(committer.email) : null;
       const committerDate = String(committer?.date || authorDate);
 
-      // Attribution Check
-      let isAttributed = false;
-      let attributionMethod: ExtractedCommit["attributionMethod"] = "unattributed";
-
-      if (
-        (authorLogin && authorLogin.toLowerCase() === candidateLoginLower) ||
-        (committerLogin && committerLogin.toLowerCase() === candidateLoginLower)
-      ) {
-        isAttributed = true;
-        attributionMethod = "login_match";
-      } else if (
-        candidateEmailLower &&
-        ((authorEmail && authorEmail.toLowerCase() === candidateEmailLower) ||
-          (committerEmail && committerEmail.toLowerCase() === candidateEmailLower))
-      ) {
-        isAttributed = true;
-        attributionMethod = "email_match";
-      } else if (
-        candidateNameLower &&
-        candidateNameLower.length > 2 &&
-        ((authorName && authorName.toLowerCase() === candidateNameLower) ||
-          (committerName && committerName.toLowerCase() === candidateNameLower))
-      ) {
-        isAttributed = true;
-        attributionMethod = "name_match";
-      }
+      // Only GitHub's own link between the commit author and the student's account counts.
+      const { isAttributed, attributionMethod } = attributeCommit(
+        { authorId: c.author?.id ?? null, authorLogin, authorType: c.author?.type ?? null, authorName, authorEmail, committerLogin, parentCount: Array.isArray(c.parents) ? c.parents.length : 0 },
+        candidateProfile,
+      );
 
       if (isAttributed) {
         candidateCommitsCount++;

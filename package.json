@@ -22,6 +22,8 @@
     "test:portfolio-network": "node --import tsx --test scripts/verify-portfolio-network.test.mjs",
     "test:core-v4-7": "node --env-file=.env --import tsx scripts/verify-v4-7-skill-intelligence.ts",
     "test:core-v4-6": "node --env-file=.env --import tsx scripts/verify-v4-6-digital-import.ts",
+    "test:github-unified": "node --import tsx --test scripts/verify-github-unified-connect.ts scripts/verify-github-unified-import.ts",
+    "e2e:github-card": "node --import tsx scripts/e2e-github-card-states.ts",
     "test:github-intelligence": "node --import tsx scripts/verify-github-intelligence-engine.ts",
     "test:github-private-auth": "node --import tsx scripts/verify-github-private-auth.ts",
     "test:github-repo-discovery": "node --import tsx scripts/verify-github-repo-discovery.ts",

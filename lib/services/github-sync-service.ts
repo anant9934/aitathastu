@@ -3,6 +3,7 @@ import { encryptConnectionToken, decryptConnectionToken, decryptConnectionTokenW
 import { coreIngestionReady } from "../security/core-ingestion-gate";
 import { mapRawRepoToProject } from "../connectors/github/client";
 import { acquireGitHubViaGraphQL, GitHubGraphQLError } from "../connectors/github/graphql";
+import { savedGitHubSelection } from "../connectors/github/selection";
 import { isServeFromCacheError } from "../connectors/rate-limiter";
 import { saveProject } from "../repositories/project-repository";
 import { writeEvidenceBatch } from "../repositories/evidence-repository";
@@ -31,6 +32,9 @@ export type GitHubSyncResult = {
   queries?: number;
   recordsFetched: number;
   recordsChanged: number;
+  /** GitHub repository IDs written this run, and how many were unchanged since the last run. */
+  importedRepoIds?: number[];
+  unchanged?: number;
   projects: DiscoveredGitHubProject[];
   error?: string;
 };
@@ -211,6 +215,8 @@ export function toGitHubSyncResult(run: RunSyncResult): GitHubSyncResult {
     recordsChanged: result.recordsChanged ?? 0,
     failedRepos: result.failedRepos ?? [],
     queries: result.queries,
+    importedRepoIds: result.importedRepoIds ?? [],
+    unchanged: result.unchanged ?? 0,
     projects: [],
     error: settled || inFlight ? undefined : op.lastError ?? undefined,
   };
@@ -223,6 +229,9 @@ export type GitHubImportSummary = {
   unchanged: number;
   failedRepos: { repo: string; reason: string }[];
   queries: number;
+  /** GitHub repository IDs written in this run, and those skipped as unchanged since the last import. */
+  importedRepoIds?: number[];
+  unchangedRepoIds?: number[];
 };
 
 /**
@@ -240,6 +249,10 @@ export async function importGitHubRepositories(params: {
   metadata: Record<string, unknown>;
   profileUrl: string;
   ctx: SyncContext;
+  /** One batch of a durable import job; defaults to the student's saved selection. */
+  onlyRepoIds?: ReadonlySet<number>;
+  /** "await": run commit/PR extraction inside this call (durable jobs); "background": fire and forget (legacy). */
+  deepExtraction?: "background" | "await";
 }): Promise<SyncWorkResult> {
   const { personId, ctx } = params;
   const syncRun = await createSyncRun(params.connectionId, personId, "github");
@@ -250,7 +263,11 @@ export async function importGitHubRepositories(params: {
       const data = snap.snapshotData as { fullName?: string; pushedAt?: string };
       if (data?.fullName && data.pushedAt && !previousPushedAt.has(data.fullName)) previousPushedAt.set(data.fullName, data.pushedAt);
     }
-    const acq = await acquireGitHubViaGraphQL({ login: params.login, token: params.token, previousPushedAt, correlationId: ctx.correlationId });
+    // Respect the student's repository selection; private repositories come only through the GitHub App.
+    const selection = params.onlyRepoIds ? new Set(params.onlyRepoIds) : savedGitHubSelection(params.metadata);
+    const acq = await acquireGitHubViaGraphQL({ login: params.login, token: params.token, previousPushedAt, correlationId: ctx.correlationId, onlyRepoIds: selection ?? undefined });
+    acq.repos = acq.repos.filter((r) => !r.private);
+    const importedRepoIds: number[] = [];
     ctx.log.info("github.acquired", { metadata: { repos: acq.repos.length, deep: acq.deep.size, unchanged: acq.unchanged.length, queries: acq.queries, rateLimitRemaining: acq.rateLimitRemaining } });
 
     const unchanged = new Set(acq.unchanged.filter((name) => previousPushedAt.has(name)));
@@ -308,6 +325,7 @@ export async function importGitHubRepositories(params: {
           importKey: `github_skill_${project.id}_${finding.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
         })));
         recordsChanged++;
+        importedRepoIds.push(Number(repo.id));
       } catch (error) {
         failedRepos.push({ repo: repo.full_name, reason: `persist:${error instanceof Error ? error.message.slice(0, 120) : "error"}` });
         ctx.log.warn("github.repo.failed", { error: error instanceof Error ? error.message : String(error), metadata: { repo: repo.full_name } });
@@ -319,24 +337,28 @@ export async function importGitHubRepositories(params: {
       metadata: { ...params.metadata, lastSyncedAt: new Date().toISOString(), repositoryCount: acq.repos.length, recordsChanged },
     });
 
-    // Trigger deep intelligence extraction asynchronously so normalized tables are populated
-    import("./github-intelligence-service")
+    // Commit / PR / contribution extraction for the same repositories. A durable job awaits it so a
+    // serverless runtime can't drop it after the response; a failure here never fails the import.
+    const deep = import("./github-intelligence-service")
       .then(({ executeFullGitHubExtraction }) =>
         executeFullGitHubExtraction({
           personId,
           username: params.login,
           token: params.token,
           trigger: "user_refresh",
+          onlyRepoIds: selection ?? undefined,
         })
       )
       .catch((err) => {
-        ctx.log.warn("github.intelligence.background_failed", {
+        ctx.log.warn("github.intelligence.extraction_failed", {
           error: err instanceof Error ? err.message : String(err),
         });
       });
+    if (params.deepExtraction === "await") await deep;
 
     const summary: GitHubImportSummary = {
-      syncRunId: syncRun.id, recordsFetched: acq.repos.length, recordsChanged, unchanged: unchanged.size, failedRepos, queries: acq.queries,
+      syncRunId: syncRun.id, recordsFetched: acq.repos.length, recordsChanged, unchanged: unchanged.size, failedRepos, queries: acq.queries, importedRepoIds,
+      unchangedRepoIds: acq.repos.filter((r) => unchanged.has(r.full_name)).map((r) => Number(r.id)),
     };
     await completeSyncRun(syncRun.id, {
       status: failedRepos.length ? "partial" : "completed",

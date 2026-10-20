@@ -41,6 +41,7 @@ export function useFootprintConnectors({
   onProfilesChange,
   onCandidatesDiscovered,
   autoLinkDiscovered = true,
+  autoImportGitHub = true,
 }: {
   initialProfiles: Partial<Record<string, string>>;
   discoveredResumeProfiles: Partial<Record<string, string>>;
@@ -48,6 +49,8 @@ export function useFootprintConnectors({
   onCandidatesDiscovered: (candidates: DiscoveredCandidates, provider: string) => void;
   /** false: CV-found links wait for the student to confirm them instead of being linked on sight. */
   autoLinkDiscovered?: boolean;
+  /** false: after GitHub sign-in nothing is imported until the student chooses repositories. */
+  autoImportGitHub?: boolean;
 }) {
   const merged = autoLinkDiscovered ? { ...discoveredResumeProfiles, ...initialProfiles } : { ...initialProfiles };
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>(merged);
@@ -80,6 +83,7 @@ export function useFootprintConnectors({
   // a footprint import so the draft's projects list is populated without the
   // user having to manually click "Import". Fires at most once per page load.
   const autoImportGitHubRef = useRef(
+    autoImportGitHub &&
     typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("success") === "github_connected"
   );

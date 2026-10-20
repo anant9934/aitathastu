@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { runDueRetries, runScheduledFootprintRefresh } from "@/lib/sync/runners";
+import { resumeStalledImports } from "@/lib/services/github-import-job";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,6 +18,8 @@ export async function GET(request: NextRequest) {
   const retries = await runDueRetries({ limit: 10 });
   // TTL-based refresh of footprint sources (Task 1.6.6), after retries.
   const refresh = await runScheduledFootprintRefresh({ limit: 20 });
-  return NextResponse.json({ retries, refresh });
+  // GitHub imports nobody is watching continue here; ones silent for a day are closed as failed.
+  const githubImports = await resumeStalledImports({ limit: 3, budgetMs: 15_000 });
+  return NextResponse.json({ retries, refresh, githubImports });
 }
 

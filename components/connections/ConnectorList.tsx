@@ -7,19 +7,17 @@
  * portalled drawer, positioned against the viewport (P4-18).
  */
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowClockwise, ArrowSquareOut, CheckCircle, FileArrowUp, Plugs, ShieldCheck, Trash } from "@phosphor-icons/react/dist/ssr";
-import { PLATFORMS, PLATFORM_GROUPS, platformById } from "@/lib/client/onboarding/platforms";
+import { ArrowClockwise, CheckCircle, FileArrowUp, Plugs, ShieldCheck, Trash } from "@phosphor-icons/react/dist/ssr";
+import { PLATFORMS, PLATFORM_GROUPS, platformById, type PlatformGroup } from "@/lib/client/onboarding/platforms";
 import type { FootprintStatus } from "@/lib/client/onboarding/use-footprint-connectors";
 import { readExportFile } from "@/lib/client/onboarding/use-footprint-connectors";
-import { Button, buttonClass } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Overlay";
 import { TextField } from "@/components/ui/Field";
 import { Banner } from "@/components/ui/Banner";
 import { StatusChip, Tag, type Tone } from "@/components/ui/StatusChip";
 import { useConfirm, toast } from "@/components/ui/Feedback";
 import { SourceMark } from "./SourceMark";
-import { GitHubPrivateAccessControls } from "./GitHubPrivateAccessControls";
-import { leaveAfter } from "./leave-after";
 
 export const STATUS_VIEW: Record<FootprintStatus, { label: string; tone: Tone }> = {
   not_connected: { label: "Not connected", tone: "neutral" },
@@ -44,15 +42,14 @@ export type ConnectorApi = {
   disconnect: (provider: string) => Promise<string | null>;
 };
 
-export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid", grouped = false, exclude = [], beforeLeave }: {
+export function ConnectorList({ api, eoraId = "eora-connections-grid", grouped = false, exclude = [], groupSlots = {} }: {
   api: ConnectorApi;
-  returnTo: string;
   eoraId?: string;
-  /** Awaited before leaving for GitHub (sign-in or app install). */
-  beforeLeave?: () => Promise<unknown>;
   /** Group rows by what each source is for (onboarding) instead of linked / available. */
   grouped?: boolean;
   exclude?: string[];
+  /** Custom content shown first inside a group (e.g. the unified GitHub card). */
+  groupSlots?: Partial<Record<PlatformGroup, React.ReactNode>>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const shown = PLATFORMS.filter((p) => !exclude.includes(p.id));
@@ -91,16 +88,20 @@ export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid",
       <div data-eora-id={eoraId} className="flex flex-col gap-6">
         {PLATFORM_GROUPS.map((g) => {
           const rows = shown.filter((p) => p.group === g.id);
-          if (!rows.length) return null;
+          const slot = groupSlots[g.id];
+          if (!rows.length && !slot) return null;
           return (
             <section key={g.id} aria-labelledby={`group-${g.id}`}>
               <h3 id={`group-${g.id}`} className="font-display text-sm font-semibold text-text-primary">{g.name}</h3>
               <p className="mb-2 text-xs text-text-muted">{g.purpose}</p>
-              <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{rows.map((p) => row(p.id))}</ul>
+              <div className="flex flex-col gap-3">
+                {slot}
+                {rows.length > 0 && <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{rows.map((p) => row(p.id))}</ul>}
+              </div>
             </section>
           );
         })}
-        {openId && <ConnectorDrawer id={openId} api={api} returnTo={returnTo} beforeLeave={beforeLeave} onClose={() => setOpenId(null)} />}
+        {openId && <ConnectorDrawer id={openId} api={api} onClose={() => setOpenId(null)} />}
       </div>
     );
   }
@@ -117,12 +118,12 @@ export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid",
         <h3 id="available-title" className="mb-2 font-display text-sm font-semibold text-text-primary">{linked.length ? "More you can add" : "Available"} <span className="font-mono text-text-muted tabular">{rest.length}</span></h3>
         <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{rest.map((p) => row(p.id))}</ul>
       </section>
-      {openId && <ConnectorDrawer id={openId} api={api} returnTo={returnTo} beforeLeave={beforeLeave} onClose={() => setOpenId(null)} />}
+      {openId && <ConnectorDrawer id={openId} api={api} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
 
-function ConnectorDrawer({ id, api, returnTo, beforeLeave, onClose }: { id: string; api: ConnectorApi; returnTo: string; beforeLeave?: () => Promise<unknown>; onClose: () => void }) {
+function ConnectorDrawer({ id, api, onClose }: { id: string; api: ConnectorApi; onClose: () => void }) {
   const p = platformById(id)!;
   const [value, setValue] = useState(api.profiles[id] && !String(api.profiles[id]).startsWith("Archive:") ? String(api.profiles[id]) : "");
   const [upload, setUpload] = useState<{ name: string; content: string } | null>(null);
@@ -183,28 +184,6 @@ function ConnectorDrawer({ id, api, returnTo, beforeLeave, onClose }: { id: stri
         )}
         {done && <Banner kind="success">Done. Closing…</Banner>}
         {error && <Banner kind="danger" title="That didn't work">{error}</Banner>}
-
-        {id === "github" && (
-          <div className="rounded-lg border border-border-medium bg-bg-surface/50 p-3.5 text-sm">
-            <p className="font-medium text-text-primary">Three levels of GitHub access</p>
-            <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-5 text-text-muted">
-              <li><span className="text-text-primary">Username:</span> reads your public repositories. It does not prove the account is yours or reach private repositories.</li>
-              <li><span className="text-text-primary">Sign in with GitHub:</span> confirms the account is yours. It asks only to read your public profile (<code className="font-mono text-xs">read:user</code>), still public repositories only.</li>
-              <li><span className="text-text-primary">Install the GitHub App:</span> on GitHub you choose exactly which repositories, including private ones, we may read. Access is read-only and you can revoke it in GitHub settings.</li>
-            </ol>
-            {status !== "connected" && (
-              <>
-                {status === "detected" && <p className="mt-2 text-text-muted">We read this account&apos;s public repositories, but haven&apos;t confirmed it&apos;s yours.</p>}
-                <a className={buttonClass("secondary", "sm", "mt-3")} href={`/api/auth/github/start?returnTo=${encodeURIComponent(returnTo)}`} onClick={leaveAfter(beforeLeave)}>
-                  <ArrowSquareOut size={16} aria-hidden="true" /> Sign in with GitHub
-                </a>
-                <p className="mt-2 text-xs text-text-muted">You&apos;ll leave this page for GitHub and come back here. Your progress is saved.</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {id === "github" && connected && <GitHubPrivateAccessControls returnTo={returnTo} beforeLeave={beforeLeave} />}
 
         <TextField
           ref={input}

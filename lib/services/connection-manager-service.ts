@@ -92,7 +92,7 @@ export async function listManagedConnections(personId: string): Promise<ManagedC
       recordsImported: (counted.get(source) ?? 0) + (source === "github" ? repoCount : 0),
       found,
       problem: op?.reason ?? null,
-      reconnectUrl: op?.reconnectUrl ?? (source === "github" && badge === "needs_reauth" ? "/api/auth/github/start?returnTo=/student/connections" : null),
+      reconnectUrl: op?.reconnectUrl ?? (source === "github" && badge === "needs_reauth" ? "/api/auth/github/connect?returnTo=/student/connections" : null),
       canSync: live && META[source].syncable && badge !== "syncing",
       canEditHandle: META[source].handleLabel !== null,
       canDisconnect: live,

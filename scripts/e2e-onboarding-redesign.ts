@@ -14,48 +14,15 @@
  * Stop any other `next dev` in this folder first; both would share .next.
  */
 import { chromium, request as pwRequest, type Page } from "playwright";
-import { spawn, type ChildProcess } from "node:child_process";
-import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { ISOLATED_ENV } from "./e2e-isolation";
+import { startIsolatedServer as startServer } from "./e2e-isolation";
 
-
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer().listen(0, "127.0.0.1", () => {
-      const port = (srv.address() as net.AddressInfo).port;
-      srv.close(() => resolve(port));
-    });
-    srv.on("error", reject);
-  });
-}
-
-async function startIsolatedServer(): Promise<{ base: string; proc: ChildProcess }> {
-  if (process.env.E2E_BASE_URL) throw new Error("E2E_BASE_URL is not supported: this script only drives a server it started with an isolated database.");
-  const port = await freePort();
-  const proc = spawn(process.execPath, [path.join("node_modules", ".bin", "next"), "dev", "-p", String(port)], {
-    env: { ...process.env, ...ISOLATED_ENV },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
-  const log = fs.createWriteStream(path.join(OUT, "server.log"));
-  proc.stdout?.pipe(log);
-  proc.stderr?.pipe(log);
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("dev server did not start in 120 s")), 120_000);
-    proc.stdout?.on("data", (d: Buffer) => { if (/Ready in/.test(d.toString())) { clearTimeout(timer); resolve(); } });
-    proc.on("exit", (code) => { clearTimeout(timer); reject(new Error(`dev server exited (${code})`)); });
-  });
-  const base = `http://127.0.0.1:${port}`;
-  await fetch(`${base}/onboarding`); // compile once before timing anything
-  return { base, proc };
-}
 
 let BASE = "";
 const OUT = process.env.E2E_OUT || path.join(os.tmpdir(), "aitathastu-e2e");
-const VIEWPORT = process.env.E2E_MOBILE ? { width: 390, height: 844 } : { width: 1280, height: 900 };
+const VIEWPORT = process.env.E2E_MOBILE ? { width: 390, height: 844 } : process.env.E2E_TABLET ? { width: 820, height: 1180 } : { width: 1280, height: 900 };
 fs.mkdirSync(OUT, { recursive: true });
 
 const results: Array<{ check: string; ok: boolean; detail: string }> = [];
@@ -93,7 +60,7 @@ async function next(page: Page, name: RegExp = /^(Continue|Skip for now|Looks ri
 }
 
 async function main() {
-  const server = await startIsolatedServer();
+  const server = await startServer(OUT);
   BASE = server.base;
   const stop = () => { try { process.kill(-server.proc.pid!, "SIGTERM"); } catch { /* already gone */ } };
   process.on("exit", stop);
@@ -176,34 +143,62 @@ async function main() {
     record("Reload resumes on Sources", /Step 5 of 11/.test(s.progress), s.progress);
   }
 
-  // GitHub drawer explains access levels; sign-in returns to onboarding.
-  await page.locator("li", { hasText: "GitHub" }).filter({ has: page.getByRole("button", { name: /Connect|Manage|Retry/ }) }).first().getByRole("button", { name: /Connect|Manage|Retry/ }).click();
-  const drawer = page.getByRole("dialog");
-  await drawer.waitFor();
-  record("GitHub drawer explains three access levels", await drawer.getByText("Three levels of GitHub access").isVisible());
-  const signIn = drawer.getByRole("link", { name: /Sign in with GitHub/ });
-  record("GitHub sign-in returns to onboarding", ((await signIn.getAttribute("href")) || "").includes("returnTo=%2Fonboarding"), (await signIn.getAttribute("href")) || "");
-  await page.screenshot({ path: path.join(OUT, "09-github-drawer.png") });
+  // ── GitHub: one card, one action ──
+  const connectGitHub = page.getByRole("link", { name: "Connect GitHub & Import Repositories" });
+  record("Exactly one GitHub connection action", (await connectGitHub.count()) === 1);
+  const competing = await page.getByRole("button", { name: /Import public data|Sign in with GitHub|Install GitHub App|Verify with GitHub|Choose repositories on GitHub/ })
+    .or(page.getByRole("link", { name: /Sign in with GitHub|Install GitHub App|Verify with GitHub/ })).count();
+  record("No competing GitHub buttons or duplicate GitHub rows", competing === 0 && (await page.locator("li", { hasText: /^GitHub/ }).count()) === 0, `competing=${competing}`);
+  record("GitHub card shows the agreed explanation", await page.getByText("Connect your GitHub account to discover your public repositories and securely select private repositories to include in your skill profile.").isVisible());
+  const href = (await connectGitHub.getAttribute("href")) || "";
+  record("GitHub connect returns to onboarding", href === "/api/auth/github/connect?returnTo=%2Fonboarding", href);
+  await page.screenshot({ path: path.join(OUT, "09-github-card.png"), fullPage: false });
 
-  // Real import of GitHub's public demo account.
-  await drawer.getByRole("textbox").fill("octocat");
-  await drawer.getByRole("button", { name: /Import public data|Refresh/ }).click();
-  const outcome = await Promise.race([
-    drawer.getByText(/Done\. Closing|Last import|Partly imported/).first().waitFor({ timeout: 90_000 }).then(() => "settled"),
-    drawer.getByText("That didn't work").waitFor({ timeout: 90_000 }).then(() => "error"),
-  ]).catch(() => "timeout");
-  await page.screenshot({ path: path.join(OUT, "10-github-import.png") });
-  await page.keyboard.press("Escape").catch(() => {});
-  await page.waitForTimeout(1500);
-  const ghRow = page.locator("li", { hasText: "GitHub" }).first();
-  const chip = ((await ghRow.textContent()) || "").match(/Imported|Partly imported|Linked|Found, not verified|Connected|Import failed/)?.[0] ?? "none";
-  record("GitHub import settles with a status from the server result", outcome !== "timeout", `outcome=${outcome}, chip=${chip}`);
+  // The redirect chain, without following it to github.com (nothing is sent to GitHub).
+  const hop = async (url: string) => (await page.request.get(url, { maxRedirects: 0 })).headers()["location"] || "";
+  const toStart = new URL(await hop(`${BASE}${href}`), BASE).toString();
+  const toGitHub = toStart.includes("/api/auth/github/start") ? await hop(toStart) : toStart;
+  if (/^https:\/\/github\.com\/login\/oauth\/authorize/.test(toGitHub)) {
+    const u = new URL(toGitHub);
+    record("Sign-in goes to GitHub's OAuth page with read:user only", u.searchParams.get("scope") === "read:user" && Boolean(u.searchParams.get("state")), `scope=${u.searchParams.get("scope")}`);
+    record("OAuth callback is this server", (u.searchParams.get("redirect_uri") || "").endsWith("/api/auth/github/callback"));
+    const state = JSON.parse(Buffer.from(u.searchParams.get("state")!, "base64url").toString());
+    record("OAuth state carries the guided flow and the allow-listed return", state.then === "app" && state.returnTo === "/onboarding");
+  } else {
+    record("Without GitHub sign-in configured, the student is told so on the same step", /\/onboarding\?error=github_signin_unavailable|app-start/.test(toGitHub), new URL(toGitHub, BASE).pathname);
+  }
+  // Clicking saves the draft first, then leaves through the unified route; stopped there so nothing reaches GitHub.
+  let savesBeforeLeaving = 0;
+  const countSaves = (r: import("playwright").Request) => { if (r.method() === "PUT" && r.url().includes("/api/onboarding-v2")) savesBeforeLeaving++; };
+  page.on("request", countSaves);
+  await page.route("**/api/auth/github/connect**", (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>stopped before GitHub</title>" }));
+  await connectGitHub.click();
+  await page.waitForURL(/\/api\/auth\/github\/connect/, { timeout: 20_000 }).catch(() => {});
+  await page.unroute("**/api/auth/github/connect**");
+  page.off("request", countSaves);
+  record("Clicking saves the draft, then leaves through the unified connect route", new URL(page.url()).pathname === "/api/auth/github/connect" && savesBeforeLeaving > 0, `saves=${savesBeforeLeaving}`);
+  await page.goto(`${BASE}/onboarding`, { waitUntil: "networkidle" });
+  s = await describe(page, "09b-back-from-github");
+  record("Draft resumes on Sources after leaving for GitHub", /Step 5 of 11/.test(s.progress), s.progress);
 
-  // Simulated return from a cancelled GitHub sign-in.
+  // Cancelled / refused authorization: explanation plus a clearly labelled public-only fallback.
   await page.goto(`${BASE}/onboarding?error=github_cancelled`, { waitUntil: "networkidle" });
   await page.getByText("GitHub sign-in was cancelled").waitFor({ timeout: 20_000 });
   s = await describe(page, "11-github-cancelled");
   record("Cancelled GitHub returns to Sources with an explanation", /Step 5 of 11/.test(s.progress) && !page.url().includes("error="), page.url());
+  const fallback = page.getByText("Public repositories only", { exact: true });
+  record("Refused authorization offers a public-only fallback", await fallback.isVisible());
+  record("Fallback says private repositories are not connected", await page.getByText(/Private repositories are not connected this way/).isVisible());
+  await page.getByLabel("GitHub username").fill("octocat");
+  await page.getByRole("button", { name: "Import public repositories only" }).click();
+  await page.getByText(/Public repositories requested|That didn't work/).first().waitFor({ timeout: 90_000 }).catch(() => {});
+  record("Public-only import completes without claiming private access",
+    (await page.getByText("Public repositories requested").isVisible()) && (await page.getByText(/Private access granted/).count()) === 0);
+  await page.screenshot({ path: path.join(OUT, "10-github-public-only.png"), fullPage: false });
+
+  // Organization approval pending, as GitHub reports it on return.
+  await page.goto(`${BASE}/onboarding?error=github_app_approval_pending`, { waitUntil: "networkidle" });
+  record("Organization approval shows as pending", await page.getByText("Waiting for an organization owner").isVisible());
 
   // Reduced motion: the animated primary button must not keep moving.
   const anim = await page.locator(".btn-primary").last().evaluate((el) => getComputedStyle(el).animationDuration);

@@ -19,6 +19,7 @@ import type { OnboardingFlow } from "@/lib/client/onboarding/use-onboarding-flow
 import type { DiscoveredCandidates } from "@/lib/client/onboarding/use-footprint-connectors";
 import { ConnectorList, type ConnectorApi } from "@/components/connections/ConnectorList";
 import { LinkedInConnect } from "@/components/connections/LinkedInConnect";
+import { GitHubConnectCard } from "@/components/connections/GitHubConnectCard";
 import { SourceMark } from "@/components/connections/SourceMark";
 import { Banner } from "@/components/ui/Banner";
 import { Button } from "@/components/ui/Button";
@@ -30,9 +31,10 @@ import { SOURCES_SCREEN } from "@/lib/onboarding-step-registry";
 import { StepFooter, StepHeader } from "../OnboardingShell";
 
 const RETURN_MESSAGES: Record<string, { kind: "success" | "warning" | "danger"; title: string; body: string }> = {
-  github_connected: { kind: "success", title: "GitHub account confirmed", body: "We're reading your public repositories now. Anything we find waits for your review." },
-  github_app_installed: { kind: "success", title: "Repository access granted", body: "Open GitHub below and choose “Sync authorized repositories” to read the repositories you selected." },
-  github_cancelled: { kind: "warning", title: "GitHub sign-in was cancelled", body: "Nothing changed and your progress is saved. You can link GitHub by username, try again, or continue without it." },
+  github_connected: { kind: "success", title: "GitHub account confirmed", body: "Choose the repositories to import in the GitHub card below. Nothing is imported until you do." },
+  github_app_installed: { kind: "success", title: "Repository access granted", body: "The repositories you shared on GitHub are listed in the GitHub card below. Choose which to import." },
+  github_cancelled: { kind: "warning", title: "GitHub sign-in was cancelled", body: "Nothing changed and your progress is saved. You can try again, import public repositories only, or continue without GitHub." },
+  github_authorization_failed: { kind: "warning", title: "GitHub didn't authorize AI Tathastu", body: "Some GitHub accounts can't authorize apps. You can import public repositories only from the GitHub card below; private repositories won't be connected." },
   github_app_approval_pending: { kind: "warning", title: "Waiting for an organization owner", body: "GitHub sent the request to the organization's owner. Once they approve, choose “Sync authorized repositories”. Public repositories still work meanwhile." },
   github_app_setup_cancelled: { kind: "warning", title: "Repository access wasn't granted", body: "Nothing changed. Public repositories still work; you can grant private access later." },
   github_app_account_mismatch: { kind: "danger", title: "That GitHub App install is for a different account", body: "Install it on the same GitHub account you linked here, or change the linked account first." },
@@ -55,9 +57,8 @@ function useReturnNotice() {
     if (!code) return null;
     return { code, ...(RETURN_MESSAGES[code] ?? (error ? GENERIC_GITHUB_FAILURE : { kind: "success" as const, title: "", body: "" })) };
   });
-  // success=github_connected is left for the connector hook, which auto-imports and then clears it.
   useEffect(() => {
-    if (!notice || notice.code === "github_connected") return;
+    if (!notice) return;
     const url = new URL(window.location.href);
     ["error", "success", "sync"].forEach((k) => url.searchParams.delete(k));
     window.history.replaceState(window.history.state, "", url.toString());
@@ -88,6 +89,7 @@ export function SourcesStep({ flow, guide, onCandidates }: {
     onProfilesChange,
     onCandidatesDiscovered: onCandidates,
     autoLinkDiscovered: false,
+    autoImportGitHub: false,
   });
 
   /** Disconnecting also drops review candidates that only came from that source. */
@@ -119,8 +121,11 @@ export function SourcesStep({ flow, guide, onCandidates }: {
 
   // Links the CV named that the student hasn't confirmed or dismissed yet.
   const dismissed = useMemo(() => new Set(data.dismissedFootprintProviders || []), [data.dismissedFootprintProviders]);
+  // A GitHub link from the CV is handled by the GitHub card, so there is one GitHub experience.
+  const cvGitHub = String(data.discoveredResumeProfiles.github || "");
+  const cvLogin = cvGitHub.match(/github\.com\/([A-Za-z0-9-]{1,39})/i)?.[1] ?? null;
   const found = Object.entries(data.discoveredResumeProfiles)
-    .filter(([id, url]) => url && !api.profiles[id] && !dismissed.has(id) && platformById(id))
+    .filter(([id, url]) => id !== "github" && url && !api.profiles[id] && !dismissed.has(id) && platformById(id))
     .map(([id, url]) => ({ id, url: String(url) }));
 
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
@@ -167,7 +172,14 @@ export function SourcesStep({ flow, guide, onCandidates }: {
     setEditing(null);
   };
 
-  const linkedCount = PLATFORMS.filter((p) => api.profiles[p.id]).length;
+  const leaveGuard = useCallback(() => flow.persist({ currentScreen: SOURCES_SCREEN }), [flow]);
+  // The verified GitHub account becomes the draft's GitHub profile, the same as any other linked source.
+  const linkGitHubProfile = useCallback((url: string) => {
+    if (flow.dataRef.current.profiles.github === url) return;
+    setData((d) => ({ ...d, profiles: { ...d.profiles, github: url } }));
+    autosave({ profiles: { github: url } });
+  }, [flow.dataRef, setData, autosave]);
+  const linkedCount = PLATFORMS.filter((p) => api.profiles[p.id] || (p.id === "github" && data.profiles.github)).length;
   const onNext = () => void commit({}, nextAfter(SOURCES_SCREEN));
   const onBack = () => goBack(prevBefore(SOURCES_SCREEN));
   useEoraStepEvents({ onNext, onBack });
@@ -285,7 +297,24 @@ export function SourcesStep({ flow, guide, onCandidates }: {
               )}
             </div>
           </div>
-          <ConnectorList api={connectorApi} returnTo="/onboarding" grouped exclude={["linkedin"]} beforeLeave={() => flow.persist({ currentScreen: SOURCES_SCREEN })} />
+          <ConnectorList
+            api={connectorApi}
+            grouped
+            exclude={["linkedin", "github"]}
+            groupSlots={{
+              development: (
+                <GitHubConnectCard
+                  returnTo="/onboarding"
+                  beforeLeave={leaveGuard}
+                  cvLogin={cvLogin}
+                  authorizationFailed={notice?.code === "github_cancelled" || notice?.code === "github_authorization_failed"}
+                  onCandidates={onCandidates}
+                  onProfileLinked={linkGitHubProfile}
+                  onPublicOnly={(username) => connectorApi.importFrom("github", username)}
+                />
+              ),
+            }}
+          />
           <div>
             <h3 className="font-display text-sm font-semibold text-text-primary">LinkedIn</h3>
             <p className="mb-2 text-xs text-text-muted">Roles, education and certifications. Linking a profile address doesn&apos;t import anything; an export or extraction does.</p>

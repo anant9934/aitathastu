@@ -999,7 +999,7 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
       { sectionId: "sync-history", label: "Sync History", description: "Audit trail of background synchronization runs.", targetId: "eora-sync-history" }
     ],
     importantButtons: [
-      { buttonId: "btn-connect-github", label: "Connect GitHub", action: "Navigate to /api/auth/github/start" },
+      { buttonId: "btn-connect-github", label: "Connect GitHub", action: "Navigate to /api/auth/github/connect" },
       { buttonId: "btn-sync-now", label: "Sync Now", action: "POST /api/student/connections/github/sync" }
     ],
     importantFormFields: [
@@ -1045,7 +1045,7 @@ export const PAGE_CONTRACTS: Record<string, EoraPageContract> = {
       title: "No Profiles Connected",
       description: "Connect GitHub to import your projects and prove your coding experience.",
       recommendedAction: "Connect GitHub",
-      actionRoute: "/api/auth/github/start"
+      actionRoute: "/api/auth/github/connect"
     },
     completionConditions: []
   },

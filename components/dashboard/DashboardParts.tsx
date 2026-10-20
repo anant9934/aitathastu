@@ -68,6 +68,7 @@ const gaps = (g: string[]) =>
 /** The hero changes shape with the #1 priority; it is the layout's own widget, not a reordered card. */
 export function PriorityHero({ hero }: { hero: HeroWidget }) {
   let body: React.ReactNode;
+  const spotlight = hero.kind === "readiness" ? "Avasar" : hero.kind === "project_workbench" || hero.kind === "network" ? "Collaborate" : hero.kind === "learning_path" ? "Learn" : "Research ledger";
   switch (hero.kind) {
     case "readiness":
       body = (
@@ -108,7 +109,7 @@ export function PriorityHero({ hero }: { hero: HeroWidget }) {
     <section aria-labelledby="hero-title" data-hero-kind={hero.kind} data-eora-id="eora-active-goal" className="flex min-w-0 flex-col rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 id="hero-title" className="font-display text-lg font-bold text-text-primary">{hero.title}</h2>
-        <Tag>Your #1 priority</Tag>
+        <div className="flex flex-wrap items-center justify-end gap-2"><Tag>Your #1 priority</Tag><span className="at-spotlight-label">SPOTLIGHT / {spotlight}</span></div>
       </div>
       <div className="flex-1">{body}</div>
       <div className="mt-5">

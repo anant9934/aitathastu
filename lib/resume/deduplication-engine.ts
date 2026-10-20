@@ -479,6 +479,11 @@ export class ResumeDeduplicationEngine {
         const exComp = normalizeCompany(exCleanComp);
         const exRole = normalizeTextKey(existing.role);
 
+        // A different role with a different start date is a separate tenure (e.g. a promotion), never a duplicate.
+        if (exRole && inRole && exRole !== inRole && existing.startDate && incoming.startDate && existing.startDate !== incoming.startDate) {
+          return false;
+        }
+
         // Same company
         if (exComp === inComp) {
           if (exRole === inRole || !exRole || !inRole || isGenericRole(existing.role) || isGenericRole(incoming.role)) {

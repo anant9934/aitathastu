@@ -119,19 +119,35 @@ const PROVIDER_DOMAINS: Array<{
   },
 ];
 
+/**
+ * "GitHub: octocat", "LeetCode | octocat", "Kaggle - octocat", "HF @octocat".
+ * An explicit separator is required: whitespace alone turned "Hugging Face
+ * Transformers" into huggingface.co/Transformers.
+ */
+function labeled(label: string): RegExp {
+  return new RegExp(`\\b(?:${label})\\s*(?:[:|]|[–—-](?=\\s)|(?=@))\\s*@?([a-zA-Z0-9_\\-\\.]+)`, "i");
+}
+
 const LABELED_PATTERNS: Array<{
   provider: FootprintProvider;
   pattern: RegExp;
 }> = [
-  { provider: "github", pattern: /\b(?:github|gittubs?|gh)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "linkedin", pattern: /\b(?:linkedin|linked\s*in)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "leetcode", pattern: /\bleetcode[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "kaggle", pattern: /\bkaggle[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "huggingface", pattern: /\b(?:hugging\s*face|hf)[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "hackerrank", pattern: /\bhackerrank[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "hackerearth", pattern: /\bhackerearth[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
-  { provider: "codechef", pattern: /\bcodechef[\s:|\-–—]+@?([a-zA-Z0-9_\-\.]+)/i },
+  { provider: "github", pattern: labeled("github|gittubs?|gh") },
+  { provider: "linkedin", pattern: labeled("linkedin|linked\\s*in") },
+  { provider: "leetcode", pattern: labeled("leetcode") },
+  { provider: "kaggle", pattern: labeled("kaggle") },
+  { provider: "huggingface", pattern: labeled("hugging\\s*face|hf") },
+  { provider: "hackerrank", pattern: labeled("hackerrank") },
+  { provider: "hackerearth", pattern: labeled("hackerearth") },
+  { provider: "codechef", pattern: labeled("codechef") },
 ];
+
+/** Words that follow a platform name in prose ("Kaggle Expert", "LeetCode: Solved 400…"), never handles. */
+const LABEL_PROSE_WORDS = new Set([
+  "expert", "master", "grandmaster", "contributor", "novice", "solved", "rating", "rank", "ranked", "rated",
+  "actions", "copilot", "pages", "transformers", "datasets", "hub", "spaces", "models", "certified",
+  "profile", "account", "username", "handle", "id", "star", "stars", "badge", "badges", "top", "global",
+]);
 
 /** Clean and strip trailing punctuation from discovered URLs */
 export function cleanRawUrl(raw: string): string {
@@ -376,12 +392,18 @@ function checkHandleConfidence(username: string): { validationResult: "valid" | 
         const isMonth = /^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)(?:uary|ruary|ch|il|e|y|ust|tember|ober|ember)?$/i.test(candidate || "");
         const isDomain = /\.(?:com|org|net|io|co|in|site|online|edu|dev)$/i.test(candidate || "");
         const hasUrlPath = line.slice(match.index || 0).includes("/");
+        // "LeetCode: Solved 400 problems" — a handle is followed by a separator or the end of the line, not more prose.
+        const rest = line.slice((match.index || 0) + match[0].length);
+        const continuesAsProse = /^\s+[A-Za-z0-9]/.test(rest) && !/^\s+(?:[|•·,;/]|(?:github|linkedin|leetcode|kaggle|hackerrank|hackerearth|codechef|hugging\s*face|email|phone|mobile)\b)/i.test(rest);
+        const isProseWord = LABEL_PROSE_WORDS.has((candidate || "").toLowerCase()) || !/[a-zA-Z]/.test(candidate || "");
 
         if (
           candidate &&
           !isMonth &&
           !isDomain &&
           !hasUrlPath &&
+          !continuesAsProse &&
+          !isProseWord &&
           !/^(none|na|n\/a|yes|no|link|url|profile|http|https|www|github|linkedin|leetcode|codechef|hackerrank)$/i.test(candidate) &&
           !candidate.startsWith("http://") &&
           !candidate.startsWith("https://") &&

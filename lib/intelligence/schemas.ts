@@ -58,6 +58,7 @@ export const ResumeInterpretationSchema = z.object({
       description: z.string().max(1000).default(""),
       technologies: z.array(z.string().max(50)).default([]),
       repositoryUrl: z.string().url().max(500).optional().or(z.literal("")),
+      demoUrl: z.string().url().max(500).optional(),
       sourceSpan: z.string().min(3).max(300),
     })
   ).default([]),

@@ -372,14 +372,20 @@ export function extractResumeDeterministicResult(
 
   // Combine discovered footprints — deduplicate across both sources
   const fps = discoverFootprintsFromResume({ text, hyperlinks });
-  const seenLinkUrls = new Set<string>(
-    det.links.map((l) => l.url.toLowerCase().replace(/\/$/, "").replace(/^(https?:\/\/)www\./, "$1"))
-  );
-  const links = [...det.links];
+  const linkKey = (url: string) =>
+    url.toLowerCase().replace(/\/$/, "").replace(/^https?:\/\/(?:www\.)?/, "").replace(/^leetcode\.com\/u\//, "leetcode.com/");
+  const links: ResumeLink[] = [];
+  const seenLinkUrls = new Set<string>();
+  for (const l of det.links) {
+    const key = linkKey(l.url);
+    if (seenLinkUrls.has(key)) continue;
+    seenLinkUrls.add(key);
+    links.push(l);
+  }
   const discoveredProfiles: Record<string, string> = {};
   for (const fp of fps) {
     if (fp.normalizedUrl) {
-      const key = fp.normalizedUrl.toLowerCase().replace(/\/$/, "").replace(/^(https?:\/\/)www\./, "$1");
+      const key = linkKey(fp.normalizedUrl);
       if (!seenLinkUrls.has(key)) {
         seenLinkUrls.add(key);
         links.push({
@@ -387,7 +393,8 @@ export function extractResumeDeterministicResult(
           url: fp.normalizedUrl,
         });
       }
-      discoveredProfiles[fp.provider] = fp.normalizedUrl;
+      // Discovery returns annotations and full URLs before labeled guesses; keep the first per provider.
+      if (!discoveredProfiles[fp.provider]) discoveredProfiles[fp.provider] = fp.normalizedUrl;
     }
   }
 

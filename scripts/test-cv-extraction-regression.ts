@@ -312,13 +312,14 @@ test("Phase 10.1 — Archetype 1 (Native Single-Column, Anant Kumar Pattern) Hig
   assert.ok(result.interpretation.skills.some((s) => s.name === "Robotics"));
 
   // 6. Research & Achievements
-  assert.ok(result.interpretation.achievements && result.interpretation.achievements.length >= 3);
-  const patent = result.interpretation.achievements.find((a) => a.category === "patent");
-  assert.ok(patent, "Patent must be classified with category 'patent'");
+  // Items under a research/patents/books heading go to `research`, not `achievements`.
+  const research = result.interpretation.research ?? [];
+  const patent = research.find((r) => r.type === "patent");
+  assert.ok(patent, "Patent must be classified with type 'patent'");
   assert.match(patent.title, /DBMS Predictive Execution/i);
 
-  const books = result.interpretation.achievements.filter((a) => a.category === "publication");
-  assert.ok(books.length >= 2, "Both books must be extracted as publications");
+  const books = research.filter((r) => r.type === "book");
+  assert.ok(books.length >= 2, "Both books must be extracted as research entries of type 'book'");
 
   // 7. Digital Footprints
   const providers = footprints.map((f) => f.provider);
@@ -485,7 +486,12 @@ test("Phase 10.6 — Consent Separation & AI Enrichment Opt-In Gate", () => {
   assert.equal(decisionNoQuota.reason, "quota_exhausted_or_unavailable");
 
   // 3. High deterministic coverage also avoids unnecessary AI calls
-  const decisionHighCoverage = shouldEnrichWithLLM(baseline, { consent: true, quotaAllowed: true });
+  // The fixture's projects name no technologies, which correctly asks for enrichment; give them some to test the skip path.
+  const sparse = shouldEnrichWithLLM(baseline, { consent: true, quotaAllowed: true });
+  assert.equal(sparse.shouldEnrich, true);
+  assert.equal(sparse.reason, "project_technologies_sparse");
+  const withTech = { ...baseline, projects: baseline.projects.map((p) => ({ ...p, technologies: ["Python"] })) };
+  const decisionHighCoverage = shouldEnrichWithLLM(withTech, { consent: true, quotaAllowed: true });
   assert.equal(decisionHighCoverage.shouldEnrich, false);
   assert.ok(["high_coverage_deterministic_baseline", "deterministic_coverage_sufficient"].includes(decisionHighCoverage.reason));
 });

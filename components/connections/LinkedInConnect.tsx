@@ -215,9 +215,13 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
         <LinkedinLogo size={22} aria-hidden="true" className="text-champagne" />
         <h3 id="li-title" className="font-display text-base font-semibold text-text-primary">LinkedIn</h3>
         <StatusChip tone="neutral" icon={null}>Optional</StatusChip>
-        {(urlDone || importDone || extractionState === "synced" || extractionState === "partial") && (
-          <StatusChip tone="verified" icon={CheckCircle}>Connected</StatusChip>
-        )}
+        {importDone || extractionState === "synced" ? (
+          <StatusChip tone="verified" icon={CheckCircle}>Imported</StatusChip>
+        ) : extractionState === "partial" ? (
+          <StatusChip tone="warning" icon={null}>Partly extracted</StatusChip>
+        ) : urlDone ? (
+          <StatusChip tone="corroborated" icon={null}>Profile linked</StatusChip>
+        ) : null}
       </div>
       <p className="mt-2 max-w-[62ch] text-sm text-text-muted">
         Adds your work history and education. Skipping is always free.

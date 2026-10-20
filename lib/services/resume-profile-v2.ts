@@ -60,6 +60,7 @@ export function buildProfileV2(params: {
       description: field(pr.description, 0.85, "projects", pr.sourceSpan, m),
       technologies: field((pr.technologies || []).join(", "), 0.9, "projects", pr.sourceSpan, m),
       ...(pr.repositoryUrl ? { github_url: field(pr.repositoryUrl, 0.95, "projects", pr.repositoryUrl, "hyperlink") } : {}),
+      ...(pr.demoUrl ? { demo_url: field(pr.demoUrl, 0.9, "projects", pr.demoUrl, "hyperlink") } : {}),
     })),
     experience: x.experience.map((ex, i) => record(`exp_${i}`, {
       organization: field(ex.company, 0.9, "experience", ex.sourceSpan, m),

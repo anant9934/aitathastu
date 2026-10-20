@@ -216,6 +216,7 @@ export class ResumePerson360Mapper {
       const techRaw = rec.fields.technologies?.value || "";
       const techList = techRaw ? techRaw.split(/[,;|]/).map((t) => t.trim()).filter(Boolean) : [];
       const repoUrl = rec.fields.github_url?.value || rec.fields.evidence_url?.value || "";
+      const demoUrl = rec.fields.demo_url?.value || "";
 
       // saveProject merges into an existing project with the same normalized
       // title or repo URL (e.g. the GitHub import of the same work).
@@ -227,6 +228,7 @@ export class ResumePerson360Mapper {
         sources: ["resume"],
         status: "candidate", // Never automatically confirmed without user approval
         repositoryUrl: repoUrl || undefined,
+        demoUrl: demoUrl || undefined,
       });
 
       result.projectsCreated++;

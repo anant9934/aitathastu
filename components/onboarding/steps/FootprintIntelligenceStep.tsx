@@ -305,7 +305,8 @@ export function FootprintIntelligenceStep({
   const [errors, setErrors] = useState<Partial<Record<FootprintProvider, string>>>({});
   const [syncingProviders, setSyncingProviders] = useState<Partial<Record<FootprintProvider, boolean>>>({});
   const [summaries, setSummaries] = useState<Partial<Record<FootprintProvider, string>>>({});
-  const [importedProviders, setImportedProviders] = useState<Set<FootprintProvider>>(new Set());
+  // "imported" only when the source returned reviewable records; a saved URL or an empty/rate-limited fetch is "linked".
+  const [importOutcomes, setImportOutcomes] = useState<Partial<Record<FootprintProvider, "imported" | "partial" | "linked">>>({});
   // Batch sync
   const [syncingAll, setSyncingAll] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -423,7 +424,8 @@ export function FootprintIntelligenceStep({
           (count > 0 ? `${count} items discovered for review` : "Profile linked successfully");
 
         setSummaries((prev) => ({ ...prev, [provider]: summaryText }));
-        setImportedProviders((prev) => new Set([...prev, provider]));
+        const outcome = count > 0 ? (d?.partial ? "partial" : "imported") : "linked";
+        setImportOutcomes((prev) => ({ ...prev, [provider]: outcome }));
 
         // Apply discovered candidate projects/skills to onboarding draft if present
         if (d?.candidates && onCandidates) {
@@ -622,9 +624,9 @@ export function FootprintIntelligenceStep({
     setInputs((prev) => ({ ...prev, [provider]: "" }));
     setErrors((prev) => ({ ...prev, [provider]: undefined }));
     setSummaries((prev) => ({ ...prev, [provider]: undefined }));
-    setImportedProviders((prev) => {
-      const next = new Set(prev);
-      next.delete(provider);
+    setImportOutcomes((prev) => {
+      const next = { ...prev };
+      delete next[provider];
       return next;
     });
     if (editingProvider === provider) {
@@ -715,7 +717,7 @@ export function FootprintIntelligenceStep({
               const isSyncing = Boolean(syncingProviders[provider]);
               const cardError = errors[provider];
               const summary = summaries[provider];
-              const isImported = importedProviders.has(provider) || Boolean(summary);
+              const outcome = importOutcomes[provider];
 
               return (
                 <div
@@ -765,9 +767,13 @@ export function FootprintIntelligenceStep({
                       ) : cardError ? (
                         <StatusChip tone="danger">Needs attention</StatusChip>
                       ) : isLinked ? (
-                        <StatusChip tone={isImported ? "verified" : "corroborated"}>
-                          {isImported ? "Imported" : "Saved"}
-                        </StatusChip>
+                        outcome === "imported" ? (
+                          <StatusChip tone="verified">Imported</StatusChip>
+                        ) : outcome === "partial" ? (
+                          <StatusChip tone="warning">Partly imported</StatusChip>
+                        ) : (
+                          <StatusChip tone="corroborated">Saved</StatusChip>
+                        )
                       ) : isDetected ? (
                         <StatusChip tone="warning">Found in CV</StatusChip>
                       ) : null}

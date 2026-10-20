@@ -15,6 +15,7 @@
     "test:legal-privacy": "node --env-file=.env --import tsx scripts/verify-legal-and-privacy.ts",
     "test:resume-pipeline": "node --import tsx --test scripts/verify-resume-pipeline.ts",
     "test:hybrid-extraction": "node --import tsx --test scripts/verify-hybrid-extraction.ts",
+    "test:cv-accuracy": "node --import tsx --test scripts/verify-cv-extraction-accuracy.ts scripts/test-cv-extraction-regression.ts scripts/verify-v6-cv-intelligence.ts",
     "test:portfolio-network": "node --import tsx --test scripts/verify-portfolio-network.test.mjs",
     "test:core-v4-7": "node --env-file=.env --import tsx scripts/verify-v4-7-skill-intelligence.ts",
     "test:core-v4-6": "node --env-file=.env --import tsx scripts/verify-v4-6-digital-import.ts",

@@ -64,6 +64,7 @@ export function Nav({
           className="burger"
           aria-label={open ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={open}
+          aria-controls="mobile-menu"
           onClick={() => setOpen(!open)}
         >
           <span />
@@ -72,7 +73,7 @@ export function Nav({
         </button>
       </div>
 
-      <div className="mobile-menu" style={{ display: open ? "flex" : undefined }}>
+      <div id="mobile-menu" className="mobile-menu" hidden={!open} style={open ? { display: "flex" } : undefined}>
         {links.map((link) => (
           <Link key={link.href} href={link.href} onClick={() => setOpen(false)}>
             {link.label}

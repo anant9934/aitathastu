@@ -653,8 +653,8 @@ export function Landing({ user }: LandingProps) {
     resizeNeural();
     const neuralObs = new IntersectionObserver(
       ([e]) => {
-        neuralRunningRef.current = e.isIntersecting;
-        if (e.isIntersecting) {
+        neuralRunningRef.current = e.isIntersecting && !rm;
+        if (e.isIntersecting && !rm) {
           cancelAnimationFrame(neuralRafRef.current);
           neuralRafRef.current = requestAnimationFrame(drawNeural);
         }
@@ -813,9 +813,20 @@ export function Landing({ user }: LandingProps) {
       </header>
 
       {/* ============================================================
+          SKIP LINK (UX-004)
+          ============================================================ */}
+      <a
+        href="#main-content"
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-4 focus-visible:left-4 focus-visible:z-[9999] focus-visible:px-4 focus-visible:py-2 focus-visible:rounded-md focus-visible:bg-background-primary focus-visible:text-foreground-primary focus-visible:border focus-visible:border-focus-ring focus-visible:outline-none focus-visible:text-sm focus-visible:font-semibold"
+      >
+        Skip to main content
+      </a>
+
+      {/* ============================================================
           HERO — Kinetic word split & 3D Interactive EORA
           ============================================================ */}
       <section className="hero" id="home">
+        <a id="main-content" tabIndex={-1} className="sr-only" aria-hidden="true" />
         <div className="hero-spot" id="heroSpot" ref={heroSpotRef}></div>
         <div className="wrap hero-grid">
           <div className="hero-copy">

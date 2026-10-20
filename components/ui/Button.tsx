@@ -17,7 +17,7 @@ const variants: Record<ButtonVariant, string> = {
   intel: "btn-intel",
   ghost: "btn-ghost",
   secondary:
-    "border border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm hover:text-text-primary hover:shadow-[0_10px_30px_-10px_rgba(244,154,71,0.25)]",
+    "border border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm hover:text-text-primary hover:shadow-[0_10px_30px_-10px_rgba(196,138,90,0.25)]",
   quiet: "bg-transparent text-accent-warm hover:bg-signal-tint hover:text-accent-warm-bright border border-transparent",
   danger: "bg-transparent text-danger border border-danger/60 hover:bg-danger-bg hover:border-danger",
 };

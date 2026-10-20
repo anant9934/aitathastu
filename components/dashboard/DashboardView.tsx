@@ -17,6 +17,7 @@ import { NextActions, PriorityHero, StatRow } from "./DashboardParts";
 import { DashboardSectionView } from "./Sections";
 import { FocusEditor } from "./FocusEditor";
 import { DashboardSkeleton } from "./DashboardSkeleton";
+import { UnifiedEcosystemDock } from "./UnifiedEcosystemDock";
 import type { SkillsEvidenceIndex } from "@/lib/client/evidence";
 import { SkillsMap } from "@/components/skills/SkillsMap";
 import { requiredGaps, toMapSkill, type IntelligenceSkill } from "@/lib/client/skills-map-data";
@@ -95,6 +96,7 @@ export function DashboardView() {
   return (
     <div className="at-dashboard mx-auto w-full max-w-[1240px] px-4 pb-16 sm:px-6 lg:px-8">
       <JumpNav items={nav} />
+      <UnifiedEcosystemDock />
 
       <section id="overview" aria-labelledby="overview-title" data-eora-id="eora-overview" className="scroll-mt-28 pt-6 lg:scroll-mt-16">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">

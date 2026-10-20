@@ -164,8 +164,6 @@ export function Footer({ className }: { className?: string }) {
         <div className="border-t border-border-subtle pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-text-dim">
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
             <span>© {new Date().getFullYear()} AI Tathastu. All claims backed by real evidence.</span>
-            <span className="hidden sm:inline-block text-border-medium">•</span>
-            <span className="text-2xs font-mono text-text-dim">Review Drafts [Awaiting Owner/Legal Fact Verification]</span>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-2xs font-mono">

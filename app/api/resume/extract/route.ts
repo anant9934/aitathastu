@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { after } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
-import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
+import { resumeIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { validateDocumentSafety } from "@/lib/resume/document-safety";
 import { queueResumeUpload, processResumeJob } from "@/lib/services/resume-ingestion-service";
 import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     jsonNoStore({ ok: false, code, message, error: message, retryable: status >= 500 || status === 429, requestId }, status, headers);
 
   try {
-    if (!coreIngestionReady()) {
+    if (!resumeIngestionReady()) {
       return fail("INGESTION_SECURITY_INCOMPLETE", "Resume import is unavailable because production ingestion security setup is incomplete.", 503);
     }
 

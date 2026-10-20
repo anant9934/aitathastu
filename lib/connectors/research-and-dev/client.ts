@@ -626,8 +626,19 @@ export async function fetchKaggleApiData(rawInput: string): Promise<KaggleProfil
     "User-Agent": "AI-Tathastu-ProfileAuditor/1.0",
   };
 
-  if (process.env.KAGGLE_USERNAME && process.env.KAGGLE_KEY) {
-    const token = Buffer.from(`${process.env.KAGGLE_USERNAME}:${process.env.KAGGLE_KEY}`).toString("base64");
+  // Prefer indexed credentials (KAGGLE_USERNAME_1..3); fall back to singular alias
+  const kaggleCred = (() => {
+    for (let i = 1; i <= 3; i++) {
+      const u = process.env[`KAGGLE_USERNAME_${i}`]?.trim();
+      const k = process.env[`KAGGLE_KEY_${i}`]?.trim();
+      if (u && k) return { u, k };
+    }
+    const u = process.env.KAGGLE_USERNAME?.trim();
+    const k = process.env.KAGGLE_KEY?.trim();
+    return u && k ? { u, k } : null;
+  })();
+  if (kaggleCred) {
+    const token = Buffer.from(`${kaggleCred.u}:${kaggleCred.k}`).toString("base64");
     headers["Authorization"] = `Basic ${token}`;
   }
 

@@ -2,11 +2,11 @@
 
 /**
  * /student/connections: live import status per source (with retry and
- * reconnect), every account connector, the optional LinkedIn import, and the
- * recent sync history. Same connector list as onboarding.
+ * reconnect), every account connector, the optional LinkedIn import, the
+ * recent sync history, and a global footprint overview summary panel.
  */
-import React, { useCallback, useEffect, useState } from "react";
-import { ArrowsClockwise } from "@phosphor-icons/react/dist/ssr";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowsClockwise, CheckCircle, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { requestJson, describeError } from "@/lib/client/api";
 import { formatDate } from "@/lib/client/format";
 import { useFootprintConnectors } from "@/lib/client/onboarding/use-footprint-connectors";
@@ -20,15 +20,80 @@ import { ConnectorList } from "./ConnectorList";
 import { LinkedInConnect } from "./LinkedInConnect";
 import { sourceLabel } from "@/components/review/EntryList";
 
+type ConnectorRow = {
+  provider: string;
+  status: string;
+  lastSyncedAt?: string | null;
+  profileUrl?: string | null;
+};
 type SyncRun = { id: string; provider: string; status: string; startedAt?: string; completedAt?: string | null; recordsFetched?: number | null; recordsChanged?: number | null; errorMessage?: string | null };
 
+function FootprintOverview({ connectors, runs }: { connectors: ConnectorRow[]; runs: SyncRun[] | null }) {
+  const connected = connectors.filter((c) => c.status !== "not_connected" && c.status !== "disconnected");
+  const synced = connectors.filter((c) => c.lastSyncedAt);
+  const needsAttention = connectors.filter((c) => c.status === "needs_attention" || c.status === "unavailable");
+  const totalRecords = useMemo(() => {
+    if (!runs) return null;
+    return runs.reduce((sum, r) => sum + (r.recordsFetched ?? 0), 0);
+  }, [runs]);
+  const lastSync = useMemo(() => {
+    const dates = connectors.filter((c) => c.lastSyncedAt).map((c) => c.lastSyncedAt as string);
+    if (!dates.length) return null;
+    return dates.sort().reverse()[0];
+  }, [connectors]);
+
+  if (!connected.length) return null;
+
+  return (
+    <Panel aria-labelledby="overview-title" className="mb-1">
+      <PanelHeader id="overview-title" title="Footprint overview" description="Aggregated across all your connected sources." />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        <div className="rounded-md border border-line-soft bg-bg-surface px-3 py-2.5">
+          <p className="font-mono text-xl font-semibold text-champagne tabular">{connected.length}</p>
+          <p className="text-xs text-muted mt-0.5">Connected</p>
+        </div>
+        <div className="rounded-md border border-line-soft bg-bg-surface px-3 py-2.5">
+          <p className="font-mono text-xl font-semibold text-verified tabular">{synced.length}</p>
+          <p className="text-xs text-muted mt-0.5">Synced</p>
+        </div>
+        <div className="rounded-md border border-line-soft bg-bg-surface px-3 py-2.5">
+          <p className="font-mono text-xl font-semibold text-warm-ivory tabular">{totalRecords ?? "—"}</p>
+          <p className="text-xs text-muted mt-0.5">Records read</p>
+        </div>
+        <div className="rounded-md border border-line-soft bg-bg-surface px-3 py-2.5">
+          {needsAttention.length > 0 ? (
+            <>
+              <p className="font-mono text-xl font-semibold text-warning tabular">{needsAttention.length}</p>
+              <p className="text-xs text-muted mt-0.5 flex items-center gap-1"><WarningCircle size={11} className="text-warning" aria-hidden="true" />Needs attention</p>
+            </>
+          ) : (
+            <>
+              <p className="font-mono text-xl font-semibold text-verified tabular">0</p>
+              <p className="text-xs text-muted mt-0.5 flex items-center gap-1"><CheckCircle size={11} className="text-verified" aria-hidden="true" />All healthy</p>
+            </>
+          )}
+        </div>
+      </div>
+      {lastSync && (
+        <p className="mt-2 text-2xs text-muted">Last synced: {formatDate(lastSync, true)}</p>
+      )}
+    </Panel>
+  );
+}
+
 export function ConnectionsView() {
+  const [connectors, setConnectors] = useState<ConnectorRow[]>([]);
   const [runs, setRuns] = useState<SyncRun[] | null>(null);
   const [syncing, setSyncing] = useState(false);
   const api = useFootprintConnectors({ initialProfiles: {}, discoveredResumeProfiles: {}, onProfilesChange: () => void loadRuns(), onCandidatesDiscovered: () => undefined });
   const loadRuns = useCallback(async () => {
-    const res = await requestJson<{ recentSyncRuns?: SyncRun[] }>("/api/student/connections", { cache: "no-store" });
-    setRuns(res.ok ? res.data.recentSyncRuns ?? [] : []);
+    const res = await requestJson<{ connectors?: ConnectorRow[]; recentSyncRuns?: SyncRun[] }>("/api/student/connections", { cache: "no-store" });
+    if (res.ok) {
+      setConnectors(res.data.connectors ?? []);
+      setRuns(res.data.recentSyncRuns ?? []);
+    } else {
+      setRuns([]);
+    }
   }, []);
   useEffect(() => { void loadRuns(); }, [loadRuns]);
 
@@ -47,6 +112,7 @@ export function ConnectionsView() {
       description="Every account is optional. We read public data only, and imported items stay suggestions until you confirm them."
       actions={api.profiles.github ? <Button variant="secondary" size="sm" icon={<ArrowsClockwise size={16} aria-hidden="true" />} loading={syncing} loadingLabel="Syncing…" onClick={() => void syncGithub()}>Sync GitHub now</Button> : undefined}
     >
+      <FootprintOverview connectors={connectors} runs={runs} />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <div className="flex min-w-0 flex-col gap-5">
           <Panel aria-labelledby="accts-title">

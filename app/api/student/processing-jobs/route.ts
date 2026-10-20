@@ -11,7 +11,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
-import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
+import { resumeIngestionReady, coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 
 export const runtime = "nodejs";
 
@@ -83,7 +83,13 @@ async function POST_handler(request: Request) {
       }, 400);
     }
 
-    if ((sourceId === "resume" || sourceId === "github") && !coreIngestionReady()) {
+    // Resume uploads only require the resume gate (no GitHub webhook secret needed).
+    // GitHub imports require the full gate (includes GITHUB_WEBHOOK_SECRET).
+    const gateBlocked =
+      sourceId === "resume" ? !resumeIngestionReady() :
+      sourceId === "github" ? !coreIngestionReady() :
+      false;
+    if (gateBlocked) {
       return jsonResponse({
         ok: false,
         code: "INGESTION_SECURITY_INCOMPLETE",

@@ -1,164 +1,375 @@
 "use client";
 
 /**
- * Optional LinkedIn sign-in import (Tasks 1.6.1, 1.6.8, 2.1.6). Recommended,
- * never required: skipping is always one click and nothing depends on it.
- * Consent comes first; the fields stay disabled until it is given. The import
- * is unproven against real LinkedIn (P4-9) and the worker can be asleep
- * (about a minute to wake), so every state says what is happening.
+ * LinkedIn profile connection — three distinct paths:
+ *   1. Link profile URL — saves a reference_only connection, no data import.
+ *   2. Extract public profile — Apify-powered extraction (requires server configuration).
+ *   3. Upload LinkedIn data export — CSV/ZIP/JSON import via the existing parser.
+ *
+ * Automated password login is permanently disabled (LinkedIn ToS).
+ * This step is optional; onboarding and scoring work without it.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Eye, EyeSlash, LinkedinLogo, LockSimple } from "@phosphor-icons/react/dist/ssr";
+import {
+  LinkedinLogo, LinkSimple, Upload, Spinner, CheckCircle, WarningCircle, MagnifyingGlass,
+} from "@phosphor-icons/react/dist/ssr";
 import { requestJson, describeError } from "@/lib/client/api";
 import { Button } from "@/components/ui/Button";
-import { Checkbox, TextField } from "@/components/ui/Field";
+import { TextField } from "@/components/ui/Field";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { Banner } from "@/components/ui/Banner";
-import { OtpDialog } from "./OtpDialog";
 
-type Status = { state: string; challengeSecondsLeft?: number | null; error?: string | null };
-const ACTIVE = ["queued", "running", "awaiting_user"];
-const SLOW_AFTER_S = 10;
+type ImportResult = {
+  ok: boolean;
+  status?: string;
+  totalRecords?: number;
+  positions?: number;
+  education?: number;
+  skills?: number;
+  certifications?: number;
+  recordsDiscovered?: number;
+  recordsPersisted?: number;
+  lastExtractedAt?: string | null;
+  message?: string;
+  error?: string;
+};
+
+type ExtractionState =
+  | "idle"          // not started
+  | "queued"        // actor started, polling
+  | "extracting"    // still running
+  | "synced"        // success
+  | "partial"       // some records
+  | "no_results"    // actor returned nothing
+  | "failed"        // actor or network error
+  | "not_configured"; // no actor in env
+
+type Mode = "idle" | "url" | "upload" | "extract";
 
 export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => void }) {
-  const [status, setStatus] = useState<Status | null>(null);
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [consent, setConsent] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [waited, setWaited] = useState(0);
-  const idem = useRef("");
+  const [mode, setMode] = useState<Mode>("idle");
+  const [urlDone, setUrlDone] = useState(false);
+  const [importDone, setImportDone] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
-  const poll = useCallback(async () => {
-    const res = await requestJson<Status>("/api/student/linkedin", { cache: "no-store" });
-    // A network blip keeps the last known state; the next poll retries.
-    if (res.ok) setStatus(res.data);
-  }, []);
-  useEffect(() => { void poll(); }, [poll]);
+  // URL linking
+  const [profileUrl, setProfileUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [urlBusy, setUrlBusy] = useState(false);
 
-  const s = status?.state ?? "not_started";
-  const active = ACTIVE.includes(s);
+  // CSV upload
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Apify extraction
+  const [extractionState, setExtractionState] = useState<ExtractionState>("idle");
+  const [extractionBusy, setExtractionBusy] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [extractionMsg, setExtractionMsg] = useState<string | null>(null);
+  const [extractionRecords, setExtractionRecords] = useState<number | null>(null);
+  const [extractionConfigured, setExtractionConfigured] = useState<boolean | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Check extraction configuration once on mount
   useEffect(() => {
-    if (!active) { setWaited(0); return; }
-    const id = setInterval(() => { void poll(); setWaited((n) => n + 1.5); }, 1500);
-    return () => clearInterval(id);
-  }, [active, poll]);
-  useEffect(() => {
-    if (["succeeded", "skipped_optional", "dead_letter"].includes(s)) onSettled?.(s);
-  }, [s, onSettled]);
-
-  const connect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!consent) { setError("Tick the box first, or skip LinkedIn."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter the email you use to sign in to LinkedIn."); return; }
-    if (!password) { setError("Enter your LinkedIn password."); return; }
-    setBusy(true);
-    idem.current ||= crypto.randomUUID();
-    const res = await requestJson<Status>("/api/student/linkedin", {
-      method: "POST",
-      headers: { "Idempotency-Key": idem.current },
-      json: { email: email.trim(), password, consent },
+    void requestJson<ImportResult>("/api/student/linkedin/extract").then((res) => {
+      if (res.ok) {
+        const st = res.data.status;
+        setExtractionConfigured(st !== "not_configured");
+        if (st === "synced" || st === "partially_extracted") {
+          setExtractionState(st === "synced" ? "synced" : "partial");
+          setExtractionRecords(res.data.recordsPersisted ?? null);
+        } else if (st === "extraction_queued" || st === "extracting") {
+          setExtractionState("queued");
+          schedulePoll();
+        }
+      } else {
+        setExtractionConfigured(false);
+      }
     });
-    setBusy(false);
-    idem.current = "";
-    if (!res.ok) { setError(`${describeError(res.error)} You can skip LinkedIn and connect it later.`); return; }
-    setPassword("");
-    setOpen(false);
-    setStatus(res.data);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const skip = async () => {
-    const res = await requestJson<Status>("/api/student/linkedin/skip", { method: "POST" });
-    setStatus(res.ok ? res.data : { state: "skipped_optional" });
-    setOpen(false);
-  };
+  const schedulePoll = useCallback(() => {
+    if (pollRef.current) clearTimeout(pollRef.current);
+    pollRef.current = setTimeout(async () => {
+      const res = await requestJson<ImportResult>("/api/student/linkedin/extract");
+      if (!res.ok) { setExtractionState("failed"); return; }
+      const st = res.data.status;
+      if (st === "extracting" || st === "extraction_queued") {
+        setExtractionState("extracting");
+        schedulePoll();
+      } else if (st === "synced") {
+        setExtractionState("synced");
+        setExtractionRecords(res.data.recordsPersisted ?? null);
+        onSettled?.("succeeded");
+      } else if (st === "partially_extracted") {
+        setExtractionState("partial");
+        setExtractionRecords(res.data.recordsPersisted ?? null);
+        onSettled?.("succeeded");
+      } else if (st === "no_results") {
+        setExtractionState("no_results");
+      } else {
+        setExtractionState("failed");
+        setExtractionError(res.data.message ?? "Extraction failed.");
+      }
+    }, 4000);
+  }, [onSettled]);
 
-  const failed = s === "dead_letter" || s === "failed" || s === "timed_out";
-  const line =
-    s === "succeeded" ? "Imported. Your LinkedIn roles and schools are waiting for your review."
-    : s === "queued" || s === "running"
-      ? waited >= SLOW_AFTER_S
-        ? "Still signing in. Our sign-in service may be waking up, which can take up to a minute. Keep going; it finishes in the background."
-        : "Signing in to LinkedIn…"
-    : s === "awaiting_user" ? "LinkedIn sent you a verification code. Enter it to continue."
-    : s === "skipped_optional" ? "Skipped. Connect LinkedIn any time from Connections."
-    : failed ? `${status?.error || "That didn't work."} Your password was not kept.`
-    : null;
+  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
+
+  const linkUrl = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUrlError(null);
+    if (!profileUrl.trim()) { setUrlError("Enter your LinkedIn profile URL."); return; }
+    setUrlBusy(true);
+    const res = await requestJson<{ state?: string; error?: string }>("/api/student/linkedin", {
+      method: "POST",
+      json: { profileUrl: profileUrl.trim(), consent: true },
+    });
+    setUrlBusy(false);
+    if (!res.ok) { setUrlError(res.error?.message ?? describeError(res.error)); return; }
+    setUrlDone(true);
+    setMode("idle");
+    onSettled?.("succeeded");
+  }, [profileUrl, onSettled]);
+
+  const uploadFile = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploadError(null);
+    if (!file) { setUploadError("Select a file first."); return; }
+    setUploadBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await requestJson<ImportResult>("/api/student/linkedin/import", { method: "POST", body: fd });
+    setUploadBusy(false);
+    if (!res.ok) { setUploadError(res.error?.message ?? describeError(res.error)); return; }
+    setImportResult(res.data);
+    setImportDone(true);
+    setMode("idle");
+    setFile(null);
+    onSettled?.("succeeded");
+  }, [file, onSettled]);
+
+  const startExtract = useCallback(async () => {
+    setExtractionError(null);
+    const url = profileUrl.trim();
+    if (!url) { setExtractionError("Enter your LinkedIn profile URL first."); return; }
+    setExtractionBusy(true);
+    const res = await requestJson<ImportResult>("/api/student/linkedin/extract", {
+      method: "POST",
+      json: { profileUrl: url },
+    });
+    setExtractionBusy(false);
+    if (!res.ok) {
+      const st = res.data?.status;
+      if (st === "not_configured") {
+        setExtractionConfigured(false);
+        setExtractionError("Apify extraction is not configured on this server.");
+      } else {
+        setExtractionState("failed");
+        setExtractionError(res.data?.message ?? describeError(res.error));
+      }
+      return;
+    }
+    const st = res.data.status;
+    if (st === "extraction_queued" || st === "extracting") {
+      setExtractionState("queued");
+      setExtractionMsg(res.data.message ?? null);
+      schedulePoll();
+    } else if (st === "synced") {
+      setExtractionState("synced");
+      setExtractionRecords(res.data.recordsPersisted ?? null);
+      onSettled?.("succeeded");
+    } else if (st === "partially_extracted") {
+      setExtractionState("partial");
+      setExtractionRecords(res.data.recordsPersisted ?? null);
+      onSettled?.("succeeded");
+    } else if (st === "no_results") {
+      setExtractionState("no_results");
+    } else {
+      setExtractionState("failed");
+      setExtractionError(res.data.message ?? "Extraction failed.");
+    }
+  }, [profileUrl, schedulePoll, onSettled]);
+
+  const reset = () => { setMode("idle"); setUrlError(null); setUploadError(null); setFile(null); setExtractionError(null); };
+
+  const extractionLabel: string | null =
+    extractionState === "queued" || extractionState === "extracting"
+      ? extractionMsg ?? "Extracting profile data…"
+      : extractionState === "synced"
+      ? `Extracted${extractionRecords != null ? ` ${extractionRecords} records` : ""}. Review in the next step.`
+      : extractionState === "partial"
+      ? `Partially extracted${extractionRecords != null ? ` (${extractionRecords} records)` : ""}.`
+      : extractionState === "no_results"
+      ? "No profile data found. Check that the profile URL is public and correct."
+      : null;
 
   return (
     <section aria-labelledby="li-title" className="rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <LinkedinLogo size={22} aria-hidden="true" className="text-champagne" />
-        <h3 id="li-title" className="font-display text-base font-semibold text-text-primary">LinkedIn sign-in import</h3>
+        <h3 id="li-title" className="font-display text-base font-semibold text-text-primary">LinkedIn</h3>
         <StatusChip tone="neutral" icon={null}>Optional</StatusChip>
+        {(urlDone || importDone || extractionState === "synced" || extractionState === "partial") && (
+          <StatusChip tone="verified" icon={<CheckCircle size={12} aria-hidden="true" />}>Connected</StatusChip>
+        )}
       </div>
       <p className="mt-2 max-w-[62ch] text-sm text-text-muted">
-        Adds your work history and education. Everything else works without it, and onboarding finishes either way.
+        Adds your work history and education. Skipping is always free.
       </p>
-      {line && (
-        <p aria-live="polite" className={failed ? "mt-3 text-sm text-danger" : "mt-3 text-sm text-warm-ivory"}>{line}</p>
-      )}
 
-      {!open && !active && s !== "succeeded" && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => { setOpen(true); setError(null); }}>{failed ? "Try again" : "Connect LinkedIn"}</Button>
-          {s !== "skipped_optional" && <Button variant="ghost" onClick={() => void skip()}>Skip for now</Button>}
+      {extractionLabel && (
+        <p aria-live="polite" className={`mt-2 text-sm ${extractionState === "failed" || extractionState === "no_results" ? "text-warning" : "text-warm-ivory"}`}>
+          {extractionState === "queued" || extractionState === "extracting"
+            ? <Spinner size={12} aria-hidden="true" className="inline mr-1.5 animate-spin" />
+            : null}
+          {extractionLabel}
+        </p>
+      )}
+      {extractionError && <p aria-live="assertive" className="mt-2 text-sm text-danger">{extractionError}</p>}
+
+      {/* ── Idle: show action buttons ── */}
+      {mode === "idle" && (
+        <div className="mt-4 grid gap-4">
+          {/* Profile URL section */}
+          {!urlDone && (
+            <Button variant="secondary" size="sm" icon={<LinkSimple size={15} aria-hidden="true" />} onClick={() => { setMode("url"); setUrlError(null); }}>
+              Link profile URL
+            </Button>
+          )}
+          {urlDone && (
+            <p className="text-xs text-verified flex items-center gap-1.5"><CheckCircle size={12} aria-hidden="true" />Profile URL saved.</p>
+          )}
+
+          {/* Apify extraction */}
+          {extractionConfigured !== null && (
+            <div className="flex flex-wrap items-center gap-2">
+              {extractionConfigured ? (
+                extractionState === "idle" || extractionState === "failed" || extractionState === "no_results" ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<MagnifyingGlass size={15} aria-hidden="true" />}
+                    onClick={() => { setMode("extract"); setExtractionError(null); }}
+                  >
+                    {extractionState === "failed" ? "Retry extraction" : "Extract public profile"}
+                  </Button>
+                ) : (extractionState === "synced" || extractionState === "partial") ? (
+                  <Button variant="ghost" size="sm" onClick={() => { setMode("extract"); setExtractionError(null); }}>
+                    Re-extract profile
+                  </Button>
+                ) : null
+              ) : (
+                <p className="text-xs text-text-muted flex items-center gap-1">
+                  <WarningCircle size={12} aria-hidden="true" className="shrink-0" />
+                  Public profile extraction is not configured on this server.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* CSV import */}
+          {!importDone ? (
+            <Button variant="secondary" size="sm" icon={<Upload size={15} aria-hidden="true" />} onClick={() => { setMode("upload"); setUploadError(null); }}>
+              Upload data export
+            </Button>
+          ) : (
+            <p className="text-xs text-verified flex items-center gap-1.5">
+              <CheckCircle size={12} aria-hidden="true" />
+              {importResult?.totalRecords ? `${importResult.totalRecords} records imported.` : "Export processed."}
+            </p>
+          )}
         </div>
       )}
-      {active && s !== "awaiting_user" && waited >= SLOW_AFTER_S && (
-        <div className="mt-4"><Button variant="ghost" onClick={() => void skip()}>Cancel and skip LinkedIn</Button></div>
-      )}
 
-      {open && (
-        <form onSubmit={connect} noValidate className="mt-4 grid max-w-md gap-4">
-          <div className="grid gap-3 rounded-lg border border-border-medium bg-bg-surface/50 p-3.5">
-            <Checkbox
-              checked={consent}
-              onChange={(e) => { setConsent(e.target.checked); setError(null); }}
-              label={<><span className="font-medium">Sign in to LinkedIn for me once, to read my own profile.</span> LinkedIn may text or email me a code; I&apos;ll have 60 seconds to enter it here.</>}
-            />
-            <p className="flex items-start gap-2 text-xs text-text-muted">
-              <LockSimple size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-champagne" />
-              Your password is encrypted (AES-256-GCM), used only to sign in for you, never shown or shared, discarded if sign-in fails, and erased when you disconnect.
-            </p>
-          </div>
-          <fieldset disabled={!consent} className="grid min-w-0 gap-3">
-            <legend className="sr-only">LinkedIn sign-in details</legend>
-            {!consent && <p className="text-xs text-muted">Tick the box above to enter your LinkedIn details.</p>}
-            <TextField label="LinkedIn email" type="email" inputMode="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <div className="flex items-end gap-2">
-              <TextField
-                wrapperClassName="flex-1"
-                label="LinkedIn password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <Button
-                variant="secondary"
-                className="w-11 px-0"
-                aria-pressed={showPassword}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword((v) => !v)}
-              >
-                {showPassword ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-              </Button>
-            </div>
-          </fieldset>
-          {error && <Banner kind="danger">{error}</Banner>}
+      {/* ── URL link form ── */}
+      {mode === "url" && (
+        <form onSubmit={linkUrl} noValidate className="mt-4 grid max-w-md gap-3">
+          <p className="text-xs text-text-muted">Enter your public LinkedIn URL. Only the link is saved — no profile data is fetched.</p>
+          <TextField
+            label="LinkedIn profile URL"
+            type="url"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="https://linkedin.com/in/yourname"
+            value={profileUrl}
+            onChange={(e) => { setProfileUrl(e.target.value); setUrlError(null); }}
+          />
+          {urlError && <Banner kind="danger">{urlError}</Banner>}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primary" disabled={!consent} loading={busy} loadingLabel="Starting…">Connect</Button>
-            <Button variant="ghost" onClick={() => void skip()}>Skip for now</Button>
+            <Button type="submit" variant="primary" loading={urlBusy} loadingLabel="Linking…">Link profile</Button>
+            <Button variant="ghost" onClick={reset}>Cancel</Button>
           </div>
         </form>
       )}
 
-      {s === "awaiting_user" && <OtpDialog secondsLeft={status?.challengeSecondsLeft ?? 60} onSubmitted={() => void poll()} onSkip={() => void skip()} />}
+      {/* ── Apify extraction form ── */}
+      {mode === "extract" && (
+        <div className="mt-4 grid max-w-md gap-3">
+          <p className="text-xs text-text-muted">
+            Extracts your public work history, education and skills from your LinkedIn profile. Only publicly visible data is collected.
+          </p>
+          <TextField
+            label="LinkedIn profile URL"
+            type="url"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="https://linkedin.com/in/yourname"
+            value={profileUrl}
+            onChange={(e) => { setProfileUrl(e.target.value); setExtractionError(null); }}
+          />
+          {extractionError && <Banner kind="danger">{extractionError}</Banner>}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              loading={extractionBusy || extractionState === "queued" || extractionState === "extracting"}
+              loadingLabel="Extracting…"
+              onClick={() => void startExtract()}
+            >
+              Extract profile
+            </Button>
+            <Button variant="ghost" onClick={reset}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── CSV upload form ── */}
+      {mode === "upload" && (
+        <form onSubmit={uploadFile} noValidate className="mt-4 grid max-w-md gap-3">
+          <div className="rounded-md border border-line-soft bg-bg-surface/50 p-3 text-xs text-text-muted space-y-1">
+            <p className="font-medium text-text-primary">How to get your LinkedIn data export:</p>
+            <ol className="list-decimal list-inside space-y-0.5">
+              <li>Go to LinkedIn → Settings &amp; Privacy → Data privacy → Get a copy of your data.</li>
+              <li>Select &quot;Want something in particular?&quot; and tick Positions, Education, Skills.</li>
+              <li>Click &quot;Request archive&quot;. LinkedIn emails a link within 10 minutes.</li>
+              <li>Download and upload the ZIP here, or upload individual CSV files.</li>
+            </ol>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-1.5" htmlFor="li-file">
+              LinkedIn export file <span className="text-text-muted font-normal">(ZIP, CSV, or JSON)</span>
+            </label>
+            <input
+              id="li-file"
+              ref={fileInputRef}
+              type="file"
+              accept=".zip,.csv,.json"
+              className="block w-full text-sm text-text-muted file:mr-3 file:rounded file:border-0 file:bg-bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-text-primary hover:file:bg-bg-elevated"
+              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setUploadError(null); }}
+            />
+            {file && <p className="mt-1 text-xs text-text-muted">{file.name} ({(file.size / 1024).toFixed(0)} KB)</p>}
+          </div>
+          {uploadError && <Banner kind="danger">{uploadError}</Banner>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="primary" disabled={!file} loading={uploadBusy} loadingLabel="Importing…">Import</Button>
+            <Button variant="ghost" onClick={reset}>Cancel</Button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }

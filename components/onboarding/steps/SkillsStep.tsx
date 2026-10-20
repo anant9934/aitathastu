@@ -41,11 +41,11 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
         <section aria-labelledby="role-fit" className="mt-6 rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line-soft pb-3">
             <div>
-              <h2 id="role-fit" className="font-display text-base font-semibold text-warm-ivory">Core skills for {role.title}</h2>
+              <h2 id="role-fit" className="font-display text-base font-semibold text-text-primary">Core skills for {role.title}</h2>
               <p className="mt-0.5 text-xs text-text-muted">Target role prerequisites derived from industry standards.</p>
             </div>
             <div className="rounded-full bg-deep-espresso px-3 py-1 text-xs font-mono text-champagne border border-line-soft self-start sm:self-auto">
-              <span className="font-semibold text-warm-ivory">{role.corePrerequisites.filter(has).length}</span> / {role.corePrerequisites.length} covered
+              <span className="font-semibold text-text-primary">{role.corePrerequisites.filter(has).length}</span> / {role.corePrerequisites.length} covered
             </div>
           </div>
           <ul className="mt-4 flex flex-wrap gap-2">
@@ -71,7 +71,7 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
             note={(importing.length > 0 || map.unreviewed.length > 0) && (
               <span data-testid="map-progress-note">
                 {importing.length > 0 && <>Still importing from {importing.join(", ")}; new evidence appears here when it lands. </>}
-                {map.unreviewed.length > 0 && <><span className="font-mono tabular text-warm-ivory">{map.unreviewed.length}</span> found skill{map.unreviewed.length === 1 ? "" : "s"} still waiting for your review {map.unreviewed.length === 1 ? "isn't" : "aren't"} drawn yet.</>}
+                {map.unreviewed.length > 0 && <><span className="font-mono tabular text-text-primary">{map.unreviewed.length}</span> found skill{map.unreviewed.length === 1 ? "" : "s"} still waiting for your review {map.unreviewed.length === 1 ? "isn't" : "aren't"} drawn yet.</>}
               </span>
             )}
           />
@@ -81,7 +81,7 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
       <section aria-labelledby="skill-list" className="mt-6 rounded-card border border-line-soft bg-bg-surface shadow-card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft px-5 py-4 bg-deep-espresso/30">
           <div>
-            <h2 id="skill-list" className="font-display text-base font-semibold text-warm-ivory">
+            <h2 id="skill-list" className="font-display text-base font-semibold text-text-primary">
               All your skills <span className="ml-1.5 rounded-full bg-champagne/15 px-2 py-0.5 font-mono text-xs font-semibold text-champagne border border-champagne/30">{skills.length}</span>
             </h2>
             <p className="text-xs text-text-muted mt-0.5">Click any skill row to inspect supporting projects and source citations.</p>
@@ -102,7 +102,7 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
                     onClick={() => setOpen(expanded ? null : e.skill)}
                     className="grid w-full cursor-pointer grid-cols-[minmax(0,9rem)_minmax(0,1fr)_auto] items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-deep-espresso/40 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_8rem_auto]"
                   >
-                    <span className="truncate font-medium text-warm-ivory">{e.skill}</span>
+                    <span className="truncate font-medium text-text-primary">{e.skill}</span>
                     <EvidenceStrip segments={evidenceSegments(e)} label={`${e.skill} evidence`} />
                     <span className="hidden text-xs text-text-muted sm:block">{TIER_WORD[e.tier]}</span>
                     <CaretDown size={16} aria-hidden="true" className={cn("text-text-muted transition-transform duration-200", expanded && "rotate-180")} />
@@ -116,7 +116,7 @@ export function SkillsStep({ data, saving, guide, onBack, onContinue }: { data: 
                           {e.items.map((it, i) => (
                             <li key={i} className="flex flex-wrap items-center gap-2 text-xs">
                               <Tag>{it.kind === "cv" ? "CV" : sourceLabel(it.source)}</Tag>
-                              <span className="text-warm-ivory font-medium">{it.kind === "project" ? `Project: ${it.title}` : it.title}</span>
+                              <span className="text-text-primary font-medium">{it.kind === "project" ? `Project: ${it.title}` : it.title}</span>
                               {it.detail && <span className="min-w-0 break-all font-mono text-2xs text-text-dim">({it.detail})</span>}
                             </li>
                           ))}

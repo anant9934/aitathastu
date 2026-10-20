@@ -193,7 +193,7 @@ export function ReviewStep({ flow, guide, onBack, onContinue }: { flow: Onboardi
                   onClick={() => { setTab(s.id); setAlert(null); }}
                   className={cn(
                     "flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 text-left text-sm transition-all duration-150",
-                    tab === s.id ? "bg-deep-espresso text-warm-ivory font-medium border border-line-medium shadow-sm" : "text-text-muted hover:bg-deep-espresso/40 hover:text-warm-ivory",
+                    tab === s.id ? "bg-deep-espresso text-text-primary font-medium border border-line-medium shadow-sm" : "text-text-muted hover:bg-deep-espresso/40 hover:text-text-primary",
                   )}
                 >
                   <s.icon size={18} aria-hidden="true" weight={tab === s.id ? "fill" : "regular"} className={tab === s.id ? "text-champagne" : undefined} />

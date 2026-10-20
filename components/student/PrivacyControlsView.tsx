@@ -116,7 +116,7 @@ export function PrivacyControlsView() {
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <ShieldCheck size={24} className="text-accent-warm-bright" aria-hidden="true" />
-              <h1 className="font-display text-2xl font-bold tracking-tight text-warm-ivory">
+              <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary">
                 Privacy, Consent &amp; Data Rights
               </h1>
             </div>
@@ -141,7 +141,7 @@ export function PrivacyControlsView() {
 
       {/* Permissions & Consent Controls */}
       <div className="rounded-card border border-border-medium bg-bg-elevated p-6 sm:p-8 shadow-card">
-        <h2 className="font-display text-lg font-bold text-warm-ivory mb-2 flex items-center gap-2">
+        <h2 className="font-display text-lg font-bold text-text-primary mb-2 flex items-center gap-2">
           <SlidersHorizontal size={20} className="text-accent-warm" aria-hidden="true" />
           <span>Active Data Processing Consents</span>
         </h2>
@@ -155,7 +155,7 @@ export function PrivacyControlsView() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border-subtle bg-bg-primary/50">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-sm text-warm-ivory">Account Registration &amp; Essential Services</span>
+                <span className="font-medium text-sm text-text-primary">Account Registration &amp; Essential Services</span>
                 <span className="rounded bg-accent-warm/15 px-2 py-0.5 text-2xs font-mono text-accent-warm-bright">
                   Essential
                 </span>
@@ -183,7 +183,7 @@ export function PrivacyControlsView() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border-subtle bg-bg-primary/50">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-sm text-warm-ivory">CV Storage &amp; Text Extraction</span>
+                <span className="font-medium text-sm text-text-primary">CV Storage &amp; Text Extraction</span>
                 {isConsentGranted("cv_processing") ? (
                   <span className="rounded bg-success/15 px-2 py-0.5 text-2xs font-mono text-success">
                     Active
@@ -214,7 +214,7 @@ export function PrivacyControlsView() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border-subtle bg-bg-primary/50">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-sm text-warm-ivory">AI-Assisted CV Suggestion Enrichment</span>
+                <span className="font-medium text-sm text-text-primary">AI-Assisted CV Suggestion Enrichment</span>
                 <span className="rounded bg-accent-warm/15 px-2 py-0.5 text-2xs font-mono text-accent-warm-bright">
                   Optional
                 </span>
@@ -259,7 +259,7 @@ export function PrivacyControlsView() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border-subtle bg-bg-primary/50">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-sm text-warm-ivory">Digital Footprint External Syncing</span>
+                <span className="font-medium text-sm text-text-primary">Digital Footprint External Syncing</span>
                 <span className="rounded bg-accent-warm/15 px-2 py-0.5 text-2xs font-mono text-accent-warm-bright">
                   Optional
                 </span>
@@ -311,7 +311,7 @@ export function PrivacyControlsView() {
           <div>
             <div className="flex items-center gap-2 mb-2 text-accent-warm-bright">
               <DownloadSimple size={20} aria-hidden="true" />
-              <h2 className="font-display text-base font-bold text-warm-ivory">
+              <h2 className="font-display text-base font-bold text-text-primary">
                 Data Portability Export
               </h2>
             </div>
@@ -338,7 +338,7 @@ export function PrivacyControlsView() {
           <div>
             <div className="flex items-center gap-2 mb-2 text-accent-warm-bright">
               <PlugsConnected size={20} aria-hidden="true" />
-              <h2 className="font-display text-base font-bold text-warm-ivory">
+              <h2 className="font-display text-base font-bold text-text-primary">
                 Connected Sources &amp; Disconnect
               </h2>
             </div>
@@ -361,7 +361,7 @@ export function PrivacyControlsView() {
 
       {/* Statutory Rights & Grievance Submission */}
       <div className="rounded-card border border-border-medium bg-bg-elevated p-6 sm:p-8 shadow-card">
-        <h2 className="font-display text-lg font-bold text-warm-ivory mb-2 flex items-center gap-2">
+        <h2 className="font-display text-lg font-bold text-text-primary mb-2 flex items-center gap-2">
           <FileText size={20} className="text-accent-warm" aria-hidden="true" />
           <span>Submit Statutory Rights or Grievance Request</span>
         </h2>
@@ -378,7 +378,7 @@ export function PrivacyControlsView() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <ClockCounterClockwise size={20} className="text-accent-warm" aria-hidden="true" />
-            <h2 className="font-display text-lg font-bold text-warm-ivory">
+            <h2 className="font-display text-lg font-bold text-text-primary">
               Immutable Consent Ledger &amp; Audit Trail
             </h2>
           </div>
@@ -424,7 +424,7 @@ export function PrivacyControlsView() {
                         minute: "2-digit",
                       })}
                     </td>
-                    <td className="py-2.5 px-3 font-medium text-warm-ivory">
+                    <td className="py-2.5 px-3 font-medium text-text-primary">
                       <span>{evt.purpose}</span>
                       {evt.scope && evt.scope !== "*" && (
                         <span className="ml-1.5 font-mono text-2xs text-text-dim">({evt.scope})</span>

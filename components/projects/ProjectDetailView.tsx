@@ -83,7 +83,7 @@ export function ProjectDetailView({ id }: { id: string }) {
           </Panel>
           <Panel aria-labelledby="mine-title" data-eora-id="eora-project-detail-contribution">
             <PanelHeader id="mine-title" title="What you did" description="Your own statement. It makes the project stronger evidence; it isn't third-party proof." />
-            {p.contributionNote ? <blockquote className="border-l-2 border-soft-amber pl-3 text-sm italic text-warm-ivory">{p.contributionNote}</blockquote> : <p className="text-sm text-text-muted">Not added yet. Use Edit to say which parts you built.</p>}
+            {p.contributionNote ? <blockquote className="border-l-2 border-soft-amber pl-3 text-sm italic text-text-primary">{p.contributionNote}</blockquote> : <p className="text-sm text-text-muted">Not added yet. Use Edit to say which parts you built.</p>}
             {p.contributionRoles.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{p.contributionRoles.map((r) => <Tag key={r}>{r}</Tag>)}</div>}
           </Panel>
         </div>

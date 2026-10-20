@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowSquareOut, CaretDown, Check, GitFork, Plus, Star, X } from "@phosphor-icons/react/dist/ssr";
+import React, { useState, useMemo } from "react";
+import { ArrowSquareOut, CaretDown, Check, GitFork, MagnifyingGlass, Plus, Star, X } from "@phosphor-icons/react/dist/ssr";
 import type { ProjectEntry } from "@/lib/client/onboarding/types";
 import { requestJson, describeError } from "@/lib/client/api";
 import { Button } from "@/components/ui/Button";
@@ -26,16 +26,33 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const visible = projects.filter((p) => p.status !== "removed" && p.status !== "rejected");
-  const [open, setOpen] = useState<string | null>(visible.find((p) => p.status === "candidate")?.id ?? null);
+  const active = projects.filter((p) => p.status !== "removed" && p.status !== "rejected");
+  const hidden = projects.filter((p) => p.status === "removed" || p.status === "rejected");
+  const [open, setOpen] = useState<string | null>(active.find((p) => p.status === "candidate")?.id ?? null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", tech: "" });
   const [formError, setFormError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [showHidden, setShowHidden] = useState(false);
   useEoraStepEvents({ onNext: onContinue, onBack });
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return active;
+    return active.filter((p) =>
+      p.title.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      p.technologies.some((t) => t.toLowerCase().includes(q))
+    );
+  }, [active, search]);
 
   const update = (id: string, patch: Partial<ProjectEntry>, soon = false) => {
     const next = projects.map((p) => (p.id === id ? { ...p, ...patch } : p));
     (soon ? onChangeSoon : onChange)(next);
+  };
+
+  const restore = (id: string) => {
+    update(id, { status: "candidate" });
   };
 
   const add = () => {
@@ -50,7 +67,7 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
     setOpen(p.id);
   };
 
-  const pending = visible.filter((p) => p.status === "candidate").length;
+  const pending = active.filter((p) => p.status === "candidate").length;
 
   return (
     <>
@@ -64,12 +81,13 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line-soft bg-bg-surface p-4 shadow-card">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-sm bg-champagne/15 text-champagne border border-champagne/30 font-mono font-semibold text-sm">
-            {visible.length}
+            {active.length}
           </span>
           <div>
-            <p className="text-sm font-medium text-warm-ivory">
-              <span className="font-mono text-champagne tabular">{visible.length - pending}</span> confirmed
+            <p className="text-sm font-medium text-text-primary">
+              <span className="font-mono text-champagne tabular">{active.length - pending}</span> confirmed
               {pending > 0 && <>, <span className="font-mono text-soft-amber tabular">{pending}</span> awaiting your review</>}
+              {hidden.length > 0 && <>, <button type="button" onClick={() => setShowHidden((v) => !v)} className="font-mono text-text-muted tabular underline underline-offset-2 hover:text-text-primary">{hidden.length} removed</button></>}
             </p>
             <p className="text-xs text-text-muted">
               Add personal contribution notes to turn imported repositories into verified evidence.
@@ -87,10 +105,24 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
         </Button>
       </div>
 
+      {active.length > 4 && (
+        <div className="mt-3 relative">
+          <MagnifyingGlass size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, description, or technology…"
+            className="w-full rounded-md border border-line-soft bg-bg-surface py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-champagne/40"
+            aria-label="Search projects"
+          />
+        </div>
+      )}
+
       {adding && (
         <form noValidate onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-4 grid gap-3.5 rounded-card border border-champagne/40 bg-bg-surface p-5 shadow-card">
           <div className="border-b border-line-soft pb-2.5">
-            <h3 className="font-display text-sm font-semibold text-warm-ivory">Add Project Manually</h3>
+            <h3 className="font-display text-sm font-semibold text-text-primary">Add Project Manually</h3>
           </div>
           <TextField label="Project name" required value={form.title} error={formError} placeholder="e.g. Real-Time Object Detection Pipeline" onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(null); }} autoFocus />
           <TextAreaField label="What it does" placeholder="Brief summary of the architecture and outcome..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -102,7 +134,7 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
         </form>
       )}
 
-      {visible.length === 0 && !adding ? (
+      {active.length === 0 && !adding ? (
         <EmptyState
           className="mt-6"
           icon={FolderSimple}
@@ -111,12 +143,31 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
         >
           Add something you built, or go back and connect GitHub to bring your repositories in automatically.
         </EmptyState>
+      ) : visible.length === 0 && search ? (
+        <p className="mt-6 text-center text-sm text-text-muted">No projects match &ldquo;{search}&rdquo;.</p>
       ) : (
         <ul className="mt-4 flex flex-col gap-3" data-eora-id="eora-projects-list">
           {visible.map((p) => (
             <ProjectRow key={p.id} p={p} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} update={update} />
           ))}
         </ul>
+      )}
+
+      {showHidden && hidden.length > 0 && (
+        <div className="mt-6">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">Removed / rejected ({hidden.length})</p>
+          <ul className="flex flex-col gap-2">
+            {hidden.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 rounded-md border border-line-soft bg-bg-surface/50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-text-muted line-through">{p.title}</p>
+                  {p.sources.length > 0 && <p className="text-xs text-text-muted">{p.sources.map(sourceLabel).join(", ")}</p>}
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => restore(p.id)}>Restore</Button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <StepFooter onBack={onBack} onNext={onContinue} saving={saving} nextLabel={pending ? `Continue (${pending} unconfirmed)` : "Continue"} />
@@ -151,7 +202,7 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
       <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-start gap-3 px-5 py-4 text-left">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-display font-medium text-warm-ivory">{p.title}</span>
+            <span className="font-display font-medium text-text-primary">{p.title}</span>
             {p.isFork && <Tag><GitFork size={12} aria-hidden="true" className="mr-1" />Fork</Tag>}
             {typeof p.stars === "number" && p.stars > 0 && <span className="inline-flex items-center gap-1 font-mono text-2xs text-text-muted tabular"><Star size={12} aria-hidden="true" className="text-soft-amber" />{p.stars}</span>}
           </p>

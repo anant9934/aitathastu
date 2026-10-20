@@ -101,7 +101,7 @@ export function DashboardView() {
           <div className="min-w-0">
             <h1 id="overview-title" className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">{first ? `Welcome back, ${first}` : "Your overview"}</h1>
             <p className="mt-1 text-sm text-text-muted">
-              Working toward <span className="font-medium text-warm-ivory">{model.targetRole}</span>
+              Working toward <span className="font-medium text-text-primary">{model.targetRole}</span>
               {model.institution ? <> · {model.institution}</> : null}
             </p>
           </div>

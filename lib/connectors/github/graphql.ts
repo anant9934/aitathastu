@@ -46,7 +46,7 @@ export const METADATA_QUERY = `query($login: String!, $first: Int!, $after: Stri
   user(login: $login) {
     databaseId login name bio websiteUrl location company url avatarUrl createdAt
     followers { totalCount } following { totalCount }
-    repositories(first: $first, after: $after, ownerAffiliations: [OWNER, COLLABORATOR], privacy: PUBLIC, orderBy: { field: PUSHED_AT, direction: DESC }) {
+    repositories(first: $first, after: $after, ownerAffiliations: [OWNER, COLLABORATOR], orderBy: { field: PUSHED_AT, direction: DESC }) {
       totalCount
       pageInfo {
         hasNextPage

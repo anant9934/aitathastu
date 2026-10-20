@@ -90,7 +90,7 @@ export function SkillDetailView({ skill }: { skill: string }) {
                   ["Verification", [q.whatIsTheVerificationStatus?.status, q.whatIsTheVerificationStatus?.tierLabel].filter(Boolean).join(" · ") || "Not verified"],
                   ["What to prove next", q.whatShouldStudentLearnOrProveNext?.action || q.whatShouldStudentLearnOrProveNext?.suggestedTask || d.whatToImprove],
                 ] as const).map(([k, v]) => (
-                  <div key={k}><dt className="text-xs text-text-muted">{k}</dt><dd className="mt-0.5 text-sm text-warm-ivory">{v || "Nothing recorded yet."}</dd></div>
+                  <div key={k}><dt className="text-xs text-text-muted">{k}</dt><dd className="mt-0.5 text-sm text-text-primary">{v || "Nothing recorded yet."}</dd></div>
                 ))}
               </dl>
               {(q.whatEvidenceIsMissing?.missingPoints?.length ?? 0) > 0 && (
@@ -105,7 +105,7 @@ export function SkillDetailView({ skill }: { skill: string }) {
             {d.relatedProjects.length ? (
               <ul className="flex flex-col gap-2">
                 {d.relatedProjects.map((p) => (
-                  <li key={p.id}><Link href={`/student/projects/${p.id}`} className="block rounded-lg border border-border-medium bg-bg-surface/40 px-3.5 py-2.5 transition-colors hover:border-champagne/40"><span className="font-display text-sm font-medium text-warm-ivory">{p.title}</span>{p.description && <span className="mt-0.5 block text-xs text-text-muted">{p.description}</span>}</Link></li>
+                  <li key={p.id}><Link href={`/student/projects/${p.id}`} className="block rounded-lg border border-border-medium bg-bg-surface/40 px-3.5 py-2.5 transition-colors hover:border-champagne/40"><span className="font-display text-sm font-medium text-text-primary">{p.title}</span>{p.description && <span className="mt-0.5 block text-xs text-text-muted">{p.description}</span>}</Link></li>
                 ))}
               </ul>
             ) : <p className="text-sm text-text-muted">No project shows this yet.</p>}

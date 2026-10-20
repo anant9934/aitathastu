@@ -681,7 +681,7 @@ export function FootprintIntelligenceStep({
         <section aria-labelledby="heading-digital-footprint" className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft pb-3">
             <div>
-              <h2 id="heading-digital-footprint" className="font-display text-lg font-medium text-warm-ivory">
+              <h2 id="heading-digital-footprint" className="font-display text-lg font-medium text-text-primary">
                 Your Digital Footprint
               </h2>
               <p className="text-xs text-text-muted mt-0.5">
@@ -748,7 +748,7 @@ export function FootprintIntelligenceStep({
                       </span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-display text-sm font-medium text-warm-ivory leading-tight truncate">
+                          <h3 className="font-display text-sm font-medium text-text-primary leading-tight truncate">
                             {meta.name}
                           </h3>
                         </div>
@@ -800,7 +800,7 @@ export function FootprintIntelligenceStep({
                                 cancelEditing(provider);
                               }
                             }}
-                            className="w-full rounded-sm border border-champagne/40 bg-deep-espresso px-2.5 py-1.5 text-xs text-warm-ivory placeholder:text-text-dim focus:border-champagne focus:outline-none"
+                            className="w-full rounded-sm border border-champagne/40 bg-deep-espresso px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-dim focus:border-champagne focus:outline-none"
                             placeholder={meta.placeholder}
                             autoFocus
                           />
@@ -847,7 +847,7 @@ export function FootprintIntelligenceStep({
                             <button
                               type="button"
                               onClick={() => startEditing(provider, savedUrl)}
-                              className="text-text-muted hover:text-warm-ivory transition-colors p-1"
+                              className="text-text-muted hover:text-text-primary transition-colors p-1"
                               aria-label={`Edit ${meta.name} profile URL`}
                               title="Edit profile"
                             >
@@ -915,7 +915,7 @@ export function FootprintIntelligenceStep({
                             <button
                               type="button"
                               onClick={() => startEditing(provider, detected.url)}
-                              className="text-text-muted hover:text-warm-ivory transition-colors p-1"
+                              className="text-text-muted hover:text-text-primary transition-colors p-1"
                               aria-label={`Edit detected ${meta.name} profile URL`}
                               title="Edit candidate"
                             >
@@ -992,7 +992,7 @@ export function FootprintIntelligenceStep({
                             placeholder={meta.placeholder}
                             disabled={isSyncing}
                             className={cn(
-                              "w-full rounded-sm border bg-deep-espresso px-2.5 py-1.5 text-xs text-warm-ivory placeholder:text-text-dim transition-colors focus:border-champagne focus:outline-none",
+                              "w-full rounded-sm border bg-deep-espresso px-2.5 py-1.5 text-xs text-text-primary placeholder:text-text-dim transition-colors focus:border-champagne focus:outline-none",
                               cardError ? "border-danger" : "border-line-medium"
                             )}
                           />
@@ -1034,7 +1034,7 @@ export function FootprintIntelligenceStep({
                 <Globe size={20} aria-hidden="true" />
               </span>
               <div>
-                <h3 id="heading-other-evidence" className="font-display text-sm font-medium text-warm-ivory">
+                <h3 id="heading-other-evidence" className="font-display text-sm font-medium text-text-primary">
                   Personal Websites & Research Identifiers
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5">
@@ -1050,7 +1050,7 @@ export function FootprintIntelligenceStep({
           <div className="flex items-start gap-3">
             <ShieldCheck size={20} className="text-champagne shrink-0 mt-0.5" aria-hidden="true" />
             <div className="text-xs text-text-muted">
-              <h4 id="heading-consent" className="font-medium text-warm-ivory mb-1">
+              <h4 id="heading-consent" className="font-medium text-text-primary mb-1">
                 Data Privacy & Ethical Acquisition Guarantee
               </h4>
               <p>
@@ -1121,7 +1121,7 @@ export function FootprintIntelligenceStep({
               return (
                 <div key={prov} className="flex flex-col gap-0.5 border-b border-border-subtle/40 pb-2 last:border-0 last:pb-0">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-warm-ivory">{meta.name}</span>
+                    <span className="font-semibold text-text-primary">{meta.name}</span>
                     <span className="font-mono text-2xs text-text-dim truncate max-w-[200px]">{cand?.url}</span>
                   </div>
                   <span className="text-2xs text-text-muted">{meta.hint}</span>

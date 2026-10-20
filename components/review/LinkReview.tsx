@@ -73,7 +73,7 @@ export function LinkReview({ links, discovered, onChange }: {
               ) : (
                 <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
                   <div className="min-w-0 flex-1 basis-56">
-                    <p className="font-display text-sm font-medium text-warm-ivory">{label(platform)}</p>
+                    <p className="font-display text-sm font-medium text-text-primary">{label(platform)}</p>
                     <a className="inline-flex max-w-full items-center gap-1 break-all text-sm text-champagne hover:underline" href={normalise(url)} target="_blank" rel="noopener noreferrer">
                       {url}<ArrowSquareOut size={14} aria-hidden="true" className="shrink-0" /><span className="sr-only">(opens in a new tab)</span>
                     </a>

@@ -184,7 +184,7 @@ export function CvStep({
               className={cn(
                 "flex flex-col items-center justify-center gap-4 rounded-card border-2 border-dashed p-8 text-center transition-all duration-200 shadow-card min-h-[260px]",
                 dragging
-                  ? "border-accent-warm-bright bg-accent-warm-bright/10 shadow-[0_0_28px_rgba(244,154,71,0.2)]"
+                  ? "border-accent-warm-bright bg-accent-warm-bright/10 shadow-[0_0_28px_rgba(196,138,90,0.2)]"
                   : cv.fileName && !failed
                   ? "border-verified/60 bg-bg-elevated"
                   : "border-border-medium bg-bg-elevated hover:border-accent-warm hover:bg-bg-elevated/80",
@@ -223,7 +223,7 @@ export function CvStep({
                 )}
               </span>
               <div>
-                <p className="font-display text-base font-bold text-warm-ivory sm:text-lg">
+                <p className="font-display text-base font-bold text-text-primary sm:text-lg">
                   {cv.fileName ?? "Drag and drop your CV here"}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
@@ -267,7 +267,7 @@ export function CvStep({
           <div className="flex flex-col gap-4 rounded-card border border-border-medium bg-bg-elevated p-5 sm:p-6 shadow-card">
             <div className="flex items-center gap-2 border-b border-border-medium/60 pb-3">
               <ShieldCheck size={18} weight="bold" className="text-verified" />
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-warm-ivory">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-text-primary">
                 Private & Evidence-Driven
               </h2>
             </div>
@@ -289,7 +289,7 @@ export function CvStep({
             <ul className="mt-2 space-y-2.5 text-xs text-text-muted border-t border-border-medium/60 pt-3">
               <li className="flex items-start gap-2">
                 <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" />
-                <span className="font-medium text-warm-ivory">
+                <span className="font-medium text-text-primary">
                   100% Privacy Protected: Mobile and phone numbers are never extracted from your CV.
                 </span>
               </li>
@@ -325,7 +325,7 @@ export function CvStep({
 
               {disclosureExpanded && (
                 <div className="mt-3 rounded-md bg-deep-espresso/60 p-3 text-2xs text-text-muted space-y-2">
-                  <p className="font-semibold text-warm-ivory">Candidate information parsed from your document:</p>
+                  <p className="font-semibold text-text-primary">Candidate information parsed from your document:</p>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 list-disc list-inside">
                     <li>Identity & contact details (email, location)</li>
                     <li>Education & degrees</li>
@@ -462,7 +462,7 @@ export function CvStep({
                       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <div className="flex items-center gap-2">
                           {getGroupIcon(group.id)}
-                          <p className="font-display text-sm font-bold text-warm-ivory" aria-hidden="true">
+                          <p className="font-display text-sm font-bold text-text-primary" aria-hidden="true">
                             {group.title}
                           </p>
                         </div>
@@ -537,7 +537,7 @@ export function CvStep({
                               className={cn(
                                 "group inline-flex items-center gap-1.5 rounded-panel border px-3 py-1.5 text-xs font-medium transition-all shadow-xs select-none",
                                 c.selected
-                                  ? "border-accent-warm bg-accent-warm/15 text-warm-ivory shadow-[0_0_12px_rgba(244,154,71,0.15)]"
+                                  ? "border-accent-warm bg-accent-warm/15 text-text-primary shadow-[0_0_12px_rgba(196,138,90,0.15)]"
                                   : "border-border-medium bg-bg-surface/50 text-text-muted hover:border-border-bright hover:text-text-primary",
                               )}
                             >
@@ -582,7 +582,7 @@ export function CvStep({
                     <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         {getGroupIcon(group.id)}
-                        <p className="font-display text-sm font-bold text-warm-ivory" aria-hidden="true">
+                        <p className="font-display text-sm font-bold text-text-primary" aria-hidden="true">
                           {group.title}
                         </p>
                       </div>
@@ -611,7 +611,7 @@ export function CvStep({
                             className={cn(
                               "flex flex-col gap-2 rounded-card border p-4 transition-all duration-150 shadow-xs",
                               c.selected
-                                ? "border-accent-warm/50 bg-accent-warm/[0.07] text-warm-ivory shadow-[0_0_16px_rgba(244,154,71,0.08)]"
+                                ? "border-accent-warm/50 bg-accent-warm/[0.07] text-text-primary shadow-[0_0_16px_rgba(196,138,90,0.08)]"
                                 : "border-border-medium bg-bg-surface/50 text-text-muted hover:border-border-bright",
                             )}
                           >
@@ -725,7 +725,7 @@ export function CvStep({
                                       </span>
                                     )}
                                     {data.issuer && (
-                                      <span className="rounded bg-deep-espresso px-1.5 py-0.5 text-3xs text-warm-ivory">
+                                      <span className="rounded bg-deep-espresso px-1.5 py-0.5 text-3xs text-text-primary">
                                         {data.issuer}
                                       </span>
                                     )}

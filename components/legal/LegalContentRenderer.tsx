@@ -63,7 +63,7 @@ export function formatInlineText(text: string): React.ReactNode[] {
     if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
       const boldText = part.slice(2, -2);
       return (
-        <strong key={index} className="font-semibold text-warm-ivory">
+        <strong key={index} className="font-semibold text-text-primary">
           {boldText}
         </strong>
       );
@@ -101,7 +101,7 @@ export function LegalContentRenderer({ content }: { content: string }) {
                   <thead>
                     <tr className="border-b border-border-medium bg-deep-espresso/50">
                       {headerCells.map((h, i) => (
-                        <th key={i} className="px-3 py-2.5 font-semibold text-warm-ivory">
+                        <th key={i} className="px-3 py-2.5 font-semibold text-text-primary">
                           {formatInlineText(h)}
                         </th>
                       ))}

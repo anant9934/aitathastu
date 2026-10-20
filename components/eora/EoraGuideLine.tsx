@@ -33,7 +33,7 @@ export function EoraGuideLine({ fallback, onAsk }: { fallback?: string; onAsk?: 
   return (
     <aside aria-label="EORA, your guide" className="rounded-card border border-line-soft bg-bg-surface shadow-card transition-all">
       <div className="flex items-start gap-3 px-4 py-3">
-        <span className="relative mt-0.5 size-9 shrink-0 overflow-hidden rounded-full border border-accent-warm/40 bg-bg-primary shadow-[0_0_12px_rgba(244,154,71,0.3)]">
+        <span className="relative mt-0.5 size-9 shrink-0 overflow-hidden rounded-full border border-accent-warm/40 bg-bg-primary shadow-[0_0_12px_rgba(196,138,90,0.3)]">
           <Image src="/assets/eora/avatar.png" alt="" fill sizes="36px" className="object-cover" />
         </span>
         <div className="min-w-0 flex-1">
@@ -49,7 +49,7 @@ export function EoraGuideLine({ fallback, onAsk }: { fallback?: string; onAsk?: 
                     onClick={() => eora.setLanguage(lang)}
                     className={cn(
                       "min-h-6 cursor-pointer rounded-full px-2 text-2xs font-medium transition-colors pointer-coarse:min-h-8",
-                      (lang === "hinglish") === hinglish ? "bg-accent-warm text-obsidian font-bold shadow-sm" : "text-text-muted hover:text-warm-ivory",
+                      (lang === "hinglish") === hinglish ? "bg-accent-warm text-espresso font-bold shadow-sm" : "text-text-muted hover:text-text-primary",
                     )}
                   >
                     {lang === "english" ? "EN" : "Hinglish"}
@@ -58,7 +58,7 @@ export function EoraGuideLine({ fallback, onAsk }: { fallback?: string; onAsk?: 
               </span>
             )}
           </p>
-          <p aria-live="polite" className={cn("mt-1.5 text-sm text-warm-ivory leading-relaxed", collapsed && "sr-only")}>{text}</p>
+          <p aria-live="polite" className={cn("mt-1.5 text-sm text-text-primary leading-relaxed", collapsed && "sr-only")}>{text}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {onAsk && (
@@ -72,7 +72,7 @@ export function EoraGuideLine({ fallback, onAsk }: { fallback?: string; onAsk?: 
             onClick={toggle}
             aria-expanded={!collapsed}
             aria-label={collapsed ? "Show EORA's tip" : "Hide EORA's tip"}
-            className="grid size-9 cursor-pointer place-items-center rounded-md text-text-muted hover:bg-deep-espresso hover:text-warm-ivory pointer-coarse:size-11 transition-colors"
+            className="grid size-9 cursor-pointer place-items-center rounded-md text-text-muted hover:bg-deep-espresso hover:text-text-primary pointer-coarse:size-11 transition-colors"
           >
             <CaretDown size={16} aria-hidden="true" className={cn("transition-transform duration-150", collapsed && "-rotate-90")} />
           </button>

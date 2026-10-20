@@ -57,6 +57,14 @@ export function useFootprintConnectors({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per mount
   }, []);
 
+  // After a GitHub OAuth redirect (?success=github_connected), auto-trigger
+  // a footprint import so the draft's projects list is populated without the
+  // user having to manually click "Import". Fires at most once per page load.
+  const autoImportGitHubRef = useRef(
+    typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("success") === "github_connected"
+  );
+
   // What the server already knows (e.g. after a refresh or a GitHub OAuth round trip).
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +84,11 @@ export function useFootprintConnectors({
     });
     return () => { cancelled = true; };
   }, []);
+
+  // importFrom is defined below (useCallback); we capture it via ref so the
+  // auto-import effect doesn't need to list it in its deps array (avoiding a
+  // temporal dead zone: the deps array is evaluated before the useCallback runs).
+  const importFromRef = useRef<((provider: string, identifier: string) => Promise<boolean>) | null>(null);
 
   const importFrom = useCallback(async (provider: string, identifier: string, upload?: { name: string; content: string } | null): Promise<boolean> => {
     const value = identifier.trim();
@@ -145,6 +158,29 @@ export function useFootprintConnectors({
       await importFrom(provider, value);
     }
   }, [importFrom]);
+
+  // Keep the ref in sync so the auto-import effect can call the latest version
+  // without listing importFrom in its deps array (which would cause a TDZ error
+  // since importFrom is defined after the effect that references it).
+  importFromRef.current = importFrom;
+
+  // Auto-import after OAuth: once profiles are available and the flag is set,
+  // trigger a footprint import to merge project candidates into the onboarding
+  // draft. The ref guard ensures it fires at most once per page load.
+  useEffect(() => {
+    if (!autoImportGitHubRef.current) return;
+    const githubProfile = profiles["github"];
+    if (!githubProfile || String(githubProfile).startsWith("Archive:")) return;
+    autoImportGitHubRef.current = false;
+    if (typeof window !== "undefined") {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("success");
+        window.history.replaceState(null, "", url.toString());
+      } catch { /* non-fatal */ }
+    }
+    void importFromRef.current?.("github", githubProfile);
+  }, [profiles]); // importFrom intentionally excluded: accessed via ref to avoid TDZ
 
   return { profiles, statuses, summaries, errors, setErrors, busy, fromCv, importFrom, disconnect, importAllLinked };
 }

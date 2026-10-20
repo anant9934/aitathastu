@@ -52,7 +52,7 @@ export function ErrorScreen({
           </div>
 
           <Label variant="intel">{offline ? "Network Disconnected" : "Application Notice"}</Label>
-          <h1 className="font-display text-2xl font-bold tracking-[-0.03em] text-warm-ivory sm:text-3xl">
+          <h1 className="font-display text-2xl font-bold tracking-[-0.03em] text-text-primary sm:text-3xl">
             {offline ? "You're currently offline" : "This page encountered an interruption"}
           </h1>
 

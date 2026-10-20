@@ -126,7 +126,7 @@ export function DirectionStep({
                 className={cn(
                   "min-h-8 shrink-0 cursor-pointer rounded-full border px-3 text-xs font-medium transition-all pointer-coarse:min-h-10",
                   category === c.id
-                    ? "border-accent-warm-bright bg-accent-warm-bright/15 text-warm-ivory font-semibold shadow-sm"
+                    ? "border-accent-warm-bright bg-accent-warm-bright/15 text-text-primary font-semibold shadow-sm"
                     : "border-border-medium text-text-muted hover:border-accent-warm hover:text-text-primary hover:bg-bg-surface",
                 )}
               >
@@ -163,13 +163,13 @@ export function DirectionStep({
                 className={cn(
                   "group relative flex cursor-pointer flex-col justify-between rounded-card border p-4 sm:p-5 text-left transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-accent-warm focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary shadow-card min-h-[160px]",
                   checked
-                    ? "border-accent-warm-bright bg-accent-warm-bright/10 text-warm-ivory shadow-[0_0_24px_rgba(244,154,71,0.15)] ring-1 ring-accent-warm-bright"
+                    ? "border-accent-warm-bright bg-accent-warm-bright/10 text-text-primary shadow-[0_0_24px_rgba(196,138,90,0.15)] ring-1 ring-accent-warm-bright"
                     : "border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm hover:bg-bg-elevated/80",
                 )}
               >
                 <div className="w-full">
                   <div className="flex items-start justify-between gap-2.5">
-                    <span className="font-display text-base font-bold text-warm-ivory group-hover:text-accent-warm-bright transition-colors">
+                    <span className="font-display text-base font-bold text-text-primary group-hover:text-accent-warm-bright transition-colors">
                       {r.title}
                     </span>
                     <span
@@ -177,7 +177,7 @@ export function DirectionStep({
                       className={cn(
                         "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border transition-all",
                         checked
-                          ? "border-accent-warm-bright bg-accent-warm-bright text-obsidian"
+                          ? "border-accent-warm-bright bg-accent-warm-bright text-espresso"
                           : "border-border-medium bg-bg-primary",
                       )}
                     >

@@ -32,7 +32,7 @@ export function ThemeToggle({ compact, className }: { compact?: boolean; classNa
             className={cn(
               "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full text-xs font-medium transition-all duration-150 pointer-coarse:h-10",
               compact ? "w-8 justify-center pointer-coarse:w-10" : "px-3",
-              active ? "bg-bg-elevated text-text-warm font-semibold shadow-[0_0_8px_rgba(201,164,109,0.2)]" : "text-text-muted hover:text-text-warm",
+              active ? "bg-bg-elevated text-text-warm font-semibold shadow-[0_0_8px_rgba(196,138,90,0.2)]" : "text-text-muted hover:text-text-warm",
             )}
           >
             <Icon size={15} weight={active ? "fill" : "regular"} className={active ? "text-accent-primary" : undefined} aria-hidden="true" />

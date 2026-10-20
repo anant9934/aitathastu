@@ -29,7 +29,7 @@ import { cn } from "@/lib/client/cn";
 export function FacultyFrame({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const link = (href: string, label: string) => (
-    <Link href={href} aria-current={path === href ? "page" : undefined} className={cn("inline-flex min-h-10 items-center rounded-md px-3 text-sm transition-colors", path === href ? "bg-deep-espresso text-warm-ivory font-medium" : "text-text-muted hover:text-text-primary hover:bg-deep-espresso/50")}>{label}</Link>
+    <Link href={href} aria-current={path === href ? "page" : undefined} className={cn("inline-flex min-h-10 items-center rounded-md px-3 text-sm transition-colors", path === href ? "bg-deep-espresso text-text-primary font-medium" : "text-text-muted hover:text-text-primary hover:bg-deep-espresso/50")}>{label}</Link>
   );
   return (
     <div className="min-h-dvh bg-bg-primary text-text-primary">

@@ -55,7 +55,7 @@ export function FinishStep({ data, guide, submitting, onBack, onFinish }: {
             >
               <dt className="text-xs font-medium text-text-muted">{label}</dt>
               <dd className="mt-3 flex items-baseline gap-2">
-                <span className="font-display text-3xl font-semibold text-warm-ivory tabular">
+                <span className="font-display text-3xl font-semibold text-text-primary tabular">
                   {n}
                 </span>
                 <span className="text-xs font-mono text-text-dim">{unit}</span>
@@ -72,7 +72,7 @@ export function FinishStep({ data, guide, submitting, onBack, onFinish }: {
             </span>
             <div className="min-w-0">
               <p className="text-xs text-text-muted font-mono uppercase tracking-wider">Target Objective</p>
-              <p className="text-sm sm:text-base font-display font-semibold text-warm-ivory truncate">
+              <p className="text-sm sm:text-base font-display font-semibold text-text-primary truncate">
                 {data.targetRole}
               </p>
               <p className="text-xs text-text-muted mt-0.5">

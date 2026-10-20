@@ -60,16 +60,16 @@ const EORA_LINES = [
 ];
 
 const SKILL_NODES = [
-  { id: "ml",    label: "Machine Learning", lines: ["Machine", "Learning"], x: 430, y: 220, r: 52, main: true,  color: "#F49A47", fontSize: 13 },
-  { id: "py",    label: "Python",           lines: ["Python"],              x: 250, y: 96,  r: 36, color: "#F49A47", fontSize: 12 },
-  { id: "math",  label: "Mathematics",      lines: ["Mathematics"],         x: 168, y: 246, r: 40, color: "#C9A46D", fontSize: 10.5 },
-  { id: "ds",    label: "Data Structures",  lines: ["Data", "Structures"],  x: 300, y: 368, r: 40, color: "#C9A46D", fontSize: 11 },
-  { id: "dl",    label: "Deep Learning",    lines: ["Deep", "Learning"],    x: 618, y: 100, r: 40, color: "#C9A46D", fontSize: 11 },
-  { id: "nlp",   label: "NLP",              lines: ["NLP"],                 x: 732, y: 232, r: 30, color: "#C9A46D", fontSize: 12 },
-  { id: "mlops", label: "MLOps",            lines: ["MLOps"],               x: 640, y: 366, r: 32, color: "#C9A46D", fontSize: 11.5 },
-  { id: "res",   label: "Research",         lines: ["Research"],            x: 430, y: 62,  r: 32, color: "#F4E7D0", fontSize: 11 },
-  { id: "gh",    label: "Project Evidence", lines: ["Project", "Evidence"], x: 760, y: 374, r: 40, color: "#F4E7D0", fontSize: 10.5 },
-  { id: "comm",  label: "Communication",    lines: ["Communication"],       x: 126, y: 382, r: 42, color: "#F4E7D0", fontSize: 9.8 },
+  { id: "ml",    label: "Machine Learning", lines: ["Machine", "Learning"], x: 430, y: 220, r: 52, main: true,  color: "#C48A5A", fontSize: 13 },
+  { id: "py",    label: "Python",           lines: ["Python"],              x: 250, y: 96,  r: 36, color: "#C48A5A", fontSize: 12 },
+  { id: "math",  label: "Mathematics",      lines: ["Mathematics"],         x: 168, y: 246, r: 40, color: "#C48A5A", fontSize: 10.5 },
+  { id: "ds",    label: "Data Structures",  lines: ["Data", "Structures"],  x: 300, y: 368, r: 40, color: "#C48A5A", fontSize: 11 },
+  { id: "dl",    label: "Deep Learning",    lines: ["Deep", "Learning"],    x: 618, y: 100, r: 40, color: "#C48A5A", fontSize: 11 },
+  { id: "nlp",   label: "NLP",              lines: ["NLP"],                 x: 732, y: 232, r: 30, color: "#C48A5A", fontSize: 12 },
+  { id: "mlops", label: "MLOps",            lines: ["MLOps"],               x: 640, y: 366, r: 32, color: "#C48A5A", fontSize: 11.5 },
+  { id: "res",   label: "Research",         lines: ["Research"],            x: 430, y: 62,  r: 32, color: "#E7D6C1", fontSize: 11 },
+  { id: "gh",    label: "Project Evidence", lines: ["Project", "Evidence"], x: 760, y: 374, r: 40, color: "#E7D6C1", fontSize: 10.5 },
+  { id: "comm",  label: "Communication",    lines: ["Communication"],       x: 126, y: 382, r: 42, color: "#E7D6C1", fontSize: 9.8 },
 ];
 
 const SKILL_EDGES: [string, string][] = [
@@ -225,7 +225,7 @@ export function Landing({ user }: LandingProps) {
         const dy = nodes[i].y - nodes[j].y;
         const d = Math.hypot(dx, dy);
         if (d < 155) {
-          ctx.strokeStyle = `rgba(201,164,109,${(1 - d / 155) * 0.22})`;
+          ctx.strokeStyle = `rgba(196,138,90,${(1 - d / 155) * 0.22})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(nodes[i].x, nodes[i].y);
@@ -245,9 +245,9 @@ export function Landing({ user }: LandingProps) {
       n.y = Math.max(0, Math.min(H, n.y));
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(244,154,71,${0.45 + Math.sin((frame + n.x) * 0.02) * 0.22})`;
+      ctx.fillStyle = `rgba(196,138,90,${0.45 + Math.sin((frame + n.x) * 0.02) * 0.22})`;
       ctx.shadowBlur = 9;
-      ctx.shadowColor = "rgba(244,154,71,.9)";
+      ctx.shadowColor = "rgba(196,138,90,.9)";
       ctx.fill();
       ctx.shadowBlur = 0;
     }
@@ -273,7 +273,7 @@ export function Landing({ user }: LandingProps) {
       const y = A.y + (B.y - A.y) * p.t;
       const grd = ctx.createRadialGradient(x, y, 0, x, y, 9);
       grd.addColorStop(0, "rgba(255,240,215,.95)");
-      grd.addColorStop(1, "rgba(201,164,109,0)");
+      grd.addColorStop(1, "rgba(196,138,90,0)");
       ctx.fillStyle = grd;
       ctx.beginPath();
       ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -653,8 +653,8 @@ export function Landing({ user }: LandingProps) {
     resizeNeural();
     const neuralObs = new IntersectionObserver(
       ([e]) => {
-        neuralRunningRef.current = e.isIntersecting;
-        if (e.isIntersecting) {
+        neuralRunningRef.current = e.isIntersecting && !rm;
+        if (e.isIntersecting && !rm) {
           cancelAnimationFrame(neuralRafRef.current);
           neuralRafRef.current = requestAnimationFrame(drawNeural);
         }
@@ -813,9 +813,20 @@ export function Landing({ user }: LandingProps) {
       </header>
 
       {/* ============================================================
+          SKIP LINK (UX-004)
+          ============================================================ */}
+      <a
+        href="#main-content"
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-4 focus-visible:left-4 focus-visible:z-[9999] focus-visible:px-4 focus-visible:py-2 focus-visible:rounded-md focus-visible:bg-background-primary focus-visible:text-foreground-primary focus-visible:border focus-visible:border-focus-ring focus-visible:outline-none focus-visible:text-sm focus-visible:font-semibold"
+      >
+        Skip to main content
+      </a>
+
+      {/* ============================================================
           HERO — Kinetic word split & 3D Interactive EORA
           ============================================================ */}
       <section className="hero" id="home">
+        <a id="main-content" tabIndex={-1} className="sr-only" aria-hidden="true" />
         <div className="hero-spot" id="heroSpot" ref={heroSpotRef}></div>
         <div className="wrap hero-grid">
           <div className="hero-copy">
@@ -1224,17 +1235,17 @@ export function Landing({ user }: LandingProps) {
             >
               <defs>
                 <linearGradient id="sgGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#F49A47" />
-                  <stop offset="55%" stopColor="#C9A46D" />
-                  <stop offset="100%" stopColor="#F4E7D0" />
+                  <stop offset="0%" stopColor="#C48A5A" />
+                  <stop offset="55%" stopColor="#C48A5A" />
+                  <stop offset="100%" stopColor="#E7D6C1" />
                 </linearGradient>
                 <radialGradient id="sgNode" cx="35%" cy="30%">
                   <stop offset="0%" stopColor="#2C2621" />
-                  <stop offset="100%" stopColor="#171513" />
+                  <stop offset="100%" stopColor="#2B1D17" />
                 </radialGradient>
                 <radialGradient id="sgMain" cx="35%" cy="30%">
                   <stop offset="0%" stopColor="#3D332A" />
-                  <stop offset="100%" stopColor="#24201B" />
+                  <stop offset="100%" stopColor="rgba(107,74,58,0.3)" />
                 </radialGradient>
               </defs>
               <g id="sgEdges"></g>
@@ -1243,9 +1254,9 @@ export function Landing({ user }: LandingProps) {
           </div>
 
           <div className="graph-legend reveal">
-            <span><i style={{ background: "#F49A47" }}></i> Core area</span>
-            <span><i style={{ background: "#C9A46D" }}></i> Related skill</span>
-            <span><i style={{ background: "#F4E7D0" }}></i> Evidence node</span>
+            <span><i style={{ background: "#C48A5A" }}></i> Core area</span>
+            <span><i style={{ background: "#C48A5A" }}></i> Related skill</span>
+            <span><i style={{ background: "#E7D6C1" }}></i> Evidence node</span>
           </div>
         </div>
       </section>
@@ -1359,7 +1370,7 @@ export function Landing({ user }: LandingProps) {
               </div>
               <button
                 type="button"
-                className="preview-tag cursor-pointer hover:border-amber-400 hover:text-warm-ivory transition-colors"
+                className="preview-tag cursor-pointer hover:border-amber-400 hover:text-text-primary transition-colors"
                 onClick={() => openEoraChat("What are the best steps to start learning AI and ML?")}
                 title="Click to open interactive companion"
               >

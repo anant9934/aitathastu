@@ -166,7 +166,7 @@ export function SkillsMap({ goal, skills: allSkills, gaps: allGaps, mode = "full
       {full && <p aria-live="polite" className="mb-2 min-h-4 text-xs text-text-muted">{matches ? `${matches.size} match${matches.size === 1 ? "" : "es"}${matches.size ? " · press Enter to go to the first" : ""}` : ""}</p>}
 
       <div className={cn("grid gap-4", full && node && "xl:grid-cols-[minmax(0,1fr)_22rem]")}>
-        <div className={cn("relative overflow-hidden bg-obsidian", demo ? "rounded-card" : "rounded-md border border-border-medium")}>
+        <div className={cn("relative overflow-hidden bg-bg-surface", demo ? "rounded-card" : "rounded-md border border-border-medium")}>
           <style>{`.sim-node:focus{outline:none}.sim-node:focus-visible .sim-ring{stroke:var(--accent-warm);opacity:1}.sim-stage.sim-smooth{transition:transform 220ms cubic-bezier(.22,1,.36,1)}.sim-edge,.sim-node{transition:opacity 160ms cubic-bezier(.4,0,.2,1)}@media (prefers-reduced-motion:reduce){.sim-stage.sim-smooth,.sim-edge,.sim-node{transition:none}}`}</style>
           <svg
             ref={svgRef}

@@ -12,7 +12,7 @@ export function Footer({ className }: { className?: string }) {
           <div className="sm:col-span-2 lg:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2 mb-4 group" aria-label="AI Tathastu home">
               <span className="logo-mark w-6 h-6 rounded-md bg-accent-warm inline-block transition-transform group-hover:scale-105" aria-hidden="true" />
-              <span className="font-display font-bold text-warm-ivory text-lg tracking-tight">
+              <span className="font-display font-bold text-text-primary text-lg tracking-tight">
                 AI Tathastu
               </span>
             </Link>
@@ -28,7 +28,7 @@ export function Footer({ className }: { className?: string }) {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="GitHub Repository"
-                className="w-8 h-8 rounded-lg border border-border-medium flex items-center justify-center font-mono text-2xs text-text-muted hover:border-accent-warm hover:text-warm-ivory transition-colors"
+                className="w-8 h-8 rounded-lg border border-border-medium flex items-center justify-center font-mono text-2xs text-text-muted hover:border-accent-warm hover:text-text-primary transition-colors"
               >
                 GH
               </a>
@@ -37,7 +37,7 @@ export function Footer({ className }: { className?: string }) {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="LinkedIn Profile"
-                className="w-8 h-8 rounded-lg border border-border-medium flex items-center justify-center font-mono text-2xs text-text-muted hover:border-accent-warm hover:text-warm-ivory transition-colors"
+                className="w-8 h-8 rounded-lg border border-border-medium flex items-center justify-center font-mono text-2xs text-text-muted hover:border-accent-warm hover:text-text-primary transition-colors"
               >
                 IN
               </a>
@@ -46,7 +46,7 @@ export function Footer({ className }: { className?: string }) {
                 target="_blank"
                 rel="noreferrer"
                 aria-label="X (formerly Twitter)"
-                className="w-8 h-8 rounded-lg border border-border-medium flex items-center justify-center font-mono text-2xs text-text-muted hover:border-accent-warm hover:text-warm-ivory transition-colors"
+                className="w-8 h-8 rounded-lg border border-border-medium flex items-center justify-center font-mono text-2xs text-text-muted hover:border-accent-warm hover:text-text-primary transition-colors"
               >
                 𝕏
               </a>
@@ -55,106 +55,106 @@ export function Footer({ className }: { className?: string }) {
 
           {/* Product & Platform */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Product &amp; Platform
             </h5>
-            <Link href="/onboarding" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/onboarding" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Get Started
             </Link>
-            <Link href="/student" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/student" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Person 360
             </Link>
-            <Link href="/student/skills" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/student/skills" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Skills Map
             </Link>
-            <Link href="/student/projects" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/student/projects" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Project Ledger
             </Link>
-            <Link href="/faculty" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/faculty" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Faculty Queue
             </Link>
-            <Link href="/verification" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/verification" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Verification Engine
             </Link>
           </div>
 
           {/* Core Legal Policies */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Legal &amp; Policies
             </h5>
-            <Link href="/privacy" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/terms" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/terms" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Terms of Use
             </Link>
-            <Link href="/cookies" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/cookies" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Cookie Policy
             </Link>
-            <Link href="/acceptable-use" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/acceptable-use" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Acceptable Use
             </Link>
-            <Link href="/copyright" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/copyright" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Copyright &amp; Attribution
             </Link>
-            <Link href="/accessibility" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/accessibility" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Accessibility
             </Link>
           </div>
 
           {/* Your Data & Privacy */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Your Data
             </h5>
-            <Link href="/privacy/your-rights" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/your-rights" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Your Privacy Rights
             </Link>
-            <Link href="/privacy/resume-processing" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/resume-processing" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               CV Data Processing
             </Link>
-            <Link href="/privacy/ai-processing" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/ai-processing" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               AI Processing &amp; EORA
             </Link>
-            <Link href="/privacy/digital-sources" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/digital-sources" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Digital Sources
             </Link>
-            <Link href="/privacy/children" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/children" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Child &amp; Guardian Notice
             </Link>
-            <Link href="/privacy/retention" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/retention" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Data Retention &amp; Deletion
             </Link>
-            <Link href="/privacy/service-providers" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/service-providers" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Service Providers Register
             </Link>
-            <Link href="/privacy/institution-sharing" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/privacy/institution-sharing" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Institution Sharing
             </Link>
           </div>
 
           {/* Trust, Security & Redressal */}
           <div className="flex flex-col space-y-2.5">
-            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-accent-warm font-semibold mb-2">
+            <h5 className="font-mono text-2xs uppercase tracking-[0.16em] text-text-warm font-semibold mb-2">
               Trust &amp; Redressal
             </h5>
-            <Link href="/security" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/security" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Security Practices
             </Link>
-            <Link href="/grievance" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/grievance" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Grievance Redressal
             </Link>
-            <Link href="/evidence-policy" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/evidence-policy" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Evidence &amp; Verification
             </Link>
-            <Link href="/disclaimer" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <Link href="/disclaimer" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Learning &amp; AI Disclaimer
             </Link>
             <Link href="/cookie-settings" className="text-xs text-accent-warm-bright hover:underline transition-colors font-medium">
               Cookie Preferences
             </Link>
-            <a href="mailto:support@aitathastu.com" className="text-xs text-text-muted hover:text-warm-ivory transition-colors">
+            <a href="mailto:support@aitathastu.com" className="text-xs text-text-muted hover:text-text-primary transition-colors">
               Contact Support
             </a>
           </div>
@@ -164,17 +164,15 @@ export function Footer({ className }: { className?: string }) {
         <div className="border-t border-border-subtle pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-text-dim">
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
             <span>© {new Date().getFullYear()} AI Tathastu. All claims backed by real evidence.</span>
-            <span className="hidden sm:inline-block text-border-medium">•</span>
-            <span className="text-2xs font-mono text-text-dim">Review Drafts [Awaiting Owner/Legal Fact Verification]</span>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-4 text-2xs font-mono">
-            <Link href="/privacy" className="hover:text-warm-ivory transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-warm-ivory transition-colors">Terms</Link>
-            <Link href="/cookies" className="hover:text-warm-ivory transition-colors">Cookies</Link>
+            <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-text-primary transition-colors">Terms</Link>
+            <Link href="/cookies" className="hover:text-text-primary transition-colors">Cookies</Link>
             <Link href="/cookie-settings" className="hover:text-accent-warm-bright transition-colors">Preferences</Link>
-            <Link href="/security" className="hover:text-warm-ivory transition-colors">Security</Link>
-            <Link href="/grievance" className="hover:text-warm-ivory transition-colors">Grievance</Link>
+            <Link href="/security" className="hover:text-text-primary transition-colors">Security</Link>
+            <Link href="/grievance" className="hover:text-text-primary transition-colors">Grievance</Link>
           </div>
         </div>
       </div>

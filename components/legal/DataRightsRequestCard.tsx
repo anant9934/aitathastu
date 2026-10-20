@@ -72,7 +72,7 @@ export function DataRightsRequestCard() {
   return (
     <div className="mt-8 rounded-card border border-border-medium bg-bg-elevated p-6 sm:p-8 shadow-card space-y-6">
       <div className="border-b border-border-subtle/80 pb-4">
-        <h3 className="font-display text-lg font-bold text-warm-ivory">
+        <h3 className="font-display text-lg font-bold text-text-primary">
           Exercise Your Privacy Rights
         </h3>
         <p className="text-xs text-text-muted mt-1">
@@ -83,7 +83,7 @@ export function DataRightsRequestCard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         {/* Left: Instant Data Portability Export */}
         <div className="rounded-lg border border-border-medium bg-bg-surface p-5 space-y-3">
-          <h4 className="font-semibold text-warm-ivory text-sm">Download My Data (Portability)</h4>
+          <h4 className="font-semibold text-text-primary text-sm">Download My Data (Portability)</h4>
           <p className="text-2xs text-text-muted leading-relaxed">
             Download a machine-readable JSON copy of all personal profile information, confirmed projects, skills evidence,
             resumes metadata, and consent audit trails stored on AI Tathastu.
@@ -103,7 +103,7 @@ export function DataRightsRequestCard() {
         {/* Right: Formal Request Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="req-type" className="block text-xs font-medium text-warm-ivory mb-1">
+            <label htmlFor="req-type" className="block text-xs font-medium text-text-primary mb-1">
               Request Type
             </label>
             <select
@@ -122,7 +122,7 @@ export function DataRightsRequestCard() {
           </div>
 
           <div>
-            <label htmlFor="req-details" className="block text-xs font-medium text-warm-ivory mb-1">
+            <label htmlFor="req-details" className="block text-xs font-medium text-text-primary mb-1">
               Details of Your Request
             </label>
             <textarea
@@ -136,7 +136,7 @@ export function DataRightsRequestCard() {
           </div>
 
           <div>
-            <label htmlFor="req-email" className="block text-xs font-medium text-warm-ivory mb-1">
+            <label htmlFor="req-email" className="block text-xs font-medium text-text-primary mb-1">
               Notification Email (Optional)
             </label>
             <input

@@ -11,7 +11,7 @@
  * navigation commands stay on the zero-LLM engine (Tasks 1.4.1, 1.4.3).
  */
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { EioraVisual } from "./EioraVisual";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, ArrowRight, ChatCircleText, MapTrifold, Minus, PaperPlaneRight, Pause, Play, SpeakerHigh, SpeakerSlash, X } from "@phosphor-icons/react/dist/ssr";
 import { useEoraSafe } from "@/lib/client/eora/provider";
@@ -77,8 +77,8 @@ export function EoraLauncher({ compact }: { compact?: boolean }) {
         compact ? "size-10 justify-center pointer-coarse:size-11" : "min-h-10 w-full px-3 text-text-muted hover:text-text-primary")}
       aria-label={compact ? `Ask EORA, your guide${hasTip ? " (new tip)" : ""}` : hasTip ? "Ask EORA (new tip)" : undefined}
     >
-      <span className="relative size-6 shrink-0 rounded-full border border-border-medium bg-deep-espresso">
-        <span className="absolute inset-0 overflow-hidden rounded-full"><Image src="/assets/eora/avatar.png" alt="" fill sizes="24px" className="object-cover" /></span>
+      <span className="relative size-6 shrink-0 overflow-hidden rounded-full border border-border-medium bg-bg-primary">
+        <EioraVisual size={24} className="absolute inset-0" state={open ? "speaking" : eora.isMinimized ? "minimized" : "idle"} />
         {hasTip && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-obsidian bg-soft-amber" aria-hidden="true" />}
       </span>
       {!compact && <span>Ask EORA</span>}
@@ -196,7 +196,7 @@ export function EoraCompanion() {
   return (
     <Portal>
       <style>{`:root[data-eora-tour="on"] [data-eora-spotlight="true"] { outline: 2px solid var(--soft-amber); outline-offset: 4px; border-radius: 8px; transition: outline-color 150ms; }`}</style>
-      <div className={position} data-eora-id="eora-floating-companion" data-eora-language={hinglish ? "hinglish" : "english"}>
+      <div className={position} data-eora-id="eora-floating-companion" data-eora-language={hinglish ? "hinglish" : "english"} data-eiora-state={speech.speaking ? "speaking" : (tour || task) ? "extracting" : eora.isMinimized ? "minimized" : "idle"}>
         {showCard && !eora.isMinimized && (
           <div
             ref={card}
@@ -300,7 +300,7 @@ export function EoraCompanion() {
             }}
             className="relative size-12 cursor-pointer overflow-hidden rounded-full border border-champagne/40 bg-deep-espresso shadow-[0_0_16px_rgba(196,138,90,0.25)] transition-transform duration-150 active:scale-95"
           >
-            <Image src="/assets/eora/avatar.png" alt="" fill sizes="48px" className="object-cover" />
+            <EioraVisual size={48} className="absolute inset-0" state={speech.speaking ? "speaking" : (tour || task) ? "extracting" : eora.isMinimized ? "minimized" : "idle"} />
             {eora.isMinimized && message && <span className="absolute right-1 top-1 size-2.5 rounded-full border-2 border-deep-espresso bg-soft-amber" aria-hidden="true" />}
           </button>
         </div>

@@ -81,16 +81,10 @@ export async function getDb(): Promise<TathastuDb> {
 
           if (!isInitialized) {
             if (!autoMigrate) throw new Error("Database schema is not initialized; runtime migrations are disabled.");
-          }
-          // Run all migrations whenever autoMigrate is on (staging/preview) so
-          // tables added since initial setup are always created. In production
-          // autoMigrate is false and `npm run db:migrate` (in the build command)
-          // is the explicit migration step.
-          if (autoMigrate) {
             for (const stmt of MIGRATION_SQL_STATEMENTS) {
               await sql.query(stmt);
             }
-            if (!isInitialized) await seedDefaultEntities(db);
+            await seedDefaultEntities(db);
           }
         } catch (migErr) {
           console.error("[Tathastu DB] Migration error on Neon Serverless HTTP:", migErr);
@@ -116,12 +110,10 @@ export async function getDb(): Promise<TathastuDb> {
 
           if (!isInitialized) {
             if (!autoMigrate) throw new Error("Database schema is not initialized; runtime migrations are disabled.");
-          }
-          if (autoMigrate) {
             for (const stmt of MIGRATION_SQL_STATEMENTS) {
               await client.unsafe(stmt);
             }
-            if (!isInitialized) await seedDefaultEntities(db);
+            await seedDefaultEntities(db);
           }
         } catch (migErr) {
           console.error("[Tathastu DB] Migration error on PostgreSQL TCP:", migErr);

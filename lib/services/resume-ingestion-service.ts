@@ -47,7 +47,7 @@ import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError, type ExtractorProfileV2 } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
 import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers";
-import { markRunFailed, persistExtraction } from "./resume-extraction-persistence";
+import { markRunFailed, persistExtraction, runIdForJob } from "./resume-extraction-persistence";
 
 export type ResumeFailureCode =
   | "DOCUMENT_RETRIEVAL_FAILED"
@@ -144,12 +144,27 @@ function meta(job: SourceProcessingJob): Record<string, unknown> {
   return (job.metadata ?? {}) as Record<string, unknown>;
 }
 
+/**
+ * Loggable view of an error. Drizzle query errors embed the bound parameters
+ * (CV text, phone numbers, ids) in their message, so only the driver's own
+ * message and SQLSTATE are kept.
+ */
+export function sanitizeError(err: unknown): { errorClass: string; sqlState: string | null; message: string } {
+  if (!(err instanceof Error)) return { errorClass: typeof err, sqlState: null, message: typeof err === "string" ? err.slice(0, 300) : "" };
+  let inner: unknown = err;
+  for (let i = 0; i < 5 && inner instanceof Error && (inner as { cause?: unknown }).cause instanceof Error; i++) inner = (inner as { cause?: unknown }).cause;
+  const code = [inner, err].map((e) => (e as { code?: unknown }).code).find((c) => typeof c === "string" && /^[0-9A-Z]{5}$/.test(c)) as string | undefined;
+  const raw = (inner as Error).message.split(/\n?params:/)[0];
+  const message = /^Failed query:/.test(raw) ? "Failed query" : raw;
+  return { errorClass: (inner as Error).constructor.name, sqlState: code ?? null, message: message.slice(0, 300) };
+}
+
 async function fail(job: SourceProcessingJob, code: ResumeFailureCode, cause?: unknown) {
   const f = FAILURES[code];
   console.error("[resume-pipeline] job failed", {
     jobId: job.id,
     code,
-    cause: cause instanceof Error ? `${cause.name}: ${cause.message}` : cause ?? null,
+    cause: cause === undefined || cause === null ? null : sanitizeError(cause),
   });
   await SourceProcessingJobService.failJob({
     jobId: job.id,
@@ -167,7 +182,7 @@ async function fail(job: SourceProcessingJob, code: ResumeFailureCode, cause?: u
       .set({ status: "failed", updatedAt: new Date() })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, job.personId)));
     await markRunFailed(job.personId, documentId, job.id, code).catch((e) =>
-      console.warn("[resume-pipeline] could not record failed run", { jobId: job.id, error: e instanceof Error ? e.message : e }));
+      console.warn("[resume-pipeline] could not record failed run", { jobId: job.id, error: sanitizeError(e) }));
   }
 }
 
@@ -676,15 +691,13 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
         quality: built.extraction.quality, llmUsed: llmEnrichmentSuccess, timings: { extractMs },
       });
     } catch (persistErr) {
-      const errMsg = persistErr instanceof Error ? persistErr.message : String(persistErr);
-      const isMissingTable = /relation .* does not exist/i.test(errMsg) || /table .* doesn't exist/i.test(errMsg);
-      console.error("[resume-pipeline] persistExtraction failed", {
-        jobId: job.id, documentId, personId,
-        stage: "persist_records",
-        errorClass: persistErr instanceof Error ? persistErr.constructor.name : "unknown",
-        errorCode: (persistErr as { code?: string }).code ?? null,
-        message: errMsg,
-        hint: isMissingTable ? "resume_extraction_runs or resume_extracted_records table is missing — run: npm run db:migrate" : undefined,
+      const safe = sanitizeError(persistErr);
+      // 42P01 undefined_table, 42703 undefined_column: the deployed code is ahead of the schema.
+      const schemaBehind = safe.sqlState === "42P01" || safe.sqlState === "42703";
+      console.error("[resume-pipeline] persist stage failed", {
+        jobId: job.id, documentId, runId: runIdForJob(job.id),
+        stage: "persist_records", operation: "upsert", committed: false, ...safe,
+        ...(schemaBehind ? { hint: "Database schema is behind the code: run `npm run db:migrate` against this database." } : {}),
       });
       throw persistErr;
     }
@@ -708,7 +721,7 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)))
       .returning();
     if (updated.length !== 1) {
-      console.error("[resume-pipeline] resume_documents update returned no rows", { jobId: job.id, documentId, personId, stage: "persist_snapshot" });
+      console.error("[resume-pipeline] persist stage failed", { jobId: job.id, documentId, stage: "persist_snapshot", operation: "update", committed: false, errorClass: "NotFound", sqlState: null, message: "resume_documents row not found for owner" });
       throw new Error(`resume_documents row ${documentId} not found for owner`);
     }
   } catch (err) {

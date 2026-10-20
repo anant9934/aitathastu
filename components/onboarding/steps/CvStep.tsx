@@ -378,7 +378,7 @@ export function CvStep({
         {cv.error && (
           <Banner
             kind={failed ? "danger" : "warning"}
-            title={failed ? "We couldn't read this file" : undefined}
+            title={failed ? (cv.error.code === "PERSIST_FAILED" ? "We read your CV but couldn't save the results" : "We couldn't read this file") : undefined}
             action={
               failed ? (
                 <>

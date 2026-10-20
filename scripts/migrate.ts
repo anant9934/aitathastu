@@ -22,11 +22,17 @@ import { MIGRATION_SQL_STATEMENTS } from "../lib/db/migration-sql";
 async function main() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
 
-  // In a CI/preview build with no DATABASE_URL the migrate step is a no-op so
-  // the build command ("npm run db:migrate && npm run build") still succeeds.
-  if (!databaseUrl || !databaseUrl.startsWith("postgres")) {
-    console.log("No PostgreSQL DATABASE_URL found – skipping migration (set DATABASE_URL to apply schema changes).");
-    process.exit(0);
+  // vercel.json runs this before every build. Only production deploys migrate:
+  // preview builds may share the production DATABASE_URL and must not change it.
+  if (process.env.VERCEL === "1") {
+    if (process.env.VERCEL_ENV !== "production") {
+      console.log(`Skipping migration on Vercel ${process.env.VERCEL_ENV ?? "unknown"} build.`);
+      process.exit(0);
+    }
+    if (!databaseUrl?.startsWith("postgres")) {
+      console.error("Production build has no PostgreSQL DATABASE_URL; refusing to deploy without a migrated database.");
+      process.exit(1);
+    }
   }
 
   console.log("Applying database migrations and seeding defaults...");
@@ -52,6 +58,16 @@ async function main() {
       console.log("✓ Database successfully initialized and migrated on Neon.");
       process.exit(0);
     }
+
+    // getDb() only migrates an empty database, so apply every statement here.
+    const { default: postgres } = await import("postgres");
+    const client = postgres(databaseUrl, { max: 1, onnotice: () => {} });
+    console.log(`Executing ${MIGRATION_SQL_STATEMENTS.length} DDL migration statements on PostgreSQL...`);
+    for (const stmt of MIGRATION_SQL_STATEMENTS) await client.unsafe(stmt);
+    await client.end({ timeout: 5 });
+    await seedDefaultEntities(await getDb());
+    console.log("✓ Database successfully migrated.");
+    process.exit(0);
   }
 
   await getDb();

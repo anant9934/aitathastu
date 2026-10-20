@@ -445,6 +445,35 @@ test("missing resume_extraction_runs table produces PERSIST_FAILED (not silent s
   assert.equal(s.result, null, "failed job must not carry a review payload");
 });
 
+test("a record rejected by a database constraint fails the save, and the log carries the SQLSTATE but no CV text", async () => {
+  await setupTestDatabase();
+  const { queueResumeUpload, sanitizeError } = await import("../lib/services/resume-ingestion-service");
+  const { persistExtraction, listRecords } = await import("../lib/services/resume-extraction-persistence");
+  const owner = await createTestPerson("cvconstraint");
+  const { jobId, documentId } = await queueResumeUpload({ personId: owner, filename: "a.pdf", mimeType: "application/pdf", bytes: read("aarav-fresher--pdf-single.pdf") });
+  const secret = "+91 98765 43210 aarav private note";
+  const bad = { candidateId: "skill_0", category: null as unknown as string, value: secret, sourceSpan: secret };
+  const err = await persistExtraction({ personId: owner, documentId, jobId, candidates: [bad], llmUsed: false }).then(() => null, (e) => e);
+  assert.ok(err, "a NOT NULL violation must not be reported as success");
+  const safe = sanitizeError(err);
+  assert.equal(safe.sqlState, "23502");
+  assert.ok(!JSON.stringify(safe).includes("98765") && !JSON.stringify(safe).includes(owner), JSON.stringify(safe));
+  assert.equal((await listRecords(owner, documentId)).length, 0, "no partial record rows");
+});
+
+test("after a successful save, reloading status returns the same persisted suggestions", async () => {
+  await setupTestDatabase();
+  const { queueResumeUpload, processResumeJob, getResumeJobStatus } = await import("../lib/services/resume-ingestion-service");
+  const owner = await createTestPerson("cvreload");
+  const { jobId, documentId } = await queueResumeUpload({ personId: owner, filename: "r.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", bytes: read("meera-research--docx-plain.docx") });
+  await processResumeJob(jobId, owner);
+  const first = await getResumeJobStatus(documentId, owner, jobId);
+  assert.equal(first.status, "review_ready", first.message ?? "");
+  await processResumeJob(jobId, owner);
+  const reload = await getResumeJobStatus(documentId, owner);
+  assert.deepEqual(reload.result!.reviewCandidates.map((c) => c.candidateId), first.result!.reviewCandidates.map((c) => c.candidateId));
+});
+
 test("PERSIST_FAILED is distinct from EXTRACTION_FAILED in the UI contract", () => {
   const { failureInfo } = require("../lib/services/resume-ingestion-service");
   const pf = failureInfo("PERSIST_FAILED");

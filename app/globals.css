@@ -35,18 +35,18 @@
   --foreground-primary:   #2B1D17;
   --foreground-secondary: #6B4A3A;
   --foreground-muted:     #6B4A3A;
-  --foreground-warm:      #C48A5A;
+  --foreground-warm:      #6B4A3A;
 
   /* Accent */
   --accent-primary:    #C48A5A;
   --accent-bright:     #C48A5A;
-  --accent-foreground: #FAF6F0;
+  --accent-foreground: #2B1D17;
 
   /* Legacy palette names */
   --champagne:         #C48A5A;
   --soft-amber:        #C48A5A;
   --warm-ivory:        #FAF6F0;
-  --primary-button-fg: #FAF6F0;
+  --primary-button-fg: #2B1D17;
   --paper:             #FAF6F0;
   --warm-paper:        #E7D6C1;
   --soft-border:       #E7D6C1;
@@ -78,13 +78,13 @@
 
   /* Gradients (Caramel-to-Mocha, within 5 colors) */
   --grad-cta:           linear-gradient(120deg, #C48A5A 0%, #6B4A3A 100%);
-  --grad-cta-shimmer:   linear-gradient(120deg, #C48A5A 0%, #6B4A3A 35%, #E7D6C1 52%, #6B4A3A 70%, #C48A5A 100%);
+  --grad-cta-shimmer:   linear-gradient(120deg, #C48A5A 0%, #E7D6C1 52%, #C48A5A 100%);
   --grad-intel:         linear-gradient(120deg, #C48A5A 0%, #E7D6C1 100%);
   --grad-intel-shimmer: linear-gradient(120deg, #C48A5A 0%, #E7D6C1 50%, #C48A5A 100%);
 
   /* Buttons */
   --button-primary:              #C48A5A;
-  --button-primary-foreground:   #FAF6F0;
+  --button-primary-foreground:   #2B1D17;
   --button-secondary:            #FFFFFF;
   --button-secondary-foreground: #2B1D17;
   --button-secondary-border:     #E7D6C1;
@@ -200,13 +200,13 @@
   /* Accent */
   --accent-primary:    #C48A5A;
   --accent-bright:     #C48A5A;
-  --accent-foreground: #FAF6F0;
+  --accent-foreground: #2B1D17;
 
   /* Legacy palette names */
   --champagne:         #C48A5A;
   --soft-amber:        #C48A5A;
   --warm-ivory:        #E7D6C1;
-  --primary-button-fg: #FAF6F0;
+  --primary-button-fg: #2B1D17;
   --paper:             #FAF6F0;
   --warm-paper:        #E7D6C1;
   --soft-border:       rgba(231, 214, 193, 0.15);
@@ -238,13 +238,13 @@
 
   /* Gradients */
   --grad-cta:           linear-gradient(120deg, #C48A5A 0%, #E7D6C1 100%);
-  --grad-cta-shimmer:   linear-gradient(120deg, #C48A5A 0%, #E7D6C1 40%, #FAF6F0 55%, #E7D6C1 70%, #C48A5A 100%);
+  --grad-cta-shimmer:   linear-gradient(120deg, #C48A5A 0%, #E7D6C1 52%, #C48A5A 100%);
   --grad-intel:         linear-gradient(120deg, #C48A5A 0%, #E7D6C1 100%);
   --grad-intel-shimmer: linear-gradient(120deg, #C48A5A 0%, #E7D6C1 50%, #C48A5A 100%);
 
   /* Buttons */
   --button-primary:              #C48A5A;
-  --button-primary-foreground:   #FAF6F0;
+  --button-primary-foreground:   #2B1D17;
   --button-secondary:            rgba(107, 74, 58, 0.3);
   --button-secondary-foreground: #FAF6F0;
   --button-secondary-border:     rgba(231, 214, 193, 0.2);

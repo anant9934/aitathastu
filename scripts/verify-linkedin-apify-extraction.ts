@@ -259,7 +259,7 @@ async function runBehavioural() {
     !svcSrc.match(/apify_[a-z0-9]{25,}/));
   // Route file must not echo the Apify token in responses
   check("extract route does not include token in response body",
-    !routeSrc.includes("APIFY_TOKEN") || routeSrc.match(/APIFY_TOKEN[^"]*process\.env/));
+    !routeSrc.includes("APIFY_TOKEN") || routeSrc.match(/APIFY_TOKEN[^"]*process\.env/) !== null);
 }
 
 runBehavioural().then(() => {

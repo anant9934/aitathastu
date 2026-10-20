@@ -101,7 +101,7 @@ export function CookieSettingsManager() {
     <div className="space-y-6">
       {/* Overview Banner */}
       <div className="rounded-lg border border-border-medium bg-bg-surface p-4 text-xs text-text-muted space-y-2">
-        <div className="flex items-center gap-2 font-semibold text-warm-ivory">
+        <div className="flex items-center gap-2 font-semibold text-text-primary">
           <Info size={16} className="text-accent-warm-bright shrink-0" aria-hidden="true" />
           <span>Transparent Storage Notice</span>
         </div>
@@ -123,7 +123,7 @@ export function CookieSettingsManager() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold text-warm-ivory">1. Strictly Essential Storage</h3>
+              <h3 className="font-display text-sm font-bold text-text-primary">1. Strictly Essential Storage</h3>
               <span className="rounded bg-verified/20 px-2 py-0.5 font-mono text-2xs font-semibold text-verified border border-verified/30">
                 Always Active
               </span>
@@ -139,11 +139,11 @@ export function CookieSettingsManager() {
         </div>
 
         <div className="rounded-md bg-deep-espresso/50 p-3 text-2xs font-mono text-text-dim space-y-1 border border-border-subtle">
-          <p className="font-semibold text-warm-ivory">Active items:</p>
+          <p className="font-semibold text-text-primary">Active items:</p>
           <ul className="list-disc list-inside space-y-0.5">
-            <li><span className="text-warm-ivory">tathastu_session</span>: HTTP-only session cookie (30-day lifetime)</li>
-            <li><span className="text-warm-ivory">tathastu_gh_oauth_state</span>: GitHub OAuth CSRF token (10 min)</li>
-            <li><span className="text-warm-ivory">tathastu_google_oauth_state / nonce</span>: Google sign-in replay tokens (10 min)</li>
+            <li><span className="text-text-primary">tathastu_session</span>: HTTP-only session cookie (30-day lifetime)</li>
+            <li><span className="text-text-primary">tathastu_gh_oauth_state</span>: GitHub OAuth CSRF token (10 min)</li>
+            <li><span className="text-text-primary">tathastu_google_oauth_state / nonce</span>: Google sign-in replay tokens (10 min)</li>
           </ul>
         </div>
       </div>
@@ -153,7 +153,7 @@ export function CookieSettingsManager() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold text-warm-ivory">2. Functional &amp; Theme Preferences</h3>
+              <h3 className="font-display text-sm font-bold text-text-primary">2. Functional &amp; Theme Preferences</h3>
               <span className="rounded bg-accent-warm/20 px-2 py-0.5 font-mono text-2xs font-semibold text-accent-warm-bright border border-accent-warm/30">
                 Optional
               </span>
@@ -176,11 +176,11 @@ export function CookieSettingsManager() {
         </div>
 
         <div className="rounded-md bg-deep-espresso/50 p-3 text-2xs font-mono text-text-dim space-y-1 border border-border-subtle">
-          <p className="font-semibold text-warm-ivory">Managed local keys:</p>
+          <p className="font-semibold text-text-primary">Managed local keys:</p>
           <ul className="list-disc list-inside space-y-0.5">
-            <li><span className="text-warm-ivory">tathastu_theme</span>: Dark / Light appearance state</li>
-            <li><span className="text-warm-ivory">tathastu_workspace_v1</span>: Local navigation layout state</li>
-            <li><span className="text-warm-ivory">tathastu_eora_*</span>: EORA guideline collapse state</li>
+            <li><span className="text-text-primary">tathastu_theme</span>: Dark / Light appearance state</li>
+            <li><span className="text-text-primary">tathastu_workspace_v1</span>: Local navigation layout state</li>
+            <li><span className="text-text-primary">tathastu_eora_*</span>: EORA guideline collapse state</li>
           </ul>
         </div>
       </div>
@@ -190,7 +190,7 @@ export function CookieSettingsManager() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold text-warm-ivory">3. Website Performance &amp; Analytics</h3>
+              <h3 className="font-display text-sm font-bold text-text-primary">3. Website Performance &amp; Analytics</h3>
               <span className="rounded bg-border-medium px-2 py-0.5 font-mono text-2xs text-text-dim">
                 None Installed
               </span>
@@ -218,7 +218,7 @@ export function CookieSettingsManager() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-display text-sm font-bold text-warm-ivory">4. Marketing &amp; Cross-Site Tracking</h3>
+              <h3 className="font-display text-sm font-bold text-text-primary">4. Marketing &amp; Cross-Site Tracking</h3>
               <span className="rounded bg-border-medium px-2 py-0.5 font-mono text-2xs text-text-dim">
                 Disabled &amp; Prohibited
               </span>

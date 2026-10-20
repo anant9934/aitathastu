@@ -38,7 +38,7 @@ export function AccountsStep({ profiles, discovered, saving, guide, onProfilesCh
                 {linkedCount}
               </span>
               <div>
-                <p className="text-sm font-medium text-warm-ivory">
+                <p className="text-sm font-medium text-text-primary">
                   {linkedCount} {linkedCount === 1 ? "account" : "accounts"} ready to sync
                 </p>
                 <p className="text-xs text-text-muted">
@@ -62,7 +62,7 @@ export function AccountsStep({ profiles, discovered, saving, guide, onProfilesCh
           <div className="flex items-center gap-3 rounded-card border border-line-soft bg-bg-surface/50 px-4 py-3 text-xs text-text-muted">
             <span className="h-2 w-2 rounded-full bg-soft-amber shrink-0" aria-hidden="true" />
             <p>
-              <strong className="text-warm-ivory font-medium">Read-only & Private:</strong> We only inspect public activity (repositories, commits, publications). No write permissions or passwords are ever accessed.
+              <strong className="text-text-primary font-medium">Read-only & Private:</strong> We only inspect public activity (repositories, commits, publications). No write permissions or passwords are ever accessed.
             </p>
           </div>
         )}

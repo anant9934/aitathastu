@@ -60,9 +60,9 @@ export function FocusEditor({ targetRole, purposes, onSave }: {
         <p className="mt-0.5 text-xs text-text-muted">The first one decides what your dashboard opens with.</p>
         <ol aria-labelledby="focus-priorities" className="mt-3 flex flex-col gap-1.5">
           {ranked.map((id, i) => (
-            <li key={id} className={cn("flex min-h-12 items-center gap-2 rounded-md border px-3 transition-colors", i === 0 ? "border-accent-warm-bright/50 bg-accent-warm-bright/10 text-warm-ivory" : "border-border-medium bg-bg-elevated text-text-primary")}>
+            <li key={id} className={cn("flex min-h-12 items-center gap-2 rounded-md border px-3 transition-colors", i === 0 ? "border-accent-warm-bright/50 bg-accent-warm-bright/10 text-text-primary" : "border-border-medium bg-bg-elevated text-text-primary")}>
               <span className="w-4 font-mono text-xs text-text-muted tabular">{i + 1}</span>
-              <span className={cn("flex-1 text-sm", i === 0 ? "font-semibold text-warm-ivory" : "text-text-primary")}>{title(id)}</span>
+              <span className={cn("flex-1 text-sm", i === 0 ? "font-semibold text-text-primary" : "text-text-primary")}>{title(id)}</span>
               <IconButton label={`Move ${title(id)} up`} disabled={busy || i === 0} onClick={() => move(i, -1)}><ArrowUp size={16} aria-hidden="true" /></IconButton>
               <IconButton label={`Move ${title(id)} down`} disabled={busy || i === ranked.length - 1} onClick={() => move(i, 1)}><ArrowDown size={16} aria-hidden="true" /></IconButton>
               <IconButton label={`Remove ${title(id)}`} disabled={busy || ranked.length <= 1} onClick={() => {

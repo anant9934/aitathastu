@@ -66,11 +66,11 @@ export function SkillsView() {
     <PageFrame
       eoraId="eora-skills-overview"
       title="Skills"
-      description={<>Measured against <span className="font-medium text-warm-ivory">{data.targetRole || data.activeGoal}</span>. Each skill shows what backs it; nothing counts as verified until faculty verify it.</>}
+      description={<>Measured against <span className="font-medium text-text-primary">{data.targetRole || data.activeGoal}</span>. Each skill shows what backs it; nothing counts as verified until faculty verify it.</>}
     >
       <dl data-eora-id="eora-skill-verification" className="mb-5 grid grid-cols-2 overflow-hidden rounded-card border border-border-medium bg-border-medium sm:grid-cols-4 shadow-card [&>div]:bg-bg-elevated" style={{ gap: 1 }}>
         {([["Skills", s.totalSkills ?? data.skills.length], ["Shown in projects", s.demonstratedSkills], ["Verified", s.verifiedSkills], ["Core skills met", s.goalPrerequisitesTotal ? `${s.goalPrerequisitesMet ?? 0}/${s.goalPrerequisitesTotal}` : "None set"]] as const).map(([l, v]) => (
-          <div key={l} className="px-4 py-3.5"><dt className="text-xs text-text-muted">{l}</dt><dd className="mt-1 font-display text-xl font-semibold text-warm-ivory tabular">{v}</dd></div>
+          <div key={l} className="px-4 py-3.5"><dt className="text-xs text-text-muted">{l}</dt><dd className="mt-1 font-display text-xl font-semibold text-text-primary tabular">{v}</dd></div>
         ))}
       </dl>
 
@@ -125,7 +125,7 @@ function Ledger({ data, reload }: { data: SkillsData; reload: () => Promise<void
         <TextField label="Search skills" labelHidden type="search" placeholder="Search skills" value={q} onChange={(e) => setQ(e.target.value)} />
         <SelectField label="Category" labelHidden value={cat} onChange={(e) => setCat(e.target.value)}>{cats.map((c) => <option key={c} value={c}>{c === "All" ? "All categories" : c}</option>)}</SelectField>
         <button type="button" aria-pressed={onlyGoal} onClick={() => setOnlyGoal((v) => !v)}
-          className={cn("min-h-11 cursor-pointer rounded-lg border px-3 text-sm transition-all duration-150", onlyGoal ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory")}>
+          className={cn("min-h-11 cursor-pointer rounded-lg border px-3 text-sm transition-all duration-150", onlyGoal ? "border-soft-amber bg-soft-amber/15 text-text-primary font-medium shadow-[0_0_12px_rgba(196,138,90,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-text-primary")}>
           Core for my role
         </button>
       </div>
@@ -137,7 +137,7 @@ function Ledger({ data, reload }: { data: SkillsData; reload: () => Promise<void
             return (
               <li key={s.name} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-3 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_9rem_auto]">
                 <div className="min-w-0">
-                  <Link href={`/student/skills/${encodeURIComponent(s.name)}`} className="block truncate font-display font-medium text-warm-ivory hover:text-soft-amber">{s.name}</Link>
+                  <Link href={`/student/skills/${encodeURIComponent(s.name)}`} className="block truncate font-display font-medium text-text-primary hover:text-soft-amber">{s.name}</Link>
                   <p className="truncate text-xs text-text-muted">{s.category}{s.isGoalPrerequisite ? " · core for your role" : ""}</p>
                 </div>
                 <EvidenceStrip className="col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto" label={`${s.name} evidence`} showCounts segments={[{ tier: v.tier, count: v.count, label: "evidence items" }]} />
@@ -193,7 +193,7 @@ function SkillEditorPanel({ studentSkills, hiddenSkills, onChanged }: { studentS
         <ul className="mt-4 divide-y divide-border-medium border-t border-border-medium">
           {studentSkills.map((s) => (
             <li key={s.evidenceId} className="flex flex-wrap items-center gap-2 py-2.5">
-              <span className="min-w-0 flex-1 basis-24 font-display font-medium text-warm-ivory">{s.name}</span>
+              <span className="min-w-0 flex-1 basis-24 font-display font-medium text-text-primary">{s.name}</span>
               <SelectField label={`Your level for ${s.name}`} labelHidden wrapperClassName="w-36" value={s.proficiency ?? ""} disabled={busy !== null}
                 onChange={(e) => void run(s.name, () => sendSkillEdit("PATCH", { name: s.name, proficiency: e.target.value || null }), `Level for ${s.name} saved`)}>
                 {LEVELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}

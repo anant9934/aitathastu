@@ -53,7 +53,7 @@ export function LegalPageShell({
             <span className="hidden sm:inline-block h-4 w-px bg-border-medium" aria-hidden="true" />
             <Link
               href="/privacy"
-              className="hidden sm:inline-flex items-center text-xs font-mono font-medium tracking-wider uppercase text-text-muted hover:text-warm-ivory transition-colors"
+              className="hidden sm:inline-flex items-center text-xs font-mono font-medium tracking-wider uppercase text-text-muted hover:text-text-primary transition-colors"
             >
               Legal &amp; Trust Center
             </Link>
@@ -62,7 +62,7 @@ export function LegalPageShell({
           <div className="flex items-center gap-2">
             <Link
               href="/"
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-elevated hover:text-warm-ivory transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-bg-elevated hover:text-text-primary transition-colors"
             >
               <ArrowLeft size={14} aria-hidden="true" />
               <span>Back to AI Tathastu</span>
@@ -71,7 +71,7 @@ export function LegalPageShell({
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="lg:hidden grid size-9 place-items-center rounded-md border border-border-medium text-text-muted hover:bg-bg-elevated hover:text-warm-ivory transition-colors"
+              className="lg:hidden grid size-9 place-items-center rounded-md border border-border-medium text-text-muted hover:bg-bg-elevated hover:text-text-primary transition-colors"
               aria-label="Open legal navigation"
             >
               <List size={20} aria-hidden="true" />
@@ -84,11 +84,11 @@ export function LegalPageShell({
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb Navigation */}
         <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-xs text-text-dim">
-          <Link href="/" className="hover:text-warm-ivory transition-colors">Home</Link>
+          <Link href="/" className="hover:text-text-primary transition-colors">Home</Link>
           <CaretRight size={12} aria-hidden="true" />
-          <Link href="/privacy" className="hover:text-warm-ivory transition-colors">Legal</Link>
+          <Link href="/privacy" className="hover:text-text-primary transition-colors">Legal</Link>
           <CaretRight size={12} aria-hidden="true" />
-          <span className="text-warm-ivory font-medium truncate max-w-[280px] sm:max-w-none">{doc.title}</span>
+          <span className="text-text-primary font-medium truncate max-w-[280px] sm:max-w-none">{doc.title}</span>
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)_220px] gap-8 items-start">
@@ -111,7 +111,7 @@ export function LegalPageShell({
                         className={cn(
                           "block rounded-md px-3 py-1.5 text-xs transition-colors",
                           active
-                            ? "bg-deep-espresso text-warm-ivory font-semibold shadow-[inset_2px_0_0_var(--soft-amber)]"
+                            ? "bg-deep-espresso text-text-primary font-semibold shadow-[inset_2px_0_0_var(--soft-amber)]"
                             : "text-text-muted hover:bg-bg-elevated hover:text-text-primary"
                         )}
                       >
@@ -137,7 +137,7 @@ export function LegalPageShell({
                         className={cn(
                           "block rounded-md px-3 py-1.5 text-xs transition-colors",
                           active
-                            ? "bg-deep-espresso text-warm-ivory font-semibold shadow-[inset_2px_0_0_var(--soft-amber)]"
+                            ? "bg-deep-espresso text-text-primary font-semibold shadow-[inset_2px_0_0_var(--soft-amber)]"
                             : "text-text-muted hover:bg-bg-elevated hover:text-text-primary"
                         )}
                       >
@@ -163,7 +163,7 @@ export function LegalPageShell({
                         className={cn(
                           "block rounded-md px-3 py-1.5 text-xs transition-colors",
                           active
-                            ? "bg-deep-espresso text-warm-ivory font-semibold shadow-[inset_2px_0_0_var(--soft-amber)]"
+                            ? "bg-deep-espresso text-text-primary font-semibold shadow-[inset_2px_0_0_var(--soft-amber)]"
                             : "text-text-muted hover:bg-bg-elevated hover:text-text-primary"
                         )}
                       >
@@ -177,7 +177,7 @@ export function LegalPageShell({
 
             {/* Quick Actions Card */}
             <div className="rounded-lg border border-border-medium bg-bg-elevated p-3.5 mt-2">
-              <p className="text-xs font-semibold text-warm-ivory mb-2">Privacy Tools</p>
+              <p className="text-xs font-semibold text-text-primary mb-2">Privacy Tools</p>
               <div className="flex flex-col gap-2">
                 <Link
                   href="/cookie-settings"
@@ -220,7 +220,7 @@ export function LegalPageShell({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-text-muted hover:text-warm-ivory"
+                  className="text-text-muted hover:text-text-primary"
                   icon={<Printer size={16} aria-hidden="true" />}
                   onClick={handlePrint}
                 >
@@ -228,7 +228,7 @@ export function LegalPageShell({
                 </Button>
               </div>
 
-              <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-warm-ivory mb-3">
+              <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-text-primary mb-3">
                 {doc.title}
               </h1>
               <p className="text-sm text-text-muted leading-relaxed mb-6">
@@ -240,7 +240,7 @@ export function LegalPageShell({
                 role="status"
                 className="rounded-lg border border-accent-warm/40 bg-accent-warm/10 p-4 sm:p-5 text-xs text-text-muted space-y-2"
               >
-                <div className="flex items-center gap-2 font-semibold text-warm-ivory">
+                <div className="flex items-center gap-2 font-semibold text-text-primary">
                   <WarningCircle size={18} className="text-accent-warm-bright shrink-0" aria-hidden="true" />
                   <span>Legal Review &amp; Compliance Status Notice</span>
                 </div>
@@ -262,7 +262,7 @@ export function LegalPageShell({
                   {Object.entries(doc.metadataFields).map(([k, v]) => (
                     <div key={k} className="flex flex-col gap-0.5">
                       <span className="font-mono text-2xs uppercase text-text-dim">{k}</span>
-                      <span className="text-warm-ivory">{formatInlineText(v)}</span>
+                      <span className="text-text-primary">{formatInlineText(v)}</span>
                     </div>
                   ))}
                 </div>
@@ -280,7 +280,7 @@ export function LegalPageShell({
                 >
                   <h2
                     id={`heading-${section.id}`}
-                    className="font-display text-lg sm:text-xl font-bold tracking-tight text-warm-ivory mb-4 border-b border-border-subtle/80 pb-2 flex items-center justify-between"
+                    className="font-display text-lg sm:text-xl font-bold tracking-tight text-text-primary mb-4 border-b border-border-subtle/80 pb-2 flex items-center justify-between"
                   >
                     <span>{section.title}</span>
                     <a
@@ -301,7 +301,7 @@ export function LegalPageShell({
             {/* Rights & Contact Box */}
             <div className="mt-10 rounded-card border border-border-medium bg-bg-elevated p-6 sm:p-8 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h3 className="font-display text-base font-bold text-warm-ivory mb-1">
+                <h3 className="font-display text-base font-bold text-text-primary mb-1">
                   Questions or privacy inquiries?
                 </h3>
                 <p className="text-xs text-text-muted">
@@ -347,7 +347,7 @@ export function LegalPageShell({
               <div className="pt-4 border-t border-border-subtle">
                 <a
                   href="#main-content"
-                  className="font-mono text-2xs text-text-dim hover:text-warm-ivory transition-colors"
+                  className="font-mono text-2xs text-text-dim hover:text-text-primary transition-colors"
                 >
                   ↑ Back to top
                 </a>
@@ -367,11 +367,11 @@ export function LegalPageShell({
         >
           <div className="relative ml-auto flex h-full w-full max-w-xs flex-col bg-bg-elevated p-6 shadow-2xl border-l border-border-medium overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-border-medium mb-6">
-              <span className="font-display font-bold text-warm-ivory text-base">Legal Directory</span>
+              <span className="font-display font-bold text-text-primary text-base">Legal Directory</span>
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(false)}
-                className="grid size-8 place-items-center rounded-md text-text-muted hover:text-warm-ivory"
+                className="grid size-8 place-items-center rounded-md text-text-muted hover:text-text-primary"
                 aria-label="Close navigation"
               >
                 <X size={20} aria-hidden="true" />
@@ -391,7 +391,7 @@ export function LegalPageShell({
                         onClick={() => setMobileNavOpen(false)}
                         className={cn(
                           "block rounded-md px-3 py-2 text-xs",
-                          pathname === item.route ? "bg-deep-espresso font-semibold text-warm-ivory" : "text-text-muted"
+                          pathname === item.route ? "bg-deep-espresso font-semibold text-text-primary" : "text-text-muted"
                         )}
                       >
                         {item.title}
@@ -413,7 +413,7 @@ export function LegalPageShell({
                         onClick={() => setMobileNavOpen(false)}
                         className={cn(
                           "block rounded-md px-3 py-2 text-xs",
-                          pathname === item.route ? "bg-deep-espresso font-semibold text-warm-ivory" : "text-text-muted"
+                          pathname === item.route ? "bg-deep-espresso font-semibold text-text-primary" : "text-text-muted"
                         )}
                       >
                         {item.title}
@@ -435,7 +435,7 @@ export function LegalPageShell({
                         onClick={() => setMobileNavOpen(false)}
                         className={cn(
                           "block rounded-md px-3 py-2 text-xs",
-                          pathname === item.route ? "bg-deep-espresso font-semibold text-warm-ivory" : "text-text-muted"
+                          pathname === item.route ? "bg-deep-espresso font-semibold text-text-primary" : "text-text-muted"
                         )}
                       >
                         {item.title}

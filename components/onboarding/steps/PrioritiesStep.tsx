@@ -122,7 +122,7 @@ export function PrioritiesStep({
                 className={cn(
                   "group relative flex min-h-28 cursor-pointer flex-col justify-between rounded-card border p-4 text-left transition-all duration-200 shadow-card outline-none focus-visible:ring-2 focus-visible:ring-accent-warm focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
                   on
-                    ? "border-accent-warm-bright bg-accent-warm-bright/10 text-warm-ivory shadow-[0_0_24px_rgba(244,154,71,0.16)] ring-1 ring-accent-warm-bright"
+                    ? "border-accent-warm-bright bg-accent-warm-bright/10 text-text-primary shadow-[0_0_24px_rgba(196,138,90,0.16)] ring-1 ring-accent-warm-bright"
                     : "border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm hover:bg-bg-elevated/80",
                 )}
               >
@@ -140,19 +140,19 @@ export function PrioritiesStep({
                     </span>
                     {on ? (
                       <span
-                        className="grid size-6 place-items-center rounded-full bg-accent-warm-bright font-mono text-xs font-bold text-obsidian shadow-sm"
+                        className="grid size-6 place-items-center rounded-full bg-accent-warm-bright font-mono text-xs font-bold text-espresso shadow-sm"
                         aria-hidden="true"
                       >
                         {rank + 1}
                       </span>
                     ) : (
-                      <span className="grid size-6 place-items-center rounded-full border border-border-medium bg-bg-primary text-text-dim group-hover:border-accent-warm group-hover:text-warm-ivory transition-colors">
+                      <span className="grid size-6 place-items-center rounded-full border border-border-medium bg-bg-primary text-text-dim group-hover:border-accent-warm group-hover:text-text-primary transition-colors">
                         <Plus size={14} aria-hidden="true" />
                       </span>
                     )}
                   </div>
 
-                  <h3 className="mt-3 font-display font-semibold text-text-primary group-hover:text-warm-ivory transition-colors">
+                  <h3 className="mt-3 font-display font-semibold text-text-primary group-hover:text-text-primary transition-colors">
                     {p.title}
                   </h3>
                   <p className="mt-1 text-xs text-text-muted leading-relaxed line-clamp-2">
@@ -171,13 +171,13 @@ export function PrioritiesStep({
         >
           <div className="flex items-center gap-2 border-b border-border-medium pb-3">
             <Sparkle size={16} weight="fill" className="text-accent-warm" />
-            <h2 id="ranked-title" className="font-display text-sm font-bold text-warm-ivory uppercase tracking-wider">
+            <h2 id="ranked-title" className="font-display text-sm font-bold text-text-primary uppercase tracking-wider">
               Priority Ranking
             </h2>
           </div>
 
           <p className="mt-2 text-xs text-text-muted leading-relaxed">
-            Your <strong className="text-warm-ivory">#1 choice</strong> becomes your dashboard hero. Reorder with arrows or click cards to adjust.
+            Your <strong className="text-text-primary">#1 choice</strong> becomes your dashboard hero. Reorder with arrows or click cards to adjust.
           </p>
 
           <ol className="mt-4 flex flex-col gap-2.5">
@@ -189,14 +189,14 @@ export function PrioritiesStep({
                   className={cn(
                     "flex min-h-12 items-center gap-2.5 rounded-lg border px-3 py-2 transition-all",
                     id
-                      ? "border-accent-warm/40 bg-deep-espresso/80 text-warm-ivory shadow-sm"
+                      ? "border-accent-warm/40 bg-deep-espresso/80 text-text-primary shadow-sm"
                       : "border-dashed border-border-medium bg-bg-surface/30 text-text-dim",
                   )}
                 >
                   <span
                     className={cn(
                       "grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs font-bold",
-                      id ? "bg-accent-warm text-obsidian" : "bg-bg-primary text-text-dim border border-border-medium",
+                      id ? "bg-accent-warm text-espresso" : "bg-bg-primary text-text-dim border border-border-medium",
                     )}
                   >
                     {i + 1}

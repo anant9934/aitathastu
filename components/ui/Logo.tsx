@@ -19,7 +19,7 @@ export function LogoMark({ size = 28, className }: { size?: number; className?: 
 
 export function Logo({ href = "/", className, label = true }: { href?: string; className?: string; label?: boolean }) {
   return (
-    <Link href={href} className={cn("inline-flex min-h-11 items-center gap-2 rounded-md font-display text-warm-ivory", className)} aria-label="AI Tathastu home">
+    <Link href={href} className={cn("inline-flex min-h-11 items-center gap-2 rounded-md font-display text-text-primary", className)} aria-label="AI Tathastu home">
       <LogoMark />
       {label && (
         <span className="text-[1.0625rem] font-semibold tracking-[-0.02em]">

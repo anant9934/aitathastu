@@ -57,7 +57,7 @@ function FootprintOverview({ connectors, runs }: { connectors: ConnectorRow[]; r
           <p className="text-xs text-muted mt-0.5">Synced</p>
         </div>
         <div className="rounded-md border border-line-soft bg-bg-surface px-3 py-2.5">
-          <p className="font-mono text-xl font-semibold text-warm-ivory tabular">{totalRecords ?? "—"}</p>
+          <p className="font-mono text-xl font-semibold text-text-primary tabular">{totalRecords ?? "—"}</p>
           <p className="text-xs text-muted mt-0.5">Records read</p>
         </div>
         <div className="rounded-md border border-line-soft bg-bg-surface px-3 py-2.5">

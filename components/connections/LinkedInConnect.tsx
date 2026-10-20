@@ -223,7 +223,7 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
       </p>
 
       {extractionLabel && (
-        <p aria-live="polite" className={`mt-2 text-sm ${extractionState === "failed" || extractionState === "no_results" ? "text-warning" : "text-warm-ivory"}`}>
+        <p aria-live="polite" className={`mt-2 text-sm ${extractionState === "failed" || extractionState === "no_results" ? "text-warning" : "text-text-primary"}`}>
           {extractionState === "queued" || extractionState === "extracting"
             ? <Spinner size={12} aria-hidden="true" className="inline mr-1.5 animate-spin" />
             : null}

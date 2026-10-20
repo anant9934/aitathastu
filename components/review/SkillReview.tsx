@@ -67,7 +67,7 @@ export function SkillReview({ skills, candidates, onSkillsChange, onCandidatesCh
                   <RenameForm initial={s} clash={(v) => has(v, s)} onCancel={() => setEditing(null)}
                     onSave={(v) => { onSkillsChange(skills.map((x) => (x === s ? v : x))); setEditing(null); }} />
                 ) : (
-                  <span className="inline-flex h-9 items-center gap-1 rounded-full border border-verified/40 bg-verified/15 pl-3 pr-1 text-sm text-warm-ivory">
+                  <span className="inline-flex h-9 items-center gap-1 rounded-full border border-verified/40 bg-verified/15 pl-3 pr-1 text-sm text-text-primary">
                     <Check size={14} weight="bold" aria-hidden="true" className="text-verified" />
                     <span className="mr-0.5">{s}</span>
                     <IconButton label={`Rename ${s}`} className="size-7 pointer-coarse:size-9" onClick={() => setEditing(`skill:${s}`)}><PencilSimple size={14} aria-hidden="true" /></IconButton>
@@ -101,7 +101,7 @@ export function SkillReview({ skills, candidates, onSkillsChange, onCandidatesCh
                       onSave={(v) => { onCandidatesChange(replaceEntry("techCandidates", candidates, c, editEntry("techCandidates", c, { name: v }))); setEditing(null); }} />
                   ) : (
                     <>
-                      <span className="min-w-0 flex-1 basis-32 font-display font-medium text-warm-ivory">{c.name}</span>
+                      <span className="min-w-0 flex-1 basis-32 font-display font-medium text-text-primary">{c.name}</span>
                       <Tag>From {sourceLabel(c.source)}{c.sourceFile ? ` · ${c.sourceFile}` : ""}{c.editedFields?.length ? " · edited" : ""}</Tag>
                       <span className="flex gap-1">
                         <Button size="sm" variant="primary" aria-label={`Accept ${c.name}`} icon={<Check size={16} aria-hidden="true" />} onClick={() => onSkillsChange([...skills, c.name])}>Accept</Button>

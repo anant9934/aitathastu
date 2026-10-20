@@ -73,7 +73,7 @@ function RailLink({ item, pathname }: { item: NavItem; pathname: string }) {
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex min-h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors duration-150",
-        active ? "bg-deep-espresso text-warm-ivory shadow-[inset_2px_0_0_var(--soft-amber)] font-semibold" : "text-text-muted hover:bg-deep-espresso/50 hover:text-text-primary",
+        active ? "bg-deep-espresso text-text-primary shadow-[inset_2px_0_0_var(--soft-amber)] font-semibold" : "text-text-muted hover:bg-deep-espresso/50 hover:text-text-primary",
       )}
     >
       <Glyph size={18} weight={active ? "fill" : "regular"} aria-hidden="true" className={active ? "text-accent-warm-bright" : undefined} />
@@ -112,7 +112,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
             <ThemeToggle />
           </div>
           <div className="flex items-center gap-3 rounded-md px-2 py-1.5">
-            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-border-medium bg-deep-espresso text-sm font-semibold text-warm-ivory">{initial}</span>
+            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-border-medium bg-deep-espresso text-sm font-semibold text-text-primary">{initial}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-text-primary">{name}</p>
               {email && <p className="truncate text-2xs text-text-muted">{email}</p>}
@@ -122,7 +122,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
               onClick={() => void signOut()}
               aria-label="Sign out"
               title="Sign out"
-              className="grid size-9 cursor-pointer place-items-center rounded-md text-text-muted transition-colors hover:bg-deep-espresso hover:text-warm-ivory"
+              className="grid size-9 cursor-pointer place-items-center rounded-md text-text-muted transition-colors hover:bg-deep-espresso hover:text-text-primary"
             >
               <SignOut size={18} aria-hidden="true" />
             </button>
@@ -183,7 +183,7 @@ export function StudentShell({ name, email, children }: { name: string; email?: 
                 href={item.href}
                 onClick={() => setMoreOpen(false)}
                 aria-current={active ? "page" : undefined}
-                className={cn("flex min-h-12 items-center gap-3 rounded-md px-3 text-base transition-colors", active ? "bg-deep-espresso text-warm-ivory font-medium" : "text-text-primary hover:bg-deep-espresso/50")}
+                className={cn("flex min-h-12 items-center gap-3 rounded-md px-3 text-base transition-colors", active ? "bg-deep-espresso text-text-primary font-medium" : "text-text-primary hover:bg-deep-espresso/50")}
               >
                 <Glyph size={20} weight={active ? "fill" : "regular"} aria-hidden="true" className={active ? "text-accent-warm-bright" : "text-text-muted"} />
                 {item.label}

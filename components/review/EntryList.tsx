@@ -80,7 +80,7 @@ export function EntryList<T extends Entry>({
     <div className="flex flex-col gap-3" data-eora-id={eoraId}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-text-muted">
-          <span className="font-mono tabular text-warm-ivory">{visible.length - pending.length}</span> confirmed
+          <span className="font-mono tabular text-text-primary">{visible.length - pending.length}</span> confirmed
           {pending.length > 0 && <>, <span className="font-mono tabular text-soft-amber">{pending.length}</span> waiting for you</>}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -155,7 +155,7 @@ export function EntryList<T extends Entry>({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h4 className="break-words font-display text-base font-medium text-warm-ivory">{title(e)}</h4>
+                  <h4 className="break-words font-display text-base font-medium text-text-primary">{title(e)}</h4>
                   {subtitle?.(e) && <p className="mt-0.5 break-words text-sm text-text-muted">{subtitle(e)}</p>}
                 </div>
                 {confirmed ? <StatusChip tone="verified" icon={Check}>Confirmed</StatusChip> : <StatusChip tone="signal">Suggested</StatusChip>}

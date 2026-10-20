@@ -73,7 +73,7 @@ export function ProjectLedgerView() {
     <PageFrame
       eoraId="eora-projects-header"
       title="Project evidence ledger"
-      description={<><span className="font-mono text-warm-ivory tabular">{included}</span> of <span className="font-mono tabular">{ledger.projects.length}</span> projects in your portfolio.</>}
+      description={<><span className="font-mono text-text-primary tabular">{included}</span> of <span className="font-mono tabular">{ledger.projects.length}</span> projects in your portfolio.</>}
       actions={<>
         <a className={buttonClass("ghost", "sm")} href="/api/student/projects/export" target="_blank" rel="noopener noreferrer"><DownloadSimple size={16} aria-hidden="true" />Export portfolio</a>
         {tab === "projects" && <Button variant="primary" size="sm" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setAdding(true)} data-eora-id="eora-add-project-btn">Add project</Button>}
@@ -127,7 +127,7 @@ export function ProjectLedgerView() {
 const chip = (on: boolean) =>
   cn(
     "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-150 pointer-coarse:min-h-11",
-    on ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory",
+    on ? "border-soft-amber bg-soft-amber/15 text-text-primary font-medium shadow-[0_0_12px_rgba(196,138,90,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-text-primary",
   );
 
 /** A calm generated tile when there is no preview image: initials and stack, no invented imagery. */
@@ -187,7 +187,7 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          <Link href={`/student/projects/${project.id}`} className="min-w-0 break-words font-display font-medium text-warm-ivory hover:text-soft-amber">{project.title}</Link>
+          <Link href={`/student/projects/${project.id}`} className="min-w-0 break-words font-display font-medium text-text-primary hover:text-soft-amber">{project.title}</Link>
           <button
             type="button"
             role="switch"
@@ -198,7 +198,7 @@ function ProjectCard({ project, onChange, onArchived }: { project: LedgerProject
             className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-xs text-text-muted disabled:opacity-50"
           >
             <span aria-hidden="true" className={cn("relative h-5 w-9 rounded-full border transition-colors", project.portfolioIncluded ? "border-soft-amber bg-soft-amber" : "border-border-medium bg-deep-espresso")}>
-              <span className={cn("absolute top-0.5 size-3.5 rounded-full transition-transform duration-150", project.portfolioIncluded ? "translate-x-4 bg-obsidian" : "translate-x-0.5 bg-text-muted")} />
+              <span className={cn("absolute top-0.5 size-3.5 rounded-full transition-transform duration-150", project.portfolioIncluded ? "translate-x-4 bg-cream" : "translate-x-0.5 bg-text-muted")} />
             </span>
             {project.portfolioIncluded ? "In portfolio" : "Not included"}
           </button>
@@ -345,7 +345,7 @@ function Publications({ ledger, onChange }: { ledger: Ledger; onChange: (p: Ledg
           {ledger.publications.map((p) => (
             <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 basis-64">
-                <p className="font-display font-medium text-warm-ivory">{p.title}</p>
+                <p className="font-display font-medium text-text-primary">{p.title}</p>
                 <p className="text-xs text-text-muted">{[p.venue, p.year].filter(Boolean).join(" · ")}{p.coAuthors.length ? ` · with ${p.coAuthors.slice(0, 4).join(", ")}` : ""}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <Tag>{p.source === "scholar" ? "From your research ID" : "Added by you"}</Tag>

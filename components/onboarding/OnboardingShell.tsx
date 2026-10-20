@@ -81,7 +81,7 @@ export function Stepper({ screen, role, done }: { screen: number; role: Onboardi
               Stage {stageNumber} of {totalStages}: {currentStage.name}
             </span>
           )}
-          <span className="font-medium text-warm-ivory text-sm">
+          <span className="font-medium text-text-primary text-sm">
             Step {pos.number} of {pos.total}
             <span className="mx-2 text-text-dim" aria-hidden="true">·</span>
             <span className="text-text-primary">{pos.step.shortLabel}</span>
@@ -100,9 +100,9 @@ export function Stepper({ screen, role, done }: { screen: number; role: Onboardi
               className={cn(
                 "h-1.5 flex-1 rounded-full transition-all duration-300",
                 state === "done"
-                  ? "bg-gradient-to-r from-champagne to-soft-amber shadow-[0_0_8px_rgba(244,154,71,0.5)]"
+                  ? "bg-gradient-to-r from-champagne to-soft-amber shadow-[0_0_8px_rgba(196,138,90,0.5)]"
                   : state === "current"
-                  ? "bg-accent-warm shadow-[0_0_6px_rgba(201,164,109,0.4)]"
+                  ? "bg-accent-warm shadow-[0_0_6px_rgba(196,138,90,0.4)]"
                   : "bg-border-subtle",
               )}
             />
@@ -139,7 +139,7 @@ export function OnboardingShell({
       {/* Accessible Skip Navigation Link */}
       <a
         href="#onboarding-main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent-warm focus:px-4 focus:py-2 focus:text-obsidian focus:font-bold focus:shadow-xl focus:outline-none"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent-warm focus:px-4 focus:py-2 focus:text-espresso focus:font-bold focus:shadow-xl focus:outline-none"
       >
         Skip to main content
       </a>
@@ -198,7 +198,7 @@ export function StepHeader({
           {badge && <div className="mb-2">{badge}</div>}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="font-display text-2xl font-bold tracking-tight text-warm-ivory sm:text-3xl lg:text-3.5xl">
+              <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3xl lg:text-3.5xl">
                 {title}
               </h1>
               {description && (

@@ -134,7 +134,7 @@ function AboutCard({ data, onSaved }: { data: Person360; onSaved: () => Promise<
             {([["Institution", saved.institution], ["Degree", saved.degree], ["Specialisation", saved.specialization], ["Graduation year", saved.expectedGraduationYear], ["Placement status", PLACEMENT[saved.placementStatus] ?? saved.placementStatus]] as const).map(([l, v]) => (
               <div key={l} className="min-w-0">
                 <dt className="text-xs text-text-muted">{l}</dt>
-                <dd className={cn("mt-0.5 break-words text-sm", v ? "text-warm-ivory" : "text-text-muted")}>{v || "Not added"}</dd>
+                <dd className={cn("mt-0.5 break-words text-sm", v ? "text-text-primary" : "text-text-muted")}>{v || "Not added"}</dd>
               </div>
             ))}
           </dl>
@@ -162,7 +162,7 @@ function EvidenceLedger({ data, onChanged }: { data: Person360; onChanged: () =>
       <div role="group" aria-label="Filter evidence" className="mb-3 flex flex-wrap gap-1.5">
         {(["all", "verified", "pending", "unverified"] as const).map((k) => (
           <button key={k} type="button" aria-pressed={filter === k} onClick={() => setFilter(k)}
-            className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-150 pointer-coarse:min-h-11", filter === k ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory")}>
+            className={cn("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-150 pointer-coarse:min-h-11", filter === k ? "border-soft-amber bg-soft-amber/15 text-text-primary font-medium shadow-[0_0_12px_rgba(196,138,90,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-text-primary")}>
             {{ all: "All", verified: "Verified", pending: "In review", unverified: "Not verified" }[k]} <span className="font-mono text-2xs tabular">{counts[k]}</span>
           </button>
         ))}
@@ -326,7 +326,7 @@ function AccountCard() {
         footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Keep my account</Button><Button variant="danger" disabled={phrase.trim().toLowerCase() !== "delete my account"} loading={busy} loadingLabel="Deleting…" onClick={() => void del()}>Delete permanently</Button></>}
       >
         <div className="grid gap-3">
-          <p className="flex items-start gap-2 text-sm text-text-muted"><ShieldWarning size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />Type <span className="font-mono text-warm-ivory">delete my account</span> to confirm.</p>
+          <p className="flex items-start gap-2 text-sm text-text-muted"><ShieldWarning size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-danger" />Type <span className="font-mono text-text-primary">delete my account</span> to confirm.</p>
           <TextField label="Confirmation" labelHidden value={phrase} onChange={(e) => setPhrase(e.target.value)} autoComplete="off" error={err} />
         </div>
       </Dialog>

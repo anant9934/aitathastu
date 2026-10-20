@@ -53,7 +53,7 @@ export function FacultyStep({ initial, isAuthenticated, submitting, guide, onBac
             <GraduationCap size={20} aria-hidden="true" />
           </span>
           <div>
-            <p className="text-sm font-medium text-warm-ivory">Institutional Verification Required</p>
+            <p className="text-sm font-medium text-text-primary">Institutional Verification Required</p>
             <p className="text-xs text-text-muted">
               Use your official college or university email (.edu, .ac.in, or university domain) for expedited approval.
             </p>
@@ -67,7 +67,7 @@ export function FacultyStep({ initial, isAuthenticated, submitting, guide, onBac
           className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card"
         >
           <div className="mb-4 border-b border-line-soft pb-3">
-            <h3 className="font-display text-sm font-semibold text-warm-ivory tracking-wide">
+            <h3 className="font-display text-sm font-semibold text-text-primary tracking-wide">
               Faculty Profile Details
             </h3>
             <p className="mt-0.5 text-xs text-text-muted">

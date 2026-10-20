@@ -60,16 +60,16 @@ const EORA_LINES = [
 ];
 
 const SKILL_NODES = [
-  { id: "ml",    label: "Machine Learning", lines: ["Machine", "Learning"], x: 430, y: 220, r: 52, main: true,  color: "#F49A47", fontSize: 13 },
-  { id: "py",    label: "Python",           lines: ["Python"],              x: 250, y: 96,  r: 36, color: "#F49A47", fontSize: 12 },
-  { id: "math",  label: "Mathematics",      lines: ["Mathematics"],         x: 168, y: 246, r: 40, color: "#C9A46D", fontSize: 10.5 },
-  { id: "ds",    label: "Data Structures",  lines: ["Data", "Structures"],  x: 300, y: 368, r: 40, color: "#C9A46D", fontSize: 11 },
-  { id: "dl",    label: "Deep Learning",    lines: ["Deep", "Learning"],    x: 618, y: 100, r: 40, color: "#C9A46D", fontSize: 11 },
-  { id: "nlp",   label: "NLP",              lines: ["NLP"],                 x: 732, y: 232, r: 30, color: "#C9A46D", fontSize: 12 },
-  { id: "mlops", label: "MLOps",            lines: ["MLOps"],               x: 640, y: 366, r: 32, color: "#C9A46D", fontSize: 11.5 },
-  { id: "res",   label: "Research",         lines: ["Research"],            x: 430, y: 62,  r: 32, color: "#F4E7D0", fontSize: 11 },
-  { id: "gh",    label: "Project Evidence", lines: ["Project", "Evidence"], x: 760, y: 374, r: 40, color: "#F4E7D0", fontSize: 10.5 },
-  { id: "comm",  label: "Communication",    lines: ["Communication"],       x: 126, y: 382, r: 42, color: "#F4E7D0", fontSize: 9.8 },
+  { id: "ml",    label: "Machine Learning", lines: ["Machine", "Learning"], x: 430, y: 220, r: 52, main: true,  color: "#C48A5A", fontSize: 13 },
+  { id: "py",    label: "Python",           lines: ["Python"],              x: 250, y: 96,  r: 36, color: "#C48A5A", fontSize: 12 },
+  { id: "math",  label: "Mathematics",      lines: ["Mathematics"],         x: 168, y: 246, r: 40, color: "#C48A5A", fontSize: 10.5 },
+  { id: "ds",    label: "Data Structures",  lines: ["Data", "Structures"],  x: 300, y: 368, r: 40, color: "#C48A5A", fontSize: 11 },
+  { id: "dl",    label: "Deep Learning",    lines: ["Deep", "Learning"],    x: 618, y: 100, r: 40, color: "#C48A5A", fontSize: 11 },
+  { id: "nlp",   label: "NLP",              lines: ["NLP"],                 x: 732, y: 232, r: 30, color: "#C48A5A", fontSize: 12 },
+  { id: "mlops", label: "MLOps",            lines: ["MLOps"],               x: 640, y: 366, r: 32, color: "#C48A5A", fontSize: 11.5 },
+  { id: "res",   label: "Research",         lines: ["Research"],            x: 430, y: 62,  r: 32, color: "#E7D6C1", fontSize: 11 },
+  { id: "gh",    label: "Project Evidence", lines: ["Project", "Evidence"], x: 760, y: 374, r: 40, color: "#E7D6C1", fontSize: 10.5 },
+  { id: "comm",  label: "Communication",    lines: ["Communication"],       x: 126, y: 382, r: 42, color: "#E7D6C1", fontSize: 9.8 },
 ];
 
 const SKILL_EDGES: [string, string][] = [
@@ -1235,17 +1235,17 @@ export function Landing({ user }: LandingProps) {
             >
               <defs>
                 <linearGradient id="sgGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#F49A47" />
-                  <stop offset="55%" stopColor="#C9A46D" />
-                  <stop offset="100%" stopColor="#F4E7D0" />
+                  <stop offset="0%" stopColor="#C48A5A" />
+                  <stop offset="55%" stopColor="#C48A5A" />
+                  <stop offset="100%" stopColor="#E7D6C1" />
                 </linearGradient>
                 <radialGradient id="sgNode" cx="35%" cy="30%">
                   <stop offset="0%" stopColor="#2C2621" />
-                  <stop offset="100%" stopColor="#171513" />
+                  <stop offset="100%" stopColor="#2B1D17" />
                 </radialGradient>
                 <radialGradient id="sgMain" cx="35%" cy="30%">
                   <stop offset="0%" stopColor="#3D332A" />
-                  <stop offset="100%" stopColor="#24201B" />
+                  <stop offset="100%" stopColor="rgba(107,74,58,0.3)" />
                 </radialGradient>
               </defs>
               <g id="sgEdges"></g>
@@ -1254,9 +1254,9 @@ export function Landing({ user }: LandingProps) {
           </div>
 
           <div className="graph-legend reveal">
-            <span><i style={{ background: "#F49A47" }}></i> Core area</span>
-            <span><i style={{ background: "#C9A46D" }}></i> Related skill</span>
-            <span><i style={{ background: "#F4E7D0" }}></i> Evidence node</span>
+            <span><i style={{ background: "#C48A5A" }}></i> Core area</span>
+            <span><i style={{ background: "#C48A5A" }}></i> Related skill</span>
+            <span><i style={{ background: "#E7D6C1" }}></i> Evidence node</span>
           </div>
         </div>
       </section>

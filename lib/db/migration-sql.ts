@@ -62,6 +62,61 @@ export const FOREIGN_KEY_REPAIR_STATEMENTS: string[] = FOREIGN_KEY_REPAIRS.flatM
   `ALTER TABLE "${t}" VALIDATE CONSTRAINT "${fkName(t, c)}";`,
 ]);
 
+/**
+ * CV extraction persistence (resume_extraction_runs, resume_extracted_records).
+ * Additive only: CREATE ... IF NOT EXISTS, no data changes. Production builds
+ * apply just this list (scripts/migrate-cv-tables.ts); it depends on persons
+ * and resume_documents, which exist on any database that accepts CV uploads.
+ */
+export const CV_PERSISTENCE_MIGRATIONS: string[] = [
+  `CREATE TABLE IF NOT EXISTS "resume_extraction_runs" (
+    "id" text PRIMARY KEY NOT NULL,
+    "document_id" text NOT NULL REFERENCES "resume_documents"("id") ON DELETE CASCADE,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "job_id" text NOT NULL,
+    "schema_version" text NOT NULL,
+    "parser_version" text NOT NULL,
+    "method" text NOT NULL,
+    "text_quality" text NOT NULL,
+    "status" text NOT NULL,
+    "document_checksum" text,
+    "page_count" integer DEFAULT 1 NOT NULL,
+    "record_count" integer DEFAULT 0 NOT NULL,
+    "candidate_count" integer DEFAULT 0 NOT NULL,
+    "needs_review_count" integer DEFAULT 0 NOT NULL,
+    "llm_used" boolean DEFAULT false NOT NULL,
+    "warnings" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "timings" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "error_code" text,
+    "started_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "finished_at" timestamp with time zone
+  );`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_runs_document" ON "resume_extraction_runs" ("document_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_runs_person" ON "resume_extraction_runs" ("person_id");`,
+  `CREATE TABLE IF NOT EXISTS "resume_extracted_records" (
+    "id" text PRIMARY KEY NOT NULL,
+    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
+    "document_id" text NOT NULL REFERENCES "resume_documents"("id") ON DELETE CASCADE,
+    "run_id" text NOT NULL,
+    "category" text NOT NULL,
+    "record_key" text NOT NULL,
+    "candidate_id" text,
+    "data" jsonb NOT NULL,
+    "evidence" jsonb,
+    "review" jsonb,
+    "provenance" text DEFAULT 'deterministic' NOT NULL,
+    "review_status" text DEFAULT 'pending' NOT NULL,
+    "user_value" text,
+    "carried_from_document_id" text,
+    "decided_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  );`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "uq_resume_records_identity" ON "resume_extracted_records" ("person_id", "document_id", "category", "record_key");`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_records_person" ON "resume_extracted_records" ("person_id");`,
+  `CREATE INDEX IF NOT EXISTS "idx_resume_records_document" ON "resume_extracted_records" ("document_id");`,
+];
+
 export const MIGRATION_SQL_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS "action_states" (
     "id" text PRIMARY KEY NOT NULL,
@@ -648,52 +703,7 @@ export const MIGRATION_SQL_STATEMENTS = [
   );`,
   `CREATE INDEX IF NOT EXISTS "idx_resume_review_document" ON "resume_review_history" ("document_id");`,
   `CREATE INDEX IF NOT EXISTS "idx_resume_review_person" ON "resume_review_history" ("person_id");`,
-  `CREATE TABLE IF NOT EXISTS "resume_extraction_runs" (
-    "id" text PRIMARY KEY NOT NULL,
-    "document_id" text NOT NULL REFERENCES "resume_documents"("id") ON DELETE CASCADE,
-    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
-    "job_id" text NOT NULL,
-    "schema_version" text NOT NULL,
-    "parser_version" text NOT NULL,
-    "method" text NOT NULL,
-    "text_quality" text NOT NULL,
-    "status" text NOT NULL,
-    "document_checksum" text,
-    "page_count" integer DEFAULT 1 NOT NULL,
-    "record_count" integer DEFAULT 0 NOT NULL,
-    "candidate_count" integer DEFAULT 0 NOT NULL,
-    "needs_review_count" integer DEFAULT 0 NOT NULL,
-    "llm_used" boolean DEFAULT false NOT NULL,
-    "warnings" jsonb DEFAULT '[]'::jsonb NOT NULL,
-    "timings" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "error_code" text,
-    "started_at" timestamp with time zone DEFAULT now() NOT NULL,
-    "finished_at" timestamp with time zone
-  );`,
-  `CREATE INDEX IF NOT EXISTS "idx_resume_runs_document" ON "resume_extraction_runs" ("document_id");`,
-  `CREATE INDEX IF NOT EXISTS "idx_resume_runs_person" ON "resume_extraction_runs" ("person_id");`,
-  `CREATE TABLE IF NOT EXISTS "resume_extracted_records" (
-    "id" text PRIMARY KEY NOT NULL,
-    "person_id" text NOT NULL REFERENCES "persons"("id") ON DELETE CASCADE,
-    "document_id" text NOT NULL REFERENCES "resume_documents"("id") ON DELETE CASCADE,
-    "run_id" text NOT NULL,
-    "category" text NOT NULL,
-    "record_key" text NOT NULL,
-    "candidate_id" text,
-    "data" jsonb NOT NULL,
-    "evidence" jsonb,
-    "review" jsonb,
-    "provenance" text DEFAULT 'deterministic' NOT NULL,
-    "review_status" text DEFAULT 'pending' NOT NULL,
-    "user_value" text,
-    "carried_from_document_id" text,
-    "decided_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
-  );`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "uq_resume_records_identity" ON "resume_extracted_records" ("person_id", "document_id", "category", "record_key");`,
-  `CREATE INDEX IF NOT EXISTS "idx_resume_records_person" ON "resume_extracted_records" ("person_id");`,
-  `CREATE INDEX IF NOT EXISTS "idx_resume_records_document" ON "resume_extracted_records" ("document_id");`,
+  ...CV_PERSISTENCE_MIGRATIONS,
 
   // Dedupe constraints (audit 2026-10-12). Application code dedupes with an
   // update -> insert-or-nothing -> update sequence that is correct with or

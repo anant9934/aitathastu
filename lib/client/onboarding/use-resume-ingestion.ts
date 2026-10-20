@@ -146,7 +146,7 @@ export function useResumeIngestion({
   const applyResult = useCallback((docId: string, name: string, result: Record<string, any>, reviewed: boolean) => {
     const rows: ResumeCandidate[] = Array.isArray(result.reviewCandidates)
       ? result.reviewCandidates.flatMap((item: Record<string, unknown>) => {
-          const { category, candidateId, value, sourceSpan, field, recordData, previousDecision, previousValue } = item ?? {};
+          const { category, candidateId, value, sourceSpan, field, recordData, previousDecision, previousValue, decision, decidedValue } = item ?? {};
           if (
             ![
               "profile", "link", "education", "experience", "project", "skill",
@@ -156,9 +156,12 @@ export function useResumeIngestion({
             ].includes(String(category)) ||
             typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string"
           ) return [];
-          // Same file uploaded before: the earlier decision is pre-applied, still editable.
-          const earlier = previousDecision === "confirmed";
-          const earlierValue = earlier && typeof previousValue === "string" && previousValue.trim() ? previousValue : null;
+          // The student's saved decision on this document wins; otherwise a
+          // decision from an earlier upload of the same file is pre-applied.
+          const saved = decision === "confirmed" || decision === "rejected";
+          const earlier = saved ? decision === "confirmed" : previousDecision === "confirmed";
+          const keptValue = saved ? decidedValue : previousValue;
+          const earlierValue = earlier && typeof keptValue === "string" && keptValue.trim() ? keptValue : null;
           return [{
             id: candidateId,
             candidateId,

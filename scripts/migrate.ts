@@ -18,19 +18,22 @@ if (!process.env.DATABASE_URL && fs.existsSync(path.join(process.cwd(), ".env"))
 
 import { getDb, seedDefaultEntities } from "../lib/db";
 import { MIGRATION_SQL_STATEMENTS } from "../lib/db/migration-sql";
+import { isDataChanging } from "../lib/db/cv-persistence-migration";
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
 
-  // vercel.json runs this before every build. Only production deploys migrate:
-  // preview builds may share the production DATABASE_URL and must not change it.
-  if (process.env.VERCEL === "1") {
-    if (process.env.VERCEL_ENV !== "production") {
-      console.log(`Skipping migration on Vercel ${process.env.VERCEL_ENV ?? "unknown"} build.`);
-      process.exit(0);
-    }
-    if (!databaseUrl?.startsWith("postgres")) {
-      console.error("Production build has no PostgreSQL DATABASE_URL; refusing to deploy without a migrated database.");
+  // The full list also deletes orphan rows, removes duplicate journey events and
+  // rewrites some columns. On anything but a local database that needs an
+  // explicit go-ahead; the CV tables alone can be created with db:migrate:cv.
+  if (databaseUrl?.startsWith("postgres")) {
+    const host = new URL(databaseUrl).hostname;
+    const local = ["127.0.0.1", "localhost", "::1"].includes(host);
+    const changing = MIGRATION_SQL_STATEMENTS.filter(isDataChanging);
+    if (!local && !process.argv.includes("--allow-data-changes")) {
+      console.error(`Refusing to run on a non-local database: ${changing.length} of ${MIGRATION_SQL_STATEMENTS.length} statements change or delete existing rows:`);
+      for (const s of changing) console.error(`  - ${s.replace(/\s+/g, " ").slice(0, 110)}`);
+      console.error("Review them, then re-run with `npm run db:migrate -- --allow-data-changes`. For only the CV tables: `npm run db:migrate:cv -- --apply`.");
       process.exit(1);
     }
   }

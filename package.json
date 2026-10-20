@@ -49,6 +49,7 @@
     "secrets:generate": "node --import tsx scripts/generate-production-secrets.ts",
     "integrations:status": "node --import tsx scripts/check-integrations-status.ts",
     "db:migrate": "node --import tsx scripts/migrate.ts",
+    "db:migrate:cv": "node --import tsx scripts/migrate-cv-tables.ts",
     "demo:study-lpu-event": "node --import tsx scripts/demo-study-lpu-event.ts",
     "demo:padho-code-event": "node --import tsx scripts/demo-padho-code-event.ts",
     "demo:eris-event": "node --import tsx scripts/demo-eris-event.ts",

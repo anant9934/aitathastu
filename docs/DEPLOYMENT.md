@@ -12,10 +12,21 @@ Two services:
 1. Create the database; copy the pooled connection string into `DATABASE_URL`.
 2. Apply the schema before the first deploy and **before every deploy that changes `lib/db/migration-sql.ts`**:
    ```bash
-   DATABASE_URL='postgres://...' npm run db:migrate
+   DATABASE_URL='postgres://...' npm run db:migrate -- --allow-data-changes
    ```
-   The app never runs DDL on a production cold start.
-3. If the output (or `scripts/report-duplicate-keys.ts`) says a unique index was skipped because of
+   The full list is **not** purely additive: 33 statements delete orphan rows, remove duplicate
+   journey events, pause duplicate active goals and backfill `evidence_items` columns. On any
+   non-local database the script lists them and stops unless `--allow-data-changes` is passed.
+   Take a Neon branch or backup first. The app never runs DDL on a production cold start.
+3. CV persistence tables only (`resume_extraction_runs`, `resume_extracted_records`): additive
+   `CREATE ... IF NOT EXISTS`, safe to repeat, and it checks the result afterwards:
+   ```bash
+   DATABASE_URL='postgres://...' npm run db:migrate:cv -- --apply
+   ```
+   The Vercel build runs this step (`vercel.json`) **only when `VERCEL_ENV=production`**; preview
+   builds skip it. It does not read `.env`, so it only touches the `DATABASE_URL` it is given.
+   Without these tables every CV upload fails with `PERSIST_FAILED` (SQLSTATE 42P01 in the logs).
+4. If the output (or `scripts/report-duplicate-keys.ts`) says a unique index was skipped because of
    duplicate rows, resolve those rows and re-run `db:migrate`.
 
 ## 2. Resume extractor (Render)
@@ -64,5 +75,5 @@ Two services:
   are not available in a Preview deployment. Set `APP_BASE_URL` for preview OAuth separately.
 - Render OCR runs outside Vercel. Its health response must report a Tesseract version;
   the app and extractor must use the same `EXTRACTOR_API_TOKEN`.
-- Rollback: restore a previous production deployment in Vercel. Migrations are additive
+- Rollback: restore a previous production deployment in Vercel. Schema changes are additive
   (`IF NOT EXISTS`), so older builds keep working against a newer schema.

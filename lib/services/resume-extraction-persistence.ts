@@ -52,8 +52,9 @@ export function recordId(personId: string, documentId: string, category: string,
   return `rec_${hash(personId, documentId, category, key)}`;
 }
 
-export function runIdForJob(jobId: string): string {
-  return `run_${hash(jobId)}`;
+/** One run row per document: a retried or re-queued job updates it instead of adding another. */
+export function runIdForDocument(documentId: string): string {
+  return `run_${hash(documentId)}`;
 }
 
 /**
@@ -71,7 +72,7 @@ export async function persistExtraction(params: {
 }): Promise<{ runId: string; records: number; carried: Map<string, { state: DecisionState; userValue: string | null }> }> {
   const { personId, documentId, jobId, candidates, quality } = params;
   const db = await getDb();
-  const runId = runIdForJob(jobId);
+  const runId = runIdForDocument(documentId);
   const [doc] = await db
     .select({ checksum: resumeDocuments.checksum })
     .from(resumeDocuments)
@@ -98,6 +99,8 @@ export async function persistExtraction(params: {
     llmUsed: params.llmUsed,
     warnings: (quality?.warnings ?? []).slice(0, 50),
     timings: params.timings ?? {},
+    errorCode: null,
+    finishedAt: null,
   };
   await db.insert(resumeExtractionRuns).values(runValues).onConflictDoUpdate({
     target: resumeExtractionRuns.id,
@@ -119,16 +122,36 @@ export async function persistExtraction(params: {
     });
   }
   const values = [...rows.values()];
-  for (let i = 0; i < values.length; i += 200) {
-    await db.insert(resumeExtractedRecords).values(values.slice(i, i + 200)).onConflictDoUpdate({
-      target: resumeExtractedRecords.id,
-      set: {
-        runId: sql`excluded.run_id`, candidateId: sql`excluded.candidate_id`, data: sql`excluded.data`,
-        evidence: sql`excluded.evidence`, review: sql`excluded.review`, provenance: sql`excluded.provenance`, updatedAt: new Date(),
-      },
-      // A decided record keeps exactly what the student approved.
-      setWhere: sql`${resumeExtractedRecords.reviewStatus} = 'pending'`,
-    });
+  // No interactive transactions on Neon HTTP: if a batch fails, rows this
+  // attempt newly inserted are removed again so no half-saved review remains.
+  const existing = new Set(
+    values.length
+      ? (await db.select({ id: resumeExtractedRecords.id }).from(resumeExtractedRecords)
+          .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId)))).map((r) => r.id)
+      : []
+  );
+  try {
+    for (let i = 0; i < values.length; i += 200) {
+      await db.insert(resumeExtractedRecords).values(values.slice(i, i + 200)).onConflictDoUpdate({
+        target: resumeExtractedRecords.id,
+        set: {
+          runId: sql`excluded.run_id`, candidateId: sql`excluded.candidate_id`, data: sql`excluded.data`,
+          evidence: sql`excluded.evidence`, review: sql`excluded.review`, provenance: sql`excluded.provenance`, updatedAt: new Date(),
+        },
+        // A decided record keeps exactly what the student approved.
+        setWhere: sql`${resumeExtractedRecords.reviewStatus} = 'pending'`,
+      });
+    }
+  } catch (err) {
+    const inserted = values.map((v) => v.id!).filter((id) => !existing.has(id));
+    if (inserted.length) {
+      await db.delete(resumeExtractedRecords).where(and(
+        eq(resumeExtractedRecords.personId, personId),
+        inArray(resumeExtractedRecords.id, inserted),
+        eq(resumeExtractedRecords.reviewStatus, "pending"),
+      )).catch(() => undefined);
+    }
+    throw err;
   }
 
   // Same file uploaded again: bring forward this person's earlier decisions.
@@ -166,11 +189,27 @@ export async function persistExtraction(params: {
 
 export async function markRunFailed(personId: string, documentId: string, jobId: string, errorCode: string): Promise<void> {
   const db = await getDb();
-  const runId = runIdForJob(jobId);
+  const runId = runIdForDocument(documentId);
   await db.insert(resumeExtractionRuns).values({
     id: runId, documentId, personId, jobId, schemaVersion: "unknown", parserVersion: "rules-v3", method: "unknown",
     textQuality: "unknown", status: "failed", errorCode, finishedAt: new Date(),
-  }).onConflictDoUpdate({ target: resumeExtractionRuns.id, set: { status: "failed", errorCode, finishedAt: new Date() } });
+  }).onConflictDoUpdate({
+    target: resumeExtractionRuns.id,
+    set: { jobId, status: "failed", errorCode, finishedAt: new Date() },
+    setWhere: sql`${resumeExtractionRuns.personId} = ${personId}`,
+  });
+}
+
+/** The student's own decisions on this document, by candidate id (restored on reload). */
+export async function decisionsByCandidate(personId: string, documentId: string): Promise<Map<string, { state: DecisionState; userValue: string | null }>> {
+  const db = await getDb();
+  const rows = await db
+    .select({ candidateId: resumeExtractedRecords.candidateId, reviewStatus: resumeExtractedRecords.reviewStatus, userValue: resumeExtractedRecords.userValue })
+    .from(resumeExtractedRecords)
+    .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId), ne(resumeExtractedRecords.reviewStatus, "pending")));
+  const out = new Map<string, { state: DecisionState; userValue: string | null }>();
+  for (const r of rows) if (r.candidateId) out.set(r.candidateId, { state: r.reviewStatus as DecisionState, userValue: r.userValue });
+  return out;
 }
 
 /**

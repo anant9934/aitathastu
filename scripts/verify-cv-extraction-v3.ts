@@ -474,6 +474,87 @@ test("after a successful save, reloading status returns the same persisted sugge
   assert.deepEqual(reload.result!.reviewCandidates.map((c) => c.candidateId), first.result!.reviewCandidates.map((c) => c.candidateId));
 });
 
+test("D/G/K: a correction survives reload and retry, retry adds no run or record, and AI is not called without consent", async () => {
+  const db = await setupTestDatabase();
+  const { queueResumeUpload, processResumeJob, getResumeJobStatus, requeueResumeDocument } = await import("../lib/services/resume-ingestion-service");
+  const { recordDecisions, listRecords } = await import("../lib/services/resume-extraction-persistence");
+  const { resumeExtractionRuns } = await import("../lib/db");
+  const { eq } = await import("drizzle-orm");
+  const owner = await createTestPerson("cvdecide");
+  const { jobId, documentId } = await queueResumeUpload({ personId: owner, filename: "k.pdf", mimeType: "application/pdf", bytes: read("kabir-internships--pdf-single.pdf"), aiConsent: false });
+  await processResumeJob(jobId, owner);
+  const first = await getResumeJobStatus(documentId, owner, jobId);
+  assert.equal(first.status, "review_ready", first.message ?? "");
+  assert.equal(first.result!.extractionMeta.llmAttempted, false, "no AI call without consent");
+  const exp = first.result!.reviewCandidates.find((c) => c.category === "experience")!;
+  const other = first.result!.reviewCandidates.find((c) => c.category === "skill")!;
+  await recordDecisions(owner, documentId, [
+    { candidateId: exp.candidateId, state: "confirmed", correctedValue: "Data Intern · Corrected Org" },
+    { candidateId: other.candidateId, state: "rejected" },
+  ]);
+
+  const reload = await getResumeJobStatus(documentId, owner);
+  const rExp = reload.result!.reviewCandidates.find((c) => c.candidateId === exp.candidateId)!;
+  const rOther = reload.result!.reviewCandidates.find((c) => c.candidateId === other.candidateId)!;
+  assert.deepEqual([rExp.decision, rExp.decidedValue, rOther.decision], ["confirmed", "Data Intern · Corrected Org", "rejected"]);
+  assert.equal(rExp.value, exp.value, "the extracted value itself is kept as evidence");
+
+  const recordsBefore = (await listRecords(owner, documentId)).length;
+  const retryJob = await requeueResumeDocument(owner, documentId);
+  assert.ok(retryJob);
+  await processResumeJob(retryJob!, owner);
+  const afterRetry = await getResumeJobStatus(documentId, owner, retryJob);
+  assert.equal(afterRetry.status, "review_ready", afterRetry.message ?? "");
+  const kept = afterRetry.result!.reviewCandidates.find((c) => c.candidateId === exp.candidateId)!;
+  assert.deepEqual([kept.decision, kept.decidedValue], ["confirmed", "Data Intern · Corrected Org"]);
+  assert.equal((await listRecords(owner, documentId)).length, recordsBefore, "retry adds no records");
+  const runs = await db.select().from(resumeExtractionRuns).where(eq(resumeExtractionRuns.documentId, documentId));
+  assert.deepEqual([runs.length, runs[0].status, runs[0].jobId], [1, "completed", retryJob], "retry updates the single run");
+});
+
+test("F: a failure in a later insert batch removes the rows this attempt added", async () => {
+  await setupTestDatabase();
+  const { queueResumeUpload } = await import("../lib/services/resume-ingestion-service");
+  const { persistExtraction, listRecords } = await import("../lib/services/resume-extraction-persistence");
+  const owner = await createTestPerson("cvpartial");
+  const { jobId, documentId } = await queueResumeUpload({ personId: owner, filename: "p.pdf", mimeType: "application/pdf", bytes: read("vikram-minimal--pdf-single.pdf") });
+  const good = Array.from({ length: 205 }, (_, i) => ({ candidateId: `skill_${i}`, category: "skill", value: `Skill ${i}`, sourceSpan: `Skill ${i}` }));
+  const bad = { candidateId: "skill_999", category: null as unknown as string, value: "x", sourceSpan: "x" };
+  await assert.rejects(persistExtraction({ personId: owner, documentId, jobId, candidates: [...good, bad], llmUsed: false }));
+  assert.equal((await listRecords(owner, documentId)).length, 0, "the first batch of 200 was rolled back by hand");
+});
+
+test("migration: CV tables are created on an existing non-empty database, idempotently, without touching data", async () => {
+  const db = await setupTestDatabase();
+  const { sql } = await import("drizzle-orm");
+  const { MIGRATION_SQL_STATEMENTS, CV_PERSISTENCE_MIGRATIONS } = await import("../lib/db/migration-sql");
+  const { applyCvPersistenceMigration, verifyCvPersistenceSchema, isDataChanging } = await import("../lib/db/cv-persistence-migration");
+  const exec = db as unknown as { execute: (q: unknown) => Promise<unknown> };
+  const query = async (s: string) => {
+    const r = (await exec.execute(sql.raw(s))) as { rows?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+    return Array.isArray(r) ? r : r.rows ?? [];
+  };
+  assert.equal(CV_PERSISTENCE_MIGRATIONS.filter(isDataChanging).length, 0);
+  assert.ok(MIGRATION_SQL_STATEMENTS.filter(isDataChanging).length >= 20, "the full list does change data, so it is not run by builds");
+  for (const s of CV_PERSISTENCE_MIGRATIONS) assert.ok(MIGRATION_SQL_STATEMENTS.includes(s), "the full list still contains the CV statements");
+
+  // An existing database: a student, an uploaded CV, then the CV tables are missing.
+  const owner = await createTestPerson("cvmig");
+  const { queueResumeUpload } = await import("../lib/services/resume-ingestion-service");
+  const { documentId } = await queueResumeUpload({ personId: owner, filename: "m.pdf", mimeType: "application/pdf", bytes: read("vikram-minimal--pdf-single.pdf") });
+  await query('DROP TABLE IF EXISTS "resume_extracted_records" CASCADE');
+  await query('DROP TABLE IF EXISTS "resume_extraction_runs" CASCADE');
+  assert.equal((await verifyCvPersistenceSchema(query)).ok, false);
+
+  const status = await applyCvPersistenceMigration(query);
+  assert.deepEqual(status, { runs: true, records: true, identityIndex: true, foreignKeys: 4, ok: true });
+  await query(`INSERT INTO "resume_extracted_records" (id, person_id, document_id, run_id, category, record_key, data, review_status, user_value) VALUES ('rec_keep', '${owner}', '${documentId}', 'run_x', 'skill', 'python', '{}'::jsonb, 'confirmed', 'Python')`);
+  assert.equal((await applyCvPersistenceMigration(query)).ok, true, "second run is a no-op");
+  const kept = await query(`SELECT review_status, user_value FROM "resume_extracted_records" WHERE id = 'rec_keep'`);
+  assert.deepEqual(kept[0], { review_status: "confirmed", user_value: "Python" });
+  assert.equal((await query(`SELECT count(*)::int AS n FROM "resume_documents" WHERE id = '${documentId}'`))[0].n, 1);
+});
+
 test("PERSIST_FAILED is distinct from EXTRACTION_FAILED in the UI contract", () => {
   const { failureInfo } = require("../lib/services/resume-ingestion-service");
   const pf = failureInfo("PERSIST_FAILED");

@@ -47,7 +47,7 @@ import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError, type ExtractorProfileV2 } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
 import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers";
-import { markRunFailed, persistExtraction, runIdForJob } from "./resume-extraction-persistence";
+import { decisionsByCandidate, markRunFailed, persistExtraction, runIdForDocument } from "./resume-extraction-persistence";
 
 export type ResumeFailureCode =
   | "DOCUMENT_RETRIEVAL_FAILED"
@@ -112,6 +112,9 @@ export type ResumeReviewCandidate = {
   /** Decision the student made on the same item in an earlier upload of this file. */
   previousDecision?: "confirmed" | "rejected";
   previousValue?: string;
+  /** The student's saved decision on this item for this document (added when status is read). */
+  decision?: "confirmed" | "rejected";
+  decidedValue?: string;
 };
 
 export type ResumeReviewPayload = {
@@ -324,6 +327,24 @@ export async function getResumeJobStatus(
 
   const ready = job.status === "review_ready" || job.status === "completed";
   const failure = failureInfo(job.errorCode);
+  let result = ready && mDoc.review ? (mDoc.review as ResumeReviewPayload) : null;
+  if (result) {
+    // A reload shows what the student saved, not the original extraction.
+    try {
+      const decided = await decisionsByCandidate(personId, documentId);
+      if (decided.size) {
+        result = {
+          ...result,
+          reviewCandidates: result.reviewCandidates.map((c) => {
+            const d = decided.get(c.candidateId);
+            return d ? { ...c, decision: d.state, ...(d.userValue ? { decidedValue: d.userValue } : {}) } : c;
+          }),
+        };
+      }
+    } catch (err) {
+      console.error("[resume-pipeline] could not load saved decisions", { documentId, ...sanitizeError(err) });
+    }
+  }
   const shouldNudge =
     job.status === "queued" ||
     (job.status === "processing" && isJobLeaseExpired(job));
@@ -339,7 +360,7 @@ export async function getResumeJobStatus(
     errorCode: job.errorCode,
     message: job.errorMessage,
     retryable: failure ? failure.retryable : Boolean((job.metadata as Record<string, unknown>)?.retryable),
-    result: (ready || job.status === "review_ready" || job.status === "completed") && mDoc.review ? (mDoc.review as ResumeReviewPayload) : null,
+    result,
     shouldNudge,
   };
 }
@@ -695,7 +716,7 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
       // 42P01 undefined_table, 42703 undefined_column: the deployed code is ahead of the schema.
       const schemaBehind = safe.sqlState === "42P01" || safe.sqlState === "42703";
       console.error("[resume-pipeline] persist stage failed", {
-        jobId: job.id, documentId, runId: runIdForJob(job.id),
+        jobId: job.id, documentId, runId: runIdForDocument(documentId),
         stage: "persist_records", operation: "upsert", committed: false, ...safe,
         ...(schemaBehind ? { hint: "Database schema is behind the code: run `npm run db:migrate` against this database." } : {}),
       });

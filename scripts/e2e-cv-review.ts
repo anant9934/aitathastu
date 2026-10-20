@@ -88,6 +88,21 @@ async function main() {
   record("Save sends a decision for every record, with the correction", Boolean(body?.decisions?.length && corrected?.state === "confirmed" && /Jun 2021/.test(corrected.correctedValue ?? "")), JSON.stringify(corrected ?? null));
   record("Unticked records are sent as rejected", Boolean(body?.decisions?.some((d) => d.state === "rejected")));
 
+  // Reload: the saved decisions, not the raw extraction, come back.
+  await page.waitForTimeout(1500);
+  await page.reload({ waitUntil: "networkidle" });
+  for (let i = 0; i < 4 && !(await review.isVisible()); i++) {
+    const back = page.getByRole("button", { name: /^Back/i }).first();
+    if (!(await back.count())) break;
+    await back.click();
+    await page.waitForTimeout(1500);
+  }
+  await review.waitFor({ timeout: 30_000 }).catch(() => undefined);
+  const kappaAfter = review.locator("li", { hasText: "Kappa Systems" }).first();
+  const reloaded = await review.isVisible();
+  record("After a reload the review shows the saved decisions", reloaded && await kappaAfter.getByRole("checkbox").isChecked() && /Jun 2021/.test((await kappaAfter.textContent()) ?? ""), reloaded ? ((await kappaAfter.textContent()) ?? "").slice(0, 120) : "review not visible after reload");
+  await page.screenshot({ path: path.join(OUT, "after-reload.png"), fullPage: true });
+
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   record("No horizontal page scroll", overflow <= 1, `overflow=${overflow}px`);
   record("No console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));

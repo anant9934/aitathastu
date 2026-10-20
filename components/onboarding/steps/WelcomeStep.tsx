@@ -7,7 +7,7 @@
  * squeezing the form into a side column.
  */
 import React, { useRef, useState } from "react";
-import Image from "next/image";
+import { EioraVisual } from "@/components/eora/EioraVisual";
 import { ArrowRight, CheckCircle, ShieldCheck, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/Field";
@@ -42,15 +42,9 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
         {/* Left Column: EORA Guide Hero Card */}
         <div className="flex flex-col items-center rounded-card border border-border-medium bg-bg-elevated p-5 sm:p-6 shadow-card md:items-start text-left">
           <div className="flex w-full items-center gap-4 md:flex-col md:items-center">
-            <div className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-panel border border-accent-warm/30 bg-bg-primary shadow-[0_0_24px_rgba(196,138,90,0.15)] sm:w-24 md:w-44 lg:w-48">
-              <Image
-                src="/assets/eora/welcome-hand.png"
-                alt="EORA, your guide, waving hello"
-                fill
-                sizes="(min-width: 1024px) 200px, (min-width: 768px) 176px, 96px"
-                className="object-contain object-bottom"
-                priority
-              />
+            <div className="at-welcome-eiora relative grid aspect-square w-24 shrink-0 place-items-center overflow-hidden rounded-full border border-accent-warm/30 bg-bg-primary sm:w-28 md:w-44 lg:w-48">
+              <EioraVisual size={184} className="absolute inset-0" state="idle" />
+              <span className="absolute bottom-2 z-10 rounded-full border border-white/70 bg-white/65 px-2 py-0.5 text-[9px] font-mono uppercase tracking-[0.12em] text-[#5A5852] backdrop-blur-md md:bottom-3 md:text-[10px]">Eiora · AI guide</span>
             </div>
             <div className="min-w-0 flex-1 md:w-full md:text-center">
               <div className="inline-flex items-center gap-1.5 rounded-full border border-accent-warm/25 bg-accent-warm/10 px-2.5 py-0.5 text-2xs font-bold text-accent-warm tracking-wider uppercase">

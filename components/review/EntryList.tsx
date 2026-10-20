@@ -158,7 +158,7 @@ export function EntryList<T extends Entry>({
                   <h4 className="break-words font-display text-base font-medium text-text-primary">{title(e)}</h4>
                   {subtitle?.(e) && <p className="mt-0.5 break-words text-sm text-text-muted">{subtitle(e)}</p>}
                 </div>
-                {confirmed ? <StatusChip tone="verified" icon={Check}>Confirmed</StatusChip> : <StatusChip tone="signal">Suggested</StatusChip>}
+                {confirmed ? <StatusChip tone="corroborated" icon={Check}>Accepted by you</StatusChip> : <StatusChip tone="signal">Suggested</StatusChip>}
               </div>
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {sources.map((s) => <Tag key={s}>From {sourceLabel(s)}</Tag>)}

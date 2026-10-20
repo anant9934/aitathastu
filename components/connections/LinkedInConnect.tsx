@@ -72,6 +72,18 @@ export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => 
   const [extractionConfigured, setExtractionConfigured] = useState<boolean | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // A profile link saved earlier is server state; show it after a refresh too.
+  useEffect(() => {
+    void requestJson<{ connectors?: Array<{ provider: string; status: string; profileUrl: string | null }> }>("/api/student/connections", { cache: "no-store" }).then((res) => {
+      if (!res.ok) return;
+      const li = res.data.connectors?.find((c) => c.provider === "linkedin");
+      if (li && li.status !== "not_connected" && li.status !== "disconnected" && li.profileUrl) {
+        setUrlDone(true);
+        setProfileUrl((u) => u || li.profileUrl || "");
+      }
+    });
+  }, []);
+
   // Check extraction configuration once on mount
   useEffect(() => {
     void requestJson<ImportResult>("/api/student/linkedin/extract").then((res) => {

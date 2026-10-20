@@ -59,8 +59,8 @@ async function main() {
 
   const steps = onboardingSteps("student");
   assert(
-    steps.length === 12 && TOTAL_ONBOARDING_STEPS === 12,
-    "Student onboarding registry contains exactly 12 steps",
+    steps.length === 11 && TOTAL_ONBOARDING_STEPS === 11,
+    "Student onboarding registry contains exactly 11 steps",
     `Total steps: ${steps.length}`
   );
 
@@ -75,38 +75,36 @@ async function main() {
 
   const step5 = steps[4];
   assert(
-    step5.id === "digital_footprint_intelligence" &&
+    step5.id === "connect_sources" &&
       step5.screen === 5.5 &&
-      step5.title === "Let's discover what you've built" &&
-      step5.shortLabel === "Footprint",
-    "Step 5 is NEW Digital Footprint Intelligence at screen 5.5",
+      step5.shortLabel === "Sources",
+    "Step 5 is the merged Connect your sources step at screen 5.5",
     `ID: ${step5.id}, Screen: ${step5.screen}, Title: "${step5.title}"`
   );
 
   assert(
-    steps[5].id === "academic_details" &&
-      steps[6].id === "digital_profiles" &&
-      steps[7].id === "import" &&
-      steps[8].id === "profile_review" &&
-      steps[9].id === "skills_map" &&
-      steps[10].id === "projects" &&
-      steps[11].id === "finish",
-    "Original Steps 5–11 are preserved and shifted to displayed steps 6–12",
-    `6: ${steps[5].title}, 7: ${steps[6].title}, 11: ${steps[10].title}, 12: ${steps[11].title}`
+    steps[5].id === "import" &&
+      steps[6].id === "profile_review" &&
+      steps[7].id === "academic_details" &&
+      steps[8].id === "skills_map" &&
+      steps[9].id === "projects" &&
+      steps[10].id === "finish",
+    "Import, review, details, skills, projects and finish follow as steps 6–11",
+    `6: ${steps[5].title}, 8: ${steps[7].title}, 11: ${steps[10].title}`
   );
 
   const pos5 = stepForScreen(5.5, "student");
   assert(
-    pos5 !== null && pos5.number === 5 && pos5.total === 12,
-    "stepForScreen maps screen 5.5 to 'Step 5 of 12'",
+    pos5 !== null && pos5.number === 5 && pos5.total === 11,
+    "stepForScreen maps screen 5.5 to 'Step 5 of 11'",
     `Calculated position: Step ${pos5?.number} of ${pos5?.total}`
   );
 
   const nextFromResume = nextOnboardingScreen(5, []);
   const nextFromFootprint = nextOnboardingScreen(5.5, []);
   assert(
-    nextFromResume === 5.5 && nextFromFootprint === 4,
-    "Onboarding sequence moves CV (5) -> Footprint (5.5) -> Details (4)",
+    nextFromResume === 5.5 && nextFromFootprint === 7,
+    "Onboarding sequence moves CV (5) -> Sources (5.5) -> Import (7)",
     `nextOnboardingScreen(5) = ${nextFromResume}, nextOnboardingScreen(5.5) = ${nextFromFootprint}`
   );
 

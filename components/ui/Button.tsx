@@ -81,7 +81,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       {...rest}
     >
       {loading ? <Spinner size={16} /> : icon}
-      <span>{loading && loadingLabel ? loadingLabel : children}</span>
+      <span className="inline-flex items-center gap-1.5">{loading && loadingLabel ? loadingLabel : children}</span>
     </button>
   );
 });

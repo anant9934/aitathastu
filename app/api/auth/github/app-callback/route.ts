@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GITHUB_APP_RETURN_COOKIE, readCookie, safeGitHubReturnPath } from "@/lib/auth/github-return";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
@@ -13,13 +14,14 @@ export const runtime = "nodejs";
  */
 export async function GET(req: Request) {
   const baseUrl = getCanonicalOrigin(req);
+  const returnTo = safeGitHubReturnPath(readCookie(req.headers.get("cookie"), GITHUB_APP_RETURN_COOKIE));
   if (!coreIngestionReady()) {
-    return NextResponse.redirect(new URL("/student/connections?error=github_unavailable", baseUrl));
+    return NextResponse.redirect(new URL(`${returnTo}?error=github_unavailable`, baseUrl));
   }
 
   const auth = await getServerAuthContext();
   if (!auth) {
-    return NextResponse.redirect(new URL("/sign-in?from=%2Fstudent%2Fconnections", baseUrl));
+    return NextResponse.redirect(new URL(`/sign-in?from=${encodeURIComponent(returnTo)}`, baseUrl));
   }
 
   const url = new URL(req.url);
@@ -31,8 +33,9 @@ export async function GET(req: Request) {
   const cookieState = match ? decodeURIComponent(match[1]) : null;
 
   const errorRedirect = (errorParam: string) => {
-    const res = NextResponse.redirect(new URL(`/student/connections?error=${errorParam}`, baseUrl));
+    const res = NextResponse.redirect(new URL(`${returnTo}?error=${errorParam}`, baseUrl));
     res.cookies.delete("tathastu_gh_app_state");
+    res.cookies.delete(GITHUB_APP_RETURN_COOKIE);
     return res;
   };
 
@@ -44,6 +47,9 @@ export async function GET(req: Request) {
   if (!stateVerification.valid) {
     return errorRedirect(stateVerification.reason === "expired_state" ? "github_app_state_expired" : "github_app_state_invalid");
   }
+
+  // "request": the install needs an organization owner's approval; GitHub sends no installation yet.
+  if (setupAction === "request") return errorRedirect("github_app_approval_pending");
 
   if (!installationId || !/^\d+$/.test(installationId)) {
     return errorRedirect("github_app_state_invalid");
@@ -94,8 +100,9 @@ export async function GET(req: Request) {
       },
     });
 
-    const response = NextResponse.redirect(new URL("/student/connections?success=github_app_installed", baseUrl));
+    const response = NextResponse.redirect(new URL(`${returnTo}?success=github_app_installed`, baseUrl));
     response.cookies.delete("tathastu_gh_app_state");
+    response.cookies.delete(GITHUB_APP_RETURN_COOKIE);
     return response;
   } catch (error) {
     console.error("[GitHub App Setup Callback]", error);

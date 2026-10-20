@@ -28,9 +28,8 @@ import { RoleStep } from "./steps/RoleStep";
 import { DirectionStep } from "./steps/DirectionStep";
 import { PrioritiesStep } from "./steps/PrioritiesStep";
 import { CvStep } from "./steps/CvStep";
-import { FootprintIntelligenceStep } from "./steps/FootprintIntelligenceStep";
+import { SourcesStep } from "./steps/SourcesStep";
 import { DetailsStep } from "./steps/DetailsStep";
-import { AccountsStep } from "./steps/AccountsStep";
 import { ImportStep } from "./steps/ImportStep";
 import { ReviewStep } from "./steps/ReviewStep";
 import { SkillsStep } from "./steps/SkillsStep";
@@ -187,7 +186,8 @@ export function OnboardingApp() {
     case 5:
       return shell(<CvStepContainer flow={flow} guide={guide} />, "balanced");
     case 5.5:
-      return shell(<FootprintIntelligenceStep flow={flow} guide={guide} onCandidates={onCandidates} />, "workspace");
+    case 6:
+      return shell(<SourcesStep flow={flow} guide={guide} onCandidates={onCandidates} />, "balanced");
     case 4:
       return shell(
         <DetailsStep
@@ -214,22 +214,8 @@ export function OnboardingApp() {
         />,
         "balanced",
       );
-    case 6:
-      return shell(
-        <AccountsStep
-          profiles={data.profiles}
-          discovered={data.discoveredResumeProfiles}
-          saving={saving}
-          guide={guide}
-          onProfilesChange={(p) => { flow.setData((d) => ({ ...d, profiles: p })); flow.autosave({ profiles: p }); }}
-          onCandidates={onCandidates}
-          onBack={() => flow.goBack(flow.prevBefore(6))}
-          onContinue={() => void flow.commit({ profiles: flow.dataRef.current.profiles }, flow.nextAfter(6))}
-        />,
-        "balanced",
-      );
     case 7:
-      return shell(<ImportStep saving={saving} guide={guide} onBack={() => flow.goBack(flow.prevBefore(7))} onContinue={() => void flow.commit({}, flow.nextAfter(7))} />, "balanced");
+      return shell(<ImportStep saving={saving} guide={guide} autoAdvance={flow.lastMove === "forward"} onBack={() => flow.goBack(flow.prevBefore(7))} onContinue={() => void flow.commit({}, flow.nextAfter(7))} />, "balanced");
     case 8:
       return shell(<ReviewStep flow={flow} guide={guide} onBack={() => flow.goBack(flow.prevBefore(8))} onContinue={() => void flow.commit({}, flow.nextAfter(8))} />, "review");
     case 9:

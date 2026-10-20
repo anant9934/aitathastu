@@ -11,9 +11,9 @@ import React from "react";
 import { ArrowLeft, ArrowRight, Check, CloudCheck, CloudSlash, CloudArrowUp } from "@phosphor-icons/react/dist/ssr";
 import { Logo } from "@/components/ui/Logo";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { Banner } from "@/components/ui/Banner";
-import { onboardingSteps, stepForScreen, type OnboardingRole } from "@/lib/onboarding-step-registry";
+import { onboardingStages, onboardingSteps, stepForScreen, type OnboardingRole } from "@/lib/onboarding-step-registry";
 import type { SaveState } from "@/lib/client/onboarding/use-onboarding-flow";
 import { cn } from "@/lib/client/cn";
 
@@ -34,78 +34,62 @@ const WIDTH_CLASSES: Record<OnboardingShellWidth, string> = {
   review: "max-w-7xl 2xl:max-w-[1400px]",
 };
 
-interface StageGroup {
-  name: string;
-  screens: number[];
-}
-
-const STUDENT_STAGES: StageGroup[] = [
-  { name: "Direction & Role", screens: [3, 3.2, 3.5] },
-  { name: "CV & Discovery", screens: [5, 5.5] },
-  { name: "Profile & Review", screens: [4, 6, 7, 8] },
-  { name: "Skills & Workspace", screens: [9, 10, 11] },
-];
-
-const FACULTY_STAGES: StageGroup[] = [
-  { name: "Role & Focus", screens: [3, 3.5] },
-  { name: "Institutional Setup", screens: [3.7] },
-];
-
 export function SaveIndicator({ save }: { save: SaveState }) {
   if (save.saving) return <span className="inline-flex items-center gap-1.5 text-xs text-text-muted" role="status"><CloudArrowUp size={16} aria-hidden="true" />Saving…</span>;
-  if (save.error) return <span className="inline-flex items-center gap-1.5 text-xs text-danger"><CloudSlash size={16} aria-hidden="true" />Not saved</span>;
-  if (save.lastSavedAt) return <span className="inline-flex items-center gap-1.5 text-xs text-text-muted"><CloudCheck size={16} aria-hidden="true" />Saved</span>;
+  if (save.error) return <span className="inline-flex items-center gap-1.5 text-xs text-danger" role="status"><CloudSlash size={16} aria-hidden="true" />Not saved</span>;
+  if (save.lastSavedAt) return <span className="inline-flex items-center gap-1.5 text-xs text-text-muted" role="status"><CloudCheck size={16} aria-hidden="true" />Saved</span>;
   return null;
 }
 
+/** Stage and step progress. Segments are grouped by stage so the four stages read at a glance. */
 export function Stepper({ screen, role, done }: { screen: number; role: OnboardingRole; done: Set<number> }) {
   const steps = onboardingSteps(role);
+  const stages = onboardingStages(role);
   const pos = stepForScreen(screen, role);
   if (!pos) return null;
 
-  const stages = role === "faculty" ? FACULTY_STAGES : STUDENT_STAGES;
-  const stageIndex = stages.findIndex((st) => st.screens.includes(screen));
-  const currentStage = stageIndex >= 0 ? stages[stageIndex] : null;
-  const stageNumber = stageIndex + 1;
-  const totalStages = stages.length;
+  const isDone = (i: number) => i + 1 < pos.number || done.has(steps[i].screen);
+  const completed = steps.filter((_, i) => isDone(i)).length;
 
   return (
-    <nav
-      aria-label={`Onboarding progress: Stage ${stageNumber} of ${totalStages}, Step ${pos.number} of ${pos.total}`}
-      className="w-full"
-    >
-      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-2 text-xs">
+    <nav aria-label="Onboarding progress" className="w-full">
+      <p className="sr-only">
+        Stage {pos.stageNumber} of {pos.stageTotal}, {pos.stage.name}. Step {pos.number} of {pos.total}, {pos.step.title}. {completed} steps completed.
+      </p>
+      <div aria-hidden="true" className="mb-2.5 flex flex-wrap items-baseline justify-between gap-2 text-xs">
         <div className="flex flex-wrap items-center gap-2">
-          {currentStage && (
-            <span className="inline-flex items-center rounded-full bg-accent-warm/15 px-2.5 py-0.5 text-2xs font-semibold text-accent-warm border border-accent-warm/30 uppercase tracking-wider">
-              Stage {stageNumber} of {totalStages}: {currentStage.name}
-            </span>
-          )}
-          <span className="font-medium text-text-primary text-sm">
+          <span className="inline-flex items-center rounded-full border border-accent-warm/30 bg-accent-warm/15 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wider text-text-warm">
+            Stage {pos.stageNumber} of {pos.stageTotal} · {pos.stage.name}
+          </span>
+          <span className="text-sm font-medium text-text-primary">
             Step {pos.number} of {pos.total}
-            <span className="mx-2 text-text-dim" aria-hidden="true">·</span>
-            <span className="text-text-primary">{pos.step.shortLabel}</span>
+            <span className="mx-2 text-text-dim">·</span>
+            {pos.step.shortLabel}
           </span>
         </div>
-        <span className="hidden font-mono text-xs text-text-dim sm:inline">
-          {steps.filter((s, i) => i + 1 < pos.number || done.has(s.screen)).length} of {pos.total} completed
-        </span>
+        <span className="hidden font-mono text-xs text-text-muted sm:inline">{completed} of {pos.total} done</span>
       </div>
-      <ol className="flex gap-1.5" aria-hidden="true">
-        {steps.map((s, i) => {
-          const state = i + 1 < pos.number || done.has(s.screen) ? "done" : i + 1 === pos.number ? "current" : "todo";
+      <ol aria-hidden="true" className="flex gap-2">
+        {stages.map((stage, si) => {
+          const stageSteps = steps.map((s, i) => ({ s, i })).filter(({ s }) => s.stage === stage.id);
+          const current = si + 1 === pos.stageNumber;
           return (
-            <li
-              key={s.id}
-              className={cn(
-                "h-1.5 flex-1 rounded-full transition-all duration-300",
-                state === "done"
-                  ? "bg-gradient-to-r from-champagne to-soft-amber shadow-[0_0_8px_rgba(196,138,90,0.5)]"
-                  : state === "current"
-                  ? "bg-accent-warm shadow-[0_0_6px_rgba(196,138,90,0.4)]"
-                  : "bg-border-subtle",
-              )}
-            />
+            <li key={stage.id} className="flex min-w-0 flex-col gap-1.5" style={{ flex: stageSteps.length }}>
+              <div className="flex gap-1">
+                {stageSteps.map(({ s, i }) => (
+                  <span
+                    key={s.id}
+                    className={cn(
+                      "h-1.5 flex-1 rounded-full transition-colors duration-300 motion-reduce:transition-none",
+                      isDone(i) ? "bg-accent-warm" : i + 1 === pos.number ? "bg-text-warm" : "bg-border-subtle",
+                    )}
+                  />
+                ))}
+              </div>
+              <span className={cn("hidden truncate text-2xs sm:block", current ? "font-semibold text-text-primary" : "text-text-muted")}>
+                {stage.name}
+              </span>
+            </li>
           );
         })}
       </ol>
@@ -163,7 +147,10 @@ export function OnboardingShell({
               kind="danger"
               className="mt-4"
               title={save.error.kind === "rate_limited" ? "Saving is paused for a moment" : "Your last change wasn't saved"}
-              action={<Button size="sm" variant="secondary" onClick={onRetrySave} loading={save.saving} loadingLabel="Retrying…">Retry now</Button>}
+              action={save.error.kind === "conflict"
+                // The email belongs to an existing account. Signing in merges this guest's progress into it.
+                ? <a className={buttonClass("secondary", "sm")} href="/sign-in?from=%2Fonboarding">Sign in instead</a>
+                : <Button size="sm" variant="secondary" onClick={onRetrySave} loading={save.saving} loadingLabel="Retrying…">Retry now</Button>}
             >
               {save.message}
             </Banner>

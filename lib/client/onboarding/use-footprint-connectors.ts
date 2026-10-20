@@ -14,24 +14,42 @@ import { requestJson, describeError } from "@/lib/client/api";
 import { normalizeImportCandidates } from "@/lib/onboarding-import-candidates";
 import { PLATFORMS } from "./platforms";
 
-export type FootprintStatus = "not_connected" | "linked" | "detected" | "connected" | "imported" | "importing" | "failed";
+export type FootprintStatus = "not_connected" | "linked" | "detected" | "connected" | "imported" | "partial" | "importing" | "failed" | "revoked";
 
 export type DiscoveredCandidates = ReturnType<typeof normalizeImportCandidates>;
 
 type ConnectorRow = { provider: string; status: string; profileUrl: string | null; lastSyncedAt: string | null };
+type SyncRunRow = { provider: string; status: string; recordsFetched?: number | null; startedAt?: string };
+
+/** Status of a saved connection from what the server recorded, never from a timestamp alone. */
+export function statusFromServer(c: ConnectorRow, latestRun?: SyncRunRow): FootprintStatus {
+  if (c.status === "reference_only" || c.status === "unavailable") return "linked";
+  if (c.status === "detected") return "detected";
+  if (c.status === "revoked") return "revoked";
+  if (c.status === "syncing") return "importing";
+  if (c.status === "needs_attention" || c.status === "error") return "failed";
+  if (latestRun?.status === "queued" || latestRun?.status === "running") return "importing";
+  if (latestRun?.status === "failed") return "failed";
+  if (latestRun?.status === "partial") return "partial";
+  if (latestRun?.status === "completed") return Number(latestRun.recordsFetched) > 0 ? "imported" : c.status === "connected" ? "connected" : "linked";
+  return c.status === "connected" ? "connected" : "linked";
+}
 
 export function useFootprintConnectors({
   initialProfiles,
   discoveredResumeProfiles,
   onProfilesChange,
   onCandidatesDiscovered,
+  autoLinkDiscovered = true,
 }: {
   initialProfiles: Partial<Record<string, string>>;
   discoveredResumeProfiles: Partial<Record<string, string>>;
   onProfilesChange: (profiles: Partial<Record<string, string>>) => void;
   onCandidatesDiscovered: (candidates: DiscoveredCandidates, provider: string) => void;
+  /** false: CV-found links wait for the student to confirm them instead of being linked on sight. */
+  autoLinkDiscovered?: boolean;
 }) {
-  const merged = { ...discoveredResumeProfiles, ...initialProfiles };
+  const merged = autoLinkDiscovered ? { ...discoveredResumeProfiles, ...initialProfiles } : { ...initialProfiles };
   const [profiles, setProfiles] = useState<Partial<Record<string, string>>>(merged);
   const profilesRef = useRef(profiles);
   profilesRef.current = profiles;
@@ -44,6 +62,7 @@ export function useFootprintConnectors({
 
   // CV links are registered as references (not scraped) the first time we see them.
   useEffect(() => {
+    if (!autoLinkDiscovered) return;
     const toRegister = Object.entries(discoveredResumeProfiles).filter(([id, url]) => url && PLATFORMS.some((p) => p.id === id));
     if (!toRegister.length) return;
     let cancelled = false;
@@ -68,18 +87,24 @@ export function useFootprintConnectors({
   // What the server already knows (e.g. after a refresh or a GitHub OAuth round trip).
   useEffect(() => {
     let cancelled = false;
-    void requestJson<{ connectors: ConnectorRow[] }>("/api/student/connections", { cache: "no-store" }).then((r) => {
+    void requestJson<{ connectors: ConnectorRow[]; recentSyncRuns?: SyncRunRow[] }>("/api/student/connections", { cache: "no-store" }).then((r) => {
       if (cancelled || !r.ok || !Array.isArray(r.data?.connectors)) return;
+      const runs = Array.isArray(r.data.recentSyncRuns) ? r.data.recentSyncRuns : [];
       const found: Record<string, string> = {};
       const next: Record<string, FootprintStatus> = {};
       for (const c of r.data.connectors) {
         if (c.status === "not_connected" || !c.profileUrl || !PLATFORMS.some((p) => p.id === c.provider)) continue;
         found[c.provider] = c.profileUrl;
-        next[c.provider] = c.status === "reference_only" ? "linked" : c.status === "detected" ? "detected" : c.lastSyncedAt ? "imported" : "connected";
+        next[c.provider] = statusFromServer(c, runs.find((run) => run.provider === c.provider));
       }
       if (Object.keys(found).length) {
         setProfiles((p) => ({ ...found, ...p }));
-        setStatuses((s) => ({ ...next, ...s }));
+        // The server's record beats the draft's "linked" guess; only an import already running stays as is.
+        setStatuses((s) => {
+          const merged = { ...s, ...next };
+          for (const [k, v] of Object.entries(s)) if (v === "importing") merged[k] = v;
+          return merged;
+        });
       }
     });
     return () => { cancelled = true; };
@@ -116,7 +141,7 @@ export function useFootprintConnectors({
     }
     const d = res.data;
     const imported = d.acquisitionStatus !== "MANUAL_PROFILE_REFERENCE" && Number(d.candidateCount) > 0;
-    setStatuses((s) => ({ ...s, [provider]: !imported ? "linked" : d.connectionStatus === "detected" ? "detected" : "imported" }));
+    setStatuses((s) => ({ ...s, [provider]: !imported ? "linked" : d.connectionStatus === "detected" ? "detected" : d.partial ? "partial" : "imported" }));
     setSummaries((m) => ({
       ...m,
       [provider]: {

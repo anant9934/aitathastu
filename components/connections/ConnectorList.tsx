@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useRef, useState } from "react";
 import { ArrowClockwise, ArrowSquareOut, CheckCircle, FileArrowUp, Plugs, ShieldCheck, Trash } from "@phosphor-icons/react/dist/ssr";
-import { PLATFORMS, platformById } from "@/lib/client/onboarding/platforms";
+import { PLATFORMS, PLATFORM_GROUPS, platformById } from "@/lib/client/onboarding/platforms";
 import type { FootprintStatus } from "@/lib/client/onboarding/use-footprint-connectors";
 import { readExportFile } from "@/lib/client/onboarding/use-footprint-connectors";
 import { Button, buttonClass } from "@/components/ui/Button";
@@ -19,6 +19,7 @@ import { StatusChip, Tag, type Tone } from "@/components/ui/StatusChip";
 import { useConfirm, toast } from "@/components/ui/Feedback";
 import { SourceMark } from "./SourceMark";
 import { GitHubPrivateAccessControls } from "./GitHubPrivateAccessControls";
+import { leaveAfter } from "./leave-after";
 
 export const STATUS_VIEW: Record<FootprintStatus, { label: string; tone: Tone }> = {
   not_connected: { label: "Not connected", tone: "neutral" },
@@ -26,8 +27,10 @@ export const STATUS_VIEW: Record<FootprintStatus, { label: string; tone: Tone }>
   detected: { label: "Found, not verified", tone: "warning" },
   connected: { label: "Connected", tone: "verified" },
   imported: { label: "Imported", tone: "verified" },
+  partial: { label: "Partly imported", tone: "warning" },
   importing: { label: "Importing", tone: "busy" },
   failed: { label: "Import failed", tone: "danger" },
+  revoked: { label: "Access revoked", tone: "danger" },
 };
 
 export type ConnectorApi = {
@@ -41,10 +44,20 @@ export type ConnectorApi = {
   disconnect: (provider: string) => Promise<string | null>;
 };
 
-export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid" }: { api: ConnectorApi; returnTo: string; eoraId?: string }) {
+export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid", grouped = false, exclude = [], beforeLeave }: {
+  api: ConnectorApi;
+  returnTo: string;
+  eoraId?: string;
+  /** Awaited before leaving for GitHub (sign-in or app install). */
+  beforeLeave?: () => Promise<unknown>;
+  /** Group rows by what each source is for (onboarding) instead of linked / available. */
+  grouped?: boolean;
+  exclude?: string[];
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const linked = PLATFORMS.filter((p) => api.profiles[p.id]);
-  const rest = PLATFORMS.filter((p) => !api.profiles[p.id]);
+  const shown = PLATFORMS.filter((p) => !exclude.includes(p.id));
+  const linked = shown.filter((p) => api.profiles[p.id]);
+  const rest = shown.filter((p) => !api.profiles[p.id]);
 
   const row = (id: string) => {
     const p = platformById(id)!;
@@ -61,16 +74,36 @@ export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid" 
             {api.fromCv.has(id) && connected && <Tag>From your CV</Tag>}
           </p>
           <p className="mt-0.5 break-words text-sm text-muted">{summary?.text ?? (connected ? api.profiles[id] : p.capability)}</p>
+          {!connected && <p className="mt-0.5 text-xs text-text-muted">How it connects: {p.method}</p>}
         </div>
         <div className="flex w-full items-center justify-between gap-2 min-[480px]:w-auto min-[480px]:justify-end">
           <StatusChip tone={view.tone}>{view.label}</StatusChip>
           <Button size="sm" variant="secondary" loading={api.busy === id} loadingLabel="Working…" onClick={() => setOpenId(id)}>
-            {status === "failed" ? "Retry" : connected ? "Manage" : "Connect"}
+            {status === "failed" ? "Retry" : status === "revoked" ? "Reconnect" : connected ? "Manage" : "Connect"}
           </Button>
         </div>
       </li>
     );
   };
+
+  if (grouped) {
+    return (
+      <div data-eora-id={eoraId} className="flex flex-col gap-6">
+        {PLATFORM_GROUPS.map((g) => {
+          const rows = shown.filter((p) => p.group === g.id);
+          if (!rows.length) return null;
+          return (
+            <section key={g.id} aria-labelledby={`group-${g.id}`}>
+              <h3 id={`group-${g.id}`} className="font-display text-sm font-semibold text-text-primary">{g.name}</h3>
+              <p className="mb-2 text-xs text-text-muted">{g.purpose}</p>
+              <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{rows.map((p) => row(p.id))}</ul>
+            </section>
+          );
+        })}
+        {openId && <ConnectorDrawer id={openId} api={api} returnTo={returnTo} beforeLeave={beforeLeave} onClose={() => setOpenId(null)} />}
+      </div>
+    );
+  }
 
   return (
     <div data-eora-id={eoraId} className="flex flex-col gap-5">
@@ -84,12 +117,12 @@ export function ConnectorList({ api, returnTo, eoraId = "eora-connections-grid" 
         <h3 id="available-title" className="mb-2 font-display text-sm font-semibold text-text-primary">{linked.length ? "More you can add" : "Available"} <span className="font-mono text-text-muted tabular">{rest.length}</span></h3>
         <ul className="divide-y divide-border-medium rounded-card border border-border-medium bg-bg-elevated shadow-card">{rest.map((p) => row(p.id))}</ul>
       </section>
-      {openId && <ConnectorDrawer id={openId} api={api} returnTo={returnTo} onClose={() => setOpenId(null)} />}
+      {openId && <ConnectorDrawer id={openId} api={api} returnTo={returnTo} beforeLeave={beforeLeave} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
 
-function ConnectorDrawer({ id, api, returnTo, onClose }: { id: string; api: ConnectorApi; returnTo: string; onClose: () => void }) {
+function ConnectorDrawer({ id, api, returnTo, beforeLeave, onClose }: { id: string; api: ConnectorApi; returnTo: string; beforeLeave?: () => Promise<unknown>; onClose: () => void }) {
   const p = platformById(id)!;
   const [value, setValue] = useState(api.profiles[id] && !String(api.profiles[id]).startsWith("Archive:") ? String(api.profiles[id]) : "");
   const [upload, setUpload] = useState<{ name: string; content: string } | null>(null);
@@ -151,19 +184,27 @@ function ConnectorDrawer({ id, api, returnTo, onClose }: { id: string; api: Conn
         {done && <Banner kind="success">Done. Closing…</Banner>}
         {error && <Banner kind="danger" title="That didn't work">{error}</Banner>}
 
-        {id === "github" && status !== "connected" && (
+        {id === "github" && (
           <div className="rounded-lg border border-border-medium bg-bg-surface/50 p-3.5 text-sm">
-            <p className="text-text-muted">
-              {status === "detected" ? "We read this account's public repositories, but haven't confirmed it's yours. " : "Typing a username reads public data only. "}
-              Signing in with GitHub proves the account is yours.
-            </p>
-            <a className={buttonClass("secondary", "sm", "mt-3")} href={`/api/auth/github/start?returnTo=${encodeURIComponent(returnTo)}`}>
-              <ArrowSquareOut size={16} aria-hidden="true" /> Verify with GitHub sign-in
-            </a>
+            <p className="font-medium text-text-primary">Three levels of GitHub access</p>
+            <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-5 text-text-muted">
+              <li><span className="text-text-primary">Username:</span> reads your public repositories. It does not prove the account is yours or reach private repositories.</li>
+              <li><span className="text-text-primary">Sign in with GitHub:</span> confirms the account is yours. It asks only to read your public profile (<code className="font-mono text-xs">read:user</code>), still public repositories only.</li>
+              <li><span className="text-text-primary">Install the GitHub App:</span> on GitHub you choose exactly which repositories, including private ones, we may read. Access is read-only and you can revoke it in GitHub settings.</li>
+            </ol>
+            {status !== "connected" && (
+              <>
+                {status === "detected" && <p className="mt-2 text-text-muted">We read this account&apos;s public repositories, but haven&apos;t confirmed it&apos;s yours.</p>}
+                <a className={buttonClass("secondary", "sm", "mt-3")} href={`/api/auth/github/start?returnTo=${encodeURIComponent(returnTo)}`} onClick={leaveAfter(beforeLeave)}>
+                  <ArrowSquareOut size={16} aria-hidden="true" /> Sign in with GitHub
+                </a>
+                <p className="mt-2 text-xs text-text-muted">You&apos;ll leave this page for GitHub and come back here. Your progress is saved.</p>
+              </>
+            )}
           </div>
         )}
 
-        {id === "github" && connected && <GitHubPrivateAccessControls />}
+        {id === "github" && connected && <GitHubPrivateAccessControls returnTo={returnTo} beforeLeave={beforeLeave} />}
 
         <TextField
           ref={input}

@@ -213,7 +213,7 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
           </div>
         </div>
         <span className="flex shrink-0 items-center gap-2">
-          {p.status === "confirmed" ? <StatusChip tone="verified" icon={Check}>Confirmed</StatusChip> : <StatusChip tone="signal">To review</StatusChip>}
+          {p.status === "confirmed" ? <StatusChip tone="corroborated" icon={Check}>Accepted by you</StatusChip> : <StatusChip tone="signal">To review</StatusChip>}
           <CaretDown size={16} aria-hidden="true" className={cn("text-text-muted transition-transform duration-200", open && "rotate-180")} />
         </span>
       </button>

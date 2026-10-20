@@ -17,7 +17,7 @@ import { requestJson, describeError, type ApiError } from "@/lib/client/api";
 import { candidateNames } from "@/lib/onboarding-import-candidates";
 import { nextOnboardingScreen } from "@/lib/onboarding-resume-coverage";
 import { editEntry, entryKey, isRejected } from "@/lib/review/entry-edits";
-import { WELCOME_SCREEN } from "@/lib/onboarding-step-registry";
+import { STUDENT_SCREEN_ORDER, WELCOME_SCREEN, normalizeOnboardingScreen } from "@/lib/onboarding-step-registry";
 import { EMPTY_ONBOARDING, type EducationEntry, type OnboardingData, type ProjectEntry } from "./types";
 
 export type LoadState = "loading" | "ready" | "error";
@@ -103,7 +103,7 @@ function restoreFromDraft(d: Record<string, any>, base: OnboardingData): { data:
   // Institution and the primary education entry agree from the start (P4-16).
   if (!data.academic.institution.trim()) data.academic.institution = primaryEducation(data.education, "")?.institution ?? "";
   const screen = typeof d.currentScreen === "number"
-    ? d.currentScreen
+    ? normalizeOnboardingScreen(d.currentScreen)
     : d.priorities?.length ? 5 : d.targetRole ? 3.5 : d.role ? 3.2 : d.name ? 3 : WELCOME_SCREEN;
   return { data, screen };
 }
@@ -114,9 +114,13 @@ export function useOnboardingFlow() {
   const dataRef = useRef<OnboardingData>(EMPTY_ONBOARDING);
   const [load, setLoad] = useState<LoadState>("loading");
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticatedState] = useState(false);
+  const isAuthenticatedRef = useRef(false);
+  const setIsAuthenticated = useCallback((v: boolean) => { isAuthenticatedRef.current = v; setIsAuthenticatedState(v); }, []);
   const [save, setSave] = useState<SaveState>({ saving: false, error: null, message: null, lastSavedAt: null });
   const [submitting, setSubmitting] = useState(false);
+  /** How the current step was reached; steps that auto-advance must not do it after Back. */
+  const [lastMove, setLastMove] = useState<"forward" | "back">("forward");
 
   const loadedRef = useRef(false);
   const hasSessionRef = useRef(false);
@@ -166,7 +170,7 @@ export function useOnboardingFlow() {
       setLoad("ready");
     })();
     return () => { active = false; };
-  }, [loadAttempt, setData]);
+  }, [loadAttempt, setData, setIsAuthenticated]);
 
   const retryLoad = useCallback(() => { setLoad("loading"); setLoadAttempt((n) => n + 1); }, []);
 
@@ -182,7 +186,10 @@ export function useOnboardingFlow() {
         if (typeof res.data?.revision === "number") revisionRef.current = res.data.revision;
         return { ok: true as const };
       }
-      unsavedRef.current = { ...unsavedRef.current, ...patch };
+      // Credentials are never kept for retry: a rejected email (e.g. it already has an account)
+      // would otherwise ride along on every later save and make all of them fail.
+      const { email: _email, password: _password, ...retryable } = patch;
+      unsavedRef.current = { ...unsavedRef.current, ...retryable };
       return { ok: false as const, error: res.error };
     };
     const result = queueRef.current.then(run, run);
@@ -224,17 +231,18 @@ export function useOnboardingFlow() {
   const commit = useCallback(async (patch: Record<string, unknown>, nextScreen: number) => {
     if (!(await flushPending())) return false;
     const ok = await track({ ...patch, currentScreen: nextScreen });
-    if (ok) setScreen(nextScreen);
+    if (ok) { setLastMove("forward"); setScreen(nextScreen); }
     return ok;
   }, [track, flushPending]);
 
   const retrySave = useCallback(() => track({}), [track]);
 
-  /** Going back never waits on the network; the position is saved in the background. */
+  /** Going back never waits on the network; the position is saved in the background and the save indicator reflects it. */
   const goBack = useCallback((target: number) => {
+    setLastMove("back");
     setScreen(target);
-    void persist({ currentScreen: target });
-  }, [persist]);
+    void track({ currentScreen: target });
+  }, [track]);
 
   /** Resolves once a session cookie exists (uploads need one); the first draft write creates the guest. */
   const ensureSession = useCallback(async () => {
@@ -247,8 +255,12 @@ export function useOnboardingFlow() {
   const profileComplete = useCallback((d: OnboardingData = dataRef.current) =>
     Boolean((d.name || d.academic.fullName).trim() && d.academic.institution.trim() && d.academic.degree.trim()), []);
 
-  const coveredScreens = useCallback((d: OnboardingData = dataRef.current) =>
-    profileComplete(d) ? [...d.resumeCovered, 4] : d.resumeCovered, [profileComplete]);
+  // Details is also where a guest creates their account, so it is never skipped for a guest:
+  // finishing as a guest would leave the whole profile tied to one browser cookie.
+  const coveredScreens = useCallback((d: OnboardingData = dataRef.current) => {
+    const fromCv = isAuthenticatedRef.current ? d.resumeCovered : d.resumeCovered.filter((s) => s !== 4);
+    return profileComplete(d) && isAuthenticatedRef.current ? [...fromCv, 4] : fromCv;
+  }, [profileComplete]);
 
   const nextAfter = useCallback((from: number, d: OnboardingData = dataRef.current) => {
     if (from === 5) return 5.5;
@@ -257,7 +269,7 @@ export function useOnboardingFlow() {
 
   /** The previous step that was actually shown (covered steps are skipped going back too). */
   const prevBefore = useCallback((from: number, d: OnboardingData = dataRef.current) => {
-    const order = [3, 3.2, 3.5, 5, 5.5, 4, 6, 7, 8, 9, 10, 11];
+    const order = STUDENT_SCREEN_ORDER;
     const covered = new Set(coveredScreens(d));
     // Details (4) was shown when there was no CV, even if it is complete now.
     if (!d.resumeFileName) covered.delete(4);
@@ -337,7 +349,7 @@ export function useOnboardingFlow() {
   }, []);
 
   return {
-    screen, setScreen, data, dataRef, setData, load, retryLoad, isAuthenticated, setIsAuthenticated,
+    screen, setScreen, lastMove, data, dataRef, setData, load, retryLoad, isAuthenticated, setIsAuthenticated,
     save, autosave, autosaveSoon, commit, retrySave, goBack, ensureSession, persist,
     nextAfter, prevBefore, completedScreens, profileComplete, setEducation, setInstitution,
     finish, finishFaculty, submitting,

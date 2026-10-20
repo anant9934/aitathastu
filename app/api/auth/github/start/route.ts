@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
+import { safeGitHubReturnPath } from "@/lib/auth/github-return";
 
 export async function GET(req: Request) {
   if (!coreIngestionReady()) return NextResponse.json({ error: "GitHub connection is unavailable until credential rotation is complete." }, { status: 503 });
@@ -10,23 +11,19 @@ export async function GET(req: Request) {
   const baseUrl = getCanonicalOrigin(req);
 
   // Where to land after OAuth. Only these in-app paths are allowed (no open redirect).
-  const requested = url.searchParams.get("returnTo");
-  const returnTo = requested === "/onboarding" ? "/onboarding" : "/student/connections";
+  const returnTo = safeGitHubReturnPath(url.searchParams.get("returnTo"));
 
   const auth = await getServerAuthContext();
   if (!auth) {
     return NextResponse.redirect(
-      new URL(`/sign-in?from=${encodeURIComponent("/student/connections")}`, baseUrl)
+      new URL(`/sign-in?from=${encodeURIComponent(returnTo)}`, baseUrl)
     );
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();
   if (!clientId) {
     return NextResponse.redirect(
-      new URL(
-        `/student/connections?error=${encodeURIComponent("GitHub App client ID is not configured. Please set GITHUB_CLIENT_ID.")}`,
-        baseUrl
-      )
+      new URL(`${returnTo}?error=github_signin_unavailable`, baseUrl)
     );
   }
 

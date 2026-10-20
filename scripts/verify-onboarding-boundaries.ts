@@ -20,10 +20,12 @@ assert.deepEqual(fresh.profiles, {});
 assert.deepEqual(initialDraft.skills, []);
 // Phase 3 (P4-13): one registry numbers every step for both the stepper and EORA.
 assert.equal(TOTAL_ONBOARDING_STEPS, 11);
-assert.deepEqual(onboardingSteps().map((s) => s.screen), [3, 3.2, 3.5, 5, 4, 6, 7, 8, 9, 10, 11]);
+assert.deepEqual(onboardingSteps().map((s) => s.screen), [3, 3.2, 3.5, 5, 5.5, 7, 8, 4, 9, 10, 11]);
 assert.equal(stepForScreen(2), null, "Welcome is an unnumbered prelude");
 assert.equal(stepForScreen(3.2)?.number, 2);
 assert.equal(stepForScreen(9)?.number, 9);
+assert.equal(stepForScreen(6)?.step.id, "connect_sources", "drafts saved on the retired accounts screen resume on sources");
+assert.deepEqual([stepForScreen(5.5)?.stageNumber, stepForScreen(5.5)?.stageTotal, stepForScreen(4)?.stage.id], [2, 4, "refine"]);
 
 const names = candidateNames([
   { name: "Python", sourceReference: "https://example.test/project", confidence: 0.93 },

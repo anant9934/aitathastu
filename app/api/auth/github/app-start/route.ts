@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GITHUB_APP_RETURN_COOKIE, safeGitHubReturnPath } from "@/lib/auth/github-return";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
@@ -6,18 +7,19 @@ import { isGitHubAppConfigured, createGitHubAppStateToken } from "@/lib/connecto
 
 export async function GET(req: Request) {
   const baseUrl = getCanonicalOrigin(req);
+  const returnTo = safeGitHubReturnPath(new URL(req.url).searchParams.get("returnTo"));
   if (!coreIngestionReady()) {
-    return NextResponse.redirect(new URL("/student/connections?error=github_unavailable", baseUrl));
+    return NextResponse.redirect(new URL(`${returnTo}?error=github_unavailable`, baseUrl));
   }
 
   const auth = await getServerAuthContext();
   if (!auth) {
-    return NextResponse.redirect(new URL("/sign-in?from=%2Fstudent%2Fconnections", baseUrl));
+    return NextResponse.redirect(new URL(`/sign-in?from=${encodeURIComponent(returnTo)}`, baseUrl));
   }
 
   const slug = process.env.GITHUB_APP_SLUG?.trim();
   if (!slug || !isGitHubAppConfigured()) {
-    return NextResponse.redirect(new URL("/student/connections?error=github_app_not_configured", baseUrl));
+    return NextResponse.redirect(new URL(`${returnTo}?error=github_app_not_configured`, baseUrl));
   }
 
   const state = createGitHubAppStateToken(auth.person.id);
@@ -26,6 +28,13 @@ export async function GET(req: Request) {
 
   const response = NextResponse.redirect(installUrl.toString());
   response.cookies.set("tathastu_gh_app_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 10 * 60,
+  });
+  response.cookies.set(GITHUB_APP_RETURN_COOKIE, returnTo, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

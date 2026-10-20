@@ -59,7 +59,7 @@ export function DetailsStep({ initial, isAuthenticated, fromCv, saving, guide, o
   return (
     <>
       <StepHeader
-        title={fromCv.length ? "Check the details we couldn't fill" : "A few details about you"}
+        title={!isAuthenticated ? "Create your account to keep this profile" : fromCv.length ? "Check the details we couldn't fill" : "A few details about you"}
         description={isAuthenticated ? "These identify your profile. Fields from your CV are marked." : "These identify your profile and create your account, so you can come back to it."}
         guide={guide}
       />

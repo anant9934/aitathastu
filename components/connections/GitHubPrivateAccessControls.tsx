@@ -6,6 +6,7 @@ import { Button, buttonClass } from "@/components/ui/Button";
 import { Banner } from "@/components/ui/Banner";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { toast } from "@/components/ui/Feedback";
+import { leaveAfter } from "./leave-after";
 
 interface PrivateAccessStatus {
   configured: boolean;
@@ -24,7 +25,7 @@ interface PrivateAccessStatus {
   connectedAccount: string | null;
 }
 
-export function GitHubPrivateAccessControls() {
+export function GitHubPrivateAccessControls({ returnTo, beforeLeave }: { returnTo?: string; beforeLeave?: () => Promise<unknown> } = {}) {
   const [busy, setBusy] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [status, setStatus] = useState<PrivateAccessStatus | null>(null);
@@ -105,9 +106,8 @@ export function GitHubPrivateAccessControls() {
       </div>
 
       {!loadingStatus && status && !status.configured && (
-        <Banner kind="warning" title="Server configuration pending">
-          {status.configDiagnostic ||
-            "Private repository access requires GitHub App credentials on the server (GITHUB_APP_ID, GITHUB_APP_SLUG, GITHUB_APP_PRIVATE_KEY)."}
+        <Banner kind="warning" title="Private repositories aren't available yet">
+          This server isn&apos;t set up for GitHub App access, so only public repositories can be read. You can continue; nothing is lost.
         </Banner>
       )}
 
@@ -135,14 +135,17 @@ export function GitHubPrivateAccessControls() {
       )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <a
-          className={buttonClass("secondary", "sm")}
-          href="/api/auth/github/app-start"
-          title="Install or reconfigure GitHub App repository permissions"
-        >
-          <ArrowSquareOut size={16} aria-hidden="true" />
-          {status?.installed ? "Reconfigure repository access" : "Authorize selected repositories"}
-        </a>
+        {status?.configured !== false && (
+          <a
+            className={buttonClass("secondary", "sm")}
+            href={returnTo === "/onboarding" ? "/api/auth/github/app-start?returnTo=%2Fonboarding" : "/api/auth/github/app-start"}
+            title="Install or reconfigure GitHub App repository permissions"
+            onClick={leaveAfter(beforeLeave)}
+          >
+            <ArrowSquareOut size={16} aria-hidden="true" />
+            {status?.installed ? "Change which repositories we can read" : "Choose repositories on GitHub"}
+          </a>
+        )}
 
         {status?.installed && (
           <Button

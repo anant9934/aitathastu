@@ -3,6 +3,7 @@ import { getServerAuthContext } from "@/lib/auth/server-session";
 import { connectGitHubAccount, syncGitHubConnection } from "@/lib/services/github-sync-service";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { getCanonicalOrigin } from "@/lib/auth/origin";
+import { readCookie, safeGitHubReturnPath } from "@/lib/auth/github-return";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -17,38 +18,34 @@ export async function GET(req: Request) {
   const baseUrl = getCanonicalOrigin(req);
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
-  if (errorParam) {
-    return NextResponse.redirect(
-      new URL(`/student/connections?error=${encodeURIComponent(`GitHub authorization was cancelled or failed: ${errorParam}`)}`, baseUrl)
-    );
-  }
-
-  if (!code || !encodedState) {
-    return NextResponse.redirect(new URL("/student/connections?error=invalid_github_response", baseUrl));
-  }
-
   let parsedState: { state: string; personId: string; returnTo?: string } | null = null;
   try {
-    const decoded = Buffer.from(encodedState, "base64url").toString("utf-8");
-    parsedState = JSON.parse(decoded);
+    parsedState = encodedState ? JSON.parse(Buffer.from(encodedState, "base64url").toString("utf-8")) : null;
   } catch {
-    return NextResponse.redirect(new URL("/student/connections?error=invalid_state", baseUrl));
+    parsedState = null;
+  }
+  // Allow-listed, so a client-visible state can only choose between two in-app pages. Every outcome,
+  // including a cancel, returns to where the student started instead of dropping them out of onboarding.
+  const returnPath = safeGitHubReturnPath(parsedState?.returnTo);
+  const back = (query: string) => {
+    const res = NextResponse.redirect(new URL(`${returnPath}?${query}`, baseUrl));
+    res.cookies.delete("tathastu_gh_oauth_state");
+    return res;
+  };
+
+  if (errorParam) {
+    return back(`error=${errorParam === "access_denied" ? "github_cancelled" : "github_authorization_failed"}`);
   }
 
-  const cookieHeader = req.headers.get("cookie") || "";
-  const match = cookieHeader.match(/tathastu_gh_oauth_state=([^;]+)/);
-  const expectedState = match ? match[1] : null;
+  if (!code || !encodedState) return back("error=invalid_github_response");
+  if (!parsedState) return back("error=invalid_state");
 
-  if (!expectedState || expectedState !== parsedState?.state) {
-    return NextResponse.redirect(new URL("/student/connections?error=state_mismatch", baseUrl));
-  }
-
-  // Allow-listed in /api/auth/github/start; re-checked here because state is client-visible.
-  const returnPath = parsedState?.returnTo === "/onboarding" ? "/onboarding" : "/student/connections";
+  const expectedState = readCookie(req.headers.get("cookie"), "tathastu_gh_oauth_state");
+  if (!expectedState || expectedState !== parsedState.state) return back("error=state_mismatch");
 
   const auth = await getServerAuthContext();
   if (!auth || auth.person.id !== parsedState?.personId) {
-    return NextResponse.redirect(new URL("/sign-in?from=/student/connections", baseUrl));
+    return NextResponse.redirect(new URL(`/sign-in?from=${encodeURIComponent(returnPath)}`, baseUrl));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();

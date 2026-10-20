@@ -7,21 +7,21 @@
  * rejected items, are shown as usual.
  *
  *   4  Academic details   name, institution and degree all accepted
- *   6  Digital footprints every extracted link accepted
  *   9  Skills map         every extracted skill accepted
  *   10 Projects           every extracted project accepted
  */
 
+import { STUDENT_SCREEN_ORDER } from "@/lib/onboarding-step-registry";
+
 export type ResumeReviewSummary = Record<string, { total: number; accepted: number }>;
 
 const SECTION_SCREENS: Array<[section: string, screen: number]> = [
-  ["links", 6],
   ["skills", 9],
   ["projects", 10],
 ];
 
-/** Student onboarding screens after the resume upload, in order. */
-const FLOW_AFTER_RESUME = [5, 5.5, 4, 6, 7, 8, 9, 10, 11];
+/** Student onboarding screens after the resume upload, in display order. */
+const FLOW_AFTER_RESUME = STUDENT_SCREEN_ORDER.slice(STUDENT_SCREEN_ORDER.indexOf(5));
 
 export function resumeCoveredScreens(
   summary: ResumeReviewSummary,

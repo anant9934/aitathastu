@@ -10,7 +10,7 @@ import { StepFooter, StepHeader } from "../OnboardingShell";
  * the CV and GitHub settle (or after 8 s); slower sources keep importing and
  * appear on the review screens.
  */
-export function ImportStep({ saving, guide, onBack, onContinue }: { saving: boolean; guide: React.ReactNode; onBack: () => void; onContinue: () => void }) {
+export function ImportStep({ saving, guide, onBack, onContinue, autoAdvance = true }: { saving: boolean; guide: React.ReactNode; onBack: () => void; onContinue: () => void; autoAdvance?: boolean }) {
   useEoraStepEvents({ onNext: onContinue, onBack });
   return (
     <>
@@ -22,13 +22,15 @@ export function ImportStep({ saving, guide, onBack, onContinue }: { saving: bool
       />
       <div className="mt-6 flex flex-col gap-4">
         <div className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
-          <SourceProgress variant="full" onReadyToReview={() => onContinue()} />
+          <SourceProgress variant="full" onReadyToReview={autoAdvance ? () => onContinue() : undefined} />
         </div>
 
         <div className="flex items-center gap-2.5 rounded-card border border-line-soft bg-bg-surface/40 px-4 py-3 text-xs text-text-muted">
           <span className="flex h-2 w-2 rounded-full bg-verified shrink-0 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
           <p>
-            Real-time synchronization. As soon as your primary sources (CV and GitHub) settle, you&apos;ll be moved automatically to the review workspace.
+            {autoAdvance
+              ? "When your CV and GitHub finish, you'll move to the review step automatically. Slower sources keep going in the background."
+              : "Sources keep importing in the background. Continue to the review step when you're ready."}
           </p>
         </div>
       </div>

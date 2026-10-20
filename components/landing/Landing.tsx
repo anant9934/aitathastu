@@ -22,6 +22,7 @@ import Link from "next/link";
 import { openEoraChat } from "@/components/eora/EoraCompanion";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Footer } from "@/components/ui/Footer";
+import { StorySequence } from "./StorySequence";
 
 /* ============================================================
    TYPES
@@ -732,6 +733,7 @@ export function Landing({ user }: LandingProps) {
 
   return (
     <>
+      <StorySequence startHref={user ? "/start" : "/onboarding"} />
       {/* ============================================================
           NAVIGATION
           ============================================================ */}
@@ -742,6 +744,7 @@ export function Landing({ user }: LandingProps) {
             AI Tathastu
           </a>
           <nav className="nav-links">
+            <a href="#ecosystem">Ecosystem</a>
             <a href="#journey">Journey</a>
             <a href="#learning">Learning</a>
             <a href="#evidence">Evidence</a>
@@ -787,6 +790,7 @@ export function Landing({ user }: LandingProps) {
             <span className="text-xs font-mono uppercase tracking-widest text-text-muted">Theme</span>
             <ThemeToggle />
           </div>
+          <a href="#ecosystem" onClick={closeNav}>Ecosystem</a>
           <a href="#journey" onClick={closeNav}>Journey</a>
           <a href="#learning" onClick={closeNav}>Learning</a>
           <a href="#evidence" onClick={closeNav}>Evidence</a>
@@ -973,6 +977,44 @@ export function Landing({ user }: LandingProps) {
         <div className="scroll-cue">
           <span>Scroll</span>
           <div className="line-cue"></div>
+        </div>
+      </section>
+
+      {/* ============================================================
+          FIVE-WORLD ECOSYSTEM — connected destinations, existing routes preserved
+          ============================================================ */}
+      <section className="at-ecosystem-section" id="ecosystem" aria-labelledby="at-ecosystem-title">
+        <div className="wrap">
+          <div className="at-ecosystem-intro">
+            <div>
+              <p className="at-ecosystem-kicker">One profile · five ways forward</p>
+              <h2 className="at-ecosystem-title" id="at-ecosystem-title">A connected world for your next chapter.</h2>
+            </div>
+            <p className="at-ecosystem-copy">Start with a clearer view of your skills and evidence. Then use that profile to choose a direction, learn deliberately, find people to build with, and show what you can do. Each world has a distinct purpose; your profile connects them.</p>
+          </div>
+          <div className="at-ecosystem-grid">
+            <article className="at-world-card">
+              <span className="at-world-index">WORLD 01 / OPPORTUNITY</span>
+              <div><h3>Avasar</h3><p>Discover internships and roles aligned with your growing skill profile.</p><Link href={user ? "/start" : "/onboarding"}>Build your profile <span aria-hidden="true">↗</span></Link></div>
+            </article>
+            <article className="at-world-card">
+              <span className="at-world-index">WORLD 02 / PEOPLE</span>
+              <div><h3>Collaborate</h3><p>Find collaborators, mentors and project partners around shared goals.</p><Link href={user ? "/start" : "/onboarding"}>Find your direction <span aria-hidden="true">↗</span></Link></div>
+            </article>
+            <article className="at-world-card">
+              <span className="at-world-index">WORLD 03 / LEARNING</span>
+              <div><h3>Learn</h3><p>Turn skill gaps into a personal roadmap with practical next steps.</p><Link href={user ? "/start" : "/onboarding"}>Map your skills <span aria-hidden="true">↗</span></Link></div>
+            </article>
+            <article className="at-world-card">
+              <span className="at-world-index">WORLD 04 / CO-CREATION</span>
+              <div><h3>Meet</h3><p>Make space for project conversations, mentoring and real-time collaboration.</p><Link href={user ? "/start" : "/onboarding"}>Get started <span aria-hidden="true">↗</span></Link></div>
+            </article>
+            <article className="at-world-card">
+              <span className="at-world-index">WORLD 05 / EVIDENCE</span>
+              <div><h3>Iris</h3><p>Demonstrate what you know through structured, integrity-first assessments.</p><Link href={user ? "/start" : "/onboarding"}>Prepare your profile <span aria-hidden="true">↗</span></Link></div>
+            </article>
+          </div>
+          <p className="at-ecosystem-note">PRODUCT NOTE · Access and availability depend on the capabilities enabled for your account.</p>
         </div>
       </section>
 

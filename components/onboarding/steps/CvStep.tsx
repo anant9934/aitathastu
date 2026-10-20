@@ -381,6 +381,8 @@ export function CvStep({
           </div>
         )}
 
+        <CvExtractionAssembly busy={cv.busy} stage={cv.stage} fileName={cv.fileName} />
+
         {cv.error && (
           <Banner
             kind={failed ? "danger" : "warning"}

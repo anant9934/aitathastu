@@ -66,7 +66,11 @@ test("state comes from persisted records; a sign-in alone is never 'imported'", 
 test("one entry point: sign-in first, then the App; allow-listed return; clear error when unconfigured", async () => {
   const { GET } = await import("../app/api/auth/github/connect/route");
   const saved = { id: process.env.GITHUB_CLIENT_ID, slug: process.env.GITHUB_APP_SLUG, appId: process.env.GITHUB_APP_ID, key: process.env.GITHUB_APP_PRIVATE_KEY };
-  const go = async (q: string) => new URL((await GET(new Request(`http://localhost:3000/api/auth/github/connect?${q}`))).headers.get("location")!);
+  const go = async (q: string) => {
+    const location = (await GET(new Request(`http://localhost:3000/api/auth/github/connect?${q}`))).headers.get("location")!;
+    assert.ok(location.startsWith("/") && !location.startsWith("//"), "same-host hop is a relative redirect");
+    return new URL(location, "http://localhost:3000");
+  };
   try {
     process.env.GITHUB_CLIENT_ID = "test-client";
     const a = await go("returnTo=/onboarding");

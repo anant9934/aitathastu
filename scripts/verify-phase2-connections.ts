@@ -34,7 +34,7 @@ test("every managed platform is listed, with records imported per source", async
   const lc = rows.find((r) => r.source === "leetcode")!;
   assert.deepEqual([lc.badge, lc.handle, lc.recordsImported, lc.canSync, lc.canDisconnect], ["connected", "kavya_r", 2, true, true]);
   assert.equal(rows.find((r) => r.source === "kaggle")!.badge, "not_connected");
-  assert.equal(rows.find((r) => r.source === "linkedin")!.canSync, false, "LinkedIn imports once; no Sync now");
+  assert.equal(rows.find((r) => r.source === "linkedin")!.canSync, false, "LinkedIn refreshes from its own card; no Sync now");
 });
 
 test("handles are validated: pasted URLs, wrong hosts, bad characters, ORCID checksum", async () => {

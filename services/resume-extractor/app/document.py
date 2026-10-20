@@ -176,7 +176,7 @@ def _words(im, config, seconds):
         if not t or conf < 0:
             continue
         x, y, w, h = d['left'][i], d['top'][i], d['width'][i], d['height'][i]
-        out.append({'x0': x, 'y0': y, 'x1': x + w, 'y1': y + h, 'text': t, 'key': (d['block_num'][i], d['par_num'][i], d['line_num'][i])})
+        out.append({'x0': x, 'y0': y, 'x1': x + w, 'y1': y + h, 'text': t, 'conf': round(conf / 100.0, 3), 'key': (d['block_num'][i], d['par_num'][i], d['line_num'][i])})
     return out
 
 def _ocr(im, page, seconds, warnings):
@@ -337,13 +337,24 @@ def _ocr(im, page, seconds, warnings):
             warnings.append(f'Page {page}: OCR processing timed out.')
         else:
             warnings.append(f'Page {page}: OCR returned no legible text.')
+    # Tesseract's own word confidence (0-1). The page mean lets the caller mark
+    # records from a poorly read page for review instead of trusting them.
+    confs = [w['conf'] for w in words if 'conf' in w]
+    quality = {
+        'mean_confidence': round(sum(confs) / len(confs), 3) if confs else 0.0,
+        'low_confidence_words': sum(1 for c in confs if c < 0.6),
+        'words': len(confs),
+    }
+    if confs and quality['mean_confidence'] < 0.65:
+        warnings.append(f'Page {page}: OCR confidence is low; check extracted values against the document.')
     layout = {
         'page': page,
         'width': im_gray.width,
         'height': im_gray.height,
         'source': 'ocr',
-        'spans': [{k: w[k] for k in ('x0', 'y0', 'x1', 'y1', 'text')} for w in words],
-        'links': []
+        'spans': [{k: w[k] for k in ('x0', 'y0', 'x1', 'y1', 'text', 'conf') if k in w} for w in words],
+        'links': [],
+        'quality': quality,
     }
     return lines, layout
 

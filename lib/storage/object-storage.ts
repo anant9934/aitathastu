@@ -10,8 +10,8 @@
  */
 
 import crypto from "node:crypto";
-import { and, eq } from "drizzle-orm";
-import { getDb, resumeDocumentBlobs, resumeDocuments } from "@/lib/db";
+import { and, eq, sql } from "drizzle-orm";
+import { getDb, resumeDocumentBlobs, resumeDocuments, resumeExtractedRecords } from "@/lib/db";
 
 export interface StoredDocumentResult {
   documentId: string;
@@ -136,15 +136,22 @@ export class ObjectStorageService {
       return false;
     }
 
-    // Mark as deleted in document record
+    // Mark as deleted and drop the extracted CV content with the file; only
+    // approved data the student already saved to their profile remains.
     await db
       .update(resumeDocuments)
       .set({
         status: "deleted",
         deletedAt: new Date(),
         updatedAt: new Date(),
+        extractedProfile: null,
+        sectionsPreview: [],
+        metadata: sql`coalesce(${resumeDocuments.metadata}, '{}'::jsonb) - 'review'`,
       })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
+    await db
+      .delete(resumeExtractedRecords)
+      .where(and(eq(resumeExtractedRecords.documentId, documentId), eq(resumeExtractedRecords.personId, personId)));
 
     // Remove blob from durable storage
     await db

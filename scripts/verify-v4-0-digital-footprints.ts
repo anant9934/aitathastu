@@ -11,7 +11,8 @@ import crypto from "crypto";
 // Connectors
 import { mapGitHubReposToProjects } from "@/lib/connectors/github/mapper";
 import { isSafePublicUrl } from "@/lib/connectors/portfolio/client";
-import { validateLinkedInUrl, parseLinkedInDataExport } from "@/lib/connectors/linkedin/client";
+import { validateLinkedInUrl } from "@/lib/connectors/linkedin/client";
+import { normalizeLinkedInProfile } from "@/lib/linkedin/normalize";
 import { normalizeLeetCodeUsername } from "@/lib/connectors/leetcode/client";
 import {
   fetchHackerRankProfile,
@@ -158,12 +159,14 @@ async function runSuite() {
     const invalidLi = validateLinkedInUrl("https://facebook.com/notlinkedin");
     assert(!invalidLi.valid, "LinkedIn Rejects Non-LinkedIn Domain", "P3_LINKEDIN");
 
-    // Test authorized CSV export parsing
-    const sampleCsv = `Position,Company Name,Started On,Finished On,Description\nAI Engineer,DeepMind,Jan 2024,Present,Building autonomous reasoning systems\nSoftware Intern,Google,May 2023,Aug 2023,Backend optimization`;
-    const parsedExport = parseLinkedInDataExport("Positions.csv", sampleCsv);
-    const posList = parsedExport.positions || [];
-    assert(posList.length === 2, "LinkedIn CSV Export Parsing", "P3_LINKEDIN", `Extracted ${posList.length} positions`);
-    assert(posList[0]?.companyName === "DeepMind", "LinkedIn Position Metadata Extraction", "P3_LINKEDIN");
+    // Public-profile normalization of provider output
+    const normalizedLi = normalizeLinkedInProfile({ experiences: [
+      { title: "AI Engineer", company: "DeepMind", startDate: "Jan 2024", endDate: "Present", description: "Building autonomous reasoning systems" },
+      { title: "Software Intern", company: "Google", startDate: "May 2023", endDate: "Aug 2023", description: "Backend optimization" },
+    ] }, validLi.normalizedUrl);
+    const posList = normalizedLi.records.filter((r) => r.kind === "experience");
+    assert(posList.length === 2, "LinkedIn Profile Normalization", "P3_LINKEDIN", `Extracted ${posList.length} positions`);
+    assert(posList[0]?.data.company === "DeepMind", "LinkedIn Position Metadata Extraction", "P3_LINKEDIN");
 
     // ------------------------------------------------------------------------
     // P4: LEETCODE

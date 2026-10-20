@@ -1,0 +1,72 @@
+{
+  "id": "aarav-fresher",
+  "description": "Indian fresher, single column, CGPA and percentages, no work experience, projects with repository links",
+  "tags": ["fresher", "indian-academic", "no-experience", "projects", "certifications"],
+  "variants": ["pdf-single", "docx-plain", "scan-good"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Aarav Mehta",
+    "headline": "Final-year B.Tech student, Computer Engineering",
+    "email": "aarav.mehta.dev@example.com",
+    "phone": "+91 98765 43210",
+    "location": "Pune, Maharashtra, India",
+    "links": [
+      { "label": "GitHub", "url": "https://github.com/aaravmehta-dev", "display": "github.com/aaravmehta-dev" },
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/aarav-mehta-21", "display": "linkedin.com/in/aarav-mehta-21" }
+    ]
+  },
+  "summary": "Computer engineering student who builds full-stack and computer-vision projects. Looking for a software engineering role starting July 2025.",
+  "sections": [
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Vishwakarma Institute of Technology", "degree": "B.Tech", "field": "Computer Engineering", "level": "undergraduate", "start": "2021-08", "end": "2025-06", "current": true, "grade": { "value": "8.62/10", "kind": "cgpa", "text": "CGPA: 8.62/10" }, "location": "Pune" },
+        { "institution": "Delhi Public School, Pune", "degree": "Class XII (CBSE)", "level": "high_school", "end": "2021", "grade": { "value": "91.4%", "kind": "percentage", "text": "91.4%" } },
+        { "institution": "Delhi Public School, Pune", "degree": "Class X (CBSE)", "level": "high_school", "end": "2019", "grade": { "value": "94.2%", "kind": "percentage", "text": "94.2%" } }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Projects",
+      "items": [
+        { "name": "CampusCart", "technologies": ["React", "Node.js", "MongoDB"], "url": "https://github.com/aaravmehta-dev/campuscart", "bullets": ["Built a marketplace for students to buy and sell used textbooks within the campus.", "Implemented chat and listing search used by 400+ students in the first semester."] },
+        { "name": "LeafLens", "technologies": ["Python", "TensorFlow", "OpenCV"], "url": "https://github.com/aaravmehta-dev/leaflens", "bullets": ["Trained a convolutional network that classifies 12 tomato leaf diseases.", "Achieved 94% validation accuracy on a 9,000-image dataset."] },
+        { "name": "Expense Splitter CLI", "technologies": ["Go"], "bullets": ["Command-line tool that settles shared expenses with the minimum number of transfers."] }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Technical Skills",
+      "groups": [
+        { "label": "Languages", "items": ["Python", "Java", "C++", "JavaScript", "Go"] },
+        { "label": "Web", "items": ["React", "Node.js", "Express", "HTML", "CSS"] },
+        { "label": "Data and ML", "items": ["TensorFlow", "Pandas", "NumPy", "OpenCV"] },
+        { "label": "Tools", "items": ["Git", "Docker", "Postman", "Linux"] }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "AWS Certified Cloud Practitioner", "issuer": "Amazon Web Services", "date": "2024-03" },
+        { "name": "Deep Learning Specialization", "issuer": "DeepLearning.AI", "date": "2023-11" },
+        { "name": "Data Structures and Algorithms", "issuer": "NPTEL", "date": "2023-04" }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Achievements",
+      "items": [
+        { "title": "Finalist, Smart India Hackathon 2023", "category": "hackathon", "date": "2023" },
+        { "title": "Dean's List for academic excellence", "category": "award", "date": "2023" }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "English" }, { "language": "Hindi" }, { "language": "Marathi" }]
+    }
+  ]
+}

@@ -14,18 +14,13 @@ import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { resumeIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { validateDocumentSafety } from "@/lib/resume/document-safety";
 import { queueResumeUpload, processResumeJob } from "@/lib/services/resume-ingestion-service";
-import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
+import { RESUME_ACCEPTED_EXTENSIONS, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB, RESUME_MIME_BY_EXTENSION, type ResumeExtension } from "@/lib/config/upload-limits";
 import { jsonNoStore } from "@/lib/api/resume-route-helpers";
 import { contentIdempotencyKey, requestIdempotencyKey, withIdempotency } from "@/lib/sync/idempotency";
 import { ConsentService } from "@/lib/services/consent-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
-
-const MIME_BY_EXTENSION = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-} as const;
 
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
@@ -61,14 +56,16 @@ export async function POST(request: Request) {
       // Missing or unselected optional consent strictly equals false
       aiConsent = form.get("aiConsent") === "true";
       const candidate = form.get("resume");
-      if (!(candidate instanceof File)) return fail("MISSING_FILE", "Choose a PDF or DOCX file first.", 400);
+      if (!(candidate instanceof File)) return fail("MISSING_FILE", "Choose a PDF, DOCX, PNG or JPEG file first.", 400);
       file = candidate;
     } catch {
       return fail("FORM_RECEIVE_FAILED", "The file could not be received. Please try again.", 400);
     }
 
-    const extension = file.name.toLowerCase().split(".").pop();
-    if (extension !== "pdf" && extension !== "docx") return fail("UNSUPPORTED_MEDIA_TYPE", "Use a PDF or DOCX file.", 415);
+    const extension = file.name.toLowerCase().split(".").pop() as ResumeExtension;
+    if (!RESUME_ACCEPTED_EXTENSIONS.includes(extension)) {
+      return fail("UNSUPPORTED_MEDIA_TYPE", extension === ("doc" as string) ? "Older .doc files can't be read. Save it as .docx or PDF and upload that." : "Use a PDF, DOCX, PNG or JPEG file.", 415);
+    }
     if (file.size === 0) return fail("EMPTY_FILE", "This file is empty. Please choose another.", 400);
     if (file.size > RESUME_MAX_UPLOAD_BYTES) {
       return fail("FILE_TOO_LARGE", `Choose a file under ${RESUME_MAX_UPLOAD_MB} MB, or enter details manually.`, 413);
@@ -77,13 +74,15 @@ export async function POST(request: Request) {
     const bytes = Buffer.from(await file.arrayBuffer());
     const isPdf = bytes.subarray(0, 5).toString() === "%PDF-";
     const isDocx = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes.includes(Buffer.from("[Content_Types].xml"));
+    const isImage = extension === "png" || extension === "jpg" || extension === "jpeg";
     if ((extension === "pdf" && !isPdf) || (extension === "docx" && !isDocx)) {
       return fail("INVALID_FILE_CONTENT", "The file content does not match its extension. Please choose another file.", 415);
     }
     const safety = validateDocumentSafety(bytes, extension);
     if (safety.isEncrypted) return fail("ENCRYPTED_DOCUMENT", "Remove the document password, then upload the unencrypted file.", 422);
+    if (safety.isTooLarge) return fail("DOCUMENT_TOO_LARGE", safety.error || "This document exceeds the processing limits.", 413);
     if (!safety.isValid) {
-      return fail("INVALID_DOCUMENT", "This document is damaged or uses an unsupported structure. Export it again as PDF or DOCX.", 422);
+      return fail(isImage ? "INVALID_IMAGE" : "INVALID_DOCUMENT", isImage ? "This image could not be read. Upload a clear PNG or JPEG of your CV, or a PDF." : "This document is damaged or uses an unsupported structure. Export it again as PDF or DOCX.", 422);
     }
 
     let queued;
@@ -93,7 +92,7 @@ export async function POST(request: Request) {
       const clientKey = request.headers.get("idempotency-key")?.trim().slice(0, 120);
       const key = clientKey ? requestIdempotencyKey(personId, "resume_upload", clientKey) : contentIdempotencyKey(personId, "resume_upload", bytes);
       const { response, replayed } = await withIdempotency({ key, personId, scope: "resume_upload" }, async () => {
-        const q = await queueResumeUpload({ personId, filename: file.name, mimeType: MIME_BY_EXTENSION[extension], bytes, aiConsent });
+        const q = await queueResumeUpload({ personId, filename: file.name, mimeType: RESUME_MIME_BY_EXTENSION[extension], bytes, aiConsent });
         return { jobId: q.jobId, documentId: q.documentId };
       });
       queued = response;
@@ -106,7 +105,7 @@ export async function POST(request: Request) {
         scope: file.name,
         status: "granted",
         sourceUI: "onboarding_cv_step",
-        metadata: { filename: file.name, size: file.size, mimeType: MIME_BY_EXTENSION[extension] },
+        metadata: { filename: file.name, size: file.size, mimeType: RESUME_MIME_BY_EXTENSION[extension] },
       }).catch((e) => console.warn("[resume-extract] consent record warning", e));
 
       if (aiConsent) {

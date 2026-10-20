@@ -51,8 +51,8 @@ interface Segment {
 
 // Bullets, dingbats, arrows and box glyphs used as list markers.
 const BULLET_RE = /^[\s•●○◦▪▫■□◆◇►▶▸▹➢➤✓✔✗☐☑\-–—*·‣⁃∙]+\s*/u;
-// How Tesseract tends to read bullet glyphs: "o", "°", "©", "+", "»" before the item text.
-const OCR_BULLET_RE = /^(?:[o°©+»®]|e)\s+(?=[A-Z(:])/u;
+// How Tesseract tends to read bullet glyphs: "o", "°", "©", "+", "»", "«" before the item text.
+const OCR_BULLET_RE = /^(?:[o°©+»«®¢]|e)\s+(?=[A-Z(:])/u;
 // Icon fonts (Font Awesome etc.) map to the Private Use Area; they carry no text.
 const ICON_RE = /[-�​-‍﻿]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[☀-➿]/gu;
 
@@ -63,7 +63,8 @@ function median(values: number[]): number {
 }
 
 function clean(text: string): string {
-  return text.replace(ICON_RE, " ").replace(/\s+/g, " ").trim();
+  // NFKC folds ligatures (ﬁ → fi), full-width forms and non-breaking spaces.
+  return text.normalize("NFKC").replace(ICON_RE, " ").replace(/[­​-‍﻿]/g, "").replace(/\s+/g, " ").trim();
 }
 
 /** Groups spans into visual lines, then splits each line at wide horizontal gaps. */
@@ -221,7 +222,8 @@ function orderRegion(segs: Segment[], x0: number, x1: number, depth: number): Ro
 
 function isHeading(row: Row, bodyHeight: number): boolean {
   const text = row.segs.map((s) => s.text).join(" ").trim();
-  if (text.length < 3 || text.length > 40 || /[.,;@]$/.test(text) || /\d{3,}/.test(text)) return false;
+  // Codes and wrapped fragments ("ID LF-8XK2Q1W9ZA)") are not headings.
+  if (text.length < 3 || text.length > 40 || /[.,;@)\]]$/.test(text) || /\d/.test(text)) return false;
   const letters = text.replace(/[^A-Za-z]/g, "");
   const allCaps = letters.length >= 3 && letters === letters.toUpperCase();
   // Short all-caps rows at body size are skills/acronyms (SQL, AWS, HTML), not
@@ -259,22 +261,80 @@ function attachLinks(spans: LayoutSpan[], links: LayoutLink[]): Set<string> {
   return used;
 }
 
-/** Reconstructs reading-order text for a whole document. */
-export function reconstructReadingOrder(pages: LayoutPage[], extraLinks: string[] = []): string {
-  const out: string[] = [];
-  const attached = new Set<string>();
+/** Per output line: where it came from, so the extractor can cite page and use layout cues. */
+export interface LayoutLineMeta {
+  page: number;
+  /** Set by layout (larger or all-caps short row) or by DOCX heading styles. */
+  heading: boolean;
+  /** Median glyph height of the row, in page units; 0 for blank or synthetic lines. */
+  height: number;
+  /** Left edge of the row as a fraction of page width. */
+  x: number;
+}
 
-  for (const page of pages) {
+export interface ReadingOrder {
+  text: string;
+  /** One entry per line of `text` (text.split("\n")). */
+  lines: LayoutLineMeta[];
+  /** Running headers/footers and page numbers that were left out. */
+  removed: string[];
+}
+
+const PAGE_NUMBER = /^(?:page\s*)?#(?:\s*(?:of|\/)\s*#)?$|^[-–—]\s*#\s*[-–—]$|^#\s*\/\s*#$/i;
+const bandKey = (text: string) => text.toLowerCase().replace(/\d+/g, "#").replace(/[^\p{L}#/]+/gu, " ").trim();
+
+/**
+ * Text that repeats at the top or bottom of several pages (name banners,
+ * "Page 2 of 3", "Curriculum Vitae") is page furniture, not CV content.
+ * Page-number rows are dropped even on a single page.
+ */
+function runningRows(pageRows: Array<{ height: number; rows: Row[] }>): Set<Row> {
+  const drop = new Set<Row>();
+  const bands = pageRows.map(({ height, rows }) => {
+    const h = height || Math.max(1, ...rows.map((r) => r.y1));
+    const band = rows.filter((r) => r.y1 <= h * 0.075 || r.y0 >= h * 0.925);
+    return band.map((r) => ({ row: r, key: bandKey(r.segs.map((s) => s.text).join(" ")) }));
+  });
+  const pagesWithKey = new Map<string, number>();
+  for (const band of bands) for (const k of new Set(band.map((b) => b.key))) pagesWithKey.set(k, (pagesWithKey.get(k) || 0) + 1);
+  for (const band of bands) {
+    for (const { row, key } of band) {
+      if (!key) continue;
+      if (PAGE_NUMBER.test(key) || (pageRows.length > 1 && (pagesWithKey.get(key) || 0) >= 2)) drop.add(row);
+    }
+  }
+  return drop;
+}
+
+/** Reconstructs reading-order text for a whole document, with per-line layout metadata. */
+export function reconstructReadingOrderDetailed(pages: LayoutPage[], extraLinks: string[] = []): ReadingOrder {
+  const out: string[] = [];
+  const meta: LayoutLineMeta[] = [];
+  const removed: string[] = [];
+  const attached = new Set<string>();
+  const blank = (page: number) => {
+    if (out.length && out[out.length - 1] !== "") { out.push(""); meta.push({ page, heading: false, height: 0, x: 0 }); }
+  };
+
+  const prepared = pages.map((page) => {
     const spans = page.spans.map((sp) => ({ ...sp }));
     for (const url of attachLinks(spans, page.links || [])) attached.add(url);
     const segs = buildSegments(spans);
-    if (segs.length === 0) continue;
+    const width = page.width || (segs.length ? Math.max(...segs.map((s) => s.x1)) : 1);
+    return { page, width, rows: segs.length ? orderRegion(segs, 0, width, 0) : [] };
+  });
+  const running = runningRows(prepared.map((p) => ({ height: p.page.height, rows: p.rows })));
 
-    const rows = orderRegion(segs, 0, page.width || Math.max(...segs.map((s) => s.x1)), 0);
+  for (const { page, width, rows } of prepared) {
+    if (rows.length === 0) continue;
     const bodyHeight = median(rows.map((r) => r.height));
     let prev: Row | null = null;
     for (const row of rows) {
       let text = row.segs.map((s) => s.text).join(" | ");
+      if (running.has(row)) {
+        removed.push(text);
+        continue;
+      }
       // Rows of lone punctuation are misread bullet dots or rules.
       if (/^[\W_]{1,3}$/u.test(text.trim())) {
         prev = row; // keep spacing measured from here so the skipped row is not read as a paragraph break
@@ -288,17 +348,32 @@ export function reconstructReadingOrder(pages: LayoutPage[], extraLinks: string[
       if (!text || text === "-") continue;
 
       const gap = prev ? row.y0 - prev.y1 : 0;
-      if (isHeading(row, bodyHeight)) out.push("", text.replace(/^- /, ""));
-      else {
-        if (prev && (gap > bodyHeight * 1.2 || gap < -bodyHeight)) out.push("");
+      const heading = isHeading(row, bodyHeight);
+      const info = { page: page.page, heading, height: row.height, x: Math.max(0, Math.min(1, row.segs[0].x0 / width)) };
+      if (heading) {
+        blank(page.page);
+        out.push(text.replace(/^- /, ""));
+      } else {
+        if (prev && (gap > bodyHeight * 1.2 || gap < -bodyHeight)) blank(page.page);
         out.push(text);
       }
+      meta.push(info);
       prev = row;
     }
-    out.push("");
+    blank(page.page);
   }
 
   const leftover = [...new Set(extraLinks)].filter((u) => !attached.has(u));
-  if (leftover.length) out.push("LINKS", ...leftover.map((u) => `- ${u}`));
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (leftover.length) {
+    const p = pages.length ? pages[pages.length - 1].page : 1;
+    out.push("LINKS", ...leftover.map((u) => `- ${u}`));
+    meta.push({ page: p, heading: true, height: 0, x: 0 }, ...leftover.map(() => ({ page: p, heading: false, height: 0, x: 0 })));
+  }
+  while (out.length && out[out.length - 1] === "") { out.pop(); meta.pop(); }
+  return { text: out.join("\n"), lines: meta, removed };
+}
+
+/** Reconstructs reading-order text for a whole document. */
+export function reconstructReadingOrder(pages: LayoutPage[], extraLinks: string[] = []): string {
+  return reconstructReadingOrderDetailed(pages, extraLinks).text;
 }

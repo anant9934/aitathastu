@@ -453,7 +453,7 @@ function checkHandleConfidence(username: string): { validationResult: "valid" | 
   // ─────────────────────────────────────────────────────────────────────────────
   // 6. Visible Portfolio / Personal Website Domains
   // ─────────────────────────────────────────────────────────────────────────────
-  const portfolioRegex = /\b(?:https?:\/\/)?([a-zA-Z0-9_\-]+\.(?:dev|me|io|ai|tech|org|com|in|co|app|site|online|xyz|space|link|live|info|page|bio))(?:\/[^\s<>"']*)?/gi;
+  const portfolioRegex = /\b(?:https?:\/\/)?((?:[a-zA-Z0-9_\-]+\.)+(?:dev|me|io|ai|tech|org|com|in|co|app|site|online|xyz|space|link|live|info|page|bio))(?:\/[^\s<>"']*)?/gi;
   for (const line of lines) {
     // Search lines mentioning "portfolio", "website", "blog", "projects", "web:", or personal links
     if (/\b(portfolio|website|site|homepage|webpage|blog|domain|web)\b/i.test(line) || /alexrivers\.dev/i.test(line)) {
@@ -490,6 +490,8 @@ export function normalizeProviderUrl(
   rawUrl?: string
 ): string {
   const clean = candidateUser.replace(/^@/, "").trim();
+  // Text-discovered URLs often lack a scheme ("scholar.google.com/citations?user=x").
+  const withScheme = (u: string) => (/^https?:\/\//i.test(u) ? u : `https://${u.replace(/^\/+/, "")}`);
   switch (provider) {
     case "github":
       return `https://github.com/${clean}`;
@@ -504,9 +506,9 @@ export function normalizeProviderUrl(
     case "orcid":
       return `https://orcid.org/${clean}`;
     case "google_scholar":
-      return rawUrl || `https://scholar.google.com/citations?user=${clean}`;
+      return rawUrl ? withScheme(rawUrl) : `https://scholar.google.com/citations?user=${clean}`;
     case "stackoverflow":
-      return rawUrl || `https://stackoverflow.com/users/${clean}`;
+      return rawUrl ? withScheme(rawUrl) : `https://stackoverflow.com/users/${clean}`;
     case "devto":
       return `https://dev.to/${clean}`;
     case "hackerrank":
@@ -519,6 +521,6 @@ export function normalizeProviderUrl(
       if (rawUrl && /^https?:\/\//i.test(rawUrl)) return rawUrl.replace(/\/$/, "");
       return `https://${clean}`;
     default:
-      return rawUrl || `https://${clean}`;
+      return rawUrl ? withScheme(rawUrl) : `https://${clean}`;
   }
 }

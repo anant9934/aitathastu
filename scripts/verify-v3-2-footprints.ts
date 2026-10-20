@@ -11,7 +11,7 @@
  * B. One real DOCX resume
  * C. One real GitHub account and authorized repository
  * D. One permitted portfolio website (SSRF tested)
- * E. One LinkedIn export archive (Positions, Education, Skills)
+ * E. One public LinkedIn profile (normalized provider output: Positions, Education, Skills)
  * F. One coding-profile integration (LeetCode GraphQL + HackerRank badges)
  * G. Two overlapping projects across sources (Relationship match -> Canonical project)
  * H. One student correcting a wrong extraction
@@ -59,7 +59,8 @@ import {
 
 // Connectors & Services
 import { isSafePublicUrl } from "../lib/connectors/portfolio/client";
-import { validateLinkedInUrl, parseLinkedInDataExport } from "../lib/connectors/linkedin/client";
+import { validateLinkedInUrl } from "../lib/connectors/linkedin/client";
+import { normalizeLinkedInProfile } from "../lib/linkedin/normalize";
 import { normalizeLeetCodeUsername } from "../lib/connectors/leetcode/client";
 
 import { CrossSourceFusionService } from "../lib/services/cross-source-fusion-service";
@@ -390,7 +391,7 @@ async function runV32Certification() {
   // -------------------------------------------------------------
   // Gate E: LinkedIn Extraction (Archive Parsing + Profile Reference)
   // -------------------------------------------------------------
-  console.log("\n[Gate E] Testing LinkedIn Export Parser & Strict Profile Linker...");
+  console.log("\n[Gate E] Testing LinkedIn Profile Normalizer & Strict Profile Linker...");
   // 1. Strict URL validator
   const validLinkedIn = validateLinkedInUrl("https://www.linkedin.com/in/ananya-sharma-ai");
   const invalidLinkedIn = validateLinkedInUrl("https://malicious-site.com/fake/linkedin");
@@ -398,16 +399,21 @@ async function runV32Certification() {
     throw new Error("LinkedIn URL validator failed security check.");
   }
 
-  // 2. Student-authorized CSV archive parser
-  const samplePositionsCsv = `Company Name,Title,Location,Started On,Finished On,Description
-DeepAI Labs,Machine Learning Intern,Bengaluru,Jan 2024,Jun 2024,Researched model quantization and inference acceleration.
-TechCorp,Software Engineering Intern,Noida,May 2023,Jul 2023,Built backend REST services with FastAPI.`;
-
-  const parsedPositions = parseLinkedInDataExport("Positions.csv", samplePositionsCsv);
-  if (!parsedPositions.positions || parsedPositions.positions.length !== 2) {
-    throw new Error("LinkedIn CSV export parsing failed.");
+  // 2. Public-profile normalization (provider output shape of the configured Apify actor)
+  const normalizedProfile = normalizeLinkedInProfile({
+    publicIdentifier: "ananya-sharma-ai",
+    experiences: [
+      { title: "Machine Learning Intern", company: "DeepAI Labs", location: "Bengaluru", startDate: "Jan 2024", endDate: "Jun 2024", description: "Researched model quantization and inference acceleration." },
+      { title: "Software Engineering Intern", company: "TechCorp", location: "Noida", startDate: "May 2023", endDate: "Jul 2023", description: "Built backend REST services with FastAPI." },
+    ],
+  }, validLinkedIn.normalizedUrl);
+  const parsedPositions = { positions: normalizedProfile.records.filter((r) => r.kind === "experience").map((r) => ({
+    title: String(r.data.title), companyName: String(r.data.company), description: String(r.data.description ?? ""), sourceLocation: validLinkedIn.normalizedUrl,
+  })) };
+  if (parsedPositions.positions.length !== 2) {
+    throw new Error("LinkedIn profile normalization failed.");
   }
-  console.log(`  ✓ LinkedIn export parsed successfully: ${parsedPositions.positions.length} work positions.`);
+  console.log(`  ✓ LinkedIn profile normalized successfully: ${parsedPositions.positions.length} work positions.`);
 
   // Ingest positions as candidate claims
   for (const pos of parsedPositions.positions) {
@@ -418,7 +424,7 @@ TechCorp,Software Engineering Intern,Noida,May 2023,Jul 2023,Built backend REST 
       source: "self_reported",
       verificationStatus: "unverified",
       sourceReference: pos.sourceLocation,
-      interpretation: "Candidate claim from student's LinkedIn export archive.",
+      interpretation: "Candidate claim from student's public LinkedIn profile.",
       whyItMatters: "Relevant industry experience, requires student confirmation.",
     });
   }
@@ -435,8 +441,8 @@ TechCorp,Software Engineering Intern,Noida,May 2023,Jul 2023,Built backend REST 
   matrix.push({
     source: "LinkedIn",
     adapterImplemented: true,
-    acquisitionMethod: "Authorized Export Archive (CSV/JSON) + Profile Link",
-    permittedFields: "Positions, Education, Skills, Projects (via export); URL reference",
+    acquisitionMethod: "Public-profile extraction (Apify) + Profile Link",
+    permittedFields: "Public profile sections (experience, education, skills, ...); URL reference",
     providerCredentialsNeeded: "None (Student export); Enterprise partner for live scopes",
     consentRequired: true,
     liveTested: true,

@@ -272,7 +272,9 @@ describe("1.1.3 grounding: fabricated LLM output is rejected", () => {
     const x = res.extracted!;
     assert.deepEqual(x.skills.map((s) => s.name), ["Python", "PyTorch", "SQL", "C++"], "Kubernetes/Rust/C are not in the CV");
     assert.deepEqual(x.education.map((e) => e.institution), ["Anna University"], "Stanford is fabricated; OCR spacing/comma tolerated");
-    assert.equal(x.education[0].degree, "Computer Science", "the fabricated M.Tech degree is dropped, the grounded field kept");
+    // The field is no longer copied into an empty degree (cv-extract/3.0: no stand-in values).
+    assert.equal(x.education[0].degree, "", "the fabricated M.Tech degree is dropped");
+    assert.equal(x.education[0].fieldOfStudy, "Computer Science", "the grounded field is kept");
     assert.deepEqual(x.experience.map((e) => e.company), ["Orbit Robotics"], "same real role cannot carry an invented company");
     assert.deepEqual(x.projects.map((p) => p.title), ["Pathfinder"]);
     assert.deepEqual(x.projects[0].technologies, ["Python", "OpenCV"], "TensorFlow is invented");

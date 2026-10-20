@@ -32,8 +32,6 @@ import { fetchGitHubIntelligence } from "@/lib/connectors/github/client";
 import { fetchPortfolioMetadata, isSafePublicUrl } from "@/lib/connectors/portfolio/client";
 import {
   validateLinkedInUrl,
-  parseLinkedInDataExport,
-  parseLinkedInZipArchive,
 } from "@/lib/connectors/linkedin/client";
 import { fetchLeetCodeProfileStats, normalizeLeetCodeUsername } from "@/lib/connectors/leetcode/client";
 import {
@@ -62,7 +60,7 @@ export interface ProfileValidationResult {
 export interface ConsentDisclosure {
   provider: string;
   displayName: string;
-  actionLabel: "Connect & Import" | "Authorize & Import" | "Import Your Data" | "Add Profile Reference";
+  actionLabel: "Connect & Import" | "Authorize & Import" | "Import Your Data" | "Add Profile Reference" | "Extract LinkedIn Profile";
   dataCollected: string[];
   strictGuarantees: string[];
   privacyNotice: string;
@@ -499,19 +497,19 @@ export class DigitalSourceImportOrchestrator {
         return {
           provider: "linkedin",
           displayName: "LinkedIn",
-          actionLabel: "Import Your Data",
+          actionLabel: "Extract LinkedIn Profile",
           dataCollected: [
-            "Work positions and employment history (from Positions.csv)",
-            "Academic qualifications and school history (from Education.csv)",
-            "Reported skills and certifications (from Skills.csv / Certifications.csv)",
+            "Headline, about, location and work history from your public profile",
+            "Education, skills, languages, certifications and courses",
+            "Projects, publications, volunteering, honors and the websites you list",
           ],
           strictGuarantees: [
-            "LinkedIn Terms of Service prohibit third-party automated scraping.",
-            "Requires student-authorized export archive (.zip or .csv) to ensure 100% legal compliance.",
-            "Imported records tagged with exact file line numbers for student review.",
+            "Only what your profile shows publicly; no LinkedIn sign-in, password or cookies are used.",
+            "Extracted roles and education stay candidates until you confirm them.",
+            "Other people's profiles shown beside yours are never collected.",
           ],
-          privacyNotice: "Files are parsed deterministically on-demand; no raw export files are retained permanently.",
-          requiresFile: true,
+          privacyNotice: "Your public profile is read through our extraction provider (Apify) when you ask; you can refresh or remove it at any time.",
+          requiresFile: false,
           requiresOAuth: false,
         };
 
@@ -992,115 +990,33 @@ export class DigitalSourceImportOrchestrator {
         }
 
         // ====================================================================
-        // LINKEDIN — Authorized User Export Archive (Positions, Education, Skills)
+        // LINKEDIN — profile link only. Profile data comes from the public-profile
+        // extraction (lib/services/linkedin-extraction-service.ts); data-export
+        // archives are no longer accepted.
         // ====================================================================
         case "linkedin": {
-          if (exportContent && exportFilename) {
-            // Student-authorized data export file
-            await SourceProcessingJobService.updateStage(jobId, personId, "extract");
-            let parsed: ReturnType<typeof parseLinkedInZipArchive>;
-            if (exportFilename.toLowerCase().endsWith(".zip")) {
-              const zipBuf = Buffer.from(exportContent, "base64");
-              parsed = parseLinkedInZipArchive(zipBuf);
-            } else {
-              parsed = parseLinkedInDataExport(exportFilename, exportContent);
-            }
-
-            acquisitionMode = "AUTHORIZED_USER_EXPORT";
-            externalUsername = exportFilename;
-            profileUrl = `export://${exportFilename}`;
-
-            await saveExternalConnection({
-              personId,
-              provider: "linkedin",
-              externalUsername: exportFilename,
-              profileUrl: `export://${exportFilename}`,
-              displayName: "LinkedIn Authorized Export",
-              status: "connected",
-              metadata: {
-                positionsCount: parsed.positions?.length || 0,
-                educationCount: parsed.education?.length || 0,
-                skillsCount: parsed.skills?.length || 0,
-                projectsCount: parsed.projects?.length || 0,
-                lastSyncedAt: new Date().toISOString(),
-              },
-            });
-
-            for (const pos of parsed.positions || []) {
-              candidates.experiences?.push({
-                title: pos.title,
-                company: pos.companyName,
-                duration: `${pos.startedOn || ""} - ${pos.finishedOn || "Present"}`,
-                sourceReference: pos.sourceLocation,
-              });
-            }
-
-            for (const edu of parsed.education || []) {
-              candidates.educations?.push({
-                school: edu.schoolName,
-                degree: edu.degreeName,
-                sourceReference: edu.sourceLocation,
-              });
-            }
-
-            for (const sk of (parsed.skills || []).slice(0, 20)) {
-              candidates.skills.push({
-                name: sk.name,
-                sourceReference: sk.sourceLocation,
-              });
-            }
-
-            for (const project of parsed.projects || []) {
-              candidates.projects.push({
-                title: project.title,
-                description: project.description,
-                technologies: [],
-                url: project.url,
-                source: "linkedin_export",
-              });
-            }
-
-            for (const certification of parsed.certifications || []) {
-              candidates.achievements?.push({
-                title: certification.name,
-                category: "certification",
-                sourceReference: certification.sourceLocation,
-                value: certification.authority,
-              });
-            }
-
-            rawSnapshotPayload = {
-              filename: exportFilename,
-              positionsCount: parsed.positions?.length || 0,
-              educationCount: parsed.education?.length || 0,
-              skillsCount: parsed.skills?.length || 0,
-              projectsCount: parsed.projects?.length || 0,
-              certificationsCount: parsed.certifications?.length || 0,
-            };
-            summary = `Parsed LinkedIn export (${exportFilename}) into review candidates: ${parsed.positions?.length || 0} roles, ${parsed.education?.length || 0} schools, ${parsed.skills?.length || 0} skills, ${parsed.projects?.length || 0} projects, and ${parsed.certifications?.length || 0} certifications.`;
-          } else {
-            // Profile reference only (scraping prohibited)
-            const val = this.validateProfile("linkedin", identifier);
-            if (!val.valid) throw new Error(val.error || "Invalid LinkedIn link.");
-            externalUsername = val.normalizedIdentifier;
-            profileUrl = val.normalizedUrl;
-            acquisitionMode = "MANUAL_PROFILE_REFERENCE";
-
-            await saveExternalConnection({
-              personId,
-              provider: "linkedin",
-              externalUsername: val.normalizedIdentifier,
-              profileUrl: val.normalizedUrl,
-              displayName: val.normalizedIdentifier,
-              status: "reference_only",
-              metadata: {
-                lastSyncedAt: new Date().toISOString(),
-                notice: "Automated profile scraping prohibited by LinkedIn ToS; export archive supported.",
-              },
-            });
-
-            summary = `Saved LinkedIn profile reference (${val.normalizedUrl}). To import career history, upload your LinkedIn ZIP/CSV archive.`;
+          if (exportContent || exportFilename) {
+            throw new Error("LinkedIn data exports are no longer accepted. Add your LinkedIn profile URL and use Extract LinkedIn Profile instead.");
           }
+          const val = this.validateProfile("linkedin", identifier);
+          if (!val.valid) throw new Error(val.error || "Invalid LinkedIn link.");
+          externalUsername = val.normalizedIdentifier;
+          profileUrl = val.normalizedUrl;
+          acquisitionMode = "MANUAL_PROFILE_REFERENCE";
+
+          const existingLinkedIn = await getExternalConnectionByProvider(personId, "linkedin").catch(() => null);
+          await saveExternalConnection({
+            personId,
+            provider: "linkedin",
+            externalUsername: val.normalizedIdentifier,
+            profileUrl: val.normalizedUrl,
+            displayName: val.normalizedIdentifier,
+            // Linking again must not hide a profile already extracted.
+            status: existingLinkedIn?.status === "connected" ? "connected" : "reference_only",
+            metadata: { linkedAt: new Date().toISOString() },
+          });
+
+          summary = `Saved LinkedIn profile reference (${val.normalizedUrl}). Use Extract LinkedIn Profile to import your public work history, education and skills.`;
           break;
         }
 

@@ -19,7 +19,7 @@ export const ResumeExtractionSchema = z.object({
   email: nstr,
   phone: nstr,
   location: nstr,
-  links: z.array(z.object({ type: z.enum(LINK_TYPES), url: z.string() })),
+  links: z.array(z.object({ type: z.enum(LINK_TYPES), url: z.string() }).strict()),
   education: z.array(z.object({
     institution: z.string(),
     degree: nstr,
@@ -28,7 +28,7 @@ export const ResumeExtractionSchema = z.object({
     start_date: nstr,
     end_date: nstr,
     grade: nstr,
-  })),
+  }).strict()),
   experience: z.array(z.object({
     company: z.string(),
     role: z.string(),
@@ -37,7 +37,7 @@ export const ResumeExtractionSchema = z.object({
     start_date: nstr,
     end_date: nstr,
     description: z.array(z.string()),
-  })),
+  }).strict()),
   projects: z.array(z.object({
     name: z.string(),
     description: z.string(),
@@ -46,11 +46,12 @@ export const ResumeExtractionSchema = z.object({
     /** Source repository URL. */
     repository: nstr,
     tech_stack: z.array(z.string()),
-  })),
+  }).strict()),
   skills: z.array(z.string()),
-  certifications: z.array(z.object({ name: z.string(), issuer: nstr, date: nstr })),
+  certifications: z.array(z.object({ name: z.string(), issuer: nstr, date: nstr }).strict()),
   achievements: z.array(z.string()),
-});
+  // Unexpected keys are a schema violation (the router asks the model to repair), not silently dropped.
+}).strict();
 
 export type ResumeExtraction = z.infer<typeof ResumeExtractionSchema>;
 

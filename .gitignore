@@ -83,3 +83,6 @@ audit-output/*
 # test resumes & test run results containing personal candidate data
 resume for test/
 scripts/four_resumes_acceptance_results.json
+
+# CV evaluation OCR cache (regenerated from fixtures)
+eval/cv/.cache/

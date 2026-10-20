@@ -27,6 +27,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import { FIELD_LABELS, REVIEW_GROUPS, type ResumeIngestion } from "@/lib/client/onboarding/use-resume-ingestion";
+import { ReviewFlags } from "@/components/onboarding/ReviewFlags";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Field";
 import { Banner } from "@/components/ui/Banner";
@@ -194,7 +195,7 @@ export function CvStep({
               <input
                 ref={fileInput}
                 type="file"
-                accept=".pdf,.docx"
+                accept=".pdf,.docx,.png,.jpg,.jpeg"
                 className="sr-only"
                 tabIndex={-1}
                 aria-hidden="true"
@@ -227,7 +228,7 @@ export function CvStep({
                   {cv.fileName ?? "Drag and drop your CV here"}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
-                  Supports PDF or DOCX formats, up to {RESUME_MAX_UPLOAD_MB} MB
+                  Supports PDF, DOCX, PNG or JPEG, up to {RESUME_MAX_UPLOAD_MB} MB
                 </p>
               </div>
 
@@ -290,7 +291,7 @@ export function CvStep({
               <li className="flex items-start gap-2">
                 <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" />
                 <span className="font-medium text-text-primary">
-                  100% Privacy Protected: Mobile and phone numbers are never extracted from your CV.
+                  Your phone number is only shown as an unticked suggestion: it is saved only if you tick it, and it is never sent to AI providers.
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -700,6 +701,8 @@ export function CvStep({
                                     {c.value}
                                   </p>
                                 )}
+
+                                <ReviewFlags data={data} previousDecision={(c as { previousDecision?: string }).previousDecision} />
 
                                 {/* Structured Metadata badges if present */}
                                 {(data.institution || data.degree || data.role || data.company || data.issuer || data.year || data.duration || data.status) && (

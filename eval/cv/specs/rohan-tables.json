@@ -1,0 +1,50 @@
+{
+  "id": "rohan-tables",
+  "description": "Data analyst whose education and skills are laid out in tables, a common Word template",
+  "tags": ["table-layout", "indian-academic", "experienced", "percentage-and-cgpa"],
+  "variants": ["docx-table", "pdf-table"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Rohan Das",
+    "email": "rohan.das92@example.com",
+    "phone": "98300 45678",
+    "location": "Kolkata, West Bengal",
+    "links": []
+  },
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Work Experience",
+      "items": [
+        { "organization": "Fractal Analytics", "title": "Senior Data Analyst", "type": "employment", "start": "2019-09", "current": true, "location": "Mumbai", "bullets": ["Own demand-forecasting dashboards for a consumer-goods client across 14 markets.", "Automated weekly reporting in Python, saving 12 analyst hours per week."] },
+        { "organization": "Mu Sigma", "title": "Data Analyst", "type": "employment", "start": "2016-06", "end": "2019-08", "location": "Bengaluru", "bullets": ["Built churn models in R for a telecom client."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Academic Qualifications",
+      "table": true,
+      "items": [
+        { "institution": "Presidency University", "degree": "M.Sc.", "field": "Physics", "level": "postgraduate", "end": "2016", "grade": { "value": "7.9", "kind": "cgpa", "text": "7.9 CGPA" } },
+        { "institution": "St. Xavier's College, Kolkata", "degree": "B.Sc. (Hons)", "field": "Physics", "level": "undergraduate", "end": "2014", "grade": { "value": "68%", "kind": "percentage", "text": "68%" } },
+        { "institution": "South Point School", "degree": "Class XII", "level": "high_school", "end": "2011", "grade": { "value": "82%", "kind": "percentage", "text": "82%" } }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "table": true,
+      "groups": [
+        { "label": "Programming", "items": ["Python", "R", "SQL"] },
+        { "label": "Visualisation", "items": ["Tableau", "Power BI"] },
+        { "label": "Statistics", "items": ["Regression", "Hypothesis Testing"] }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [{ "name": "Tableau Desktop Specialist", "issuer": "Tableau", "date": "2020" }]
+    }
+  ]
+}

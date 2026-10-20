@@ -31,7 +31,7 @@ import { getDb, resumeDocuments, sourceProcessingJobs } from "@/lib/db";
 import { ObjectStorageService } from "@/lib/storage/object-storage";
 import { SourceProcessingJobService, type SourceProcessingJob, type ProcessingStage } from "./source-processing-job-service";
 import { readDocumentText } from "@/lib/resume/document-text";
-import { reconstructReadingOrder } from "@/lib/resume/layout";
+import { reconstructReadingOrderDetailed, type LayoutLineMeta } from "@/lib/resume/layout";
 import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
 import {
   extractResumeStructured,
@@ -47,6 +47,7 @@ import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError, type ExtractorProfileV2 } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
 import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers";
+import { markRunFailed, persistExtraction } from "./resume-extraction-persistence";
 
 export type ResumeFailureCode =
   | "DOCUMENT_RETRIEVAL_FAILED"
@@ -107,6 +108,10 @@ export type ResumeReviewCandidate = {
   value: string;
   sourceSpan: string;
   field?: string;
+  recordData?: Record<string, unknown>;
+  /** Decision the student made on the same item in an earlier upload of this file. */
+  previousDecision?: "confirmed" | "rejected";
+  previousValue?: string;
 };
 
 export type ResumeReviewPayload = {
@@ -161,6 +166,8 @@ async function fail(job: SourceProcessingJob, code: ResumeFailureCode, cause?: u
       .update(resumeDocuments)
       .set({ status: "failed", updatedAt: new Date() })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, job.personId)));
+    await markRunFailed(job.personId, documentId, job.id, code).catch((e) =>
+      console.warn("[resume-pipeline] could not record failed run", { jobId: job.id, error: e instanceof Error ? e.message : e }));
   }
 }
 
@@ -427,18 +434,21 @@ async function runInProcessStep(job: SourceProcessingJob) {
   } catch (err) {
     throw new PipelineFailure("DOCUMENT_RETRIEVAL_FAILED", err);
   }
-  const extension = doc.filename.toLowerCase().endsWith(".docx") ? "docx" : "pdf";
+  const name = doc.filename.toLowerCase();
+  const extension = name.endsWith(".docx") ? "docx" : /\.(?:png|jpe?g)$/.test(name) ? "image" : "pdf";
 
   // Verification switch: send text-layer PDFs through the OCR branch too.
   const forceOcr = extension === "pdf" && process.env.RESUME_FORCE_OCR === "true";
-  let parsed;
-  try {
-    parsed = await readDocumentText(doc.buffer, extension);
-  } catch (err) {
-    throw new PipelineFailure("PARSE_FAILED", err);
+  let parsed: Awaited<ReturnType<typeof readDocumentText>> = { text: "", hyperlinks: [], pageCount: 1 };
+  if (extension !== "image") {
+    try {
+      parsed = await readDocumentText(doc.buffer, extension);
+    } catch (err) {
+      throw new PipelineFailure("PARSE_FAILED", err);
+    }
   }
 
-  if (!forceOcr && parsed.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
+  if (extension !== "image" && !forceOcr && parsed.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS) {
     await finalize(job, documentId, {
       text: parsed.text,
       hyperlinks: parsed.hyperlinks,
@@ -446,6 +456,7 @@ async function runInProcessStep(job: SourceProcessingJob) {
       pageCount: parsed.pageCount || 1,
       ocrUsed: false,
       via: extension === "docx" ? "docx" : "native-pdf",
+      lines: parsed.lines,
     });
     return;
   }
@@ -547,14 +558,11 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
       let hyperlinks: string[];
       let pageCount: number;
       let renderProfile: ExtractorProfileV2 | null = null;
+      let ocrLines: LayoutLineMeta[] | undefined;
+      let pageQuality: Record<number, number> | undefined;
       try {
         const raw = await ExtractorServiceClient.getRawText(extractorDocumentId, identity);
-        hyperlinks = [...new Set((raw.pages || []).flatMap((p) => (p.links || []).map((l) => l.url)).filter((u) => /^https?:/i.test(u)))];
-        text = raw.pages?.length ? reconstructReadingOrder(raw.pages, hyperlinks) : raw.raw_text || "";
-        if (text.replace(/\s/g, "").length < MIN_TEXT_CHARS && raw.raw_text) {
-          text = raw.raw_text;
-        }
-        pageCount = raw.pages?.length || 1;
+        ({ text, hyperlinks, pageCount, lines: ocrLines, pageQuality } = textFromExtractorPayload(raw));
 
         // Retrieve Render Schema v2.0 structured profile
         try {
@@ -576,17 +584,34 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
       await finalize(claimed, documentId, {
         text,
         hyperlinks,
-        fileFormat: "pdf",
+        fileFormat: /\.(?:png|jpe?g)$/i.test(String(m.filename ?? "")) ? "image" : "pdf",
         pageCount,
         ocrUsed: true,
         via: "extractor-ocr",
         renderProfile,
+        lines: ocrLines,
+        pageQuality,
       });
       return;
     }
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
+}
+
+/** Reading-order text, links and line metadata from the extractor's /text payload (OCR word boxes). */
+export function textFromExtractorPayload(raw: { raw_text?: string; pages?: Array<{ page?: number; links?: Array<{ url: string }>; quality?: { mean_confidence?: number } } & Record<string, any>> }): { text: string; hyperlinks: string[]; pageCount: number; lines?: LayoutLineMeta[]; pageQuality?: Record<number, number> } {
+  const hyperlinks = [...new Set((raw.pages || []).flatMap((p) => (p.links || []).map((l) => l.url)).filter((u) => /^https?:/i.test(u)))];
+  const pageQuality: Record<number, number> = {};
+  for (const p of raw.pages || []) if (typeof p.quality?.mean_confidence === "number" && typeof p.page === "number") pageQuality[p.page] = p.quality.mean_confidence;
+  const quality = Object.keys(pageQuality).length ? pageQuality : undefined;
+  if (raw.pages?.length) {
+    const order = reconstructReadingOrderDetailed(raw.pages as never, hyperlinks);
+    if (order.text.replace(/\s/g, "").length >= MIN_TEXT_CHARS || !raw.raw_text) {
+      return { text: order.text, hyperlinks, pageCount: raw.pages.length, lines: order.lines, pageQuality: quality };
+    }
+  }
+  return { text: raw.raw_text || "", hyperlinks, pageCount: raw.pages?.length || 1, pageQuality: quality };
 }
 
 /**
@@ -617,42 +642,105 @@ function profileCandidates(extraction: ResumeExtractionResult, text: string): Re
   return out;
 }
 
-async function finalize(
-  job: SourceProcessingJob,
-  documentId: string,
-  input: {
-    text: string;
-    hyperlinks: string[];
-    fileFormat: string;
-    pageCount: number;
-    ocrUsed: boolean;
-    via: string;
-    renderProfile?: ExtractorProfileV2 | null;
-  }
-) {
+export interface ExtractionInput {
+  text: string;
+  hyperlinks: string[];
+  fileFormat: string;
+  pageCount: number;
+  ocrUsed: boolean;
+  via: string;
+  renderProfile?: ExtractorProfileV2 | null;
+  /** Per-line page/heading/height metadata aligned with `text`. */
+  lines?: LayoutLineMeta[];
+  /** Mean OCR word confidence per page (0-1), when the extractor reports it. */
+  pageQuality?: Record<number, number>;
+}
+
+async function finalize(job: SourceProcessingJob, documentId: string, input: ExtractionInput) {
   const { personId } = job;
   await SourceProcessingJobService.updateStage(job.id, personId, "validate", { heartbeatAt: Date.now() });
+  const t0 = Date.now();
+  const built = await buildResumeReview(input, { documentId, personId, aiConsent: meta(job).aiConsent === true, jobId: job.id });
+  const { review, profile, reviewCandidates, extractedInterpretation, mergedDiscoveredProfiles, llmEnrichmentSuccess } = built;
+  const extractMs = Date.now() - t0;
+
+  await SourceProcessingJobService.updateStage(job.id, personId, "persist", { heartbeatAt: Date.now() });
+
+  try {
+    // Records first: a retry re-upserts the same ids, and decided rows are left alone.
+    const t1 = Date.now();
+    const persisted = await persistExtraction({
+      personId, documentId, jobId: job.id, candidates: reviewCandidates as never,
+      quality: built.extraction.quality, llmUsed: llmEnrichmentSuccess, timings: { extractMs },
+    });
+    review.extractionMeta.persistMs = Date.now() - t1;
+    review.extractionMeta.runId = persisted.runId;
+    for (const c of review.reviewCandidates) {
+      const prior = persisted.carried.get(c.candidateId);
+      if (prior) Object.assign(c, { previousDecision: prior.state, ...(prior.userValue ? { previousValue: prior.userValue } : {}) });
+    }
+    // Snapshot first: /apply and onboarding completion validate claims against it.
+    await saveResumeCandidates(personId, documentId, extractedInterpretation, input.text);
+    const db = await getDb();
+    const updated = await db
+      .update(resumeDocuments)
+      .set({
+        status: "review_ready",
+        extractedProfile: profile,
+        metadata: sql`coalesce(${resumeDocuments.metadata}, '{}'::jsonb) || ${JSON.stringify({ review, via: input.via })}::jsonb`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)))
+      .returning();
+    if (updated.length !== 1) throw new Error(`resume_documents row ${documentId} not found for owner`);
+  } catch (err) {
+    throw new PipelineFailure("PERSIST_FAILED", err);
+  }
+
+  await SourceProcessingJobService.transition({
+    jobId: job.id, personId, from: ["processing"], to: "review_ready", stage: "review",
+    errorCode: null, errorMessage: null,
+    resultReference: `resume:${documentId}`,
+    metadata: {
+      candidates: reviewCandidates.length,
+      via: input.via,
+      heartbeatAt: Date.now(),
+      llmEnriched: llmEnrichmentSuccess,
+      deterministicCoverage: extractedInterpretation ? Object.keys(extractedInterpretation).length : 0,
+    },
+  });
+
+  await seedDraftFromResume(personId, documentId, extractedInterpretation, mergedDiscoveredProfiles);
+}
+
+/**
+ * Text in, reviewable extraction out: deterministic baseline, optional
+ * consented LLM enrichment, link discovery and review candidates. No database
+ * writes, so the evaluation suite runs exactly this code.
+ */
+export async function buildResumeReview(
+  input: ExtractionInput,
+  ctx: { documentId: string; personId: string; aiConsent: boolean; jobId?: string }
+) {
+  const { documentId, personId } = ctx;
+  const job = { id: ctx.jobId ?? "eval" };
 
   // 1. Establish Tier 1 Deterministic Baseline via Source-Grounded Reconciliation
-  const tsBaseline = extractResumeDeterministicResult(input.text, input.hyperlinks);
-  let baseline: ResumeExtractionResult;
-  if (input.renderProfile) {
+  const method = input.ocrUsed ? "ocr" : input.fileFormat === "docx" ? "docx" : input.fileFormat === "pdf" ? "native_pdf" : "text";
+  const tsBaseline = extractResumeDeterministicResult(input.text, input.hyperlinks, {
+    lines: input.lines, method, pageQuality: input.pageQuality, pageCount: input.pageCount,
+  });
+  // The OCR text from Render goes through the same engine as text-layer files.
+  // Render's own profile is a fallback only: merging two parses of the same
+  // text duplicated records and let the weaker parse overwrite fields.
+  let baseline: ResumeExtractionResult = tsBaseline;
+  if (!(tsBaseline.success && tsBaseline.extracted) && input.renderProfile) {
     const renderResult = adaptRenderProfileToInterpretation(input.renderProfile, input.text);
-    if (renderResult.success && renderResult.extracted && tsBaseline.success && tsBaseline.extracted) {
-      // Reconcile Render structured profile with TypeScript deterministic baseline
-      baseline = mergeExtractionResults(renderResult, tsBaseline, input.text);
-    } else if (renderResult.success && renderResult.extracted) {
-      baseline = renderResult;
-    } else {
-      baseline = tsBaseline;
-    }
-  } else {
-    baseline = tsBaseline;
+    if (renderResult.success && renderResult.extracted) baseline = renderResult;
   }
 
   // 2. Evaluate Optional AI Enrichment
-  const m = meta(job);
-  const userConsent = m.aiConsent === true;
+  const userConsent = ctx.aiConsent;
   const decision = shouldEnrichWithLLM(baseline.extracted, { consent: userConsent, rawText: input.text });
 
   let extraction: ResumeExtractionResult = baseline;
@@ -753,8 +841,6 @@ async function finalize(
     ocrUsed: input.ocrUsed,
   });
 
-  await SourceProcessingJobService.updateStage(job.id, personId, "persist", { heartbeatAt: Date.now() });
-
   const review: ResumeReviewPayload = {
     reviewCandidates,
     structured: extractedInterpretation,
@@ -772,6 +858,8 @@ async function finalize(
       llmSkippedReason: !decision.shouldEnrich ? decision.reason : undefined,
       llmError: llmErrorNotice,
       ocrUsed: input.ocrUsed,
+      quality: extraction.quality ?? baseline.quality,
+      schemaVersion: extraction.quality?.schemaVersion ?? baseline.quality?.schemaVersion,
       latencyMs: extraction.latencyMs,
       truncated: extraction.truncated,
       via: input.via,
@@ -779,39 +867,7 @@ async function finalize(
     },
   };
 
-  try {
-    // Snapshot first: /apply and onboarding completion validate claims against it.
-    await saveResumeCandidates(personId, documentId, extractedInterpretation, input.text);
-    const db = await getDb();
-    const updated = await db
-      .update(resumeDocuments)
-      .set({
-        status: "review_ready",
-        extractedProfile: profile,
-        metadata: sql`coalesce(${resumeDocuments.metadata}, '{}'::jsonb) || ${JSON.stringify({ review, via: input.via })}::jsonb`,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)))
-      .returning();
-    if (updated.length !== 1) throw new Error(`resume_documents row ${documentId} not found for owner`);
-  } catch (err) {
-    throw new PipelineFailure("PERSIST_FAILED", err);
-  }
-
-  await SourceProcessingJobService.transition({
-    jobId: job.id, personId, from: ["processing"], to: "review_ready", stage: "review",
-    errorCode: null, errorMessage: null,
-    resultReference: `resume:${documentId}`,
-    metadata: {
-      candidates: reviewCandidates.length,
-      via: input.via,
-      heartbeatAt: Date.now(),
-      llmEnriched: llmEnrichmentSuccess,
-      deterministicCoverage: extractedInterpretation ? Object.keys(extractedInterpretation).length : 0,
-    },
-  });
-
-  await seedDraftFromResume(personId, documentId, extractedInterpretation, mergedDiscoveredProfiles);
+  return { review, profile, reviewCandidates, extractedInterpretation, mergedDiscoveredProfiles, llmEnrichmentSuccess, extraction };
 }
 
 /**

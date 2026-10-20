@@ -16,11 +16,14 @@ import { normalizeTextKey, tokenJaccardSimilarity } from "@/lib/resume/deduplica
 export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceText?: string): Candidate[] {
   const candidates: Candidate[] = [];
   const normalizedSource = sourceText?.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+  // Candidate ids are "<category>_<index in the source array>": /apply maps them back
+  // to the same position in the stored profile, so filtered lists keep source indices.
   const add = (
     category: Candidate["category"],
-    rows: Array<{ value: string; sourceSpan: string; recordData?: Record<string, any> }>
+    rows: Array<{ value: string; sourceSpan: string; recordData?: Record<string, any>; index?: number }>
   ) => {
-    rows.forEach((row, index) => {
+    rows.forEach((row, position) => {
+      const index = row.index ?? position;
       const trimmedVal = row.value.trim();
       const trimmedSpan = row.sourceSpan.trim();
       if (!trimmedVal || !trimmedSpan) return;
@@ -69,7 +72,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : x.graduationYear ? `Class of ${x.graduationYear}` : undefined,
       ].filter(Boolean);
       return {
-        value: (x as any).displayText || parts.join(" · ") || x.institution || "Education Entry",
+        value: (x as any).displayText || parts.join(" · ") || x.institution || x.degree,
         sourceSpan: x.sourceSpan,
         recordData: x as Record<string, any>,
       };
@@ -84,7 +87,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : x.duration,
       ].filter(Boolean);
       return {
-        value: (x as any).displayText || parts.join(" · ") || x.company || "Experience Entry",
+        value: (x as any).displayText || parts.join(" · ") || x.company || x.role,
         sourceSpan: x.sourceSpan,
         recordData: x as Record<string, any>,
       };
@@ -155,7 +158,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         .trim();
 
     const seenLeadKeys = new Set<string>();
-    const distinctLeadership = extracted.leadership.filter((l) => {
+    const distinctLeadership = extracted.leadership.map((l, index) => ({ ...l, __index: index })).filter((l) => {
       const lOrg = normalizeTextKey(cleanOrgName(l.organization));
       const lRole = normalizeTextKey(l.role);
       const leadKey = `${lOrg}::${lRole}`;
@@ -184,10 +187,12 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
             x.organization,
             x.startDate && x.endDate ? `${x.startDate}–${x.endDate}` : undefined,
           ].filter(Boolean);
+          const { __index, ...record } = x;
           return {
-            value: (x as any).displayText || parts.join(" · ") || x.organization || "Leadership Entry",
+            value: (x as any).displayText || parts.join(" · ") || x.organization || x.role,
             sourceSpan: x.sourceSpan || (x as any).displayText || x.role || "",
-            recordData: x as Record<string, any>,
+            recordData: record as Record<string, any>,
+            index: __index,
           };
         })
       );
@@ -207,7 +212,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
   }
   if (Array.isArray(extracted.research) && extracted.research.length > 0) {
     const pubs = (extracted.achievements || []).filter((x) => x.category === "publication" || x.category === "patent" || x.category === "book");
-    const distinctResearch = extracted.research.filter((r) => {
+    const distinctResearch = extracted.research.map((r, index) => ({ ...r, __index: index })).filter((r) => {
       const normR = r.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       return !pubs.some((p) => {
         const normP = p.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -219,10 +224,12 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
         "research",
         distinctResearch.map((x) => {
           const parts = [x.title, x.type, x.publisher, x.date].filter(Boolean);
+          const { __index, ...record } = x;
           return {
-            value: (x as any).displayText || parts.join(" · ") || x.title || "Research Entry",
+            value: (x as any).displayText || parts.join(" · ") || x.title,
             sourceSpan: x.sourceSpan || x.title || "",
-            recordData: x as Record<string, any>,
+            recordData: record as Record<string, any>,
+            index: __index,
           };
         })
       );
@@ -234,7 +241,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       extracted.hackathons.map((x) => {
         const parts = [x.event, x.organizer, x.award || x.rank, x.date].filter(Boolean);
         return {
-          value: (x as any).displayText || parts.join(" · ") || x.event || "Hackathon Entry",
+          value: (x as any).displayText || parts.join(" · ") || x.event,
           sourceSpan: x.sourceSpan || x.event || "",
           recordData: x as Record<string, any>,
         };
@@ -247,7 +254,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       extracted.training.map((x) => {
         const parts = [x.title, x.provider, x.dates, x.duration].filter(Boolean);
         return {
-          value: (x as any).displayText || parts.join(" · ") || x.title || "Training Entry",
+          value: (x as any).displayText || parts.join(" · ") || x.title,
           sourceSpan: x.sourceSpan || x.title || "",
           recordData: x as Record<string, any>,
         };
@@ -260,7 +267,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       extracted.volunteering.map((x) => {
         const parts = [x.role, x.organization, x.dates].filter(Boolean);
         return {
-          value: (x as any).displayText || parts.join(" · ") || x.organization || "Volunteering Entry",
+          value: (x as any).displayText || parts.join(" · ") || x.organization || x.role,
           sourceSpan: x.sourceSpan || x.organization || "",
           recordData: x as Record<string, any>,
         };
@@ -282,7 +289,7 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
   }
   if (Array.isArray(extracted.digitalFootprints) && extracted.digitalFootprints.length > 0) {
     const seenUrls = new Set<string>();
-    const distinctFootprints = extracted.digitalFootprints.filter((df) => {
+    const distinctFootprints = extracted.digitalFootprints.map((df, index) => ({ ...df, __index: index })).filter((df) => {
       const normU = df.url.toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/\/+$/, "");
       if (seenUrls.has(normU)) return false;
       seenUrls.add(normU);
@@ -292,10 +299,12 @@ export function resumeCandidates(extracted: ResumeInterpretationOutput, sourceTe
       "digitalFootprint",
       distinctFootprints.map((x) => {
         const parts = [x.platform, x.url, x.handle ? `@${x.handle}` : undefined].filter(Boolean);
+        const { __index, ...record } = x;
         return {
           value: (x as any).displayText || parts.join(" · ") || x.url,
           sourceSpan: x.sourceSpan || x.url,
-          recordData: x as Record<string, any>,
+          recordData: record as Record<string, any>,
+          index: __index,
         };
       })
     );

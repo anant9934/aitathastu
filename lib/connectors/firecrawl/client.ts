@@ -127,7 +127,8 @@ export async function enrichWebsiteWithFirecrawl(targetUrl: string): Promise<Fir
     const textLower = markdown.toLowerCase();
     const detectedTechnologies: string[] = [];
     for (const tech of COMMON_TECH_SET) {
-      const regex = new RegExp(`\\b${tech.replace(".", "\\.")}\\b`, "i");
+      // Escaped in full ("c++" is not a valid pattern), with boundaries that also hold after "+" or ".".
+      const regex = new RegExp(`(?<![a-z0-9])${tech.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9])`, "i");
       if (regex.test(textLower)) {
         detectedTechnologies.push(tech.charAt(0).toUpperCase() + tech.slice(1));
       }

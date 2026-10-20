@@ -10,10 +10,50 @@ import { z } from "zod";
 // ------------------------------------------------------------------------------
 // Task A: Resume Interpretation (PROFILE_EXTRACT)
 // ------------------------------------------------------------------------------
+
+/** Extraction metadata shared by record types (schema cv-extract/3.0; all optional for older payloads). */
+const NormDateSchema = z.object({
+  raw: z.string().max(80),
+  value: z.string().max(10).nullable(),
+  precision: z.enum(["month", "year"]).nullable(),
+  present: z.boolean().optional(),
+  ambiguous: z.boolean().optional(),
+  expected: z.boolean().optional(),
+});
+const ReviewSchema = z.object({
+  status: z.enum(["high_confidence", "needs_review", "conflicting", "unreadable", "not_found", "invalid", "user_confirmed"]),
+  confidence: z.number().min(0).max(1),
+  issues: z.array(z.string().max(80)).max(20).default([]),
+  fields: z.record(z.string(), z.enum(["high_confidence", "needs_review", "conflicting", "unreadable", "not_found", "invalid"])).default({}),
+});
+const EvidenceSchema = z.object({
+  page: z.number().int().min(1).max(500),
+  section: z.string().max(50),
+  lineStart: z.number().int().min(0),
+  lineEnd: z.number().int().min(0),
+  text: z.string().max(600),
+  method: z.enum(["native_pdf", "docx", "ocr", "text", "llm"]),
+  bbox: z.array(z.number()).length(4).optional(),
+});
+const RecordMetaBase = {
+  current: z.boolean().optional(),
+  location: z.string().max(150).optional(),
+  review: ReviewSchema.optional(),
+  evidence: EvidenceSchema.optional(),
+  provenance: z.enum(["deterministic", "llm", "render"]).optional(),
+};
+const RecordMeta = {
+  dates: z.object({ start: NormDateSchema.optional(), end: NormDateSchema.optional(), issued: NormDateSchema.optional(), expires: NormDateSchema.optional() }).optional(),
+  ...RecordMetaBase,
+};
+export type ExtractionReview = z.infer<typeof ReviewSchema>;
 export const ResumeInterpretationSchema = z.object({
+  schemaVersion: z.string().max(30).optional(),
   personal: z.object({
     fullName: z.string().max(100).optional(),
     email: z.string().email().optional().or(z.literal("")),
+    phone: z.string().max(40).optional(),
+    links: z.array(z.string().max(500)).max(20).optional(),
     title: z.string().max(150).optional(),
     location: z.string().max(150).optional(),
     sourceSpan: z.string().max(300).optional(),
@@ -27,8 +67,10 @@ export const ResumeInterpretationSchema = z.object({
   }).optional(),
   education: z.array(
     z.object({
-      institution: z.string().min(1).max(200),
+      institution: z.string().max(200),
       degree: z.string().max(100),
+      grade: z.object({ raw: z.string().max(60), value: z.string().max(40), kind: z.enum(["cgpa", "gpa", "percentage", "classification"]) }).optional(),
+      ...RecordMeta,
       fieldOfStudy: z.string().max(100).optional(),
       startDate: z.string().max(30).optional(),
       endDate: z.string().max(30).optional(),
@@ -41,8 +83,9 @@ export const ResumeInterpretationSchema = z.object({
   ).default([]),
   experience: z.array(
     z.object({
-      company: z.string().min(1).max(150),
-      role: z.string().min(1).max(150),
+      company: z.string().max(150),
+      role: z.string().max(150),
+      ...RecordMeta,
       type: z.enum(["employment", "internship", "freelance", "founder", "leadership", "volunteering", "other"]).default("employment").optional(),
       duration: z.string().max(100).optional(),
       startDate: z.string().max(30).optional(),
@@ -60,6 +103,7 @@ export const ResumeInterpretationSchema = z.object({
       repositoryUrl: z.string().url().max(500).optional().or(z.literal("")),
       demoUrl: z.string().url().max(500).optional(),
       sourceSpan: z.string().min(3).max(300),
+      ...RecordMeta,
     })
   ).default([]),
   skills: z.array(
@@ -71,6 +115,10 @@ export const ResumeInterpretationSchema = z.object({
       isExplicit: z.boolean().default(true).optional(),
       sourceSection: z.string().max(50).default("skills").optional(),
       associatedEntity: z.string().max(150).optional(),
+      originalName: z.string().max(100).optional(),
+      group: z.string().max(60).optional(),
+      evidence: EvidenceSchema.optional(),
+      provenance: z.enum(["deterministic", "llm", "render"]).optional(),
     })
   ).default([]),
   certifications: z.array(
@@ -82,7 +130,9 @@ export const ResumeInterpretationSchema = z.object({
       expiryDate: z.string().max(30).optional(),
       credentialId: z.string().max(100).optional(),
       credentialUrl: z.string().url().max(500).optional().or(z.literal("")),
+      status: z.enum(["completed", "in_progress"]).optional(),
       sourceSpan: z.string().min(1).max(300),
+      ...RecordMeta,
     })
   ).default([]),
   achievements: z.array(
@@ -95,12 +145,13 @@ export const ResumeInterpretationSchema = z.object({
       date: z.string().max(30).optional(),
       description: z.string().max(500).default(""),
       sourceSpan: z.string().min(3).max(300),
+      ...RecordMeta,
     })
   ).default([]),
   leadership: z.array(
     z.object({
-      organization: z.string().min(1).max(150),
-      role: z.string().min(1).max(150),
+      organization: z.string().max(150),
+      role: z.string().max(150),
       type: z.enum(["founder", "leadership", "advisor", "student_org", "nonprofit", "other"]).default("leadership"),
       startDate: z.string().max(30).optional(),
       endDate: z.string().max(30).optional(),
@@ -109,6 +160,7 @@ export const ResumeInterpretationSchema = z.object({
       impact: z.string().max(500).optional(),
       sourceSpan: z.string().min(1).max(300),
       underlyingRecordId: z.string().max(100).optional(),
+      ...RecordMeta,
     })
   ).default([]).optional(),
   research: z.array(
@@ -121,6 +173,7 @@ export const ResumeInterpretationSchema = z.object({
       url: z.string().url().max(500).optional().or(z.literal("")),
       description: z.string().max(500).default("").optional(),
       sourceSpan: z.string().min(1).max(300),
+      ...RecordMeta,
     })
   ).default([]).optional(),
   hackathons: z.array(
@@ -148,12 +201,15 @@ export const ResumeInterpretationSchema = z.object({
   ).default([]).optional(),
   volunteering: z.array(
     z.object({
-      organization: z.string().min(1).max(150),
-      role: z.string().min(1).max(150),
+      organization: z.string().max(150),
+      role: z.string().max(150),
       dates: z.string().max(100).optional(),
       responsibilities: z.array(z.string().max(500)).default([]).optional(),
       impact: z.string().max(500).optional(),
       sourceSpan: z.string().min(1).max(300),
+      ...RecordMetaBase,
+      // "dates" stays display text (older payloads); normalised dates live in dateRange.
+      dateRange: z.object({ start: NormDateSchema.optional(), end: NormDateSchema.optional() }).optional(),
     })
   ).default([]).optional(),
   languages: z.array(
@@ -161,6 +217,7 @@ export const ResumeInterpretationSchema = z.object({
       language: z.string().min(1).max(100),
       proficiency: z.string().max(50).optional(),
       sourceSpan: z.string().min(1).max(300),
+      evidence: EvidenceSchema.optional(),
     })
   ).default([]).optional(),
   digitalFootprints: z.array(
@@ -180,11 +237,22 @@ export const ResumeInterpretationSchema = z.object({
       suggestedCategory: z.string().max(50).optional(),
       uncertaintyReason: z.string().max(200).optional(),
       sourceSpan: z.string().min(1).max(300),
+      evidence: EvidenceSchema.optional(),
     })
   ).default([]).optional(),
 });
 
 export type ResumeInterpretationOutput = z.infer<typeof ResumeInterpretationSchema>;
+
+/** Document-level extraction quality, stored alongside the interpretation. */
+export interface ExtractionQuality {
+  schemaVersion: string;
+  method: "native_pdf" | "docx" | "ocr" | "text";
+  textQuality: "good" | "limited" | "poor" | "unreadable";
+  pageCount: number;
+  warnings: string[];
+  sections: Array<{ section: string; heading: string; page: number }>;
+}
 
 // ------------------------------------------------------------------------------
 // Task B: Goal Understanding (GOAL_INTERPRETATION)

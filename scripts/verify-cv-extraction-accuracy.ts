@@ -4,6 +4,7 @@
  *   node --import tsx --test scripts/verify-cv-extraction-accuracy.ts
  */
 import test from "node:test";
+import { sanitizeTextForModel } from "../lib/intelligence/context-firewall";
 import assert from "node:assert/strict";
 import { extractResumeDeterministic, tagLines } from "../lib/resume/deterministic-extractor";
 import { extractResumeDeterministicResult } from "../lib/services/resume-extraction-service";
@@ -106,7 +107,8 @@ Worked on dashboards in Tableau and SQL.
 St. Xavier's College, Mumbai — B.Sc. Statistics (2018 – 2021)
 Proficient in Excel, Power BI and Python (pandas, numpy).`).interpretation;
   assert.deepEqual([r.experience[0]?.company, r.experience[0]?.role], ["Flipkart", "Data Analyst"]);
-  assert.deepEqual([r.education[0]?.institution, r.education[0]?.degree, r.education[0]?.fieldOfStudy], ["St. Xavier's College, Mumbai", "B.Sc", "Statistics"]);
+  // The degree keeps the document's spelling ("B.Sc.").
+  assert.deepEqual([r.education[0]?.institution, r.education[0]?.degree, r.education[0]?.fieldOfStudy], ["St. Xavier's College, Mumbai", "B.Sc.", "Statistics"]);
   assert.ok(r.skills.some((s) => s.name === "Python"));
 });
 
@@ -131,7 +133,8 @@ test("footprints: labelled handles and wrapped URLs are still found", () => {
   assert.match(byProvider.linkedin, /linkedin\.com\/in\/rahulverma$/);
 
   const det = extractResumeDeterministic("Rahul Verma\nrahul@example.org\nhttps://github.com/rahul-\nverma-dev").interpretation.digitalFootprints ?? [];
-  assert.deepEqual(det.map((f) => f.url), ["https://github.com/rahulverma-dev"]);
+  // A PDF line break inside a URL adds no hyphen, so the trailing "-" belongs to the handle.
+  assert.deepEqual(det.map((f) => f.url), ["https://github.com/rahul-verma-dev"]);
 });
 
 test("links: leetcode /u/ and bare forms are one profile", () => {
@@ -140,8 +143,14 @@ test("links: leetcode /u/ and bare forms are one profile", () => {
   assert.equal(leet.length, 1);
 });
 
-test("phone numbers are never extracted from a CV (privacy guarantee)", () => {
-  assert.equal(extractResumeDeterministic(STANDARD).profile.mobile, undefined);
+test("phone: the candidate's own number only, never a referee's, never sent to a model", () => {
+  const text = "Asha Rao\nasha@example.com | +91 98765 43210\nREFERENCES\nDr. K. Menon, Professor\nmenon@example.edu | +91 90000 11111";
+  const r = extractResumeDeterministic(text);
+  assert.equal(r.profile.mobile, "+91 98765 43210");
+  assert.equal(r.profile.email, "asha@example.com");
+  assert.ok(!r.engine.personal.phones.some((p) => p.normalized.endsWith("9000011111")));
+  assert.ok(!r.engine.personal.emails.some((e) => e.value === "menon@example.edu"));
+  assert.ok(!sanitizeTextForModel(text).includes("98765 43210"), "the model never sees the number");
 });
 
 test("dedup keeps a promotion at the same company as two roles", () => {

@@ -1,0 +1,59 @@
+{
+  "id": "priya-sidebar",
+  "description": "Experienced backend engineer, two-column template with a sidebar for contact, skills, languages and certifications",
+  "tags": ["experienced", "two-column", "sidebar", "certifications", "skills-in-descriptions"],
+  "variants": ["pdf-sidebar", "scan-good", "scan-poor"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Priya Raghavan",
+    "headline": "Senior Backend Engineer",
+    "email": "priya.raghavan@example.org",
+    "phone": "+91 99000 11223",
+    "location": "Bengaluru, India",
+    "links": [
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/priyaraghavan", "display": "linkedin.com/in/priyaraghavan" },
+      { "label": "Portfolio", "url": "https://priyaraghavan.dev", "display": "priyaraghavan.dev" }
+    ]
+  },
+  "summary": "Backend engineer with eight years of experience building payment and logistics platforms that handle millions of transactions a day.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Northwind Payments Pvt. Ltd.", "title": "Senior Software Engineer", "type": "employment", "start": "2021-04", "current": true, "location": "Bengaluru", "bullets": ["Led the redesign of the settlement service in Java and Kafka, reducing settlement latency by 38%.", "Mentored four engineers and ran the on-call rotation for the payouts team."] },
+        { "organization": "Cobalt Logistics", "title": "Software Engineer II", "type": "employment", "start": "2018-07", "end": "2021-03", "location": "Chennai", "bullets": ["Built route-optimisation APIs on PostgreSQL and Redis serving 2,000 requests per second.", "Migrated batch jobs to Kubernetes, cutting infrastructure cost by 22%."] },
+        { "organization": "Infosys", "title": "Systems Engineer", "type": "employment", "start": "2016-08", "end": "2018-06", "location": "Mysuru", "bullets": ["Maintained billing modules for a European telecom client."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "College of Engineering, Guindy", "degree": "B.E.", "field": "Information Technology", "level": "undergraduate", "start": "2012-08", "end": "2016-05", "grade": { "value": "8.1/10", "kind": "cgpa", "text": "CGPA 8.1/10" }, "location": "Chennai" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "sidebar": true,
+      "groups": [{ "items": ["Java", "Kotlin", "Spring Boot", "Kafka", "PostgreSQL", "Redis", "AWS", "Kubernetes", "Terraform", "gRPC"] }]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "sidebar": true,
+      "items": [{ "language": "English", "proficiency": "Fluent" }, { "language": "Tamil", "proficiency": "Native" }, { "language": "Hindi", "proficiency": "Conversational" }]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "sidebar": true,
+      "items": [
+        { "name": "AWS Certified Solutions Architect – Associate", "issuer": "Amazon Web Services", "date": "2022-09" },
+        { "name": "Certified Kubernetes Application Developer (CKAD)", "issuer": "The Linux Foundation", "date": "2023-02", "credentialId": "LF-8XK2Q1W9ZA" }
+      ]
+    }
+  ]
+}

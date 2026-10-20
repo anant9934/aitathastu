@@ -91,7 +91,7 @@ export class ApifyConnector {
         items: [],
         audit: {
           actorId: params.actorId,
-          reason: "LinkedIn automated scraping prohibited by ToS. Use OAuth or user export archive.",
+          reason: "Generic crawler actors may not read LinkedIn. LinkedIn profiles go through the dedicated public-profile extraction.",
           accessedUrl: params.accessedUrl,
           status: "rejected",
           outputCount: 0,

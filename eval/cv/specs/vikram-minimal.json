@@ -1,0 +1,41 @@
+{
+  "id": "vikram-minimal",
+  "description": "Minimal text-only CV with genuinely missing dates, no summary and no links",
+  "tags": ["minimal", "missing-dates", "missing-fields", "non-tech", "image-upload"],
+  "variants": ["pdf-single", "docx-plain", "jpg"],
+  "dateStyle": "year",
+  "docxContactIn": "header",
+  "rangeSep": " - ",
+  "person": {
+    "name": "Vikram Rao",
+    "email": "vikram.rao.sales@example.com",
+    "phone": "90100 22334",
+    "location": "Hyderabad",
+    "links": []
+  },
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Bharat Motors", "title": "Sales Executive", "type": "employment", "location": "Hyderabad", "bullets": ["Handled walk-in customers and test drives for the two-wheeler showroom."] },
+        { "organization": "Teleperformance", "title": "Customer Support Associate", "type": "employment", "bullets": ["Resolved billing queries for a telecom client over phone and chat."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [{ "institution": "Osmania University", "degree": "B.Com", "level": "undergraduate", "end": "2018" }]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [{ "items": ["MS Excel", "Tally ERP 9", "Customer Relationship Management", "Negotiation"] }]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages Known",
+      "items": [{ "language": "Telugu" }, { "language": "Hindi" }, { "language": "English" }]
+    }
+  ]
+}

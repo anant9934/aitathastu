@@ -25,7 +25,7 @@ import { aggregateSkillsAcrossRepositories } from "../lib/services/evidence-norm
 import { fuseMultiSourceProjects } from "../lib/services/cross-source-fusion-service";
 import { isSafePublicIp, isPublicIpv6 } from "../lib/connectors/portfolio/client";
 import { isSafePublicUrl } from "../lib/connectors/portfolio/url-check";
-import { parseLinkedInDataExport } from "../lib/connectors/linkedin/client";
+import { normalizeLinkedInProfile } from "../lib/linkedin/normalize";
 import { storedLinkedInPassword, connectLinkedIn, LinkedInPolicyError } from "../lib/services/linkedin-import-service";
 import { APPROVED_APIFY_ACTORS, ApifyConnector } from "../lib/connectors/apify/client";
 import { composePersonalizedDashboard, type StudentPersonalizationContext } from "../lib/domain/personalization-engine";
@@ -400,14 +400,16 @@ services:
     assert.strictEqual(pwd, null, "storedLinkedInPassword must never return credentials");
   });
 
-  await runTest("Parses student-authorized LinkedIn data export files accurately", () => {
-    const sampleCsv = `Title,Company Name,Started On,Finished On,Description\nSenior AI Engineer,DeepTech Labs,Jan 2023,,Building LLM pipelines with RAG\nMachine Learning Intern,DataCorp,May 2022,Aug 2022,Trained PyTorch models\n`;
-    const parsed = parseLinkedInDataExport("Positions.csv", sampleCsv);
-    assert(parsed.positions, "Positions must be parsed");
-    assert.strictEqual(parsed.positions.length, 2);
-    assert.strictEqual(parsed.positions[0].title, "Senior AI Engineer");
-    assert.strictEqual(parsed.positions[0].companyName, "DeepTech Labs");
-    assert.strictEqual(parsed.positions[1].companyName, "DataCorp");
+  await runTest("Normalizes public LinkedIn profile output accurately", () => {
+    const parsed = normalizeLinkedInProfile({ experiences: [
+      { title: "Senior AI Engineer", company: "DeepTech Labs", startDate: "Jan 2023", description: "Building LLM pipelines with RAG" },
+      { title: "Machine Learning Intern", company: "DataCorp", startDate: "May 2022", endDate: "Aug 2022", description: "Trained PyTorch models" },
+    ] }, "https://www.linkedin.com/in/student");
+    const positions = parsed.records.filter((r) => r.kind === "experience");
+    assert.strictEqual(positions.length, 2);
+    assert.strictEqual(positions[0].data.title, "Senior AI Engineer");
+    assert.strictEqual(positions[0].data.company, "DeepTech Labs");
+    assert.strictEqual(positions[1].data.company, "DataCorp");
   });
 
   // ---------------------------------------------------------------------------

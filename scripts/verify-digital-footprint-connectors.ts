@@ -31,7 +31,8 @@ check("github graphql connector exists", fs.existsSync("lib/connectors/github/gr
 check("leetcode connector exists", fs.existsSync("lib/connectors/leetcode/client.ts"));
 check("portfolio connector exists", fs.existsSync("lib/connectors/portfolio/client.ts"));
 check("linkedin connector exists", fs.existsSync("lib/connectors/linkedin/client.ts"));
-check("apify-linkedin service exists", fs.existsSync("lib/services/apify-linkedin-service.ts"));
+check("linkedin extraction service exists", fs.existsSync("lib/services/linkedin-extraction-service.ts"));
+check("linkedin export upload route removed", !fs.existsSync("app/api/student/linkedin/import/route.ts"));
 check("research-and-dev connector exists", fs.existsSync("lib/connectors/research-and-dev/client.ts"));
 check("kaggle-client exists", fs.existsSync("lib/connectors/research-and-dev/kaggle-client.ts"));
 check("coding-platforms connector exists", fs.existsSync("lib/connectors/coding-platforms/client.ts"));
@@ -94,14 +95,11 @@ check("graphql does not filter to PUBLIC repos only (private repos accessible)",
 
 // ─── 6. LinkedIn: status correctly reflects extraction result ─────────────────
 
-const apifySvc = fs.readFileSync("lib/services/apify-linkedin-service.ts", "utf-8");
-check("apify service sets connected status on synced result (so UI shows Imported)",
-  apifySvc.includes('"connected"') && apifySvc.includes("connStatus"));
-check("apify service includes lastSyncedAt in metadata on success",
-  apifySvc.includes("lastSyncedAt: syncedAt") || apifySvc.includes("lastSyncedAt: extractedAt"));
-check("updateConnectionStatus accepts connected status",
-  apifySvc.match(/status.*:.*"syncing".*"reference_only".*"needs_attention".*"connected"/) !== null ||
-  apifySvc.includes('"syncing" | "reference_only" | "needs_attention" | "connected"'));
+const liSvc = fs.readFileSync("lib/services/linkedin-extraction-service.ts", "utf-8");
+check("extraction sets connected status on success (so UI shows Extracted)",
+  liSvc.includes('succeeded || hadSuccess ? "connected"'));
+check("extraction records lastSyncedAt in metadata on success",
+  liSvc.includes("lastSyncedAt: at"));
 
 // ─── 7. Units: normalization and validation ────────────────────────────────────
 
@@ -118,14 +116,11 @@ async function runUnits() {
   check("normalizeCodingHandle strips CodeChef URL",
     normalizeCodingHandle("https://www.codechef.com/users/myuser", "codechef") === "myuser");
 
-  const { validateLinkedInUrl, parseLinkedInDataExport } = await import("../lib/connectors/linkedin/client");
+  const { validateLinkedInUrl } = await import("../lib/connectors/linkedin/client");
   check("validateLinkedInUrl accepts valid URL",
     validateLinkedInUrl("https://www.linkedin.com/in/john-doe").valid === true);
   check("validateLinkedInUrl rejects non-LinkedIn URL",
     validateLinkedInUrl("https://twitter.com/johndoe").valid === false);
-  const csv = `Company Name,Title,Started On,Finished On\nAcme Corp,Software Engineer,Jan 2021,Dec 2023`;
-  check("parseLinkedInDataExport parses Positions.csv",
-    (parseLinkedInDataExport("Positions.csv", csv).positions?.length ?? 0) > 0);
 
   // Portfolio URL safety checks — isSafePublicUrl returns {safe, reason?}, not a boolean
   const { isSafePublicUrl } = await import("../lib/connectors/portfolio/client");
@@ -140,16 +135,15 @@ async function runUnits() {
   check("isValidOrcidChecksum accepts valid ORCID", isValidOrcidChecksum("0000-0002-1825-0097"));
   check("isValidOrcidChecksum rejects invalid ORCID", !isValidOrcidChecksum("0000-0002-1825-0000"));
 
-  // mapActorOutputToEvidence with actual actor schema
-  const { mapActorOutputToEvidence } = await import("../lib/services/apify-linkedin-service");
-  const items = [{
+  // Normalization of the configured actor's output schema
+  const { normalizeLinkedInProfile } = await import("../lib/linkedin/normalize");
+  const normalized = normalizeLinkedInProfile({
     linkedinUrl: "https://linkedin.com/in/test",
     experiences: [{ title: "Engineer", company: "Acme", startDate: "Jan 2020" }],
     educations: [{ school: "MIT", degree: "BSc CS", endYear: "2020" }],
-  }];
-  const mapped = mapActorOutputToEvidence(items, "https://linkedin.com/in/test", "parseforge/linkedin-profile-scraper", new Date().toISOString());
-  check("mapActorOutputToEvidence: experiences (plural) mapped", mapped.filter((e) => e.category === "experience").length === 1);
-  check("mapActorOutputToEvidence: educations (plural) mapped", mapped.filter((e) => e.category === "education").length === 1);
+  }, "https://www.linkedin.com/in/test");
+  check("normalizeLinkedInProfile: experiences (plural) mapped", normalized.records.filter((r) => r.kind === "experience").length === 1);
+  check("normalizeLinkedInProfile: educations (plural) mapped", normalized.records.filter((r) => r.kind === "education").length === 1);
 
   // ─── 8. Live: Kaggle datasets (anonymous) ──────────────────────────────────────
 

@@ -1,0 +1,47 @@
+{
+  "renderVersion": 1,
+  "documents": [
+    {
+      "file": "deepa-phd-scan--pdf-single.pdf",
+      "spec": "deepa-phd-scan",
+      "variant": "pdf-single",
+      "sha256": "d4391bed0ed6c51379a7e4673c5bee37e378acf562d60d0f5c44f23588c74aa8"
+    },
+    {
+      "file": "deepa-phd-scan--scan-good.pdf",
+      "spec": "deepa-phd-scan",
+      "variant": "scan-good",
+      "sha256": "2dce26a8cd9153ffff3afab44409cb2d0543d498da95755ea492e3d05497db69"
+    },
+    {
+      "file": "harpreet-teacher--docx-plain.docx",
+      "spec": "harpreet-teacher",
+      "variant": "docx-plain",
+      "sha256": "b1e1819088d94aa22e68dd99a70e7dd2910941c58b59b80e9b88548288e43d9a"
+    },
+    {
+      "file": "harpreet-teacher--pdf-single.pdf",
+      "spec": "harpreet-teacher",
+      "variant": "pdf-single",
+      "sha256": "88caee77b621b55041dd8b608cd7e89a422d08ba798c20a0bab96c870d0a982e"
+    },
+    {
+      "file": "nikhil-devops--pdf-single.pdf",
+      "spec": "nikhil-devops",
+      "variant": "pdf-single",
+      "sha256": "df9ee8ffc3f196fb1d8927c093665d4944dfa0ae1d80fa84b8bc8fe2f43571ff"
+    },
+    {
+      "file": "nikhil-devops--docx-plain.docx",
+      "spec": "nikhil-devops",
+      "variant": "docx-plain",
+      "sha256": "fb8a0fec125c67c30fc86c8e8d1329e40dce9413700523486eb6c202f4ac7c05"
+    },
+    {
+      "file": "rahul-pm-sidebar--pdf-sidebar.pdf",
+      "spec": "rahul-pm-sidebar",
+      "variant": "pdf-sidebar",
+      "sha256": "b8a86b83e1940dd80aced998a546a3875bee52e6310c5cc1ccabd2b83266a1c5"
+    }
+  ]
+}

@@ -68,7 +68,7 @@ export async function assertLinkedInAllowed(personId: string, now = Date.now()) 
 export async function connectLinkedIn(personId: string, urlOrHandle?: string, _password?: string, _requestId?: string): Promise<LinkedInStatus> {
   if (_password) {
     throw new LinkedInPolicyError(
-      "Automated password login is disabled for security and LinkedIn terms compliance. Please connect your profile via public URL or upload your student-authorised LinkedIn data export archive."
+      "Automated password login is disabled for security and LinkedIn terms compliance. Enter your public profile URL and use Extract LinkedIn Profile instead."
     );
   }
   if (!urlOrHandle) {

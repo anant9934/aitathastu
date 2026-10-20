@@ -315,11 +315,7 @@ export function SourcesStep({ flow, guide, onCandidates }: {
               ),
             }}
           />
-          <div>
-            <h3 className="font-display text-sm font-semibold text-text-primary">LinkedIn</h3>
-            <p className="mb-2 text-xs text-text-muted">Roles, education and certifications. Linking a profile address doesn&apos;t import anything; an export or extraction does.</p>
-            <LinkedInConnect />
-          </div>
+          <LinkedInConnect />
         </section>
       </div>
 

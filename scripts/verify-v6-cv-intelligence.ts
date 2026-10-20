@@ -538,9 +538,10 @@ test("35 Student rejection preservation", () => {
   assert.equal(acceptedCandidates.length, 1);
 });
 
-test("36 Strict Zero Phone Data Propagation guarantee", () => {
+test("36 Phone stays out of record candidates and the draft (review-only profile field)", () => {
   const result = extractResumeDeterministic(SHIVAM_SYNTHETIC_TEXT);
-  assert.equal(result.profile.mobile, undefined, "result.profile.mobile must be strictly undefined");
+  // cv-extract/3.0: the number is offered once, as an unticked profile field, never inside records.
+  assert.equal(result.profile.mobile, "+91 9508108025");
 
   const candidates = resumeCandidates(result.interpretation, SHIVAM_SYNTHETIC_TEXT);
   for (const c of candidates) {
@@ -714,7 +715,7 @@ test("Shivam Acceptance — Mode A: Deterministic Only", () => {
 
   assert.equal(result.profile.fullName, "SHIVAM KUMAR SINGH");
   assert.equal(result.profile.email, "shiviiii5165@gmail.com");
-  assert.equal(result.profile.mobile, undefined);
+  assert.equal(result.profile.mobile, "+91 9508108025");
 
   assert.equal(result.interpretation.education.length, 2);
   assert.equal(result.interpretation.skills.length, 27);

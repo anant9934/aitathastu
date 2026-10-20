@@ -38,10 +38,10 @@ export const PLATFORMS: PlatformConfig[] = [
     guarantees: ["Private repositories are accessed only after you install the GitHub App and select repository access.", "GitHub App access is limited to read-only Metadata and Contents permissions.", "No commits are pushed, files changed, or code executed.", "Imported evidence is unverified and waits for your review."],
   },
   {
-    id: "linkedin", group: "professional", method: "Profile link, data export, or public-profile extraction", name: "LinkedIn", monogram: "IN", placeholder: "Profile URL or handle, e.g. in/anant-kumar", type: "EXPORT_REQUIRED",
-    actionLabel: "Import your export", capability: "Roles and education from your data export", supportsExportUpload: true,
-    dataCollected: ["Roles and positions (Positions.csv)", "Degrees and institutions (Education.csv)", "Listed skills (Skills.csv)", "Projects and certifications (Projects.csv)"],
-    guarantees: ["We never ask for your LinkedIn password or session.", "The export archive you download from LinkedIn (.zip or .csv) is the most complete source.", "Public-profile extraction runs only if this server has it configured, and only after you ask.", "Every record keeps where it came from, and re-importing never duplicates records."],
+    id: "linkedin", group: "professional", method: "Public-profile extraction from your profile URL", name: "LinkedIn", monogram: "IN", placeholder: "Profile URL, e.g. linkedin.com/in/anant-kumar", type: "PUBLIC_SCRAPE",
+    actionLabel: "Extract LinkedIn Profile", capability: "Roles, education, skills and more from your public profile",
+    dataCollected: ["Headline, about and location", "Roles and employment history", "Degrees and institutions", "Skills, languages, certifications and courses", "Projects, publications, volunteering, honors and listed websites"],
+    guarantees: ["We never ask for your LinkedIn password or session.", "Only what your profile shows publicly is read, and only when you ask.", "Extracted roles and education stay candidates until you confirm them.", "Every record keeps where it came from, and refreshing never duplicates records."],
   },
   {
     id: "portfolio", group: "development", method: "Website link", name: "Portfolio or website", monogram: "WW", placeholder: "https://your-site.dev", type: "PUBLIC_SCRAPE",

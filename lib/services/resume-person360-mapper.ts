@@ -184,7 +184,8 @@ export class ResumePerson360Mapper {
       }
 
 
-      const id = `ev_res_${crypto.createHash("sha256").update(`${personId}:skill:${skillName}:${documentId}`).digest("hex").slice(0, 24)}`;
+      // One resume skill row per person and skill: re-uploading the same CV (a new document id) must not duplicate it.
+      const id = `ev_res_${crypto.createHash("sha256").update(`${personId}:skill:${skillName.trim().toLowerCase()}`).digest("hex").slice(0, 24)}`;
 
       await db
         .insert(evidenceItems)
@@ -199,9 +200,9 @@ export class ResumePerson360Mapper {
           sourceReference: `resume:sha256:${documentId}`,
           interpretation: `Skill self-reported via resume document.`,
           whyItMatters: `Identified candidate skill for role alignment.`,
-          importKey: `resume:${documentId}:skill:${skillName}`,
+          importKey: `resume:skill:${skillName.trim().toLowerCase()}`,
         })
-        .onConflictDoNothing({ target: evidenceItems.id });
+        .onConflictDoNothing();
 
       result.evidenceCreated++;
     }
@@ -235,7 +236,8 @@ export class ResumePerson360Mapper {
     }
 
     // 6. Record Journey Event
-    const journeyId = `je_res_${crypto.createHash("sha256").update(`${personId}:${documentId}:${Date.now()}`).digest("hex").slice(0, 24)}`;
+    // Deterministic: retrying the same save records the import once.
+    const journeyId = `je_res_${crypto.createHash("sha256").update(`${personId}:${documentId}:resume_imported`).digest("hex").slice(0, 24)}`;
     await db
       .insert(journeyEvents)
       .values({

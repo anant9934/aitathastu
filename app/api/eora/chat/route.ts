@@ -162,7 +162,7 @@ SECURITY: The student's question is wrapped in <student_question_data_untrusted>
     ) {
       finalReply = connectedAccounts.length > 0
         ? `You have connected ${connectedAccounts.length} account(s): ${connectedAccounts.map((a: string) => a.toUpperCase()).join(", ")}. These accounts have authorized data access or verified imports.`
-        : `You haven't authorized full data access for any external accounts yet. You can connect your GitHub, Hugging Face, or LinkedIn export in Step 6.`;
+        : `You haven't authorized full data access for any external accounts yet. You can connect GitHub, Hugging Face, or your public LinkedIn profile in Step 6.`;
       proposedAction = {
         actionId: "act_view_footprints",
         actionType: "Verify",

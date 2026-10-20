@@ -1,0 +1,59 @@
+{
+  "id": "deepa-phd-scan",
+  "description": "Held-out: doctoral student CV, scanned, publications and conference talks, teaching assistantships",
+  "tags": ["holdout", "research", "scanned", "publications"],
+  "variants": ["pdf-single", "scan-good"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Deepa Krishnan",
+    "headline": "PhD Candidate, Materials Science",
+    "email": "deepa.krishnan@example.ac.in",
+    "location": "Chennai, Tamil Nadu",
+    "links": [{ "label": "ORCID", "url": "https://orcid.org/0000-0001-5109-3700", "display": "orcid.org/0000-0001-5109-3700" }]
+  },
+  "sections": [
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "IIT Madras", "degree": "Ph.D.", "field": "Metallurgical and Materials Engineering", "level": "doctorate", "start": "2021-07", "end": "2026", "current": true, "endText": "Expected 2026" },
+        { "institution": "Anna University", "degree": "M.E.", "field": "Materials Science", "level": "postgraduate", "start": "2019-08", "end": "2021-05", "grade": { "value": "8.9/10", "kind": "cgpa", "text": "CGPA 8.9/10" } },
+        { "institution": "PSG College of Technology", "degree": "B.E.", "field": "Mechanical Engineering", "level": "undergraduate", "start": "2015-07", "end": "2019-05", "grade": { "value": "8.2/10", "kind": "cgpa", "text": "CGPA 8.2/10" } }
+      ]
+    },
+    {
+      "kind": "experience",
+      "heading": "Research and Teaching",
+      "items": [
+        { "organization": "IIT Madras", "title": "Teaching Assistant", "type": "employment", "start": "2022-01", "end": "2024-05", "location": "Chennai", "bullets": ["Ran laboratory sessions for the undergraduate course on phase transformations."] },
+        { "organization": "Max Planck Institute for Iron Research", "title": "Visiting Researcher", "type": "internship", "start": "2023-06", "end": "2023-09", "location": "Düsseldorf, Germany", "bullets": ["Characterised hydrogen embrittlement in high-entropy alloys with atom probe tomography."] }
+      ]
+    },
+    {
+      "kind": "publications",
+      "heading": "Publications",
+      "items": [
+        { "title": "Hydrogen trapping at grain boundaries in a CoCrFeNiMn high-entropy alloy", "venue": "Acta Materialia", "date": "2024" },
+        { "title": "Machine-learned interatomic potentials for refractory alloys", "venue": "npj Computational Materials", "date": "2023" },
+        { "title": "Corrosion of additively manufactured stainless steel in seawater", "venue": "Corrosion Science", "date": "2022" }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Honours",
+      "items": [
+        { "title": "Prime Minister's Research Fellowship", "category": "award", "date": "2021" },
+        { "title": "Best Oral Presentation, International Conference on Advanced Materials", "category": "award", "date": "2023" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Technical Skills",
+      "groups": [
+        { "label": "Characterisation", "items": ["SEM", "TEM", "Atom Probe Tomography", "XRD"] },
+        { "label": "Computation", "items": ["Python", "LAMMPS", "VASP"] }
+      ]
+    }
+  ]
+}

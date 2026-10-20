@@ -15,8 +15,8 @@ async function POST_handler(req: Request) {
   const body = (await req.json().catch(() => null)) as { email?: string; password?: string; consent?: boolean; profileUrl?: string } | null;
   if (body?.password) {
     return NextResponse.json({
-      error: "Automated password sign-in is disabled in compliance with LinkedIn terms and security policy. Please link your profile URL or upload your student-authorized data export archive.",
-      compliantOptions: ["profile_url", "data_export_archive", "oauth"],
+      error: "Automated password sign-in is disabled in compliance with LinkedIn terms and security policy. Enter your public profile URL and use Extract LinkedIn Profile instead.",
+      compliantOptions: ["profile_url", "public_profile_extraction"],
     }, { status: 400 });
   }
   if (body?.consent !== true) return NextResponse.json({ error: "Please confirm your consent to link your LinkedIn profile." }, { status: 400 });

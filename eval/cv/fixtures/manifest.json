@@ -1,0 +1,143 @@
+{
+  "renderVersion": 1,
+  "documents": [
+    {
+      "file": "aarav-fresher--pdf-single.pdf",
+      "spec": "aarav-fresher",
+      "variant": "pdf-single",
+      "sha256": "5d8045e1eb6a872dfabd61fd0c7f14272eb64a4301d655e997a7aa50f658107d"
+    },
+    {
+      "file": "aarav-fresher--docx-plain.docx",
+      "spec": "aarav-fresher",
+      "variant": "docx-plain",
+      "sha256": "e416c3d5983f0d2ffb6d8986127d0d5c20c20996f2016a4169752e1fd97092b0"
+    },
+    {
+      "file": "aarav-fresher--scan-good.pdf",
+      "spec": "aarav-fresher",
+      "variant": "scan-good",
+      "sha256": "997f2b8c11512bb0d6543a795b32d2d2142a89d8a11807c5b623d4be8f519e37"
+    },
+    {
+      "file": "ananya-dates--pdf-single.pdf",
+      "spec": "ananya-dates",
+      "variant": "pdf-single",
+      "sha256": "6edc07a611e142101fada5678aaec5547002186a1f2e10dae5bfa1f22eb4cbde"
+    },
+    {
+      "file": "arjun-duplicates--pdf-single.pdf",
+      "spec": "arjun-duplicates",
+      "variant": "pdf-single",
+      "sha256": "7662b6223867c24b9083cfa5ac2bc01652c235f0d9891a57c457365dffc409b1"
+    },
+    {
+      "file": "fatima-volunteer--pdf-single.pdf",
+      "spec": "fatima-volunteer",
+      "variant": "pdf-single",
+      "sha256": "98076c80f4b6678ca7bfcef140c935a20b116d053007fe45305bad7dd068e9d4"
+    },
+    {
+      "file": "fatima-volunteer--docx-table.docx",
+      "spec": "fatima-volunteer",
+      "variant": "docx-table",
+      "sha256": "7f67ea226bb22408d5ee652d0e2e3edb5d99e32ead0523656808ddaaded2ef70"
+    },
+    {
+      "file": "kabir-internships--pdf-single.pdf",
+      "spec": "kabir-internships",
+      "variant": "pdf-single",
+      "sha256": "512d9d9a1f37ded6c80c5a8e6b161ceb5e95beaba71098542dfe5a6938928f60"
+    },
+    {
+      "file": "kabir-internships--png.png",
+      "spec": "kabir-internships",
+      "variant": "png",
+      "sha256": "7ad1c3434ca35bef1f3ad2d05fd41e84c9bd3302241fc8e436e2025ebfa15277"
+    },
+    {
+      "file": "meera-research--pdf-multipage.pdf",
+      "spec": "meera-research",
+      "variant": "pdf-multipage",
+      "sha256": "1117462d24f905155fbb0ea95bdeaa641ca4234b9e0d5154d16ce0e0fa820ecb"
+    },
+    {
+      "file": "meera-research--docx-plain.docx",
+      "spec": "meera-research",
+      "variant": "docx-plain",
+      "sha256": "3bca0b6c76f295a352d6e037b397e5bec4b61198bb962ff9c773e4c4e34a4c56"
+    },
+    {
+      "file": "priya-sidebar--pdf-sidebar.pdf",
+      "spec": "priya-sidebar",
+      "variant": "pdf-sidebar",
+      "sha256": "f85fe0ec5e323f91cb3d5c9b1f855b379e95df321f6e3eaddc64a09620fba2cb"
+    },
+    {
+      "file": "priya-sidebar--scan-good.pdf",
+      "spec": "priya-sidebar",
+      "variant": "scan-good",
+      "sha256": "9ffab36c6157f5beca8abc9e5b2f8f9705f77e72ac3ec21ef82471ea8cd3aab9"
+    },
+    {
+      "file": "priya-sidebar--scan-poor.pdf",
+      "spec": "priya-sidebar",
+      "variant": "scan-poor",
+      "sha256": "8918267dfac17cc6d87c5b2dccec4caf5ab3ca7c0dd87b3d11517c776952efa9"
+    },
+    {
+      "file": "rohan-tables--docx-table.docx",
+      "spec": "rohan-tables",
+      "variant": "docx-table",
+      "sha256": "8537f7f91585e9b6c1ad793652c351ead0c0d1a7439c14bc2a593f23f0cd3d8a"
+    },
+    {
+      "file": "rohan-tables--pdf-table.pdf",
+      "spec": "rohan-tables",
+      "variant": "pdf-table",
+      "sha256": "f514f911c83cbd5b8b9ffcbb54a9f43c088deab7e548b1f16cdfba036345950a"
+    },
+    {
+      "file": "sara-unconventional--pdf-single.pdf",
+      "spec": "sara-unconventional",
+      "variant": "pdf-single",
+      "sha256": "225f9ab552a9ace746efe6b457e8fa1ffad214bfce75fa774e35b5e5dc8a8b6b"
+    },
+    {
+      "file": "sara-unconventional--docx-plain.docx",
+      "spec": "sara-unconventional",
+      "variant": "docx-plain",
+      "sha256": "2f72117dafd35ffd7b78a799aa2faf3dbff38efb26f6c66073a8ec31fdcfad8c"
+    },
+    {
+      "file": "vikram-minimal--pdf-single.pdf",
+      "spec": "vikram-minimal",
+      "variant": "pdf-single",
+      "sha256": "90f1885d4af86d3ae121423ba967e03fbec6b7c9ee239f83cc1c3ea70c700ded"
+    },
+    {
+      "file": "vikram-minimal--docx-plain.docx",
+      "spec": "vikram-minimal",
+      "variant": "docx-plain",
+      "sha256": "d618106730a283e14d0635236538574c1568bd31f60fcae6d7dacb8851334d7b"
+    },
+    {
+      "file": "vikram-minimal--jpg.jpg",
+      "spec": "vikram-minimal",
+      "variant": "jpg",
+      "sha256": "ff5e067c1c7ab9124d4ce8844c730d9baffc0c8d4564cb6bf949f749e4d2133c"
+    },
+    {
+      "file": "zoe-unicode--pdf-sidebar.pdf",
+      "spec": "zoe-unicode",
+      "variant": "pdf-sidebar",
+      "sha256": "b62596f1f700b0b01159e868345beff64fa953718b4c3c753a230e448f11fcb4"
+    },
+    {
+      "file": "zoe-unicode--docx-plain.docx",
+      "spec": "zoe-unicode",
+      "variant": "docx-plain",
+      "sha256": "dfa7dad07ae9eb5a9e287cd601a0b3b2fe92054981a6d463a1324be6551a5138"
+    }
+  ]
+}

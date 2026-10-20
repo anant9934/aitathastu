@@ -1,0 +1,58 @@
+{
+  "id": "rahul-pm-sidebar",
+  "description": "Held-out: product manager in a sidebar template, MBA, metric-heavy bullets, volunteering",
+  "tags": ["holdout", "two-column", "sidebar", "product", "volunteering"],
+  "variants": ["pdf-sidebar"],
+  "dateStyle": "num",
+  "rangeSep": " - ",
+  "person": {
+    "name": "Rahul Menon",
+    "headline": "Senior Product Manager",
+    "email": "rahul.menon.pm@example.in",
+    "phone": "+91 98450 66778",
+    "location": "Bengaluru, Karnataka",
+    "links": [{ "label": "LinkedIn", "url": "https://www.linkedin.com/in/rahulmenonpm", "display": "linkedin.com/in/rahulmenonpm" }]
+  },
+  "summary": "Product manager who has shipped payments and lending products used by more than ten million customers.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "PhonePe", "title": "Senior Product Manager", "type": "employment", "start": "2021-08", "current": true, "location": "Bengaluru", "bullets": ["Own the UPI Lite roadmap; daily transactions grew from 0.4 to 3.1 million in 18 months.", "Led a 22-person team across engineering, design and risk."] },
+        { "organization": "Myntra", "title": "Product Manager", "type": "employment", "start": "2018-06", "end": "2021-07", "location": "Bengaluru", "bullets": ["Launched size recommendations that reduced returns by 11%."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Indian Institute of Management Kozhikode", "degree": "MBA", "level": "postgraduate", "start": "2016-06", "end": "2018-04" },
+        { "institution": "National Institute of Technology Calicut", "degree": "B.Tech", "field": "Computer Science and Engineering", "level": "undergraduate", "start": "2011-07", "end": "2015-05" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "sidebar": true,
+      "groups": [{ "items": ["Product Strategy", "SQL", "Mixpanel", "Figma", "A/B Testing", "JIRA"] }]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "sidebar": true,
+      "items": [{ "name": "Certified Scrum Product Owner", "issuer": "Scrum Alliance", "date": "2019-08" }]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Volunteering",
+      "items": [{ "organization": "Akshaya Patra Foundation", "role": "Volunteer Mentor", "start": "2019-01", "current": true, "bullets": ["Mentor two school-meal programme coordinators on data reporting."] }]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "sidebar": true,
+      "items": [{ "language": "Malayalam", "proficiency": "Native" }, { "language": "English", "proficiency": "Fluent" }, { "language": "Kannada", "proficiency": "Basic" }]
+    }
+  ]
+}

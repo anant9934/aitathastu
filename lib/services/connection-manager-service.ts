@@ -25,7 +25,7 @@ export const BADGE_LABEL: Record<ConnectionBadge, string> = {
 
 const META: Record<ManagedSource, { title: string; what: string; handleLabel: string | null; syncable: boolean }> = {
   github: { title: "GitHub", what: "Public repositories, languages and project evidence.", handleLabel: null, syncable: true },
-  linkedin: { title: "LinkedIn", what: "Roles, education and listed skills, imported once with your consent.", handleLabel: null, syncable: false },
+  linkedin: { title: "LinkedIn", what: "Roles, education, skills and more from your public profile, extracted when you ask.", handleLabel: null, syncable: false },
   leetcode: { title: "LeetCode", what: "Problems solved, contest rating and topic tags.", handleLabel: "LeetCode username", syncable: true },
   hackerrank: { title: "HackerRank", what: "Skill badges and certificates.", handleLabel: "HackerRank username", syncable: true },
   kaggle: { title: "Kaggle", what: "Competitions, datasets and notebooks.", handleLabel: "Kaggle username", syncable: true },
@@ -139,7 +139,7 @@ export async function updateHandle(personId: string, rawSource: unknown, rawHand
 /** Checks a sync can start; the route then runs runManagedSync after responding. */
 export async function assertSyncable(personId: string, rawSource: unknown): Promise<ManagedSource> {
   const source = parseManagedSource(rawSource);
-  if (!META[source].syncable) throw new ConnectionManagerError("LinkedIn imports once when you connect it; there is nothing to refresh.");
+  if (!META[source].syncable) throw new ConnectionManagerError("Refresh LinkedIn from its card with Refresh profile.");
   const conn = await getExternalConnectionByProvider(personId, source);
   if (!conn || conn.status === "disconnected") throw new ConnectionManagerError(`Connect ${META[source].title} first.`, 409);
   return source;

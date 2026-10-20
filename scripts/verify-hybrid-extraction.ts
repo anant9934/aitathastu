@@ -73,7 +73,8 @@ test("Phase 1: Deterministic baseline extracts structured data without LLM", () 
   // Identity & Contact
   assert.equal(det.profile.fullName, "PRIYA RAMAN");
   assert.equal(det.profile.email, "priya.raman@example.com");
-  assert.equal(det.profile.mobile, undefined, "Phone extraction is strictly prohibited per V4 privacy guarantee");
+  // Phone policy (cv-extract/3.0): the candidate's own number is a review-only candidate (the student must tick it); never pre-filled, never sent to an LLM.
+  assert.match(det.profile.mobile ?? "", /^\+?[\d\s-]{10,}$/);
   assert.equal(det.profile.location, "Bengaluru, Karnataka");
 
   // Education

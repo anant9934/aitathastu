@@ -1,0 +1,83 @@
+{
+  "id": "meera-research",
+  "description": "Multi-page research CV with publications, repeated page header and footer, and sections that continue across pages",
+  "tags": ["multi-page", "research", "publications", "repeated-header-footer", "volunteering", "memberships"],
+  "variants": ["pdf-multipage", "docx-plain"],
+  "dateStyle": "month",
+  "rangeSep": " – ",
+  "pageHeader": "Meera Iyer — Curriculum Vitae",
+  "person": {
+    "name": "Meera Iyer",
+    "headline": "Postdoctoral Researcher, Computational Biology",
+    "email": "meera.iyer@example.ac.in",
+    "location": "Bengaluru, India",
+    "links": [
+      { "label": "Google Scholar", "url": "https://scholar.google.com/citations?user=AbCdEf123", "display": "scholar.google.com/citations?user=AbCdEf123" },
+      { "label": "ORCID", "url": "https://orcid.org/0000-0002-1825-0097", "display": "orcid.org/0000-0002-1825-0097" }
+    ]
+  },
+  "summary": "Computational biologist working on single-cell transcriptomics and gene-regulatory network inference, with six peer-reviewed publications.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Research Experience",
+      "items": [
+        { "organization": "National Centre for Biological Sciences", "title": "Postdoctoral Fellow", "type": "employment", "start": "2021-02", "current": true, "location": "Bengaluru", "bullets": ["Develop probabilistic models for inferring regulatory networks from single-cell RNA-seq data.", "Built a Nextflow pipeline that processes 1.2 million cells per run on the institute cluster.", "Co-supervise two doctoral students and one master's student.", "Wrote the computational aims of a successful DBT grant proposal worth INR 1.4 crore.", "Maintain the lab's shared reference atlas and its documentation.", "Organise the fortnightly computational journal club."] },
+        { "organization": "European Bioinformatics Institute", "title": "Research Intern", "type": "internship", "start": "2019-05", "end": "2019-08", "location": "Hinxton, United Kingdom", "bullets": ["Benchmarked six batch-correction methods on 40 public datasets.", "Contributed a Python package for metric computation that is now used by two other groups."] },
+        { "organization": "Indian Institute of Science", "title": "Teaching Assistant", "type": "employment", "start": "2016-08", "end": "2019-04", "location": "Bengaluru", "bullets": ["Taught tutorials for the graduate course on statistical genomics for three years.", "Designed weekly R programming assignments and graded 60 students per term."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Indian Institute of Science", "degree": "Ph.D.", "field": "Computational Biology", "level": "doctorate", "start": "2015-08", "end": "2020-12", "location": "Bengaluru" },
+        { "institution": "University of Hyderabad", "degree": "M.Sc.", "field": "Bioinformatics", "level": "postgraduate", "start": "2013-07", "end": "2015-05", "location": "Hyderabad" },
+        { "institution": "Mount Carmel College", "degree": "B.Sc.", "field": "Biotechnology", "level": "undergraduate", "start": "2010-06", "end": "2013-04", "location": "Bengaluru" }
+      ]
+    },
+    {
+      "kind": "publications",
+      "heading": "Publications",
+      "items": [
+        { "title": "Sparse Bayesian inference of gene-regulatory networks from single-cell data", "venue": "Nature Communications", "date": "2023" },
+        { "title": "A benchmark of batch-correction methods for single-cell transcriptomics", "venue": "Genome Biology", "date": "2022" },
+        { "title": "Cell-type specific enhancer usage during zebrafish fin regeneration", "venue": "Development", "date": "2021" },
+        { "title": "Scalable pseudotime estimation with optimal transport", "venue": "Bioinformatics", "date": "2020" },
+        { "title": "Transcriptional dynamics of the early immune response in Indian major carp", "venue": "BMC Genomics", "date": "2019" },
+        { "title": "An open atlas of regulatory elements in rice", "venue": "Nucleic Acids Research", "date": "2018" }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Awards and Fellowships",
+      "items": [
+        { "title": "DBT Junior Research Fellowship", "category": "award", "date": "2015" },
+        { "title": "Best Poster Award, ISMB 2019", "category": "award", "date": "2019" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Computational Skills",
+      "groups": [
+        { "label": "Languages", "items": ["Python", "R", "Bash"] },
+        { "label": "Workflows", "items": ["Snakemake", "Nextflow"] },
+        { "label": "Machine learning", "items": ["PyTorch", "scikit-learn"] },
+        { "label": "Infrastructure", "items": ["Linux", "SLURM", "Docker"] }
+      ]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Service and Outreach",
+      "items": [
+        { "organization": "Women in Bioinformatics India", "role": "Mentor", "start": "2021-01", "current": true, "bullets": ["Mentor undergraduate women applying to computational biology programmes."] },
+        { "organization": "Bengaluru Science Gallery", "role": "Volunteer Explainer", "start": "2017-03", "end": "2018-02", "bullets": ["Explained genomics exhibits to school groups on weekends."] }
+      ]
+    },
+    {
+      "kind": "memberships",
+      "heading": "Professional Memberships",
+      "items": [{ "title": "Member, International Society for Computational Biology" }, { "title": "Member, Indian Society of Cell Biology" }]
+    }
+  ]
+}

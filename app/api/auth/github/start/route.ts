@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getServerAuthContext } from "@/lib/auth/server-session";
 import { coreIngestionReady } from "@/lib/security/core-ingestion-gate";
-import { getCanonicalOrigin } from "@/lib/auth/origin";
+import { getCanonicalOrigin, sameHostRedirect } from "@/lib/auth/origin";
 import { safeGitHubReturnPath } from "@/lib/auth/github-return";
 
 export async function GET(req: Request) {
@@ -17,16 +17,12 @@ export async function GET(req: Request) {
 
   const auth = await getServerAuthContext();
   if (!auth) {
-    return NextResponse.redirect(
-      new URL(`/sign-in?from=${encodeURIComponent(returnTo)}`, baseUrl)
-    );
+    return sameHostRedirect(`/sign-in?from=${encodeURIComponent(returnTo)}`);
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();
   if (!clientId) {
-    return NextResponse.redirect(
-      new URL(`${returnTo}?error=github_signin_unavailable`, baseUrl)
-    );
+    return sameHostRedirect(`${returnTo}?error=github_signin_unavailable`);
   }
 
   const redirectUri = `${baseUrl}/api/auth/github/callback`;

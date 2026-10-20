@@ -1,0 +1,53 @@
+{
+  "id": "sara-unconventional",
+  "description": "Designer CV with unconventional section headings",
+  "tags": ["unconventional-headings", "design", "experienced"],
+  "variants": ["pdf-single", "docx-plain"],
+  "dateStyle": "month",
+  "rangeSep": " to ",
+  "person": {
+    "name": "Sara Thomas",
+    "headline": "Product Designer",
+    "email": "hello@sarathomas.design",
+    "location": "Kochi, Kerala",
+    "links": [{ "label": "Portfolio", "url": "https://sarathomas.design", "display": "sarathomas.design" }]
+  },
+  "summary": "Product designer focused on healthcare and accessibility, with five years of experience across research, interaction design and prototyping.",
+  "summaryHeading": "Hello",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Where I've Worked",
+      "items": [
+        { "organization": "Lumen Health", "title": "Product Designer", "type": "employment", "start": "2022-01", "current": true, "location": "Kochi", "bullets": ["Redesigned the appointment flow, increasing completed bookings by 17%.", "Run monthly usability sessions with patients over sixty."] },
+        { "organization": "Paperboat Studio", "title": "UX Designer", "type": "employment", "start": "2019-07", "end": "2021-12", "location": "Bengaluru", "bullets": ["Designed mobile banking and insurance apps for three clients."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "What I Studied",
+      "items": [
+        { "institution": "National Institute of Design", "degree": "M.Des", "field": "Interaction Design", "level": "postgraduate", "start": "2017", "end": "2019", "location": "Ahmedabad" },
+        { "institution": "Sir J.J. School of Art", "degree": "Bachelor of Fine Arts", "level": "undergraduate", "start": "2013", "end": "2017", "location": "Mumbai" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Toolbox",
+      "groups": [{ "items": ["Figma", "Sketch", "Adobe XD", "Framer", "HTML", "CSS", "User Research", "Prototyping"] }]
+    },
+    {
+      "kind": "projects",
+      "heading": "Things I've Made",
+      "items": [
+        { "name": "Clinic Queue Redesign", "technologies": ["Figma"], "bullets": ["Concept that replaces paper tokens with SMS updates for a district hospital."] },
+        { "name": "Accessible Banking App Concept", "technologies": ["Framer"], "bullets": ["Screen-reader-first banking prototype tested with twelve blind users."] }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Recognition",
+      "items": [{ "title": "Red Dot Design Award, Honourable Mention", "category": "award", "date": "2021" }]
+    }
+  ]
+}

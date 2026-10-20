@@ -1,0 +1,67 @@
+{
+  "id": "fatima-volunteer",
+  "description": "Social-sector CV with volunteering, awards, memberships and a references section whose third-party contacts must not be taken as the candidate's",
+  "tags": ["volunteering", "awards", "references", "memberships", "non-tech"],
+  "variants": ["pdf-single", "docx-table"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Fatima Sheikh",
+    "headline": "Education Programme Coordinator",
+    "email": "fatima.sheikh@example.net",
+    "phone": "+91 98190 77881",
+    "location": "Mumbai, Maharashtra",
+    "links": []
+  },
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Work Experience",
+      "items": [
+        { "organization": "Pratham Education Foundation", "title": "Programme Coordinator", "type": "employment", "start": "2021-06", "current": true, "location": "Mumbai", "bullets": ["Coordinate reading programmes in 45 municipal schools reaching 6,000 children."] }
+      ]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Volunteering",
+      "items": [
+        { "organization": "Teach For India", "role": "Volunteer Teacher", "start": "2019-06", "end": "2021-05", "bullets": ["Taught English and mathematics to a class of 38 grade-four students."] },
+        { "organization": "Goonj", "role": "Volunteer", "start": "2017", "end": "2019", "bullets": ["Organised clothing collection drives in Bandra."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Tata Institute of Social Sciences", "degree": "Master of Social Work", "level": "postgraduate", "start": "2017-07", "end": "2019-04" },
+        { "institution": "Sophia College", "degree": "B.A.", "field": "Sociology", "level": "undergraduate", "start": "2014-06", "end": "2017-04", "grade": { "value": "72%", "kind": "percentage", "text": "72%" } }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Awards",
+      "items": [
+        { "title": "Fellowship Leadership Award, Teach For India", "category": "award", "date": "2020" },
+        { "title": "First prize, Maharashtra state-level debate competition", "category": "award", "date": "2016" }
+      ]
+    },
+    {
+      "kind": "memberships",
+      "heading": "Professional Memberships",
+      "items": [{ "title": "Member, National Association of Professional Social Workers in India" }]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Urdu" }, { "language": "Hindi" }, { "language": "English" }, { "language": "Marathi" }]
+    },
+    {
+      "kind": "references",
+      "heading": "References",
+      "items": [
+        { "name": "Ms. Kavita Rao", "relation": "Programme Manager, Teach For India", "email": "kavita.rao@example.org", "phone": "+91 90000 12345" },
+        { "name": "Dr. Sunil Menon", "relation": "Professor, Tata Institute of Social Sciences", "email": "s.menon@example.edu" }
+      ]
+    }
+  ]
+}

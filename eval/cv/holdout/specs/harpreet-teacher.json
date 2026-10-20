@@ -1,0 +1,59 @@
+{
+  "id": "harpreet-teacher",
+  "description": "Held-out: school teacher, B.Ed and M.A., workshops attended, Indian languages, no links",
+  "tags": ["holdout", "non-tech", "education-sector", "training"],
+  "variants": ["docx-plain", "pdf-single"],
+  "dateStyle": "month",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Harpreet Kaur",
+    "headline": "Secondary School English Teacher",
+    "email": "harpreet.kaur.teach@example.com",
+    "phone": "98140 55667",
+    "location": "Ludhiana, Punjab",
+    "links": []
+  },
+  "summary": "English teacher with nine years of classroom experience in CBSE schools, focused on reading programmes and board-exam preparation.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Teaching Experience",
+      "items": [
+        { "organization": "Sacred Heart Convent School", "title": "TGT English", "type": "employment", "start": "2019-04", "current": true, "location": "Ludhiana", "bullets": ["Teach English to classes IX and X; 96% of students scored above 75% in the 2024 board examination.", "Started the school reading club with 140 members."] },
+        { "organization": "Guru Nanak Public School", "title": "PRT English", "type": "employment", "start": "2015-07", "end": "2019-03", "location": "Jalandhar", "bullets": ["Taught English and environmental studies to classes III to V."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Educational Qualifications",
+      "items": [
+        { "institution": "Panjab University", "degree": "M.A.", "field": "English", "level": "postgraduate", "start": "2013-07", "end": "2015-05", "grade": { "value": "68%", "kind": "percentage", "text": "68%" } },
+        { "institution": "Lovely Professional University", "degree": "B.Ed", "level": "undergraduate", "start": "2011-07", "end": "2013-05", "grade": { "value": "74%", "kind": "percentage", "text": "74%" } },
+        { "institution": "Guru Nanak Dev University", "degree": "B.A.", "field": "English Literature", "level": "undergraduate", "start": "2008-07", "end": "2011-05", "grade": { "value": "71%", "kind": "percentage", "text": "71%" } }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Workshops and Certifications",
+      "items": [
+        { "name": "Central Teacher Eligibility Test (CTET) – Paper II", "issuer": "CBSE", "date": "2016-02" },
+        { "name": "Teaching English as a Foreign Language (TEFL)", "issuer": "British Council", "date": "2020-11" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [{ "items": ["Lesson Planning", "Classroom Management", "Google Classroom", "MS Word", "Public Speaking"] }]
+    },
+    {
+      "kind": "awards",
+      "heading": "Achievements",
+      "items": [{ "title": "Best Teacher Award, Sahodaya School Complex Ludhiana", "category": "award", "date": "2022" }]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Punjabi" }, { "language": "Hindi" }, { "language": "English" }]
+    }
+  ]
+}

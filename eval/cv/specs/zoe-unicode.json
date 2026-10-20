@@ -1,0 +1,55 @@
+{
+  "id": "zoe-unicode",
+  "description": "Unicode names, curly punctuation, ligatures, decorative bullets and icon glyphs in a two-column layout",
+  "tags": ["unicode", "ligatures", "icons", "two-column", "finance"],
+  "variants": ["pdf-sidebar", "docx-plain"],
+  "dateStyle": "mon",
+  "rangeSep": " — ",
+  "ligatures": true,
+  "person": {
+    "name": "Zoë D’Souza",
+    "headline": "Financial Analyst",
+    "email": "zoe.dsouza@example.com",
+    "phone": "+91 98220 33445",
+    "location": "Panaji, Goa",
+    "contactIcons": true,
+    "links": [{ "label": "LinkedIn", "url": "https://www.linkedin.com/in/zoe-dsouza", "display": "linkedin.com/in/zoe-dsouza" }]
+  },
+  "summary": "Financial analyst with four years in corporate finance, building forecasting workflows and efficient month-end close processes.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Goa Shipyard Limited", "title": "Financial Analyst", "type": "employment", "start": "2022-02", "current": true, "location": "Vasco da Gama", "bullets": ["Built a rolling cash-flow forecast used by the CFO’s office for quarterly planning.", "Cut month-end close from nine days to five by reworking the reconciliation workflow."] },
+        { "organization": "Kotak Mahindra Bank", "title": "Junior Analyst", "type": "employment", "start": "2020-07", "end": "2022-01", "location": "Mumbai", "bullets": ["Prepared credit memos for mid-market borrowers in the hospitality sector."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Goa Institute of Management", "degree": "PGDM", "field": "Finance", "level": "postgraduate", "start": "2018-06", "end": "2020-04" },
+        { "institution": "St. Xavier’s College, Mapusa", "degree": "B.Com", "level": "undergraduate", "start": "2015-06", "end": "2018-04", "grade": { "value": "78%", "kind": "percentage", "text": "78%" } }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "sidebar": true,
+      "groups": [{ "items": ["Financial Modelling", "Excel", "SAP FICO", "Power BI", "Python"] }]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "sidebar": true,
+      "items": [{ "name": "CFA Level II", "issuer": "CFA Institute", "date": "2023-08" }]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "sidebar": true,
+      "items": [{ "language": "English" }, { "language": "Konkani" }, { "language": "Portuguese" }]
+    }
+  ]
+}

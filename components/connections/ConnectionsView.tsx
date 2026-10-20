@@ -107,7 +107,7 @@ export function ConnectionsView() {
             <PanelHeader id="accts-title" title="Accounts" />
             <div className="flex flex-col gap-4">
               <GitHubConnectCard returnTo="/student/connections" onPublicOnly={(username) => api.importFrom("github", username)} />
-              <ConnectorList api={api} exclude={["github"]} />
+              <ConnectorList api={api} exclude={["github", "linkedin"]} />
             </div>
           </Panel>
         </div>

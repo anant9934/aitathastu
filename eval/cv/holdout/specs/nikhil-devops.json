@@ -1,0 +1,63 @@
+{
+  "id": "nikhil-devops",
+  "description": "Held-out: DevOps engineer, two-digit years, credential IDs and URLs, grouped skills",
+  "tags": ["holdout", "experienced", "two-digit-years", "certifications"],
+  "variants": ["pdf-single", "docx-plain"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Nikhil Bhatt",
+    "headline": "Site Reliability Engineer",
+    "email": "nikhil.bhatt.sre@example.com",
+    "phone": "+91 97111 22334",
+    "location": "Noida, Uttar Pradesh",
+    "links": [
+      { "label": "GitHub", "url": "https://github.com/nbhatt-sre", "display": "github.com/nbhatt-sre" },
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/nikhilbhatt", "display": "linkedin.com/in/nikhilbhatt" }
+    ]
+  },
+  "summary": "Site reliability engineer who has run production Kubernetes for fintech and e-commerce platforms for six years.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Professional Experience",
+      "items": [
+        { "organization": "Paytm", "title": "Senior Site Reliability Engineer", "type": "employment", "start": "2022-03", "current": true, "location": "Noida", "bullets": ["Run 40 production Kubernetes clusters across two regions with 99.95% availability.", "Cut incident mean time to recovery from 48 to 19 minutes with runbook automation."] },
+        { "organization": "Snapdeal", "title": "DevOps Engineer", "type": "employment", "start": "2019-01", "end": "2022-02", "dateText": "Jan '19 – Feb '22", "location": "Gurugram", "bullets": ["Moved 120 services from virtual machines to containers on AWS.", "Built the Terraform module library used by every product team."] },
+        { "organization": "HCLTech", "title": "Graduate Engineer Trainee", "type": "internship", "start": "2018-07", "end": "2018-12", "location": "Noida", "bullets": ["Supported Linux server patching for a banking client."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Jaypee Institute of Information Technology", "degree": "B.Tech", "field": "Electronics and Communication Engineering", "level": "undergraduate", "start": "2014-07", "end": "2018-06", "grade": { "value": "7.4/10", "kind": "cgpa", "text": "CGPA 7.4/10" }, "location": "Noida" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [
+        { "label": "Cloud", "items": ["AWS", "Google Cloud"] },
+        { "label": "Containers", "items": ["Kubernetes", "Docker", "Helm"] },
+        { "label": "Infrastructure as code", "items": ["Terraform", "Ansible"] },
+        { "label": "Observability", "items": ["Prometheus", "Grafana", "OpenTelemetry"] },
+        { "label": "Languages", "items": ["Go", "Python", "Bash"] }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Certified Kubernetes Administrator (CKA)", "issuer": "The Linux Foundation", "date": "2021-06", "credentialId": "LF-CKA-77310" },
+        { "name": "AWS Certified DevOps Engineer – Professional", "issuer": "Amazon Web Services", "date": "2023-01" },
+        { "name": "HashiCorp Certified: Terraform Associate", "issuer": "HashiCorp", "date": "2020-09" }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Hindi" }, { "language": "English" }, { "language": "Garhwali" }]
+    }
+  ]
+}

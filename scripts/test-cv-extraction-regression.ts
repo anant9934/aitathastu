@@ -259,7 +259,8 @@ test("Phase 10.1 — Archetype 1 (Native Single-Column, Anant Kumar Pattern) Hig
   // 1. Identity & Contacts
   assert.equal(result.profile.fullName, "Alex Mercer");
   assert.equal(result.profile.email, "alex.mercer@testmail.com");
-  assert.equal(result.profile.mobile, undefined, "V6 Privacy Guarantee: Mobile numbers must never be extracted from CV");
+  // Phone policy (cv-extract/3.0): the candidate's own number is a review-only candidate (the student must tick it); never pre-filled, never sent to an LLM.
+  assert.equal(result.profile.mobile?.replace(/\D/g, "").slice(-10), "9123456789");
   assert.equal(result.profile.location, "Jaipur, Rajasthan, India");
 
   // 2. Education (3 distinct tiers preserved without placeholder values)
@@ -269,7 +270,8 @@ test("Phase 10.1 — Archetype 1 (Native Single-Column, Anant Kumar Pattern) Hig
   assert.match(edu1.institution, /Apex Global University/i);
   assert.equal(edu1.degree, "B.Tech");
   assert.equal(edu1.gpa, "8.84 / 10");
-  assert.equal(edu1.startDate, "2025");
+  // The source says "Aug. 2025": month precision is kept (the old "2025" dropped it).
+  assert.equal(edu1.startDate, "Aug. 2025");
   assert.equal(edu1.endDate, "Present");
 
   assert.match(edu2.institution, /Heritage Mission School/i);
@@ -411,7 +413,8 @@ test("Phase 10.4 — Archetype 4 (Scanned 2-Column Banner, Emily Saavedra) UK Ho
   assert.equal(result.interpretation.education.length, 2, "Must extract both university and IB diploma");
   const uni = result.interpretation.education.find((e) => /Chichester/i.test(e.institution));
   assert.ok(uni, "Chichester University must be extracted");
-  assert.match(uni.degree, /Mathematics and Statistics/i);
+  // The CV names the subject only; it is the field of study, not an invented degree.
+  assert.match(uni.degree || uni.fieldOfStudy || "", /Mathematics and Statistics/i);
 
   const ib = result.interpretation.education.find((e) => /Estepona/i.test(e.institution));
   assert.ok(ib, "IB institution must be extracted");
@@ -424,9 +427,12 @@ test("Phase 10.4 — Archetype 4 (Scanned 2-Column Banner, Emily Saavedra) UK Ho
 
   // 4. Natural Languages
   const skillNames = result.interpretation.skills.map((s) => s.name);
-  assert.ok(skillNames.includes("Spanish"), "Must recognize Spanish");
-  assert.ok(skillNames.includes("English"), "Must recognize English");
-  assert.ok(skillNames.includes("French"), "Must recognize French");
+  // Spoken languages are kept apart from technical skills (cv-extract/3.0).
+  const languages = (result.interpretation.languages ?? []).map((l) => l.language);
+  assert.ok(languages.includes("Spanish"), "Must recognize Spanish as a spoken language");
+  assert.ok(!skillNames.includes("Spanish"), "Spanish is not a technical skill");
+  assert.ok(languages.includes("English"), "Must recognize English");
+  assert.ok(languages.includes("French"), "Must recognize French");
 
   // 5. Certification
   assert.ok(result.interpretation.certifications.length >= 1, "Must extract BCS certification");

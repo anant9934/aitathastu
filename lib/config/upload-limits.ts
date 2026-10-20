@@ -9,3 +9,18 @@
  */
 export const RESUME_MAX_UPLOAD_MB = 4;
 export const RESUME_MAX_UPLOAD_BYTES = RESUME_MAX_UPLOAD_MB * 1024 * 1024;
+
+/** File types a CV may be uploaded as. Images and scanned PDFs are read by the OCR extractor. */
+export const RESUME_ACCEPTED_EXTENSIONS = ["pdf", "docx", "png", "jpg", "jpeg"] as const;
+export type ResumeExtension = (typeof RESUME_ACCEPTED_EXTENSIONS)[number];
+export const RESUME_MIME_BY_EXTENSION: Record<ResumeExtension, string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+};
+/** Largest accepted image side, in pixels (decompression-bomb guard). */
+export const RESUME_MAX_IMAGE_SIDE = 8000;
+/** Most pages a CV may have; longer documents are rejected before parsing. */
+export const RESUME_MAX_PAGES = 10;

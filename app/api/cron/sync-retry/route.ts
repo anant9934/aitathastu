@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runDueRetries, runScheduledFootprintRefresh } from "@/lib/sync/runners";
 import { resumeStalledImports } from "@/lib/services/github-import-job";
+import { resumeStalledExtractions } from "@/lib/services/linkedin-extraction-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
   const refresh = await runScheduledFootprintRefresh({ limit: 20 });
   // GitHub imports nobody is watching continue here; ones silent for a day are closed as failed.
   const githubImports = await resumeStalledImports({ limit: 3, budgetMs: 15_000 });
-  return NextResponse.json({ retries, refresh, githubImports });
+  // Same for LinkedIn extractions: unattended ones continue, ones silent for hours are closed.
+  const linkedinExtractions = await resumeStalledExtractions({ limit: 3, budgetMs: 10_000 });
+  return NextResponse.json({ retries, refresh, githubImports, linkedinExtractions });
 }
 

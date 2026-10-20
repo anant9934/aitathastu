@@ -1,391 +1,300 @@
 "use client";
 
 /**
- * LinkedIn profile connection — three distinct paths:
- *   1. Link profile URL — saves a reference_only connection, no data import.
- *   2. Extract public profile — Apify-powered extraction (requires server configuration).
- *   3. Upload LinkedIn data export — CSV/ZIP/JSON import via the existing parser.
+ * LinkedIn: extract the student's public profile from its URL.
  *
- * Automated password login is permanently disabled (LinkedIn ToS).
+ * One URL field and one action at a time (Extract, Refresh, or Retry), with
+ * progress while the server-side job runs, what was saved per section, and the
+ * saved details. The job lives on the server, so leaving and coming back shows
+ * the same state. When extraction isn't configured on this server, the profile
+ * link can still be saved on its own.
+ *
+ * No LinkedIn password, session or data export is ever asked for.
  * This step is optional; onboarding and scoring work without it.
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  LinkedinLogo, LinkSimple, Upload, Spinner, CheckCircle, WarningCircle, MagnifyingGlass,
-} from "@phosphor-icons/react/dist/ssr";
-import { requestJson, describeError } from "@/lib/client/api";
+import { LinkedinLogo, MagnifyingGlass, ArrowsClockwise, CheckCircle, WarningCircle, Spinner, CaretDown } from "@phosphor-icons/react/dist/ssr";
+import { requestJson, describeError, waitPhrase } from "@/lib/client/api";
+import { formatDate } from "@/lib/client/format";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/Field";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { Banner } from "@/components/ui/Banner";
 
-type ImportResult = {
-  ok: boolean;
-  status?: string;
-  totalRecords?: number;
-  positions?: number;
-  education?: number;
-  skills?: number;
-  certifications?: number;
-  recordsDiscovered?: number;
-  recordsPersisted?: number;
-  lastExtractedAt?: string | null;
-  message?: string;
-  error?: string;
+type Kind = "experience" | "education" | "skill" | "language" | "certification" | "course" | "project" | "publication" | "volunteering" | "honor" | "link";
+type State = "not_connected" | "ready" | "queued" | "running" | "succeeded" | "partial" | "failed" | "cancelled";
+type JobView = {
+  id: string; state: State; trigger: "initial" | "refresh" | "retry"; step: "waiting" | "starting" | "extracting" | "saving" | "done";
+  attempt: number; maxAttempts: number; retryAt: string | null; profileUrl: string; message: string | null;
+  counts: Partial<Record<Kind, number>>; unavailableSections: Kind[];
+};
+type SavedRecord = { kind: Kind; data: Record<string, unknown>; missing: boolean };
+type Snapshot = {
+  configured: boolean; notConfiguredMessage?: string; state: State; profileUrl: string | null; lastSuccessfulAt: string | null;
+  job: JobView | null; profile: { fullName: string | null; headline: string | null; location: string | null; about: string | null } | null;
+  counts: Record<Kind, number> | null; records: SavedRecord[];
 };
 
-type ExtractionState =
-  | "idle"          // not started
-  | "queued"        // actor started, polling
-  | "extracting"    // still running
-  | "synced"        // success
-  | "partial"       // some records
-  | "no_results"    // actor returned nothing
-  | "failed"        // actor or network error
-  | "not_configured"; // no actor in env
+const SECTIONS: Array<{ kind: Kind; label: string }> = [
+  { kind: "experience", label: "Experience" }, { kind: "education", label: "Education" }, { kind: "skill", label: "Skills" },
+  { kind: "language", label: "Languages" }, { kind: "certification", label: "Certifications" }, { kind: "course", label: "Courses" },
+  { kind: "project", label: "Projects" }, { kind: "publication", label: "Publications" }, { kind: "volunteering", label: "Volunteering" },
+  { kind: "honor", label: "Honors & awards" }, { kind: "link", label: "Websites" },
+];
+const STEP_TEXT: Record<JobView["step"], string> = {
+  waiting: "Waiting to start…", starting: "Contacting the extraction service…", extracting: "Reading your public profile…", saving: "Saving what was found…", done: "",
+};
+const ACTIVE = (s: State | undefined) => s === "queued" || s === "running";
+const s = (v: unknown) => (typeof v === "string" ? v : "");
 
-type Mode = "idle" | "url" | "upload" | "extract";
+function recordLine(r: SavedRecord): { title: string; detail: string } {
+  const d = r.data;
+  const dates = [s(d.startDate), d.current ? "Present" : s(d.endDate)].filter(Boolean).join(" – ");
+  switch (r.kind) {
+    case "experience": return { title: `${s(d.title)} · ${s(d.company)}`, detail: [dates, s(d.location)].filter(Boolean).join(" · ") };
+    case "education": return { title: s(d.institution), detail: [s(d.degree), s(d.fieldOfStudy), dates].filter(Boolean).join(" · ") };
+    case "certification": case "course": return { title: s(d.name), detail: [s(d.issuer), s(d.issueDate)].filter(Boolean).join(" · ") };
+    case "language": return { title: s(d.name), detail: s(d.proficiency) };
+    case "volunteering": return { title: [s(d.role), s(d.organization)].filter(Boolean).join(" · "), detail: dates };
+    case "link": return { title: s(d.url), detail: s((d.website as Record<string, unknown> | undefined)?.title) };
+    case "skill": return { title: s(d.name), detail: "" };
+    default: return { title: s(d.title), detail: [s(d.publisher) || s(d.issuer) || s(d.organization), s(d.date)].filter(Boolean).join(" · ") };
+  }
+}
 
 export function LinkedInConnect({ onSettled }: { onSettled?: (state: string) => void }) {
-  const [mode, setMode] = useState<Mode>("idle");
-  const [urlDone, setUrlDone] = useState(false);
-  const [importDone, setImportDone] = useState(false);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
-
-  // URL linking
-  const [profileUrl, setProfileUrl] = useState("");
+  const [snap, setSnap] = useState<Snapshot | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
-  const [urlBusy, setUrlBusy] = useState(false);
-
-  // CSV upload
-  const [file, setFile] = useState<File | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadBusy, setUploadBusy] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Apify extraction
-  const [extractionState, setExtractionState] = useState<ExtractionState>("idle");
-  const [extractionBusy, setExtractionBusy] = useState(false);
-  const [extractionError, setExtractionError] = useState<string | null>(null);
-  const [extractionMsg, setExtractionMsg] = useState<string | null>(null);
-  const [extractionRecords, setExtractionRecords] = useState<number | null>(null);
-  const [extractionConfigured, setExtractionConfigured] = useState<boolean | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [linkSaved, setLinkSaved] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollDelay = useRef(2500);
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
+  const wasActive = useRef(false);
 
-  // A profile link saved earlier is server state; show it after a refresh too.
-  useEffect(() => {
-    void requestJson<{ connectors?: Array<{ provider: string; status: string; profileUrl: string | null }> }>("/api/student/connections", { cache: "no-store" }).then((res) => {
-      if (!res.ok) return;
-      const li = res.data.connectors?.find((c) => c.provider === "linkedin");
-      if (li && li.status !== "not_connected" && li.status !== "disconnected" && li.profileUrl) {
-        setUrlDone(true);
-        setProfileUrl((u) => u || li.profileUrl || "");
-      }
-    });
+  const load = useCallback(async () => {
+    const res = await requestJson<Snapshot>("/api/student/linkedin/extract", { cache: "no-store" });
+    if (!res.ok) { setLoadError(describeError(res.error)); return null; }
+    setLoadError(null);
+    setSnap(res.data);
+    setUrl((u) => u || res.data.profileUrl || "");
+    const active = ACTIVE(res.data.job?.state);
+    if (wasActive.current && !active && (res.data.state === "succeeded" || res.data.state === "partial")) onSettledRef.current?.("succeeded");
+    wasActive.current = active;
+    return res.data;
   }, []);
 
-  // Check extraction configuration once on mount
-  useEffect(() => {
-    void requestJson<ImportResult>("/api/student/linkedin/extract").then((res) => {
-      if (res.ok) {
-        const st = res.data.status;
-        setExtractionConfigured(st !== "not_configured");
-        if (st === "synced" || st === "partially_extracted") {
-          setExtractionState(st === "synced" ? "synced" : "partial");
-          setExtractionRecords(res.data.recordsPersisted ?? null);
-        } else if (st === "extraction_queued" || st === "extracting") {
-          setExtractionState("queued");
-          schedulePoll();
-        }
-      } else {
-        setExtractionConfigured(false);
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const schedulePoll = useCallback(() => {
+  const schedule = useCallback(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
     pollRef.current = setTimeout(async () => {
-      const res = await requestJson<ImportResult>("/api/student/linkedin/extract");
-      if (!res.ok) { setExtractionState("failed"); return; }
-      const st = res.data.status;
-      if (st === "extracting" || st === "extraction_queued") {
-        setExtractionState("extracting");
-        schedulePoll();
-      } else if (st === "synced") {
-        setExtractionState("synced");
-        setExtractionRecords(res.data.recordsPersisted ?? null);
-        onSettled?.("succeeded");
-      } else if (st === "partially_extracted") {
-        setExtractionState("partial");
-        setExtractionRecords(res.data.recordsPersisted ?? null);
-        onSettled?.("succeeded");
-      } else if (st === "no_results") {
-        setExtractionState("no_results");
-      } else {
-        setExtractionState("failed");
-        setExtractionError(res.data.message ?? "Extraction failed.");
+      const data = await load();
+      if (data && ACTIVE(data.job?.state)) {
+        pollDelay.current = Math.min(8000, pollDelay.current * 1.4);
+        schedule();
       }
-    }, 4000);
-  }, [onSettled]);
+    }, pollDelay.current);
+  }, [load]);
 
-  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
+  useEffect(() => {
+    void load().then((data) => { if (data && ACTIVE(data.job?.state)) schedule(); });
+    return () => { if (pollRef.current) clearTimeout(pollRef.current); };
+  }, [load, schedule]);
 
-  const linkUrl = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUrlError(null);
-    if (!profileUrl.trim()) { setUrlError("Enter your LinkedIn profile URL."); return; }
-    setUrlBusy(true);
-    const res = await requestJson<{ state?: string; error?: string }>("/api/student/linkedin", {
-      method: "POST",
-      json: { profileUrl: profileUrl.trim(), consent: true },
-    });
-    setUrlBusy(false);
-    if (!res.ok) { setUrlError(res.error?.message ?? describeError(res.error)); return; }
-    setUrlDone(true);
-    setMode("idle");
-    onSettled?.("succeeded");
-  }, [profileUrl, onSettled]);
-
-  const uploadFile = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUploadError(null);
-    if (!file) { setUploadError("Select a file first."); return; }
-    setUploadBusy(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await requestJson<ImportResult>("/api/student/linkedin/import", { method: "POST", body: fd });
-    setUploadBusy(false);
-    if (!res.ok) { setUploadError(res.error?.message ?? describeError(res.error)); return; }
-    setImportResult(res.data);
-    setImportDone(true);
-    setMode("idle");
-    setFile(null);
-    onSettled?.("succeeded");
-  }, [file, onSettled]);
-
-  const startExtract = useCallback(async () => {
-    setExtractionError(null);
-    const url = profileUrl.trim();
-    if (!url) { setExtractionError("Enter your LinkedIn profile URL first."); return; }
-    setExtractionBusy(true);
-    const res = await requestJson<ImportResult>("/api/student/linkedin/extract", {
-      method: "POST",
-      json: { profileUrl: url },
-    });
-    setExtractionBusy(false);
+  const act = useCallback(async (action: "start" | "retry" | "refresh") => {
+    setActionError(null);
+    const value = url.trim();
+    if (action === "start" && !value) { setUrlError("Enter your LinkedIn profile URL."); return; }
+    setBusy(true);
+    const res = await requestJson<{ job: JobView }>("/api/student/linkedin/extract", { method: "POST", json: { action, ...(value ? { profileUrl: value } : {}) } });
+    setBusy(false);
     if (!res.ok) {
-      const errData = res.data as { status?: string; message?: string } | undefined;
-      const st = errData?.status;
-      if (st === "not_configured") {
-        setExtractionConfigured(false);
-        setExtractionError("Apify extraction is not configured on this server.");
-      } else {
-        setExtractionState("failed");
-        setExtractionError(errData?.message ?? describeError(res.error));
-      }
+      if (res.error.code === "invalid_url") setUrlError(res.error.message);
+      else setActionError(res.error.kind === "rate_limited" && res.error.code !== "cooldown" && res.error.code !== "daily_limit" ? `Too many attempts. Try again ${waitPhrase(res.error.retryAfter)}.` : describeError(res.error));
+      void load();
       return;
     }
-    const st = res.data.status;
-    if (st === "extraction_queued" || st === "extracting") {
-      setExtractionState("queued");
-      setExtractionMsg(res.data.message ?? null);
-      schedulePoll();
-    } else if (st === "synced") {
-      setExtractionState("synced");
-      setExtractionRecords(res.data.recordsPersisted ?? null);
-      onSettled?.("succeeded");
-    } else if (st === "partially_extracted") {
-      setExtractionState("partial");
-      setExtractionRecords(res.data.recordsPersisted ?? null);
-      onSettled?.("succeeded");
-    } else if (st === "no_results") {
-      setExtractionState("no_results");
-    } else {
-      setExtractionState("failed");
-      setExtractionError(res.data.message ?? "Extraction failed.");
-    }
-  }, [profileUrl, schedulePoll, onSettled]);
+    wasActive.current = true;
+    pollDelay.current = 2500;
+    setSnap((prev) => (prev ? { ...prev, state: res.data.job.state, job: res.data.job } : prev));
+    schedule();
+  }, [url, load, schedule]);
 
-  const reset = () => { setMode("idle"); setUrlError(null); setUploadError(null); setFile(null); setExtractionError(null); };
+  const cancel = useCallback(async () => {
+    setBusy(true);
+    const res = await requestJson("/api/student/linkedin/extract", { method: "DELETE" });
+    setBusy(false);
+    if (!res.ok && res.status !== 409) setActionError(describeError(res.error));
+    void load();
+  }, [load]);
 
-  const extractionLabel: string | null =
-    extractionState === "queued" || extractionState === "extracting"
-      ? extractionMsg ?? "Extracting profile data…"
-      : extractionState === "synced"
-      ? `Extracted${extractionRecords != null ? ` ${extractionRecords} records` : ""}. Review in the next step.`
-      : extractionState === "partial"
-      ? `Partially extracted${extractionRecords != null ? ` (${extractionRecords} records)` : ""}.`
-      : extractionState === "no_results"
-      ? "No profile data found. Check that the profile URL is public and correct."
-      : null;
+  const saveLinkOnly = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUrlError(null);
+    if (!url.trim()) { setUrlError("Enter your LinkedIn profile URL."); return; }
+    setBusy(true);
+    const res = await requestJson("/api/student/linkedin", { method: "POST", json: { profileUrl: url.trim(), consent: true } });
+    setBusy(false);
+    if (!res.ok) { setUrlError(describeError(res.error)); return; }
+    setLinkSaved(true);
+    onSettledRef.current?.("succeeded");
+    void load();
+  }, [url, load]);
+
+  const job = snap?.job ?? null;
+  const state: State | undefined = snap?.state;
+  const active = ACTIVE(job?.state);
+  const hasProfile = Boolean(snap?.profile);
+  const normalized = (u: string) => u.trim().toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/\/+$/, "");
+  const sameUrl = Boolean(snap?.profileUrl && normalized(url) === normalized(snap.profileUrl));
+  const primary: { action: "start" | "retry" | "refresh"; label: string; icon: React.ReactNode } =
+    hasProfile && sameUrl ? { action: "refresh", label: "Refresh profile", icon: <ArrowsClockwise size={16} aria-hidden="true" /> }
+      : (state === "failed" || state === "cancelled") && sameUrl ? { action: "retry", label: "Retry extraction", icon: <ArrowsClockwise size={16} aria-hidden="true" /> }
+      : { action: "start", label: "Extract LinkedIn Profile", icon: <MagnifyingGlass size={16} aria-hidden="true" /> };
+
+  const chip = !snap ? null
+    : active ? <StatusChip tone="busy" icon={null}>{job?.state === "queued" ? "Queued" : "Extracting"}</StatusChip>
+    : state === "succeeded" ? <StatusChip tone="verified" icon={CheckCircle}>Extracted</StatusChip>
+    : state === "partial" ? <StatusChip tone="warning" icon={null}>Partly extracted</StatusChip>
+    : state === "failed" ? <StatusChip tone="danger" icon={null}>Failed</StatusChip>
+    : state === "cancelled" ? <StatusChip tone="neutral" icon={null}>Cancelled</StatusChip>
+    : state === "ready" || linkSaved ? <StatusChip tone="corroborated" icon={null}>Profile linked</StatusChip>
+    : <StatusChip tone="neutral" icon={null}>Optional</StatusChip>;
+
+  const counts = snap?.counts;
+  const unavailable = new Set(job && !active ? job.unavailableSections : []);
+  const records = snap?.records ?? [];
 
   return (
-    <section aria-labelledby="li-title" className="rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5 shadow-card">
+    <section aria-labelledby="li-title" className="rounded-card border border-border-medium bg-bg-elevated p-4 shadow-card sm:p-5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <LinkedinLogo size={22} aria-hidden="true" className="text-champagne" />
         <h3 id="li-title" className="font-display text-base font-semibold text-text-primary">LinkedIn</h3>
-        <StatusChip tone="neutral" icon={null}>Optional</StatusChip>
-        {importDone || extractionState === "synced" ? (
-          <StatusChip tone="verified" icon={CheckCircle}>Imported</StatusChip>
-        ) : extractionState === "partial" ? (
-          <StatusChip tone="warning" icon={null}>Partly extracted</StatusChip>
-        ) : urlDone ? (
-          <StatusChip tone="corroborated" icon={null}>Profile linked</StatusChip>
-        ) : null}
+        {chip}
       </div>
       <p className="mt-2 max-w-[62ch] text-sm text-text-muted">
-        Adds your work history and education. Skipping is always free.
+        Reads your public profile: roles, education, skills, certifications and more. No password or data export needed. Skipping is always fine.
       </p>
 
-      {extractionLabel && (
-        <p aria-live="polite" className={`mt-2 text-sm ${extractionState === "failed" || extractionState === "no_results" ? "text-warning" : "text-text-primary"}`}>
-          {extractionState === "queued" || extractionState === "extracting"
-            ? <Spinner size={12} aria-hidden="true" className="inline mr-1.5 animate-spin" />
-            : null}
-          {extractionLabel}
+      {loadError && !snap && <div className="mt-3"><Banner kind="danger">{loadError}</Banner></div>}
+
+      {snap && (
+        <form
+          className="mt-4 grid max-w-xl gap-3"
+          noValidate
+          onSubmit={(e) => { if (snap.configured) { e.preventDefault(); void act(primary.action); } else void saveLinkOnly(e); }}
+        >
+          <TextField
+            label="LinkedIn profile URL"
+            type="url"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="https://www.linkedin.com/in/your-name"
+            value={url}
+            disabled={active}
+            error={urlError}
+            hint="Your public profile address, from linkedin.com/in/…"
+            onChange={(e) => { setUrl(e.target.value); setUrlError(null); setActionError(null); }}
+          />
+          {!snap.configured && (
+            <Banner kind="info">{snap.notConfiguredMessage ?? "LinkedIn extraction isn't available on this server yet."}</Banner>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {snap.configured ? (
+              active ? (
+                <>
+                  <Button type="button" variant="primary" loading loadingLabel="Extracting…" disabled>{primary.label}</Button>
+                  <Button type="button" variant="ghost" onClick={() => void cancel()} disabled={busy}>Cancel</Button>
+                </>
+              ) : (
+                <Button type="submit" variant={primary.action === "refresh" ? "secondary" : "primary"} icon={primary.icon} loading={busy} loadingLabel="Starting…">
+                  {primary.label}
+                </Button>
+              )
+            ) : (
+              <Button type="submit" variant="secondary" loading={busy} loadingLabel="Saving…" disabled={linkSaved && sameUrl}>
+                {linkSaved || state === "ready" ? "Link saved" : "Save profile link"}
+              </Button>
+            )}
+          </div>
+        </form>
+      )}
+
+      {actionError && <div className="mt-3 max-w-xl"><Banner kind="danger">{actionError}</Banner></div>}
+
+      {active && job && (
+        <p aria-live="polite" className="mt-3 flex items-center gap-2 text-sm text-text-primary">
+          <Spinner size={14} aria-hidden="true" className="shrink-0 animate-spin" />
+          <span>
+            {job.retryAt ? `${job.message ?? "Retrying automatically."} Next attempt ${formatDate(job.retryAt, true)}.` : STEP_TEXT[job.step]}
+            {job.attempt > 1 && ` (attempt ${job.attempt} of ${job.maxAttempts})`}
+          </span>
         </p>
       )}
-      {extractionError && <p aria-live="assertive" className="mt-2 text-sm text-danger">{extractionError}</p>}
 
-      {/* ── Idle: show action buttons ── */}
-      {mode === "idle" && (
-        <div className="mt-4 grid gap-4">
-          {/* Profile URL section */}
-          {!urlDone && (
-            <Button variant="secondary" size="sm" icon={<LinkSimple size={15} aria-hidden="true" />} onClick={() => { setMode("url"); setUrlError(null); }}>
-              Link profile URL
-            </Button>
-          )}
-          {urlDone && (
-            <p className="text-xs text-verified flex items-center gap-1.5"><CheckCircle size={12} aria-hidden="true" />Profile URL saved.</p>
-          )}
+      {!active && job?.state === "failed" && job.message && (
+        <div className="mt-3 max-w-xl"><Banner kind="warning">{job.message}{hasProfile ? " Your previously extracted profile is unchanged." : ""}</Banner></div>
+      )}
+      {!active && job?.state === "partial" && (
+        <p className="mt-3 flex items-start gap-1.5 text-sm text-warning">
+          <WarningCircle size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+          Some sections weren&apos;t available from your public profile; everything that was is saved below.
+        </p>
+      )}
 
-          {/* Apify extraction */}
-          {extractionConfigured !== null && (
-            <div className="flex flex-wrap items-center gap-2">
-              {extractionConfigured ? (
-                extractionState === "idle" || extractionState === "failed" || extractionState === "no_results" ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<MagnifyingGlass size={15} aria-hidden="true" />}
-                    onClick={() => { setMode("extract"); setExtractionError(null); }}
-                  >
-                    {extractionState === "failed" ? "Retry extraction" : "Extract public profile"}
-                  </Button>
-                ) : (extractionState === "synced" || extractionState === "partial") ? (
-                  <Button variant="ghost" size="sm" onClick={() => { setMode("extract"); setExtractionError(null); }}>
-                    Re-extract profile
-                  </Button>
-                ) : null
-              ) : (
-                <p className="text-xs text-text-muted flex items-center gap-1">
-                  <WarningCircle size={12} aria-hidden="true" className="shrink-0" />
-                  Public profile extraction is not configured on this server.
-                </p>
+      {snap?.lastSuccessfulAt && (
+        <p className="mt-3 text-xs text-text-muted">Last extracted {formatDate(snap.lastSuccessfulAt, true)}</p>
+      )}
+
+      {counts && (
+        <div className="mt-3">
+          {snap?.profile && (snap.profile.fullName || snap.profile.headline) && (
+            <p className="text-sm text-text-primary">
+              <span className="font-semibold">{snap.profile.fullName}</span>
+              {snap.profile.headline && <span className="text-text-muted"> · {snap.profile.headline}</span>}
+            </p>
+          )}
+          <ul aria-label="Saved from LinkedIn" className="mt-2 flex flex-wrap gap-1.5">
+            {SECTIONS.map(({ kind, label }) => (
+              <li key={kind} className={`rounded-full border px-2.5 py-0.5 text-xs ${counts[kind] ? "border-border-medium text-text-primary" : "border-line-soft text-text-muted"}`}>
+                {label} {counts[kind] ? <span className="font-semibold tabular-nums">{counts[kind]}</span> : unavailable.has(kind) ? "· not available" : "· none"}
+              </li>
+            ))}
+          </ul>
+          {records.length > 0 && (
+            <div className="mt-3">
+              <Button variant="ghost" size="sm" aria-expanded={showDetails} aria-controls="li-details" icon={<CaretDown size={14} aria-hidden="true" className={showDetails ? "rotate-180" : ""} />} onClick={() => setShowDetails((v) => !v)}>
+                {showDetails ? "Hide saved details" : "Show saved details"}
+              </Button>
+              {showDetails && (
+                <div id="li-details" className="mt-2 grid gap-3">
+                  {SECTIONS.filter(({ kind }) => records.some((r) => r.kind === kind)).map(({ kind, label }) => (
+                    <div key={kind} className="min-w-0">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</h4>
+                      <ul className="mt-1 grid gap-1">
+                        {records.filter((r) => r.kind === kind).map((r, i) => {
+                          const line = recordLine(r);
+                          return (
+                            <li key={`${kind}-${i}`} className="min-w-0 text-sm text-text-primary">
+                              <span className="break-words">{line.title}</span>
+                              {line.detail && <span className="text-text-muted"> · {line.detail}</span>}
+                              {r.missing && <span className="ml-1 text-xs text-text-muted">(no longer on your profile)</span>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                  <p className="text-xs text-text-muted">Roles and education appear in your review as suggestions; nothing counts until you confirm it.</p>
+                </div>
               )}
             </div>
           )}
-
-          {/* CSV import */}
-          {!importDone ? (
-            <Button variant="secondary" size="sm" icon={<Upload size={15} aria-hidden="true" />} onClick={() => { setMode("upload"); setUploadError(null); }}>
-              Upload data export
-            </Button>
-          ) : (
-            <p className="text-xs text-verified flex items-center gap-1.5">
-              <CheckCircle size={12} aria-hidden="true" />
-              {importResult?.totalRecords ? `${importResult.totalRecords} records imported.` : "Export processed."}
-            </p>
-          )}
         </div>
-      )}
-
-      {/* ── URL link form ── */}
-      {mode === "url" && (
-        <form onSubmit={linkUrl} noValidate className="mt-4 grid max-w-md gap-3">
-          <p className="text-xs text-text-muted">Enter your public LinkedIn URL. Only the link is saved — no profile data is fetched.</p>
-          <TextField
-            label="LinkedIn profile URL"
-            type="url"
-            inputMode="url"
-            autoComplete="url"
-            placeholder="https://linkedin.com/in/yourname"
-            value={profileUrl}
-            onChange={(e) => { setProfileUrl(e.target.value); setUrlError(null); }}
-          />
-          {urlError && <Banner kind="danger">{urlError}</Banner>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primary" loading={urlBusy} loadingLabel="Linking…">Link profile</Button>
-            <Button variant="ghost" onClick={reset}>Cancel</Button>
-          </div>
-        </form>
-      )}
-
-      {/* ── Apify extraction form ── */}
-      {mode === "extract" && (
-        <div className="mt-4 grid max-w-md gap-3">
-          <p className="text-xs text-text-muted">
-            Extracts your public work history, education and skills from your LinkedIn profile. Only publicly visible data is collected.
-          </p>
-          <TextField
-            label="LinkedIn profile URL"
-            type="url"
-            inputMode="url"
-            autoComplete="url"
-            placeholder="https://linkedin.com/in/yourname"
-            value={profileUrl}
-            onChange={(e) => { setProfileUrl(e.target.value); setExtractionError(null); }}
-          />
-          {extractionError && <Banner kind="danger">{extractionError}</Banner>}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              loading={extractionBusy || extractionState === "queued" || extractionState === "extracting"}
-              loadingLabel="Extracting…"
-              onClick={() => void startExtract()}
-            >
-              Extract profile
-            </Button>
-            <Button variant="ghost" onClick={reset}>Cancel</Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── CSV upload form ── */}
-      {mode === "upload" && (
-        <form onSubmit={uploadFile} noValidate className="mt-4 grid max-w-md gap-3">
-          <div className="rounded-md border border-line-soft bg-bg-surface/50 p-3 text-xs text-text-muted space-y-1">
-            <p className="font-medium text-text-primary">How to get your LinkedIn data export:</p>
-            <ol className="list-decimal list-inside space-y-0.5">
-              <li>Go to LinkedIn → Settings &amp; Privacy → Data privacy → Get a copy of your data.</li>
-              <li>Select &quot;Want something in particular?&quot; and tick Positions, Education, Skills.</li>
-              <li>Click &quot;Request archive&quot;. LinkedIn emails a link within 10 minutes.</li>
-              <li>Download and upload the ZIP here, or upload individual CSV files.</li>
-            </ol>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1.5" htmlFor="li-file">
-              LinkedIn export file <span className="text-text-muted font-normal">(ZIP, CSV, or JSON)</span>
-            </label>
-            <input
-              id="li-file"
-              ref={fileInputRef}
-              type="file"
-              accept=".zip,.csv,.json"
-              className="block w-full text-sm text-text-muted file:mr-3 file:rounded file:border-0 file:bg-bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-text-primary hover:file:bg-bg-elevated"
-              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setUploadError(null); }}
-            />
-            {file && <p className="mt-1 text-xs text-text-muted">{file.name} ({(file.size / 1024).toFixed(0)} KB)</p>}
-          </div>
-          {uploadError && <Banner kind="danger">{uploadError}</Banner>}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primary" disabled={!file} loading={uploadBusy} loadingLabel="Importing…">Import</Button>
-            <Button variant="ghost" onClick={reset}>Cancel</Button>
-          </div>
-        </form>
       )}
     </section>
   );

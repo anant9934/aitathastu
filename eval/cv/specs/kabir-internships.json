@@ -1,0 +1,57 @@
+{
+  "id": "kabir-internships",
+  "description": "Internship-heavy student CV; a freelance project and a college project must stay projects, not employment",
+  "tags": ["internship-heavy", "projects-vs-employment", "hackathons", "image-upload"],
+  "variants": ["pdf-single", "png"],
+  "dateStyle": "mon",
+  "rangeSep": " - ",
+  "person": {
+    "name": "Kabir Singh",
+    "headline": "B.E. student, Electronics and Computer Engineering",
+    "email": "kabir.singh@example.in",
+    "phone": "+91 70090 11234",
+    "location": "Patiala, Punjab",
+    "links": [{ "label": "GitHub", "url": "https://github.com/kabirsingh-ml", "display": "github.com/kabirsingh-ml" }]
+  },
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Internships",
+      "items": [
+        { "organization": "Saarthi AI Labs", "title": "Machine Learning Intern", "type": "internship", "start": "2024-05", "end": "2024-07", "location": "Remote", "bullets": ["Fine-tuned a speech-recognition model for Punjabi, cutting word error rate from 31% to 19%."] },
+        { "organization": "Zentro Fintech", "title": "Software Development Intern", "type": "internship", "start": "2023-12", "end": "2024-02", "location": "Bengaluru", "bullets": ["Wrote FastAPI services for KYC document checks."] },
+        { "organization": "IIT Madras", "title": "Research Intern", "type": "internship", "start": "2023-05", "end": "2023-07", "location": "Chennai", "bullets": ["Studied low-power keyword spotting on microcontrollers."] },
+        { "organization": "Bharat Electronics Limited", "title": "Summer Trainee", "type": "internship", "start": "2022-06", "end": "2022-07", "location": "Panchkula", "bullets": ["Assisted with radar signal-processing test benches."] }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Projects",
+      "items": [
+        { "name": "Pharmacy Inventory Dashboard", "technologies": ["React", "Firebase"], "bullets": ["Freelance build for a local pharmacy that tracks stock and expiry dates for 1,100 items."] },
+        { "name": "Speech Emotion Recognition", "technologies": ["Python", "PyTorch", "Librosa"], "url": "https://github.com/kabirsingh-ml/speech-emotion", "bullets": ["College project supervised by Prof. R. Sharma; classifies seven emotions from audio clips."] },
+        { "name": "Portfolio Website", "technologies": ["Next.js", "Tailwind CSS"], "url": "https://kabirsingh.vercel.app", "bullets": ["Personal site with a blog and project write-ups."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Thapar Institute of Engineering and Technology", "degree": "B.E.", "field": "Electronics and Computer Engineering", "level": "undergraduate", "start": "2021-08", "end": "2025-06", "current": true, "grade": { "value": "9.1/10", "kind": "cgpa", "text": "CGPA 9.1/10" }, "location": "Patiala" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [{ "items": ["Python", "PyTorch", "Hugging Face Transformers", "FastAPI", "Docker", "SQL", "Next.js", "Tailwind CSS"] }]
+    },
+    {
+      "kind": "awards",
+      "heading": "Hackathons",
+      "items": [
+        { "title": "Winner, Flipkart GRiD 5.0", "category": "hackathon", "date": "2023" },
+        { "title": "Top 10, Google Solution Challenge India", "category": "hackathon", "date": "2024" }
+      ]
+    }
+  ]
+}

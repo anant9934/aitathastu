@@ -188,7 +188,7 @@ async function runAll() {
       input: {},
     });
     assert.equal(linkedInScrape.audit.status, "rejected", "LinkedIn scraping should be rejected");
-    assert.ok(linkedInScrape.audit.reason.includes("LinkedIn automated scraping prohibited"));
+    assert.ok(linkedInScrape.audit.reason.includes("may not read LinkedIn"));
   });
 
   // ─────────────────────────────────────────────────────────────────────────

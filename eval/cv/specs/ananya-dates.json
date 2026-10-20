@@ -1,0 +1,47 @@
+{
+  "id": "ananya-dates",
+  "description": "Ambiguous and abbreviated date formats: numeric months, two-digit session years, seasons and a day/month-ambiguous certificate date",
+  "tags": ["ambiguous-dates", "numeric-dates", "session-years", "consulting"],
+  "variants": ["pdf-single"],
+  "dateStyle": "num",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Ananya Gupta",
+    "headline": "Management Consultant",
+    "email": "ananya.gupta@example.com",
+    "location": "Gurugram, Haryana",
+    "links": [{ "label": "LinkedIn", "url": "https://www.linkedin.com/in/ananya-gupta-consulting", "display": "linkedin.com/in/ananya-gupta-consulting" }]
+  },
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Professional Experience",
+      "items": [
+        { "organization": "KPMG", "title": "Associate Consultant", "type": "employment", "start": "2020-12", "current": true, "location": "Gurugram", "bullets": ["Advise banking clients on credit-risk operating models."] },
+        { "organization": "Deloitte", "title": "Business Analyst", "type": "employment", "start": "2019-03", "end": "2020-11", "location": "Hyderabad", "bullets": ["Wrote requirements for a core-banking migration covering 4 million accounts."] },
+        { "organization": "HDFC Bank", "title": "Summer Intern", "type": "internship", "start": "2018", "end": "2018", "dateText": "Summer 2018", "location": "Mumbai", "bullets": ["Analysed retail loan attrition across 60 branches."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "IIM Indore", "degree": "PGDM", "level": "postgraduate", "start": "2017", "end": "2019", "dateText": "2017-19" },
+        { "institution": "Manipal Institute of Technology", "degree": "B.Tech", "field": "Mechanical Engineering", "level": "undergraduate", "start": "2012", "end": "2016", "dateText": "2012-16", "grade": { "value": "7.6/10", "kind": "cgpa", "text": "CGPA 7.6/10" } }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Certified Scrum Product Owner", "issuer": "Scrum Alliance", "date": "2022", "dateText": "12/03/2022", "dateAmbiguous": true },
+        { "name": "Financial Risk Manager Part I", "issuer": "GARP", "date": "2021-05" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [{ "items": ["Excel", "SQL", "Power BI", "Process Mapping", "Stakeholder Management"] }]
+    }
+  ]
+}

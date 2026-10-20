@@ -14,7 +14,8 @@
 import { ResumeInterpretationSchema, type ResumeInterpretationOutput } from "../intelligence/schemas";
 import { LINK_TYPES, type ResumeExtraction } from "@/lib/resume/schema";
 import { structureResumeText, RESUME_PROMPT_VERSION, ResumeStructuringError } from "@/lib/resume/structure";
-import { extractResumeDeterministic } from "@/lib/resume/deterministic-extractor";
+import { extractResumeDeterministic, type ExtractionContext } from "@/lib/resume/deterministic-extractor";
+import type { ExtractionQuality } from "../intelligence/schemas";
 import { ResumeDeduplicationEngine } from "@/lib/resume/deduplication-engine";
 import { discoverFootprintsFromResume } from "./digital-footprint-discovery";
 import { CvQualityEvaluator, type SourceCoverageReport } from "@/lib/resume/quality-evaluator";
@@ -48,6 +49,8 @@ export interface ResumeExtractionResult {
   latencyMs: number;
   truncated: boolean;
   error?: string;
+  /** Document-level quality from the deterministic engine. */
+  quality?: ExtractionQuality;
   /** Why structuring failed, when it did: "quota" lets ingestion say so plainly. */
   errorKind?: "not_configured" | "quota" | "provider" | "invalid_output";
 }
@@ -96,7 +99,12 @@ function normalizeUrl(raw: string | null | undefined): string | null {
 }
 
 function linkType(url: string, claimed: ResumeLink["type"]): ResumeLink["type"] {
-  const host = new URL(url).hostname.replace(/^www\./, "");
+  let host: string;
+  try {
+    host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
+  } catch {
+    return "other";
+  }
   const known = DOMAIN_TYPES.find(([re]) => re.test(host));
   if (known) return known[1];
   // A claimed site type whose domain does not match is wrong; personal domains are portfolios.
@@ -219,10 +227,17 @@ export function isGrounded(normalizedSource: string, value: string | null | unde
 
 const year = (s: string | null) => s?.match(/\b(19|20)\d{2}\b/g)?.pop();
 
+/** Model output never counts as checked: it is marked "llm" and held for the student's review. */
+const LLM_REVIEW = (issues: string[] = []) => ({
+  status: "needs_review" as const, confidence: 0.6, issues: ["model_extracted", ...issues], fields: {},
+});
+
 export function toInterpretation(r: ResumeExtraction, sourceText: string): ResumeInterpretationOutput {
   const lines = sourceText.split("\n");
   const norm = normalizeForGrounding(sourceText);
   const grounded = (v: string | null | undefined) => isGrounded(norm, v);
+  // A model value the document does not contain is dropped (a field) or the record is skipped (its key).
+  const keep = (v: string | null | undefined) => (v && grounded(v) ? v : undefined);
   const out: ResumeInterpretationOutput = { education: [], experience: [], projects: [], skills: [], certifications: [], achievements: [] };
 
   for (const e of r.education) {
@@ -232,33 +247,41 @@ export function toInterpretation(r: ResumeExtraction, sourceText: string): Resum
     if (!span) continue;
     const degree = grounded(e.degree) ? e.degree : null;
     const field = grounded(e.field_of_study) ? e.field_of_study : null;
+    const end = keep(e.end_date);
+    const grade = keep(e.grade);
     out.education.push({
       institution: e.institution,
-      degree: degree || field || "",
+      degree: degree || "",
       fieldOfStudy: field || undefined,
-      startDate: e.start_date || undefined,
-      endDate: e.end_date || undefined,
-      graduationYear: year(e.end_date),
-      gpa: e.grade && !/%/.test(e.grade) ? e.grade : undefined,
-      percentage: e.grade && /%/.test(e.grade) ? e.grade : undefined,
+      startDate: keep(e.start_date),
+      endDate: end,
+      graduationYear: year(end ?? null),
+      gpa: grade && !/%/.test(grade) ? grade : undefined,
+      percentage: grade && /%/.test(grade) ? grade : undefined,
       academicLevel: e.level,
       sourceSpan: span,
+      provenance: "llm",
+      review: LLM_REVIEW(e.start_date && !keep(e.start_date) || e.end_date && !end ? ["ungrounded_date_dropped"] : []),
     });
   }
   for (const e of r.experience) {
     if (!grounded(e.company)) continue;
     const span = evidenceLine(lines, e.company, e.role);
     if (!span) continue;
+    const start = keep(e.start_date), end = /^(present|current|ongoing|now)$/i.test(e.end_date ?? "") ? "Present" : keep(e.end_date);
+    const role = keep(e.role) ?? "";
     out.experience.push({
       company: e.company,
-      role: e.role,
+      role,
       type: e.type,
-      startDate: e.start_date || undefined,
-      endDate: e.end_date || undefined,
-      duration: [e.start_date, e.end_date].filter(Boolean).join(" – ") || undefined,
-      highlights: e.description,
+      startDate: start,
+      endDate: end,
+      duration: [start, end].filter(Boolean).join(" – ") || undefined,
+      highlights: e.description.filter((d) => grounded(d.slice(0, 60))),
       technologies: [],
       sourceSpan: span,
+      provenance: "llm",
+      review: LLM_REVIEW(role ? [] : ["missing_title"]),
     });
   }
   for (const p of r.projects) {
@@ -267,22 +290,22 @@ export function toInterpretation(r: ResumeExtraction, sourceText: string): Resum
     if (!span) continue;
     // A repository or tech the document never mentions is a fabrication: drop it.
     const repositoryUrl = [p.repository, p.link].find((u) => grounded(u)) || undefined;
-    out.projects.push({ title: p.name, description: p.description, technologies: p.tech_stack.filter(grounded), repositoryUrl, sourceSpan: span });
+    out.projects.push({ title: p.name, description: grounded(p.description.slice(0, 60)) ? p.description : "", technologies: p.tech_stack.filter(grounded), repositoryUrl, sourceSpan: span, provenance: "llm", review: LLM_REVIEW() });
   }
   for (const s of r.skills) {
     if (!grounded(s)) continue;
     const span = evidenceLine(lines, s);
-    if (span) out.skills.push({ name: s, category: "other", proficiencyHint: "unknown", sourceSpan: span });
+    if (span) out.skills.push({ name: s, category: "other", proficiencyHint: "unknown", sourceSpan: span, provenance: "llm" });
   }
   for (const c of r.certifications) {
     const span = evidenceLine(lines, c.name);
-    if (span) out.certifications.push({ name: c.name, issuer: c.issuer || undefined, year: year(c.date), sourceSpan: span });
+    if (span) out.certifications.push({ name: c.name, issuer: keep(c.issuer), year: year(keep(c.date) ?? null), sourceSpan: span, provenance: "llm", review: LLM_REVIEW() });
   }
   for (const a of r.achievements) {
     const span = evidenceLine(lines, a, a.slice(0, 40));
     if (!span) continue;
     const category = /patent/i.test(a) ? "patent" : /publi|journal|conference|paper/i.test(a) ? "publication" : /hackathon/i.test(a) ? "hackathon" : "award";
-    out.achievements.push({ title: a, category, description: "", sourceSpan: span });
+    out.achievements.push({ title: a, category, description: "", sourceSpan: span, provenance: "llm", review: LLM_REVIEW() });
   }
   return out;
 }
@@ -352,10 +375,11 @@ export async function extractResumeStructured(resumeText: string, personId?: str
  */
 export function extractResumeDeterministicResult(
   text: string,
-  hyperlinks: string[] = []
+  hyperlinks: string[] = [],
+  ctx: ExtractionContext = {}
 ): ResumeExtractionResult {
   const startTime = Date.now();
-  const det = extractResumeDeterministic(text, hyperlinks);
+  const det = extractResumeDeterministic(text, hyperlinks, ctx);
   const validated = ResumeInterpretationSchema.safeParse(det.interpretation);
   if (!validated.success) {
     return {
@@ -382,22 +406,19 @@ export function extractResumeDeterministicResult(
     seenLinkUrls.add(key);
     links.push(l);
   }
+  // The engine's links (header/contact area and profile URLs) come first; the
+  // discovery pass may add other known profile providers, never guessed portfolios.
   const discoveredProfiles: Record<string, string> = {};
+  for (const l of links) if (l.type !== "other" && !discoveredProfiles[l.type]) discoveredProfiles[l.type] = l.url;
   for (const fp of fps) {
-    if (fp.normalizedUrl) {
-      const key = linkKey(fp.normalizedUrl);
-      if (!seenLinkUrls.has(key)) {
-        seenLinkUrls.add(key);
-        links.push({
-          type: linkType(fp.normalizedUrl, "portfolio"),
-          url: fp.normalizedUrl,
-        });
-      }
-      // Discovery returns annotations and full URLs before labeled guesses; keep the first per provider.
-      if (!discoveredProfiles[fp.provider]) discoveredProfiles[fp.provider] = fp.normalizedUrl;
+    if (!fp.normalizedUrl || fp.provider === "portfolio") continue;
+    const key = linkKey(fp.normalizedUrl);
+    if (!seenLinkUrls.has(key)) {
+      seenLinkUrls.add(key);
+      links.push({ type: linkType(fp.normalizedUrl, "portfolio"), url: fp.normalizedUrl });
     }
+    if (!discoveredProfiles[fp.provider]) discoveredProfiles[fp.provider] = fp.normalizedUrl;
   }
-
 
   return {
     success: true,
@@ -405,9 +426,10 @@ export function extractResumeDeterministicResult(
     extractedProfile: det.profile,
     links,
     discoveredProfiles,
+    quality: det.quality,
     provider: "deterministic-engine",
-    modelUsed: "rules-v1",
-    promptVersion: "v1",
+    modelUsed: "rules-v3",
+    promptVersion: "cv-extract/3.0",
     latencyMs: Date.now() - startTime,
     truncated: false,
   };

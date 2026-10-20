@@ -626,6 +626,8 @@ export const sourceProcessingJobs = pgTable(
   (table) => [
     index("idx_source_jobs_person").on(table.personId),
     index("idx_source_jobs_status").on(table.status),
+    // At most one LinkedIn extraction in flight per student, enforced by the database.
+    uniqueIndex("uq_linkedin_extract_inflight").on(table.personId).where(sql`source_id = 'linkedin_extract' AND status IN ('queued', 'processing')`),
   ]
 );
 
@@ -780,6 +782,74 @@ export const resumeReviewHistory = pgTable(
   (table) => [
     index("idx_resume_review_document").on(table.documentId),
     index("idx_resume_review_person").on(table.personId),
+  ]
+);
+
+/**
+ * One row per CV processing job: what read the document, how well, and what
+ * came out. The id is derived from the job, so a retried job updates its row.
+ */
+export const resumeExtractionRuns = pgTable(
+  "resume_extraction_runs",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull().references(() => resumeDocuments.id, { onDelete: "cascade" }),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    jobId: text("job_id").notNull(),
+    schemaVersion: text("schema_version").notNull(),
+    parserVersion: text("parser_version").notNull(),
+    method: text("method").notNull(), // native_pdf | docx | ocr
+    textQuality: text("text_quality").notNull(), // good | limited | poor | unreadable
+    status: text("status").notNull(), // persisting | completed | failed
+    documentChecksum: text("document_checksum"),
+    pageCount: integer("page_count").default(1).notNull(),
+    recordCount: integer("record_count").default(0).notNull(),
+    candidateCount: integer("candidate_count").default(0).notNull(),
+    needsReviewCount: integer("needs_review_count").default(0).notNull(),
+    llmUsed: boolean("llm_used").default(false).notNull(),
+    warnings: jsonb("warnings").default([]).notNull(),
+    timings: jsonb("timings").default({}).notNull(),
+    errorCode: text("error_code"),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("idx_resume_runs_document").on(table.documentId),
+    index("idx_resume_runs_person").on(table.personId),
+  ]
+);
+
+/**
+ * Normalised CV records with their evidence and review state. The id is a hash
+ * of (person, document, category, record key), so reprocessing the same
+ * document updates rows instead of duplicating them, and a row the student
+ * confirmed, corrected or rejected is never overwritten by a later run.
+ */
+export const resumeExtractedRecords = pgTable(
+  "resume_extracted_records",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    documentId: text("document_id").notNull().references(() => resumeDocuments.id, { onDelete: "cascade" }),
+    runId: text("run_id").notNull(),
+    category: text("category").notNull(),
+    recordKey: text("record_key").notNull(),
+    candidateId: text("candidate_id"),
+    data: jsonb("data").notNull(),
+    evidence: jsonb("evidence"),
+    review: jsonb("review"),
+    provenance: text("provenance").default("deterministic").notNull(),
+    reviewStatus: text("review_status").default("pending").notNull(), // pending | confirmed | rejected
+    userValue: text("user_value"),
+    carriedFromDocumentId: text("carried_from_document_id"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_resume_records_identity").on(table.personId, table.documentId, table.category, table.recordKey),
+    index("idx_resume_records_person").on(table.personId),
+    index("idx_resume_records_document").on(table.documentId),
   ]
 );
 
@@ -1143,3 +1213,62 @@ export const githubSyncRuns = pgTable(
   ]
 );
 
+
+// ============================================================================
+// LINKEDIN PUBLIC PROFILE (extracted through an approved provider; see
+// lib/services/linkedin-extraction-service.ts). One profile row per student and
+// one row per extracted record; runs are tracked in source_processing_jobs.
+// ============================================================================
+
+export const linkedinProfiles = pgTable(
+  "linkedin_profiles",
+  {
+    id: text("id").primaryKey(), // `lip_${personId}`
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    profileUrl: text("profile_url").notNull(),
+    publicIdentifier: text("public_identifier"),
+    fullName: text("full_name"),
+    headline: text("headline"),
+    about: text("about"),
+    location: text("location"),
+    provider: text("provider").notNull(), // 'apify'
+    providerActor: text("provider_actor"),
+    normalizationVersion: text("normalization_version").notNull(),
+    /** Outcome of the latest run: queued | running | succeeded | partial | failed. */
+    extractionStatus: text("extraction_status").notNull(),
+    lastJobId: text("last_job_id"),
+    lastSuccessfulJobId: text("last_successful_job_id"),
+    lastSuccessfulAt: timestamp("last_successful_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("uq_linkedin_profiles_person").on(table.personId)]
+);
+
+export const linkedinProfileRecords = pgTable(
+  "linkedin_profile_records",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => persons.id, { onDelete: "cascade" }),
+    /** experience | education | skill | language | certification | course | project | publication | volunteering | honor | link */
+    kind: text("kind").notNull(),
+    /** Deterministic key from normalized source fields (or the provider's own ID), so re-runs upsert. */
+    recordKey: text("record_key").notNull(),
+    data: jsonb("data").notNull(),
+    source: text("source").notNull(), // 'linkedin' | 'website'
+    provider: text("provider").notNull(), // 'apify' | 'firecrawl'
+    sourceUrl: text("source_url").notNull(),
+    providerRecordId: text("provider_record_id"),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    lastJobId: text("last_job_id"),
+    /** Set when a later successful run returned this section without this record; never deleted automatically. */
+    missingSince: timestamp("missing_since", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("uq_linkedin_records_person_kind_key").on(table.personId, table.kind, table.recordKey),
+    index("idx_linkedin_records_person").on(table.personId),
+  ]
+);

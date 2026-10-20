@@ -16,6 +16,7 @@ import type { ExtractorProfileV2 } from "@/lib/services/extractor-service-client
 import { ResumePerson360Mapper } from "@/lib/services/resume-person360-mapper";
 import { applyReviewDecisions, type ReviewDecision } from "@/lib/services/resume-review-decisions";
 import { SourceProcessingJobService } from "@/lib/services/source-processing-job-service";
+import { recordDecisions } from "@/lib/services/resume-extraction-persistence";
 import type { ResumeReviewPayload } from "@/lib/services/resume-ingestion-service";
 import { docMeta, jsonNoStore, loadOwnedResumeDocument, unauthorized } from "@/lib/api/resume-route-helpers";
 
@@ -63,6 +64,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .set({ extractedProfile: applied.profile, updatedAt: new Date() })
       .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId)));
 
+    const recorded = await recordDecisions(personId, documentId, decisions);
     const mappingResult = await ResumePerson360Mapper.applyProfileToPerson360(personId, documentId, applied.profile);
 
     await db
@@ -74,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await SourceProcessingJobService.completeJob({ jobId, personId, resultReference: `resume:${documentId}`, metadata: { applied: true } });
     }
 
-    return jsonNoStore({ ok: true, documentId, confirmed: applied.confirmed, rejected: applied.rejected, mappingResult });
+    return jsonNoStore({ ok: true, documentId, confirmed: applied.confirmed, rejected: applied.rejected, recordsUpdated: recorded.updated, mappingResult });
   } catch (err) {
     console.error("[resume-apply] failed", { documentId, error: err instanceof Error ? err.message : err });
     return jsonNoStore({ ok: false, code: "APPLY_FAILED", error: "We could not save your reviewed details. Please retry." }, 500);

@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { requestJson, describeError } from "@/lib/client/api";
-import { RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
+import { RESUME_ACCEPTED_EXTENSIONS, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import type { ReviewedResumeClaim } from "./types";
 
 export type ResumeProcessingState = "IDLE" | "UPLOADING" | "QUEUED" | "PROCESSING" | "REVIEW_REQUIRED" | "SAVING" | "COMPLETED" | "FAILED";
@@ -20,6 +20,7 @@ export type ResumeProcessingState = "IDLE" | "UPLOADING" | "QUEUED" | "PROCESSIN
 export type ResumeCandidate = Omit<ReviewedResumeClaim, "category"> & {
   id: string;
   selected: boolean;
+  previousDecision?: string;
   category: ReviewedResumeClaim["category"] | "achievement" | "profile" | "link" | "publication";
   field?: string;
 };
@@ -145,7 +146,7 @@ export function useResumeIngestion({
   const applyResult = useCallback((docId: string, name: string, result: Record<string, any>, reviewed: boolean) => {
     const rows: ResumeCandidate[] = Array.isArray(result.reviewCandidates)
       ? result.reviewCandidates.flatMap((item: Record<string, unknown>) => {
-          const { category, candidateId, value, sourceSpan, field, recordData } = item ?? {};
+          const { category, candidateId, value, sourceSpan, field, recordData, previousDecision, previousValue } = item ?? {};
           if (
             ![
               "profile", "link", "education", "experience", "project", "skill",
@@ -155,15 +156,19 @@ export function useResumeIngestion({
             ].includes(String(category)) ||
             typeof candidateId !== "string" || typeof value !== "string" || typeof sourceSpan !== "string"
           ) return [];
+          // Same file uploaded before: the earlier decision is pre-applied, still editable.
+          const earlier = previousDecision === "confirmed";
+          const earlierValue = earlier && typeof previousValue === "string" && previousValue.trim() ? previousValue : null;
           return [{
             id: candidateId,
             candidateId,
             category: category as ResumeCandidate["category"],
-            value,
+            value: earlierValue ?? value,
             sourceSpan,
             documentId: docId,
-            corrected: false,
-            selected: false,
+            corrected: Boolean(earlierValue && earlierValue !== value),
+            selected: earlier,
+            previousDecision: typeof previousDecision === "string" ? previousDecision : undefined,
             field: typeof field === "string" ? field : undefined,
             recordData: (recordData as Record<string, any>) || undefined,
           }];
@@ -243,7 +248,7 @@ export function useResumeIngestion({
   const checkFile = (file: File, consent: boolean): string | null => {
     const ext = file.name.toLowerCase().split(".").pop();
     if (ext === "doc") return "Older .doc files can't be read. Open it in Word or LibreOffice and save it as .docx or PDF.";
-    if (ext !== "pdf" && ext !== "docx") return "Choose a PDF or DOCX file.";
+    if (!(RESUME_ACCEPTED_EXTENSIONS as readonly string[]).includes(ext || "")) return "Choose a PDF, DOCX, PNG or JPEG file.";
     if (file.size > RESUME_MAX_UPLOAD_BYTES) return `Choose a file under ${RESUME_MAX_UPLOAD_MB} MB, or continue without a CV.`;
     if (serviceReady === false) return "CV upload is unavailable right now. Continue without a CV; you can add it later from your profile.";
     if (!consent) return "Tick the consent box first, so we can read your CV.";

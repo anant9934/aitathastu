@@ -1,0 +1,52 @@
+{
+  "id": "arjun-duplicates",
+  "description": "Repeated sections and records, a continued experience heading, an end date before its start date, and an expected graduation",
+  "tags": ["duplicates", "contradictory-dates", "continued-section", "current-enrollment"],
+  "variants": ["pdf-single"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Arjun Nair",
+    "headline": "Software Engineer",
+    "email": "arjun.nair.dev@example.com",
+    "location": "Thiruvananthapuram, Kerala",
+    "links": [{ "label": "GitHub", "url": "https://github.com/arjunnair-dev", "display": "github.com/arjunnair-dev" }]
+  },
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Kappa Systems", "title": "Software Engineer", "type": "employment", "start": "2023-06", "end": "2022-01", "expectInvalidDates": true, "location": "Kochi", "bullets": ["Built internal tooling in TypeScript for release management."] }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [{ "items": ["TypeScript", "Python", "React", "PostgreSQL", "Python"] }]
+    },
+    {
+      "kind": "experience",
+      "heading": "Experience (continued)",
+      "items": [
+        { "organization": "UST Global", "title": "Associate Engineer", "type": "employment", "start": "2020-08", "end": "2021-12", "location": "Thiruvananthapuram", "bullets": ["Maintained Angular dashboards for a healthcare client."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "IIIT Kottayam", "degree": "M.Tech", "field": "Computer Science", "level": "postgraduate", "start": "2024-08", "end": "2026", "current": true, "endText": "Expected 2026" },
+        { "institution": "College of Engineering Trivandrum", "degree": "B.Tech", "field": "Computer Science", "level": "undergraduate", "start": "2016-08", "end": "2020-06", "grade": { "value": "8.3/10", "kind": "cgpa", "text": "CGPA 8.3/10" } }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Google Cloud Associate Cloud Engineer", "issuer": "Google Cloud", "date": "2022-10" },
+        { "name": "Google Cloud Associate Cloud Engineer", "issuer": "Google Cloud", "date": "2022-10", "duplicateOf": 0 }
+      ]
+    }
+  ]
+}

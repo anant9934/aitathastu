@@ -42,7 +42,7 @@ export function JumpNav({ items }: { items: { id: string; label: string }[] }) {
             onClick={() => setActive(i.id)}
             className={cn(
               "inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-sm font-medium transition-colors duration-150 pointer-coarse:min-h-11",
-              active === i.id ? "bg-deep-espresso text-warm-ivory shadow-[0_0_0_1px_var(--border-medium)]" : "text-text-muted hover:text-text-primary",
+              active === i.id ? "bg-deep-espresso text-text-primary shadow-[0_0_0_1px_var(--border-medium)]" : "text-text-muted hover:text-text-primary",
             )}
           >
             {i.label}

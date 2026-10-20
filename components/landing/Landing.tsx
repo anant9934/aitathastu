@@ -225,7 +225,7 @@ export function Landing({ user }: LandingProps) {
         const dy = nodes[i].y - nodes[j].y;
         const d = Math.hypot(dx, dy);
         if (d < 155) {
-          ctx.strokeStyle = `rgba(201,164,109,${(1 - d / 155) * 0.22})`;
+          ctx.strokeStyle = `rgba(196,138,90,${(1 - d / 155) * 0.22})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(nodes[i].x, nodes[i].y);
@@ -245,9 +245,9 @@ export function Landing({ user }: LandingProps) {
       n.y = Math.max(0, Math.min(H, n.y));
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(244,154,71,${0.45 + Math.sin((frame + n.x) * 0.02) * 0.22})`;
+      ctx.fillStyle = `rgba(196,138,90,${0.45 + Math.sin((frame + n.x) * 0.02) * 0.22})`;
       ctx.shadowBlur = 9;
-      ctx.shadowColor = "rgba(244,154,71,.9)";
+      ctx.shadowColor = "rgba(196,138,90,.9)";
       ctx.fill();
       ctx.shadowBlur = 0;
     }
@@ -273,7 +273,7 @@ export function Landing({ user }: LandingProps) {
       const y = A.y + (B.y - A.y) * p.t;
       const grd = ctx.createRadialGradient(x, y, 0, x, y, 9);
       grd.addColorStop(0, "rgba(255,240,215,.95)");
-      grd.addColorStop(1, "rgba(201,164,109,0)");
+      grd.addColorStop(1, "rgba(196,138,90,0)");
       ctx.fillStyle = grd;
       ctx.beginPath();
       ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -1370,7 +1370,7 @@ export function Landing({ user }: LandingProps) {
               </div>
               <button
                 type="button"
-                className="preview-tag cursor-pointer hover:border-amber-400 hover:text-warm-ivory transition-colors"
+                className="preview-tag cursor-pointer hover:border-amber-400 hover:text-text-primary transition-colors"
                 onClick={() => openEoraChat("What are the best steps to start learning AI and ML?")}
                 title="Click to open interactive companion"
               >

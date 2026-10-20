@@ -53,7 +53,7 @@ export function RoadmapView() {
   if (!data) return <Loading label="Loading your roadmap" />;
   const r = data.roadmap;
   return (
-    <PageFrame width="narrow" eoraId="eora-roadmap-header" title="Roadmap" description={<>Toward <span className="font-medium text-warm-ivory">{r.targetRole || r.goal}</span>. Stage <span className="font-mono tabular">{Math.min(r.currentStageIndex + 1, r.totalStages)}</span> of <span className="font-mono tabular">{r.totalStages}</span>.</>}>
+    <PageFrame width="narrow" eoraId="eora-roadmap-header" title="Roadmap" description={<>Toward <span className="font-medium text-text-primary">{r.targetRole || r.goal}</span>. Stage <span className="font-mono tabular">{Math.min(r.currentStageIndex + 1, r.totalStages)}</span> of <span className="font-mono tabular">{r.totalStages}</span>.</>}>
       {r.stages.length === 0 ? (
         <EmptyState icon={Path} title="No roadmap yet" actions={<Link className="text-sm font-medium text-accent-warm hover:text-accent-warm-bright" href="/student">Set a target role</Link>}>Choose a target role and confirm a few skills; the roadmap orders what to learn and build next.</EmptyState>
       ) : (

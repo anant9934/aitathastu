@@ -42,7 +42,7 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
         {/* Left Column: EORA Guide Hero Card */}
         <div className="flex flex-col items-center rounded-card border border-border-medium bg-bg-elevated p-5 sm:p-6 shadow-card md:items-start text-left">
           <div className="flex w-full items-center gap-4 md:flex-col md:items-center">
-            <div className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-panel border border-accent-warm/30 bg-bg-primary shadow-[0_0_24px_rgba(244,154,71,0.15)] sm:w-24 md:w-44 lg:w-48">
+            <div className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-panel border border-accent-warm/30 bg-bg-primary shadow-[0_0_24px_rgba(196,138,90,0.15)] sm:w-24 md:w-44 lg:w-48">
               <Image
                 src="/assets/eora/welcome-hand.png"
                 alt="EORA, your guide, waving hello"
@@ -58,7 +58,7 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
                 AI Guide & Partner
               </div>
               <p className="mt-2 text-sm text-text-muted">
-                I&apos;m <span className="font-semibold text-warm-ivory">EORA</span>. I&apos;ll walk you through this in <span className="text-text-primary">English</span> or <span className="text-text-primary">Hinglish</span>.
+                I&apos;m <span className="font-semibold text-text-primary">EORA</span>. I&apos;ll walk you through this in <span className="text-text-primary">English</span> or <span className="text-text-primary">Hinglish</span>.
               </p>
             </div>
           </div>
@@ -67,11 +67,11 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
           <ul className="mt-5 hidden w-full flex-col gap-2.5 border-t border-border-medium/60 pt-4 text-xs text-text-muted md:flex">
             <li className="flex items-start gap-2">
               <CheckCircle size={15} weight="bold" className="mt-0.5 shrink-0 text-accent-warm" aria-hidden="true" />
-              <span><strong className="text-warm-ivory">Proof over claims:</strong> Backed by your code and papers.</span>
+              <span><strong className="text-text-primary">Proof over claims:</strong> Backed by your code and papers.</span>
             </li>
             <li className="flex items-start gap-2">
               <ShieldCheck size={15} weight="bold" className="mt-0.5 shrink-0 text-verified" aria-hidden="true" />
-              <span><strong className="text-warm-ivory">Private & read-only:</strong> Nothing is added until you confirm.</span>
+              <span><strong className="text-text-primary">Private & read-only:</strong> Nothing is added until you confirm.</span>
             </li>
           </ul>
         </div>
@@ -83,7 +83,7 @@ export function WelcomeStep({ initialName, saving, onContinue, onSkip }: {
           className="flex min-w-0 flex-col gap-5 sm:gap-6"
         >
           <div>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-warm-ivory sm:text-3.5xl lg:text-4xl lg:leading-[1.15]">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-text-primary sm:text-3.5xl lg:text-4xl lg:leading-[1.15]">
               Let&apos;s build one honest picture of what you can do
             </h1>
             <p className="mt-3 max-w-[60ch] text-base text-text-muted leading-relaxed sm:text-lg">

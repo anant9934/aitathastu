@@ -338,7 +338,7 @@ export function GitHubIntelligenceDashboard() {
           )}
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display text-xl font-bold text-warm-ivory">
+              <h2 className="font-display text-xl font-bold text-text-primary">
                 {profile.displayName || profile.login}
               </h2>
               <a
@@ -391,7 +391,7 @@ export function GitHubIntelligenceDashboard() {
             <span className="text-xs text-text-muted">Total Indexed Commits</span>
             <GitCommit size={18} className="text-champagne" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-warm-ivory">{commitAnalytics.totalAccessibleCommits}</div>
+          <div className="mt-2 text-2xl font-bold text-text-primary">{commitAnalytics.totalAccessibleCommits}</div>
           <div className="mt-1 font-mono text-3xs text-text-muted">
             {commitAnalytics.candidateAttributedCommits} candidate-attributed
           </div>
@@ -402,7 +402,7 @@ export function GitHubIntelligenceDashboard() {
             <span className="text-xs text-text-muted">30-Day Activity</span>
             <CheckCircle size={18} className="text-success" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-warm-ivory">{commitAnalytics.commitsLast30Days}</div>
+          <div className="mt-2 text-2xl font-bold text-text-primary">{commitAnalytics.commitsLast30Days}</div>
           <div className="mt-1 font-mono text-3xs text-text-muted">
             {commitAnalytics.commitsLast90Days} in last 90 days
           </div>
@@ -413,7 +413,7 @@ export function GitHubIntelligenceDashboard() {
             <span className="text-xs text-text-muted">PRs & Issues</span>
             <GitPullRequest size={18} className="text-soft-amber" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-warm-ivory">
+          <div className="mt-2 text-2xl font-bold text-text-primary">
             {data.pullRequests.length + data.issues.length}
           </div>
           <div className="mt-1 font-mono text-3xs text-text-muted">
@@ -426,7 +426,7 @@ export function GitHubIntelligenceDashboard() {
             <span className="text-xs text-text-muted">Resume Project Matches</span>
             <ShieldCheck size={18} className="text-champagne" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-warm-ivory">{resumeMatches.length}</div>
+          <div className="mt-2 text-2xl font-bold text-text-primary">{resumeMatches.length}</div>
           <div className="mt-1 font-mono text-3xs text-text-muted">Correlated with resume portfolio</div>
         </Panel>
       </div>
@@ -434,7 +434,7 @@ export function GitHubIntelligenceDashboard() {
       {/* Top Languages Distribution */}
       {topLanguages.length > 0 && (
         <div className="rounded-[var(--radius-panel)] border border-border-medium bg-surface-base p-4">
-          <div className="mb-2 flex items-center justify-between text-xs font-medium text-warm-ivory">
+          <div className="mb-2 flex items-center justify-between text-xs font-medium text-text-primary">
             <span>Primary Language Breakdown (Across Public Repositories)</span>
             <span className="font-mono text-2xs text-text-muted">Byte-level statistics</span>
           </div>
@@ -455,7 +455,7 @@ export function GitHubIntelligenceDashboard() {
             {topLanguages.map((tl) => (
               <span key={tl.lang} className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-champagne" />
-                {tl.lang}: <strong className="text-warm-ivory">{tl.percentage}%</strong>
+                {tl.lang}: <strong className="text-text-primary">{tl.percentage}%</strong>
               </span>
             ))}
           </div>
@@ -474,7 +474,7 @@ export function GitHubIntelligenceDashboard() {
                 "rounded-full px-3 py-1 text-xs font-medium capitalize transition-all",
                 filterType === mode
                   ? "bg-champagne/20 text-champagne border border-champagne/40"
-                  : "bg-surface-elevated text-text-muted hover:text-warm-ivory"
+                  : "bg-surface-elevated text-text-muted hover:text-text-primary"
               )}
             >
               {mode} ({data.repositories.filter((r) => (mode === "all" ? true : mode === "original" ? !r.isFork : mode === "forks" ? r.isFork : r.isArchived)).length})
@@ -494,7 +494,7 @@ export function GitHubIntelligenceDashboard() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="rounded-md border border-border-medium bg-surface-elevated px-2.5 py-1.5 text-xs text-warm-ivory focus:outline-none"
+            className="rounded-md border border-border-medium bg-surface-elevated px-2.5 py-1.5 text-xs text-text-primary focus:outline-none"
           >
             <option value="stars">Most Stars</option>
             <option value="pushed">Recently Pushed</option>
@@ -529,7 +529,7 @@ export function GitHubIntelligenceDashboard() {
                       <span className="text-text-muted">
                         {isExpanded ? <CaretDown size={14} /> : <CaretRight size={14} />}
                       </span>
-                      <h3 className="font-display text-base font-semibold text-warm-ivory hover:text-champagne">
+                      <h3 className="font-display text-base font-semibold text-text-primary hover:text-champagne">
                         {repo.name}
                       </h3>
                       {repo.isFork && <StatusChip tone="neutral" size="sm">Fork</StatusChip>}
@@ -573,7 +573,7 @@ export function GitHubIntelligenceDashboard() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 rounded-md border border-border-medium px-2.5 py-1 text-xs text-text-muted hover:border-champagne/40 hover:text-warm-ivory"
+                      className="inline-flex items-center gap-1 rounded-md border border-border-medium px-2.5 py-1 text-xs text-text-muted hover:border-champagne/40 hover:text-text-primary"
                     >
                       GitHub <ArrowSquareOut size={12} />
                     </a>
@@ -595,7 +595,7 @@ export function GitHubIntelligenceDashboard() {
                           <div className="rounded-lg border border-champagne/30 bg-champagne/10 p-3">
                             <div className="text-xs font-semibold text-champagne">Resume Project Match Details</div>
                             {matches.map((m) => (
-                              <div key={m.id} className="mt-1 text-xs text-warm-ivory">
+                              <div key={m.id} className="mt-1 text-xs text-text-primary">
                                 Linked with resume project: <strong>{m.resumeProjectTitle}</strong> (Confidence:{" "}
                                 {Math.round(m.matchScore * 100)}%)
                                 <div className="mt-0.5 text-2xs text-text-muted">
@@ -620,7 +620,7 @@ export function GitHubIntelligenceDashboard() {
                                 (t: any) => (
                                   <span
                                     key={t.id || t.name}
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-border-medium bg-surface-base px-2.5 py-1 text-xs font-mono text-warm-ivory"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border-medium bg-surface-base px-2.5 py-1 text-xs font-mono text-text-primary"
                                   >
                                     <span>{t.name}</span>
                                     <span className="text-3xs text-text-muted">
@@ -643,7 +643,7 @@ export function GitHubIntelligenceDashboard() {
                               <div key={c.sha} className="flex items-center justify-between p-2.5 text-xs">
                                 <div className="flex items-center gap-2 overflow-hidden">
                                   <span className="font-mono text-2xs text-champagne">{c.sha.slice(0, 7)}</span>
-                                  <span className="truncate text-warm-ivory">{c.message}</span>
+                                  <span className="truncate text-text-primary">{c.message}</span>
                                 </div>
                                 <div className="flex items-center gap-3 font-mono text-3xs text-text-muted">
                                   {c.isAttributedToCandidate ? (

@@ -73,7 +73,7 @@ export function DetailsStep({ initial, isAuthenticated, fromCv, saving, guide, o
         {/* SECTION 1: Personal & Account Identity */}
         <div className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
           <div className="mb-4 border-b border-line-soft pb-3">
-            <h3 className="font-display text-sm font-semibold text-warm-ivory tracking-wide">
+            <h3 className="font-display text-sm font-semibold text-text-primary tracking-wide">
               Personal Information
             </h3>
             <p className="mt-0.5 text-xs text-text-muted">
@@ -151,7 +151,7 @@ export function DetailsStep({ initial, isAuthenticated, fromCv, saving, guide, o
         {/* SECTION 2: Academic / Institutional Background */}
         <div className="rounded-card border border-line-soft bg-bg-surface p-5 sm:p-6 shadow-card">
           <div className="mb-4 border-b border-line-soft pb-3">
-            <h3 className="font-display text-sm font-semibold text-warm-ivory tracking-wide">
+            <h3 className="font-display text-sm font-semibold text-text-primary tracking-wide">
               Academic & Professional Details
             </h3>
             <p className="mt-0.5 text-xs text-text-muted">

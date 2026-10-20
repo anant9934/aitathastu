@@ -138,7 +138,7 @@ export function NextActions({ actions }: { actions: NextBestAction[] }) {
                   </Link>
                   <p className="mt-0.5 text-sm text-text-muted">{a.description}</p>
                   <button type="button" aria-expanded={why === a.id} onClick={() => setWhy(why === a.id ? null : a.id)}
-                    className="mt-1.5 inline-flex min-h-8 cursor-pointer items-center gap-1 text-xs text-text-muted hover:text-warm-ivory pointer-coarse:min-h-11">
+                    className="mt-1.5 inline-flex min-h-8 cursor-pointer items-center gap-1 text-xs text-text-muted hover:text-text-primary pointer-coarse:min-h-11">
                     <Info size={14} aria-hidden="true" />Why this
                     <CaretDown size={12} aria-hidden="true" className={cn("transition-transform", why === a.id && "rotate-180")} />
                   </button>

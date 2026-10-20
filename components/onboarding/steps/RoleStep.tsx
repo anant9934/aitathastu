@@ -142,7 +142,7 @@ export function RoleStep({
                 className={cn(
                   "relative flex cursor-pointer flex-col justify-between rounded-card border p-5 sm:p-6 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-accent-warm focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary shadow-card",
                   checked
-                    ? "border-accent-warm-bright bg-accent-warm-bright/10 text-warm-ivory shadow-[0_0_28px_rgba(244,154,71,0.18)]"
+                    ? "border-accent-warm-bright bg-accent-warm-bright/10 text-text-primary shadow-[0_0_28px_rgba(196,138,90,0.18)]"
                     : "border-border-medium bg-bg-elevated text-text-primary hover:border-accent-warm hover:bg-bg-elevated/80",
                   !r.available && "cursor-not-allowed opacity-65 hover:border-border-medium",
                 )}
@@ -153,7 +153,7 @@ export function RoleStep({
                       className={cn(
                         "grid size-12 shrink-0 place-items-center rounded-panel border transition-colors",
                         checked
-                          ? "border-accent-warm-bright/60 bg-accent-warm-bright/15 text-accent-warm-bright shadow-[0_0_12px_rgba(244,154,71,0.25)]"
+                          ? "border-accent-warm-bright/60 bg-accent-warm-bright/15 text-accent-warm-bright shadow-[0_0_12px_rgba(196,138,90,0.25)]"
                           : "border-border-medium bg-deep-espresso text-text-dim",
                       )}
                     >
@@ -171,7 +171,7 @@ export function RoleStep({
                         className={cn(
                           "grid size-5 place-items-center rounded-full border transition-all",
                           checked
-                            ? "border-accent-warm-bright bg-accent-warm-bright text-obsidian"
+                            ? "border-accent-warm-bright bg-accent-warm-bright text-espresso"
                             : "border-border-medium bg-bg-primary",
                         )}
                         aria-hidden="true"
@@ -181,7 +181,7 @@ export function RoleStep({
                     </div>
                   </div>
 
-                  <h2 className="mt-4 font-display text-lg font-bold text-warm-ivory sm:text-xl">
+                  <h2 className="mt-4 font-display text-lg font-bold text-text-primary sm:text-xl">
                     {r.title}
                   </h2>
                   <p className="mt-2 text-sm text-text-muted leading-relaxed">

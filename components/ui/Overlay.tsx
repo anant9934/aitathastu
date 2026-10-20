@@ -136,7 +136,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
       >
         <div className="flex items-start gap-3 border-b border-border-subtle px-5 pb-3.5 pt-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-bold text-warm-ivory">{title}</h2>
+            <h2 id={titleId} className="text-lg font-bold text-text-primary">{title}</h2>
             {description && <p id={descId} className="mt-1 text-sm text-text-muted">{description}</p>}
           </div>
           {!hideClose && (
@@ -203,7 +203,7 @@ export function Drawer({ open, onClose, title, description, children, footer, si
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-border-medium md:hidden" aria-hidden="true" />
         <div className="flex items-start gap-2 border-b border-border-subtle px-5 pb-3.5 pt-3 md:pt-4">
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-lg font-bold text-warm-ivory">{title}</h2>
+            <h2 id={titleId} className="text-lg font-bold text-text-primary">{title}</h2>
             {description && <p id={descId} className="mt-1 text-sm text-text-muted">{description}</p>}
           </div>
           {headerActions}

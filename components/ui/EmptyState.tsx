@@ -35,7 +35,7 @@ export function EmptyState({
         </span>
       )}
       <div className="max-w-[60ch]">
-        <p className="font-display font-medium text-warm-ivory">{title}</p>
+        <p className="font-display font-medium text-text-primary">{title}</p>
         {children && <div className="mt-1 text-sm text-text-muted">{children}</div>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}

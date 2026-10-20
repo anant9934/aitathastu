@@ -84,10 +84,10 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
             {active.length}
           </span>
           <div>
-            <p className="text-sm font-medium text-warm-ivory">
+            <p className="text-sm font-medium text-text-primary">
               <span className="font-mono text-champagne tabular">{active.length - pending}</span> confirmed
               {pending > 0 && <>, <span className="font-mono text-soft-amber tabular">{pending}</span> awaiting your review</>}
-              {hidden.length > 0 && <>, <button type="button" onClick={() => setShowHidden((v) => !v)} className="font-mono text-text-muted tabular underline underline-offset-2 hover:text-warm-ivory">{hidden.length} removed</button></>}
+              {hidden.length > 0 && <>, <button type="button" onClick={() => setShowHidden((v) => !v)} className="font-mono text-text-muted tabular underline underline-offset-2 hover:text-text-primary">{hidden.length} removed</button></>}
             </p>
             <p className="text-xs text-text-muted">
               Add personal contribution notes to turn imported repositories into verified evidence.
@@ -113,7 +113,7 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, description, or technology…"
-            className="w-full rounded-md border border-line-soft bg-bg-surface py-2 pl-9 pr-3 text-sm text-warm-ivory placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-champagne/40"
+            className="w-full rounded-md border border-line-soft bg-bg-surface py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-champagne/40"
             aria-label="Search projects"
           />
         </div>
@@ -122,7 +122,7 @@ export function ProjectsStep({ projects, saving, guide, onChange, onChangeSoon, 
       {adding && (
         <form noValidate onSubmit={(e) => { e.preventDefault(); add(); }} className="mt-4 grid gap-3.5 rounded-card border border-champagne/40 bg-bg-surface p-5 shadow-card">
           <div className="border-b border-line-soft pb-2.5">
-            <h3 className="font-display text-sm font-semibold text-warm-ivory">Add Project Manually</h3>
+            <h3 className="font-display text-sm font-semibold text-text-primary">Add Project Manually</h3>
           </div>
           <TextField label="Project name" required value={form.title} error={formError} placeholder="e.g. Real-Time Object Detection Pipeline" onChange={(e) => { setForm({ ...form, title: e.target.value }); setFormError(null); }} autoFocus />
           <TextAreaField label="What it does" placeholder="Brief summary of the architecture and outcome..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -202,7 +202,7 @@ function ProjectRow({ p, open, onToggle, update }: { p: ProjectEntry; open: bool
       <button type="button" aria-expanded={open} onClick={onToggle} className="flex w-full cursor-pointer items-start gap-3 px-5 py-4 text-left">
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-display font-medium text-warm-ivory">{p.title}</span>
+            <span className="font-display font-medium text-text-primary">{p.title}</span>
             {p.isFork && <Tag><GitFork size={12} aria-hidden="true" className="mr-1" />Fork</Tag>}
             {typeof p.stars === "number" && p.stars > 0 && <span className="inline-flex items-center gap-1 font-mono text-2xs text-text-muted tabular"><Star size={12} aria-hidden="true" className="text-soft-amber" />{p.stars}</span>}
           </p>

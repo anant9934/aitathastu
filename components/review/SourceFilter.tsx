@@ -32,7 +32,7 @@ export function SourceFilter({ counts, active, onSelect, forkCount, onAcceptAll,
   const chip = (pressed: boolean) =>
     cn(
       "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm transition-all duration-150 pointer-coarse:min-h-11",
-      pressed ? "border-soft-amber bg-soft-amber/15 text-warm-ivory font-medium shadow-[0_0_12px_rgba(244,154,71,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-warm-ivory",
+      pressed ? "border-soft-amber bg-soft-amber/15 text-text-primary font-medium shadow-[0_0_12px_rgba(196,138,90,0.2)]" : "border-border-medium text-text-muted hover:border-champagne/40 hover:text-text-primary",
     );
 
   return (
@@ -50,7 +50,7 @@ export function SourceFilter({ counts, active, onSelect, forkCount, onAcceptAll,
       </div>
       {active && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border-medium bg-bg-elevated px-3.5 py-2.5 shadow-card">
-          <span className="mr-auto text-sm text-text-muted">Showing only items from <span className="font-medium text-warm-ivory">{sourceLabel(active)}</span>.</span>
+          <span className="mr-auto text-sm text-text-muted">Showing only items from <span className="font-medium text-text-primary">{sourceLabel(active)}</span>.</span>
           <Button size="sm" variant="primary" icon={<Check size={16} aria-hidden="true" />} onClick={() => run(() => onAcceptAll(active))}>Accept all from {sourceLabel(active)}</Button>
           {active === "github" && forkCount > 0 && (
             <Button size="sm" variant="secondary" icon={<GitFork size={16} aria-hidden="true" />} onClick={() => run(onExcludeForks)}>Exclude forks ({forkCount})</Button>

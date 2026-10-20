@@ -38,7 +38,7 @@ export default function NotFound() {
         </div>
 
         <Label variant="warm">404 · Page Not Found</Label>
-        <h1 className="h2 mt-2 font-display text-3xl font-bold tracking-[-0.03em] text-warm-ivory sm:text-4xl">
+        <h1 className="h2 mt-2 font-display text-3xl font-bold tracking-[-0.03em] text-text-primary sm:text-4xl">
           There&apos;s nothing at this address
         </h1>
         <p className="lede mt-3 max-w-[480px] text-text-muted">

@@ -193,11 +193,11 @@ function ConnectorDrawer({ id, api, returnTo, onClose }: { id: string; api: Conn
 
         <div className="grid gap-4 border-t border-border-medium pt-4 sm:grid-cols-2">
           <div>
-            <p className="mb-2 flex items-center gap-1.5 font-display text-sm font-medium text-warm-ivory"><CheckCircle size={16} aria-hidden="true" className="text-champagne" />What we read</p>
+            <p className="mb-2 flex items-center gap-1.5 font-display text-sm font-medium text-text-primary"><CheckCircle size={16} aria-hidden="true" className="text-champagne" />What we read</p>
             <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-text-muted">{p.dataCollected.map((d) => <li key={d}>{d}</li>)}</ul>
           </div>
           <div>
-            <p className="mb-2 flex items-center gap-1.5 font-display text-sm font-medium text-warm-ivory"><ShieldCheck size={16} aria-hidden="true" className="text-champagne" />Our promises</p>
+            <p className="mb-2 flex items-center gap-1.5 font-display text-sm font-medium text-text-primary"><ShieldCheck size={16} aria-hidden="true" className="text-champagne" />Our promises</p>
             <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-text-muted">{p.guarantees.map((g) => <li key={g}>{g}</li>)}</ul>
           </div>
         </div>

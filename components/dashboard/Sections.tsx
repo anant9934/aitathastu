@@ -86,7 +86,7 @@ function SkillsSection({ model, index }: { model: Model; index: SkillsEvidenceIn
       <div className="rounded-card border border-border-medium bg-bg-elevated p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="font-display text-sm font-semibold text-text-primary">Core skills for {model.targetRole}</h3>
-          <span className="text-xs text-text-muted"><span className="font-mono text-warm-ivory tabular">{model.growthSection.coveredPrerequisites.length}</span> of {prereqs.length} shown</span>
+          <span className="text-xs text-text-muted"><span className="font-mono text-text-primary tabular">{model.growthSection.coveredPrerequisites.length}</span> of {prereqs.length} shown</span>
         </div>
         <ul className="mt-4 flex flex-col gap-3.5" data-eora-id="eora-skills-overview">
           {prereqs.map((p) => {
@@ -168,7 +168,7 @@ function RoadmapSection({ model }: { model: Model }) {
         {ms.map((m, i) => (
           <li key={`${m.title}-${i}`} className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-3">
             <span aria-hidden="true" className={cn("mt-1 grid size-5 place-items-center rounded-full border text-2xs font-mono",
-              m.status === "completed" ? "border-verified bg-verified text-obsidian font-bold" : m.status === "in_progress" ? "border-accent-warm-bright text-accent-warm-bright font-semibold" : "border-border-medium text-text-dim")}>
+              m.status === "completed" ? "border-verified bg-verified text-espresso font-bold" : m.status === "in_progress" ? "border-accent-warm-bright text-accent-warm-bright font-semibold" : "border-border-medium text-text-dim")}>
               {i + 1}
             </span>
             <div>

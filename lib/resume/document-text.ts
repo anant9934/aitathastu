@@ -12,6 +12,7 @@
  */
 
 import fs from "node:fs";
+import { readPlainText, readRtf } from "./text-formats";
 import path from "node:path";
 import zlib from "node:zlib";
 import { reconstructReadingOrderDetailed, type LayoutLineMeta, type LayoutLink, type LayoutPage, type LayoutSpan } from "./layout";
@@ -195,8 +196,10 @@ async function readDocx(bytes: Buffer): Promise<DocumentText> {
   return { text: lines.join("\n"), hyperlinks, pageCount: 1, lines: meta };
 }
 
-export async function readDocumentText(bytes: Buffer, extension: "pdf" | "docx"): Promise<DocumentText> {
+export async function readDocumentText(bytes: Buffer, extension: "pdf" | "docx" | "txt" | "rtf"): Promise<DocumentText> {
   if (extension === "docx") return readDocx(bytes);
+  if (extension === "txt") return readPlainText(bytes);
+  if (extension === "rtf") return readRtf(bytes);
   const { pages, hyperlinks } = await readPdfLayout(bytes);
   const order = reconstructReadingOrderDetailed(pages, hyperlinks);
   return { text: order.text, hyperlinks, pageCount: pages.length || 1, lines: order.lines, removed: order.removed };

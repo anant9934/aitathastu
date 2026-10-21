@@ -9,6 +9,7 @@ export type IntelligenceTask =
   | "ROADMAP_EXPLANATION"
   | "LEARNING_RECOMMENDATIONS"
   | "RESUME_STRUCTURE"
+  | "RESUME_RECOVERY"
   // Legacy aliases
   | "resume_interpretation"
   | "project_summarization"

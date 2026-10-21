@@ -9,7 +9,7 @@ export const TITLE_WORDS = new RegExp(
     [
       "developer", "designer", "engineer", "architect", "scientist", "manager", "lead", "founder", "co-?founder",
       "consultant", "specialist", "analyst", "intern", "internship", "student", "researcher", "author", "officer",
-      "advisor", "adviser", "assistant", "associate", "director", "coordinator", "executive", "editor", "president",
+      "advisor", "adviser", "assistant", "associate", "director", "coordinator", "chair(?:person)?", "executive", "editor", "president",
       "vice president", "vp", "coo", "ceo", "cto", "cfo", "tutor", "educator", "teacher", "lecturer", "professor",
       "freelancer", "fellow", "instructor", "trainee", "apprentice", "programmer", "administrator", "volunteer",
       "mentor", "head", "representative", "ambassador", "technician", "accountant", "auditor", "clerk", "nurse",
@@ -80,6 +80,8 @@ const WORLD_CITIES = [
   "vancouver", "sydney", "melbourne", "berlin", "munich", "paris", "amsterdam", "zurich", "stockholm", "dublin",
   "tokyo", "beijing", "shanghai", "abu dhabi", "doha", "riyadh", "kathmandu", "dhaka", "colombo", "suva",
   "el paraiso", "estepona", "madrid", "barcelona", "lisbon",
+  "valencia", "seville", "bilbao", "porto", "milan", "rome", "vienna", "prague", "warsaw", "brussels",
+  "copenhagen", "oslo", "helsinki", "hamburg", "frankfurt", "lyon", "geneva",
 ];
 const MODES = ["remote", "hybrid", "on-site", "onsite", "work from home", "wfh"];
 
@@ -88,6 +90,21 @@ const US_STATE = /^(?:[A-Z]{2})$/;
 
 function placeKey(s: string): string {
   return s.normalize("NFKC").toLowerCase().replace(/[.()]/g, "").replace(/\s+/g, " ").trim();
+}
+
+const CITY_SET = new Set([...INDIAN_CITIES, ...WORLD_CITIES]);
+const STATE_SET = new Set(INDIAN_STATES);
+const COUNTRY_SET = new Set(COUNTRIES);
+
+/** What kind of place one comma part names, from the gazetteer; null when unknown. */
+export function placeKind(text: string): "city" | "state" | "country" | null {
+  const k = placeKey(text);
+  if (COUNTRY_SET.has(k) && !CITY_SET.has(k)) return "country";
+  if (STATE_SET.has(k) && !CITY_SET.has(k)) return "state";
+  if (CITY_SET.has(k)) return "city";
+  if (COUNTRY_SET.has(k)) return "country";
+  if (STATE_SET.has(k)) return "state";
+  return null;
 }
 
 /** True when every comma part of `text` is a known place ("Pune, Maharashtra, India", "Remote"). */
@@ -179,7 +196,7 @@ export const KNOWN_TECH = [...new Set(TAXONOMY.flatMap(([, n]) => n))].filter((n
 /** Section families: the first family whose pattern matches a heading wins. */
 export const SECTION_FAMILIES: Array<[string, RegExp]> = [
   ["references", /^(?:references?|professional references?|referees?|references available on request)$/],
-  ["contact", /^(?:contact(?: me| details| info(?:rmation)?)?|personal (?:details|information|info|profile data)|get in touch|reach me)$/],
+  ["contact", /^(?:contact(?: me| details| info(?:rmation)?)?|personal (?:details|information|info|profile data|particulars)|get in touch|reach me|links|profiles|online (?:profiles|presence)|social(?: links| profiles)?|web presence)$/],
   ["summary", /^(?:summary|profile|professional (?:summary|profile)|career (?:objective|summary|profile)|objective|about(?: me)?|executive summary|personal (?:profile|statement)|hello|hi|introduction|overview|who i am|bio(?:graphy)?)$/],
   ["languages", /^(?:languages?(?: known| spoken| proficiency)?|spoken languages|linguistic (?:skills|proficiency)|language skills)$/],
   ["education", /\b(?:education(?:al)?|academics?|academic (?:background|qualifications?|details|record|profile)|qualifications? academic|what i studied|studies|schooling|degrees?)\b/],

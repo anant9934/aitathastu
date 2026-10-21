@@ -48,7 +48,7 @@
     {
       "kind": "awards",
       "heading": "Achievements",
-      "items": [{ "title": "Best Teacher Award, Sahodaya School Complex Ludhiana", "category": "award", "date": "2022" }]
+      "items": [{ "title": "Best Teacher Award, Sahodaya School Complex Ludhiana", "category": "award", "date": "2022", "issuer": "Sahodaya School Complex Ludhiana" }]
     },
     {
       "kind": "languages",

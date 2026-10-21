@@ -1,0 +1,36 @@
+Arvind Raghunathan
+arvind.r.data@example.com | +91 98450 77881 | Coimbatore, Tamil Nadu
+github.com/arvindr-data | kaggle.com/arvindrdata
+CAREER OBJECTIVE
+Data engineer who builds batch and streaming pipelines for manufacturing analytics.
+WORK EXPERIENCE:
+Feb 2023 - Present | Data Engineer | Bosch Global Software Technologies, Coimbatore
+Run Spark jobs that clean sensor data from 14 plants every night.
+Aug 2021 - Jan 2023 | Associate Data Engineer | Tiger Analytics, Chennai
+Moved 60 reporting tables from SQL Server to Snowflake.
+Jan 2021 - Jun 2021 | Data Engineering Intern | Tiger Analytics, Chennai
+Wrote dbt tests for the marketing data mart.
+ACADEMIC QUALIFICATIONS:
+Aug 2017 - May 2021  B.E., Mechanical Engineering — PSG College of Technology (CGPA 7.9/10)
+Jun 2014 - Apr 2017  Diploma, Automobile Engineering — PSG Polytechnic College (88%)
+Sep 2022 - May 2026 (Expected)  BS, Data Science and Applications — Indian Institute of Technology Madras
+ACADEMIC AND PERSONAL PROJECTS:
+Spindle Watch — Flags CNC spindle vibration anomalies from streaming sensor data. Stack: Python, Kafka, TimescaleDB. Repo: github.com/arvindr-data/spindle-watch Demo: spindlewatch.streamlit.app
+Fuel Ledger — Dashboard of fleet fuel use for a local transport cooperative. Stack: SQL, Metabase. Repo: github.com/arvindr-data/fuel-ledger
+CERTIFICATIONS:
+Snowflake — SnowPro Core Certification (Jul 2022, valid until Jul 2024, ID SPC-118204)
+IBM — Data Engineering Professional Certificate (Nov 2021) www.coursera.org/account/accomplishments/professional-cert/AB12CD34EF
+Apache Spark Developer Associate (May 2023)
+ACHIEVEMENTS:
+Runner-up, Smart Manufacturing Hackathon, CII Coimbatore, 2022
+Spot Award for pipeline reliability, Bosch Global Software Technologies, 2024
+SKILLS:
+Data – Python | SQL | Apache Spark | Kafka | dbt | Snowflake
+Cloud – AWS | Airflow | Terraform
+EXTRA-CURRICULAR ACTIVITIES:
+Jul 2019 - Dec 2020 | Team Captain | SAE Collegiate Club, PSG College of Technology
+Led a 25-member team building a formula student car.
+LANGUAGES KNOWN:
+Tamil (Native), English (Fluent), Hindi (Basic)
+REFERENCES:
+Mr. K. Senthil, Lead Engineer, Bosch, k.senthil@example.com, +91 98940 22334

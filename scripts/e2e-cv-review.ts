@@ -52,7 +52,7 @@ async function main() {
   await advance(/^Continue/);
 
   const fileInput = page.locator('input[type="file"]');
-  record("CV step accepts PDF, DOCX, PNG and JPEG", (await fileInput.getAttribute("accept")) === ".pdf,.docx,.png,.jpg,.jpeg");
+  record("CV step accepts PDF, DOCX, PNG, JPEG, TXT and RTF", (await fileInput.getAttribute("accept")) === ".pdf,.docx,.png,.jpg,.jpeg,.txt,.rtf");
   record("Phone copy matches the policy", await page.getByText(/only shown as an unticked suggestion/).isVisible());
   await page.getByText("I allow AI Tathastu to upload, store and process my CV", { exact: false }).click();
 
@@ -72,7 +72,16 @@ async function main() {
   record("A duplicated certificate is offered once", (await certs.count()) === 1, String(await certs.count()));
   const pythonChips = review.getByRole("button", { name: /^Python$/ });
   record("A repeated skill is offered once", (await pythonChips.count()) <= 1, String(await pythonChips.count()));
+  const groupTitles = await review.locator("fieldset legend").allTextContents();
+  record("Personal details are grouped as Identity, Contact and Location", ["Identity", "Contact", "Location"].every((t) => groupTitles.includes(t)), groupTitles.join(", "));
   record("Clean records carry no warning", !(await review.locator("li", { hasText: "UST Global" }).first().getByText("Needs a fix").count()));
+
+  // Bulk selection never ticks a record that needs a fix.
+  const expGroup = review.locator("fieldset", { has: page.locator("li", { hasText: "Kappa Systems" }) });
+  await expGroup.getByRole("button", { name: /^Tick all/ }).click();
+  const ust = review.locator("li", { hasText: "UST Global" }).first();
+  record("Tick all skips records that need a fix", !(await kappa.getByRole("checkbox").isChecked()) && await ust.getByRole("checkbox").isChecked());
+  await expGroup.getByRole("button", { name: /^Clear/ }).click();
 
   // Correct one record, tick two, save.
   await kappa.getByRole("checkbox").check();
@@ -80,12 +89,14 @@ async function main() {
   const input = kappa.locator("input[id^='cv-input-']");
   await input.fill("Software Engineer · Kappa Systems · Jun 2021 – Jan 2022");
   await input.press("Enter");
+  record("An edited record drops the extractor's stale warning", await kappa.getByText("Edited by you").isVisible() && !(await kappa.getByText("Needs a fix").count()));
   await review.locator("li", { hasText: "UST Global" }).first().getByRole("checkbox").check();
   await page.getByRole("button", { name: /Save & Continue/ }).click();
   await page.waitForFunction(() => document.body.textContent?.includes("Saved to profile") || document.querySelector("h1")?.textContent?.includes("account"), null, { timeout: 30_000 }).catch(() => undefined);
   const body = applyBodies[0] as { decisions?: Array<{ candidateId: string; state: string; correctedValue?: string }> } | undefined;
   const corrected = body?.decisions?.find((d) => d.correctedValue);
   record("Save sends a decision for every record, with the correction", Boolean(body?.decisions?.length && corrected?.state === "confirmed" && /Jun 2021/.test(corrected.correctedValue ?? "")), JSON.stringify(corrected ?? null));
+  record("Personal-detail decisions are saved with the review", Boolean(body?.decisions?.some((d) => /^profile_/.test(d.candidateId))), JSON.stringify(body?.decisions?.filter((d) => /^profile_/.test(d.candidateId)).map((d) => d.candidateId) ?? []));
   record("Unticked records are sent as rejected", Boolean(body?.decisions?.some((d) => d.state === "rejected")));
 
   // Reload: the saved decisions, not the raw extraction, come back.
@@ -101,6 +112,7 @@ async function main() {
   const kappaAfter = review.locator("li", { hasText: "Kappa Systems" }).first();
   const reloaded = await review.isVisible();
   record("After a reload the review shows the saved decisions", reloaded && await kappaAfter.getByRole("checkbox").isChecked() && /Jun 2021/.test((await kappaAfter.textContent()) ?? ""), reloaded ? ((await kappaAfter.textContent()) ?? "").slice(0, 120) : "review not visible after reload");
+  record("A restored correction is labelled as saved with the student's edit", reloaded && await kappaAfter.getByText("Saved with your edit").isVisible());
   await page.screenshot({ path: path.join(OUT, "after-reload.png"), fullPage: true });
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

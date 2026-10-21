@@ -1,0 +1,255 @@
+{
+  "id": "ishaan-modern",
+  "description": "Modern template: promotion at one company, two degrees at one institution, projects with GitHub and Live lines, certifications with expiry and credential URLs, coding-profile links without scheme, leadership, languages with proficiency, contact only in the DOCX page header, references",
+  "tags": [
+    "modern-template",
+    "promotion",
+    "same-institution",
+    "demo-links",
+    "credential-url",
+    "coding-profiles",
+    "docx-header-contact",
+    "references"
+  ],
+  "style": "modern",
+  "variants": [
+    "pdf-single",
+    "docx-plain",
+    "png",
+    "rtf"
+  ],
+  "docxContactIn": "header",
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Ishaan Kapoor",
+    "headline": "Backend Engineer, Payments Infrastructure",
+    "email": "ishaan.kapoor.dev@example.com",
+    "location": "Pune, Maharashtra",
+    "links": [
+      {
+        "label": "GitHub",
+        "url": "https://github.com/ishaankapoor",
+        "display": "github.com/ishaankapoor"
+      },
+      {
+        "label": "LeetCode",
+        "url": "https://leetcode.com/u/ishaan_k",
+        "display": "leetcode.com/u/ishaan_k"
+      },
+      {
+        "label": "Kaggle",
+        "url": "https://www.kaggle.com/ishaankapoor",
+        "display": "kaggle.com/ishaankapoor"
+      }
+    ]
+  },
+  "summary": "Backend engineer who builds reliable payment reconciliation and ledger services in Go and PostgreSQL.",
+  "summaryHeading": "Profile",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Work Experience",
+      "items": [
+        {
+          "organization": "Razorpay",
+          "title": "Software Engineer II",
+          "type": "employment",
+          "start": "2023-04",
+          "current": true,
+          "location": "Bengaluru",
+          "bullets": [
+            "Own the settlement reconciliation service that matches 9 million transactions a day."
+          ]
+        },
+        {
+          "organization": "Razorpay",
+          "title": "Software Engineer",
+          "type": "employment",
+          "start": "2021-07",
+          "end": "2023-03",
+          "location": "Bengaluru",
+          "bullets": [
+            "Built idempotent webhook delivery with retries and a dead-letter queue."
+          ]
+        },
+        {
+          "organization": "Zomato",
+          "title": "SDE Intern",
+          "type": "internship",
+          "start": "2020-05",
+          "end": "2020-07",
+          "location": "Gurugram",
+          "bullets": [
+            "Added rate limiting to the restaurant search API."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        {
+          "institution": "Indian Institute of Technology Roorkee",
+          "degree": "M.Tech",
+          "field": "Power Systems",
+          "level": "postgraduate",
+          "start": "2020-07",
+          "end": "2021-06",
+          "grade": {
+            "text": "CGPA 8.7/10",
+            "value": "8.7"
+          }
+        },
+        {
+          "institution": "Indian Institute of Technology Roorkee",
+          "degree": "B.Tech",
+          "field": "Electrical Engineering",
+          "level": "undergraduate",
+          "start": "2016-07",
+          "end": "2020-06",
+          "grade": {
+            "text": "CGPA 8.1/10",
+            "value": "8.1"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Projects",
+      "items": [
+        {
+          "name": "LedgerLite",
+          "technologies": [
+            "Go",
+            "PostgreSQL",
+            "gRPC"
+          ],
+          "url": "https://github.com/ishaankapoor/ledgerlite",
+          "demo": "https://ledgerlite.fly.dev",
+          "bullets": []
+        },
+        {
+          "name": "QueueScope",
+          "technologies": [
+            "TypeScript",
+            "React",
+            "Redis"
+          ],
+          "url": "https://github.com/ishaankapoor/queuescope",
+          "bullets": []
+        }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        {
+          "name": "AWS Certified Developer – Associate",
+          "issuer": "Amazon Web Services",
+          "date": "2022-11",
+          "expires": "2025-11",
+          "credentialUrl": "https://www.credly.com/badges/3f1c2a7e-ishaan"
+        },
+        {
+          "name": "Certified Kubernetes Application Developer",
+          "issuer": "The Linux Foundation",
+          "date": "2023-08",
+          "credentialId": "LF-9X2KQ71"
+        },
+        {
+          "name": "Advanced SQL for Data Engineers",
+          "date": "2021-02"
+        }
+      ]
+    },
+    {
+      "kind": "leadership",
+      "heading": "Positions of Responsibility",
+      "items": [
+        {
+          "organization": "Training and Placement Cell, IIT Roorkee",
+          "role": "Student Coordinator",
+          "start": "2019-08",
+          "end": "2020-05",
+          "bullets": []
+        }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Achievements",
+      "items": [
+        {
+          "title": "Winner, Smart India Hackathon",
+          "category": "hackathon",
+          "issuer": "Ministry of Education",
+          "date": "2019"
+        },
+        {
+          "title": "Global Rank 312, Google Kick Start Round D",
+          "category": "award",
+          "date": "2020"
+        }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [
+        {
+          "label": "Languages",
+          "items": [
+            "Go",
+            "Python",
+            "TypeScript",
+            "SQL"
+          ]
+        },
+        {
+          "label": "Systems",
+          "items": [
+            "PostgreSQL",
+            "Redis",
+            "Kafka",
+            "gRPC",
+            "Kubernetes"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [
+        {
+          "language": "Hindi",
+          "proficiency": "Native"
+        },
+        {
+          "language": "English",
+          "proficiency": "Full professional"
+        },
+        {
+          "language": "Marathi",
+          "proficiency": "Conversational"
+        }
+      ]
+    },
+    {
+      "kind": "references",
+      "heading": "References",
+      "items": [
+        {
+          "name": "Dr. Kavita Rao",
+          "relation": "Engineering Manager, Razorpay",
+          "email": "kavita.rao@example.com",
+          "phone": "+91 98200 11223"
+        }
+      ]
+    }
+  ]
+}

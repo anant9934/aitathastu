@@ -17,6 +17,7 @@ import type { LayoutLineMeta } from "./layout";
 import { CvQualityEvaluator, type SourceCoverageReport } from "./quality-evaluator";
 import { extractCv, EXTRACTION_SCHEMA_VERSION, type ExtractedCv, type ExtractMethod, type Evidence, type Review } from "./extract/engine";
 import type { NormDate } from "./extract/dates";
+import { buildPersonalDetails, type PersonalDetails } from "./extract/personal-details";
 
 // Legacy line tagger (kept for scripts that inspect section tagging).
 const HAS_YEAR = /\b(?:19|20)\d{2}\b/;
@@ -194,6 +195,7 @@ export interface CvSourceGraph {
 
 export interface DeterministicExtractionResult {
   interpretation: ResumeInterpretationOutput;
+  personalDetails: PersonalDetails;
   profile: ExtractedProfile;
   links: ResumeLink[];
   confidence: number;
@@ -466,7 +468,7 @@ export function extractResumeDeterministic(sourceText: string, hyperlinks: strin
     sections: cv.sections.map((s) => ({ section: s.section, heading: s.heading.slice(0, 80), page: s.page })),
   };
   return {
-    interpretation, profile, links, confidence,
+    interpretation, profile, links, confidence, personalDetails: buildPersonalDetails(cv, ctx.now ?? new Date()),
     sectionsDetected: [...new Set(cv.sections.map((s) => s.section))],
     sourceGraph: buildSourceGraph(cv),
     coverageReport: CvQualityEvaluator.evaluateSourceCoverage(interpretation, sourceText),

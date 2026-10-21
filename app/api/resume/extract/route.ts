@@ -14,7 +14,7 @@ import { checkRateLimitDistributed } from "@/lib/security/rate-limit";
 import { resumeIngestionReady } from "@/lib/security/core-ingestion-gate";
 import { validateDocumentSafety } from "@/lib/resume/document-safety";
 import { queueResumeUpload, processResumeJob } from "@/lib/services/resume-ingestion-service";
-import { RESUME_ACCEPTED_EXTENSIONS, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB, RESUME_MIME_BY_EXTENSION, type ResumeExtension } from "@/lib/config/upload-limits";
+import { RESUME_ACCEPTED_EXTENSIONS, RESUME_ACCEPTED_LABEL, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB, RESUME_MIME_BY_EXTENSION, type ResumeExtension } from "@/lib/config/upload-limits";
 import { jsonNoStore } from "@/lib/api/resume-route-helpers";
 import { contentIdempotencyKey, requestIdempotencyKey, withIdempotency } from "@/lib/sync/idempotency";
 import { ConsentService } from "@/lib/services/consent-service";
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       // Missing or unselected optional consent strictly equals false
       aiConsent = form.get("aiConsent") === "true";
       const candidate = form.get("resume");
-      if (!(candidate instanceof File)) return fail("MISSING_FILE", "Choose a PDF, DOCX, PNG or JPEG file first.", 400);
+      if (!(candidate instanceof File)) return fail("MISSING_FILE", `Choose a ${RESUME_ACCEPTED_LABEL} file first.`, 400);
       file = candidate;
     } catch {
       return fail("FORM_RECEIVE_FAILED", "The file could not be received. Please try again.", 400);
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
     const extension = file.name.toLowerCase().split(".").pop() as ResumeExtension;
     if (!RESUME_ACCEPTED_EXTENSIONS.includes(extension)) {
-      return fail("UNSUPPORTED_MEDIA_TYPE", extension === ("doc" as string) ? "Older .doc files can't be read. Save it as .docx or PDF and upload that." : "Use a PDF, DOCX, PNG or JPEG file.", 415);
+      return fail("UNSUPPORTED_MEDIA_TYPE", extension === ("doc" as string) ? "Older .doc files can't be read. Save it as .docx or PDF and upload that." : `Use a ${RESUME_ACCEPTED_LABEL} file.`, 415);
     }
     if (file.size === 0) return fail("EMPTY_FILE", "This file is empty. Please choose another.", 400);
     if (file.size > RESUME_MAX_UPLOAD_BYTES) {
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     if (safety.isEncrypted) return fail("ENCRYPTED_DOCUMENT", "Remove the document password, then upload the unencrypted file.", 422);
     if (safety.isTooLarge) return fail("DOCUMENT_TOO_LARGE", safety.error || "This document exceeds the processing limits.", 413);
     if (!safety.isValid) {
-      return fail(isImage ? "INVALID_IMAGE" : "INVALID_DOCUMENT", isImage ? "This image could not be read. Upload a clear PNG or JPEG of your CV, or a PDF." : "This document is damaged or uses an unsupported structure. Export it again as PDF or DOCX.", 422);
+      return fail(isImage ? "INVALID_IMAGE" : "INVALID_DOCUMENT", isImage ? "This image could not be read. Upload a clear PNG or JPEG of your CV, or a PDF." : extension === "txt" || extension === "rtf" ? "This file is not readable text. Save your CV as PDF, DOCX or plain text and upload that." : "This document is damaged or uses an unsupported structure. Export it again as PDF or DOCX.", 422);
     }
 
     let queued;

@@ -25,8 +25,8 @@ import {
   Trophy,
   Users,
 } from "@phosphor-icons/react/dist/ssr";
-import { RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
-import { FIELD_LABELS, REVIEW_GROUPS, type ResumeIngestion } from "@/lib/client/onboarding/use-resume-ingestion";
+import { RESUME_ACCEPTED_EXTENSIONS, RESUME_ACCEPTED_LABEL, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
+import { FIELD_LABELS, REVIEW_GROUPS, inGroup, isBulkSelectable, type ResumeIngestion } from "@/lib/client/onboarding/use-resume-ingestion";
 import { ReviewFlags } from "@/components/onboarding/ReviewFlags";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Field";
@@ -144,6 +144,7 @@ export function CvStep({
       case "languages":
         return <Globe size={18} weight="bold" className="text-accent-warm" />;
       case "links":
+      case "profiles":
         return <LinkSimple size={18} weight="bold" className="text-accent-warm" />;
       default:
         return <FileText size={18} weight="bold" className="text-accent-warm" />;
@@ -195,7 +196,7 @@ export function CvStep({
               <input
                 ref={fileInput}
                 type="file"
-                accept=".pdf,.docx,.png,.jpg,.jpeg"
+                accept={RESUME_ACCEPTED_EXTENSIONS.map((e) => `.${e}`).join(",")}
                 className="sr-only"
                 tabIndex={-1}
                 aria-hidden="true"
@@ -228,7 +229,7 @@ export function CvStep({
                   {cv.fileName ?? "Drag and drop your CV here"}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
-                  Supports PDF, DOCX, PNG or JPEG, up to {RESUME_MAX_UPLOAD_MB} MB
+                  Supports {RESUME_ACCEPTED_LABEL}, up to {RESUME_MAX_UPLOAD_MB} MB
                 </p>
               </div>
 
@@ -445,7 +446,7 @@ export function CvStep({
 
             <div className="divide-y divide-border-medium">
               {REVIEW_GROUPS.map((group) => {
-                const rows = cv.candidates.filter((c) => group.categories.includes(c.category));
+                const rows = cv.candidates.filter((c) => inGroup(c, group));
                 if (!rows.length) return null;
                 const selectedInGroup = rows.filter((r) => r.selected).length;
 
@@ -466,7 +467,7 @@ export function CvStep({
                         </span>
                         <span className="ml-auto flex gap-1">
                           <Button size="sm" variant="quiet" onClick={() => cv.setAll(group.categories, true)}>
-                            Select all ({rows.length})
+                            Select all ({rows.filter(isBulkSelectable).length})
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => cv.setAll(group.categories, false)}>
                             Clear
@@ -596,7 +597,7 @@ export function CvStep({
 
                     <ul className="grid gap-3 sm:grid-cols-2">
                       {rows.map((c) => {
-                        const label = c.field ? FIELD_LABELS[c.field] || c.field : c.category;
+                        const label = c.field ? FIELD_LABELS[c.field] || c.field : c.category === "digitalFootprint" ? "Profile link" : c.category;
                         const data = (c as any).recordData || {};
                         const isEditing = editingCandidate?.id === c.id;
 
@@ -696,7 +697,7 @@ export function CvStep({
                                   </p>
                                 )}
 
-                                <ReviewFlags data={data} previousDecision={(c as { previousDecision?: string }).previousDecision} />
+                                <ReviewFlags data={data} previousDecision={c.previousDecision} savedDecision={c.savedDecision} corrected={c.corrected} />
 
                                 {/* Structured Metadata badges if present */}
                                 {(data.institution || data.degree || data.role || data.company || data.issuer || data.year || data.duration || data.status) && (

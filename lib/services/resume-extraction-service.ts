@@ -51,6 +51,8 @@ export interface ResumeExtractionResult {
   error?: string;
   /** Document-level quality from the deterministic engine. */
   quality?: ExtractionQuality;
+  /** Personal details with evidence and confidence; deterministic only (never from a model). */
+  personalDetails?: import("@/lib/resume/extract/personal-details").PersonalDetails;
   /** Why structuring failed, when it did: "quota" lets ingestion say so plainly. */
   errorKind?: "not_configured" | "quota" | "provider" | "invalid_output";
 }
@@ -333,11 +335,11 @@ export function toExtractedProfile(r: ResumeExtraction): ExtractedProfile {
 }
 
 /** Primary entry point: reading-order text in, structured + validated resume out. */
-export async function extractResumeStructured(resumeText: string, personId?: string): Promise<ResumeExtractionResult> {
+export async function extractResumeStructured(resumeText: string, personId?: string, router?: import("@/lib/intelligence/router").IntelligenceRouter): Promise<ResumeExtractionResult> {
   const startTime = Date.now();
   let base = { provider: "unknown", promptVersion: RESUME_PROMPT_VERSION, truncated: false };
   try {
-    const { data, model, provider, truncated } = await structureResumeText(resumeText, personId);
+    const { data, model, provider, truncated } = await structureResumeText(resumeText, personId, router);
     base = { ...base, provider };
     const { resume, links } = sanitizeResumeExtraction(data);
     const validated = ResumeInterpretationSchema.safeParse(toInterpretation(resume, resumeText));
@@ -424,6 +426,7 @@ export function extractResumeDeterministicResult(
     success: true,
     extracted: validated.data,
     extractedProfile: det.profile,
+    personalDetails: det.personalDetails,
     links,
     discoveredProfiles,
     quality: det.quality,
@@ -1105,6 +1108,7 @@ export function mergeExtractionResults(
     extracted: mergedInterpretation,
     resume: enriched.resume || baseline.resume,
     extractedProfile: mergedProfile,
+    personalDetails: baseline.personalDetails,
     links: mergedLinks,
     discoveredProfiles: mergedDiscoveredProfiles,
     provider: `${baseline.provider}+${enriched.provider}`,

@@ -1,0 +1,71 @@
+{
+  "id": "kenji-modern",
+  "description": "Held-out, modern template: Japanese engineer, demo-only projects, certification without issuer, an ambiguous year-only certification, unusual skill names, Japanese and English proficiency",
+  "tags": ["modern-template", "unicode", "multilingual", "demo-only", "missing-issuer", "unusual-skills"],
+  "style": "modern",
+  "variants": ["pdf-single", "png", "docx-table"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Kenji Watanabe",
+    "headline": "Graphics and Frontend Engineer",
+    "email": "kenji.watanabe@example.jp",
+    "location": "Osaka, Japan",
+    "links": [
+      { "label": "GitHub", "url": "https://github.com/kwatanabe-gfx", "display": "github.com/kwatanabe-gfx" }
+    ]
+  },
+  "summary": "Engineer building real-time 3D visualisation tools for the web.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "CyberAgent", "title": "Frontend Engineer", "type": "employment", "start": "2021-04", "current": true, "location": "Tokyo", "bullets": ["Built a WebGPU renderer for interactive advertising previews."] },
+        { "organization": "Nintendo", "title": "Tools Programmer Intern", "type": "internship", "start": "2020-07", "end": "2020-09", "location": "Kyoto", "bullets": ["Wrote asset pipeline validators in Python."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Osaka University", "degree": "B.Eng.", "field": "Information Science", "level": "undergraduate", "start": "2017-04", "end": "2021-03" }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Projects",
+      "items": [
+        { "name": "TerrainForge", "technologies": ["Rust", "WebGPU", "WASM"], "demo": "https://terrainforge.pages.dev", "bullets": ["Procedural terrain editor that runs entirely in the browser."] },
+        { "name": "Kanji Flow", "technologies": ["Three.js", "Tauri", "Svelte"], "demo": "https://kanjiflow.app", "bullets": ["Desktop app that animates kanji stroke order."] }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Applied Information Technology Engineer Examination", "issuer": "IPA Japan", "date": "2020-12" },
+        { "name": "TOEIC Listening and Reading 920", "date": "2022-06" }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [
+        { "label": "Graphics", "items": ["WebGPU", "WGSL", "Three.js", "Blender"] },
+        { "label": "Languages", "items": ["Rust", "TypeScript", "Python"] },
+        { "label": "Frameworks", "items": ["Svelte", "Tauri"] }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Japanese", "proficiency": "Native" }, { "language": "English", "proficiency": "Business" }]
+    },
+    {
+      "kind": "awards",
+      "heading": "Awards",
+      "items": [{ "title": "Gold Award, Japan Media Arts Festival Student Category", "category": "award", "date": "2020" }]
+    }
+  ]
+}

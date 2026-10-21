@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { requestJson, describeError } from "@/lib/client/api";
-import { RESUME_ACCEPTED_EXTENSIONS, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
+import { RESUME_ACCEPTED_EXTENSIONS, RESUME_ACCEPTED_LABEL, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
 import type { ReviewedResumeClaim } from "./types";
 
 export type ResumeProcessingState = "IDLE" | "UPLOADING" | "QUEUED" | "PROCESSING" | "REVIEW_REQUIRED" | "SAVING" | "COMPLETED" | "FAILED";
@@ -21,9 +21,16 @@ export type ResumeCandidate = Omit<ReviewedResumeClaim, "category"> & {
   id: string;
   selected: boolean;
   previousDecision?: string;
+  /** The decision saved for this document, restored after a reload. */
+  savedDecision?: "confirmed" | "rejected";
   category: ReviewedResumeClaim["category"] | "achievement" | "profile" | "link" | "publication";
   field?: string;
 };
+
+const UNSAFE_FOR_BULK = new Set(["invalid", "unreadable", "conflicting"]);
+export function isBulkSelectable(c: { recordData?: Record<string, any> }): boolean {
+  return !UNSAFE_FOR_BULK.has(String(c.recordData?.review?.status ?? ""));
+}
 
 export type AcceptedResumeProfile = Partial<Record<"fullName" | "email" | "mobile" | "location" | "degree" | "specialization" | "institution" | "currentYear" | "expectedGraduationYear" | "gpa", string>>;
 
@@ -54,10 +61,20 @@ type JobStatus = {
 };
 
 const RECORD_CANDIDATE_ID = /^[a-zA-Z_]+_\d+$/;
+const ONBOARDING_PROFILE_FIELDS = new Set(["fullName", "email", "mobile", "location", "degree", "specialization", "institution", "currentYear", "expectedGraduationYear", "gpa"]);
 
 /** Review sections, structured per record category for all 16 CV categories. */
-export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: ResumeCandidate["category"][] }> = [
-  { id: "identity", title: "Identity and contact", categories: ["profile"] },
+/** Personal-detail fields shown in each personal group (category "profile"). */
+const IDENTITY_FIELDS = ["fullName", "pronouns", "dateOfBirth", "nationality"];
+const CONTACT_FIELDS = ["email", "alternateEmail", "mobile", "alternatePhone"];
+const LOCATION_FIELDS = ["location", "address"];
+const PROFILE_FIELDS = ["headline", "currentRole", "currentEmployer", "experienceDuration", "workAuthorization", "drivingLicence", "institution", "degree", "specialization", "expectedGraduationYear"];
+
+export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: ResumeCandidate["category"][]; fields?: string[] }> = [
+  { id: "identity", title: "Identity", categories: ["profile"], fields: IDENTITY_FIELDS },
+  { id: "contact", title: "Contact", categories: ["profile"], fields: CONTACT_FIELDS },
+  { id: "location", title: "Location", categories: ["profile"], fields: LOCATION_FIELDS },
+  { id: "profiles", title: "Professional profile and links", categories: ["profile", "link", "digitalFootprint"], fields: PROFILE_FIELDS },
   { id: "summary", title: "Professional summary", categories: ["summary"] },
   { id: "education", title: "Education", categories: ["education"] },
   { id: "skills", title: "Skills and technologies", categories: ["skill"] },
@@ -71,12 +88,21 @@ export const REVIEW_GROUPS: Array<{ id: string; title: string; categories: Resum
   { id: "training", title: "Training, courses and workshops", categories: ["training"] },
   { id: "volunteering", title: "Volunteering and community", categories: ["volunteering"] },
   { id: "languages", title: "Languages", categories: ["language"] },
-  { id: "links", title: "Digital footprints", categories: ["link", "digitalFootprint"] },
   { id: "additional", title: "Additional information", categories: ["additional"] },
 ];
 
+/** Whether a candidate belongs in a review group (personal fields are split across four groups). */
+export function inGroup(c: { category: string; field?: string }, group: { categories: string[]; fields?: string[] }): boolean {
+  if (!group.categories.includes(c.category)) return false;
+  return c.category !== "profile" || !group.fields || group.fields.includes(c.field ?? "");
+}
+
 export const FIELD_LABELS: Record<string, string> = {
   fullName: "Full name", email: "Email", mobile: "Phone number", location: "Location",
+  pronouns: "Pronouns", dateOfBirth: "Date of birth", nationality: "Nationality",
+  alternateEmail: "Alternate email", alternatePhone: "Alternate phone", address: "Address",
+  headline: "Headline", currentRole: "Current designation", currentEmployer: "Current employer",
+  experienceDuration: "Total experience", workAuthorization: "Work authorisation", drivingLicence: "Driving licence",
   institution: "Institution", degree: "Degree", specialization: "Field of study",
   expectedGraduationYear: "Graduation year", github: "GitHub", linkedin: "LinkedIn", portfolio: "Portfolio",
 };
@@ -172,6 +198,7 @@ export function useResumeIngestion({
             corrected: Boolean(earlierValue && earlierValue !== value),
             selected: earlier,
             previousDecision: typeof previousDecision === "string" ? previousDecision : undefined,
+            savedDecision: saved ? (decision as "confirmed" | "rejected") : undefined,
             field: typeof field === "string" ? field : undefined,
             recordData: (recordData as Record<string, any>) || undefined,
           }];
@@ -251,7 +278,7 @@ export function useResumeIngestion({
   const checkFile = (file: File, consent: boolean): string | null => {
     const ext = file.name.toLowerCase().split(".").pop();
     if (ext === "doc") return "Older .doc files can't be read. Open it in Word or LibreOffice and save it as .docx or PDF.";
-    if (!(RESUME_ACCEPTED_EXTENSIONS as readonly string[]).includes(ext || "")) return "Choose a PDF, DOCX, PNG or JPEG file.";
+    if (!(RESUME_ACCEPTED_EXTENSIONS as readonly string[]).includes(ext || "")) return `Choose a ${RESUME_ACCEPTED_LABEL} file.`;
     if (file.size > RESUME_MAX_UPLOAD_BYTES) return `Choose a file under ${RESUME_MAX_UPLOAD_MB} MB, or continue without a CV.`;
     if (serviceReady === false) return "CV upload is unavailable right now. Continue without a CV; you can add it later from your profile.";
     if (!consent) return "Tick the consent box first, so we can read your CV.";
@@ -294,9 +321,10 @@ export function useResumeIngestion({
     await poll(docId, res.data.jobId, fileName || selectedFile.current?.name || "CV");
   };
 
+  /** "Select all" never ticks a record the extractor marked as needing a fix; those are ticked one by one. */
   const setAll = (categories: ResumeCandidate["category"][], selected: boolean) => {
     setReviewSaved(false);
-    setCandidates((cur) => cur.map((c) => (categories.includes(c.category) ? { ...c, selected } : c)));
+    setCandidates((cur) => cur.map((c) => (categories.includes(c.category) && (!selected || isBulkSelectable(c)) ? { ...c, selected } : c)));
   };
   const toggle = (id: string, selected: boolean) => {
     setReviewSaved(false);
@@ -324,19 +352,22 @@ export function useResumeIngestion({
     const acceptedLinks: Partial<Record<string, string>> = {};
     const acceptedPortfolioUrls: string[] = [];
     for (const c of accepted) {
-      if (c.category === "profile" && c.field) acceptedProfile[c.field as keyof AcceptedResumeProfile] = c.value.trim();
+      // Only the onboarding profile's own fields seed the draft; the rest are kept with the CV review.
+      if (c.category === "profile" && c.field && ONBOARDING_PROFILE_FIELDS.has(c.field)) acceptedProfile[c.field as keyof AcceptedResumeProfile] = c.value.trim();
       if (c.category === "link" && c.field) {
         if (!acceptedLinks[c.field]) acceptedLinks[c.field] = c.value.trim();
         if (c.field === "portfolio") acceptedPortfolioUrls.push(c.value.trim());
       }
     }
     const reviewSummary = Object.fromEntries(REVIEW_GROUPS.map((g) => {
-      const rows = candidates.filter((c) => g.categories.includes(c.category));
+      const rows = candidates.filter((c) => inGroup(c, g));
       return [g.id, { total: rows.length, accepted: rows.filter((c) => accepted.includes(c)).length }];
     }));
     setState("SAVING");
     setError(null);
-    const decisions = records.map((c) => ({
+    // Personal-detail fields are decided too, so a confirmed or corrected value survives reloads and reprocessing.
+    const profileRows = candidates.filter((c) => c.category === "profile" && /^profile_[a-zA-Z]+(?:_\d+)?$/.test(c.candidateId || c.id));
+    const decisions = [...records, ...profileRows].map((c) => ({
       candidateId: c.candidateId || c.id,
       state: c.selected && c.value.trim() ? "confirmed" : "rejected",
       ...(c.corrected && c.selected ? { correctedValue: c.value.trim() } : {}),

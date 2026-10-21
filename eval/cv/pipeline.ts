@@ -65,7 +65,7 @@ export interface PipelineOutput {
 }
 
 const empty = (): Prediction => ({
-  personal: { emails: [], phones: [], links: [] }, education: [], experience: [], projects: [], skills: [],
+  personal: { emails: [], phones: [], links: [] }, leadership: [], languageProficiency: {}, education: [], experience: [], projects: [], skills: [],
   certifications: [], awards: [], publications: [], volunteering: [], languages: [], memberships: [], claimedValues: [],
 });
 
@@ -83,6 +83,10 @@ export function toPrediction(review: { structured: any; extractedProfile: any; d
   out.personal.emails = [p.email ?? x.personal?.email].filter(Boolean);
   out.personal.phones = [p.mobile ?? x.personal?.phone].filter(Boolean);
   out.personal.location = p.location ?? x.personal?.location;
+  out.personal.headline = x.personal?.title ?? x.summary?.headline;
+  out.summary = x.summary?.text;
+  out.leadership = (x.leadership || []).map((l: any) => ({ organization: l.organization, role: l.role, start: d(l.startDate, l.dates?.start?.value), end: /present/i.test(l.endDate ?? "") ? undefined : d(l.endDate, l.dates?.end?.value), current: l.current }));
+  for (const l of x.languages || []) out.languageProficiency[l.language] = l.proficiency;
   const links = new Set<string>([...Object.values(review.discoveredProfiles || {}) as string[], ...((review.links || []) as Array<{ url: string }>).map((l) => l.url)]);
   const projectUrls = new Set((x.projects || []).flatMap((pr: any) => [pr.repositoryUrl, pr.demoUrl]).filter(Boolean).map((u: string) => u.toLowerCase().replace(/\/$/, "")));
   out.personal.links = [...links].filter((u) => u && !projectUrls.has(u.toLowerCase().replace(/\/$/, "")));
@@ -96,17 +100,17 @@ export function toPrediction(review: { structured: any; extractedProfile: any; d
   out.experience = (x.experience || []).map((e: any) => ({
     organization: e.company, title: e.role, type: e.type,
     start: d(e.startDate, e.dates?.start?.value), end: isPresent(e.endDate) ? undefined : d(e.endDate, e.dates?.end?.value),
-    current: isPresent(e.endDate) || e.current === true, flags: flagsOf(e), status: e.review?.status,
+    current: isPresent(e.endDate) || e.current === true, flags: flagsOf(e), status: e.review?.status, location: e.location,
   }));
-  out.projects = (x.projects || []).map((pr: any) => ({ name: pr.title, technologies: pr.technologies || [], url: pr.repositoryUrl || pr.demoUrl || undefined }));
+  out.projects = (x.projects || []).map((pr: any) => ({ name: pr.title, technologies: pr.technologies || [], url: pr.repositoryUrl || pr.demoUrl || undefined, repo: pr.repositoryUrl || undefined, demo: pr.demoUrl || undefined }));
   out.skills = (x.skills || []).filter((s: any) => s.isExplicit !== false).map((s: any) => s.originalName ?? s.name);
-  out.certifications = (x.certifications || []).map((c: any) => ({ name: c.name, issuer: c.issuer, date: d(c.issueDate ?? c.year, c.dates?.issued?.value), credentialId: c.credentialId, flags: flagsOf(c), status: c.review?.status }));
+  out.certifications = (x.certifications || []).map((c: any) => ({ name: c.name, issuer: c.issuer, date: d(c.issueDate ?? c.year, c.dates?.issued?.value), credentialId: c.credentialId, credentialUrl: c.credentialUrl, expires: d(c.expiryDate, c.dates?.expires?.value), flags: flagsOf(c), status: c.review?.status }));
   out.awards = [
-    ...(x.achievements || []).filter((a: any) => !["publication", "patent", "book"].includes(a.category)).map((a: any) => ({ title: a.title, category: a.category })),
+    ...(x.achievements || []).filter((a: any) => !["publication", "patent", "book"].includes(a.category)).map((a: any) => ({ title: a.title, category: a.category, issuer: a.issuer, date: d(a.date) })),
     ...(x.hackathons || []).map((h: any) => ({ title: h.event, category: "hackathon" })),
   ];
   out.publications = [
-    ...(x.research || []).map((r: any) => ({ title: r.title })),
+    ...(x.research || []).map((r: any) => ({ title: r.title, venue: r.publisher, date: d(r.date) })),
     ...(x.achievements || []).filter((a: any) => ["publication", "patent", "book"].includes(a.category)).map((a: any) => ({ title: a.title })),
   ];
   out.volunteering = [

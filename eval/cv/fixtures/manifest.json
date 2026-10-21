@@ -138,6 +138,84 @@
       "spec": "zoe-unicode",
       "variant": "docx-plain",
       "sha256": "dfa7dad07ae9eb5a9e287cd601a0b3b2fe92054981a6d463a1324be6551a5138"
+    },
+    {
+      "file": "lucia-modern--pdf-single.pdf",
+      "spec": "lucia-modern",
+      "variant": "pdf-single",
+      "sha256": "61ecd374358a59883182a3da09d92bbf35235c5c72bbf6e96b18d0357fed5535"
+    },
+    {
+      "file": "lucia-modern--docx-plain.docx",
+      "spec": "lucia-modern",
+      "variant": "docx-plain",
+      "sha256": "3f300252666a3d85aafd2bf31c0c0dded5cf3b65a4e29b7184cc54d42d918994"
+    },
+    {
+      "file": "tanvir-modern--pdf-multipage.pdf",
+      "spec": "tanvir-modern",
+      "variant": "pdf-multipage",
+      "sha256": "8f779bad050f1b4bc93ae8065a37ccc97f0d2234072d19d5ef5a2150ca4db56b"
+    },
+    {
+      "file": "tanvir-modern--docx-table.docx",
+      "spec": "tanvir-modern",
+      "variant": "docx-table",
+      "sha256": "051446591f02e0e61b573b3145705bc0b70b41b8571d8e5578d8d02d80e4986b"
+    },
+    {
+      "file": "tanvir-modern--scan-good.pdf",
+      "spec": "tanvir-modern",
+      "variant": "scan-good",
+      "sha256": "842fe90e27e96e01100b784ad05f208cd8dee62a610adc2ade5bee37af797349"
+    },
+    {
+      "file": "arvind-compact--pdf-single.pdf",
+      "spec": "arvind-compact",
+      "variant": "pdf-single",
+      "sha256": "f317852e401033fb571ef333583ae1a2d80c076ef8251e355771715952878957"
+    },
+    {
+      "file": "arvind-compact--docx-plain.docx",
+      "spec": "arvind-compact",
+      "variant": "docx-plain",
+      "sha256": "ccd0d83da8cc830686ec21ee55e5e78a4d6d33eeb3d009f95381b64317b14087"
+    },
+    {
+      "file": "arvind-compact--png.png",
+      "spec": "arvind-compact",
+      "variant": "png",
+      "sha256": "ff6335a648f138c6cec9b2d53bcea7104209d3b768f6b1fe5cbc3c9fa74850fb"
+    },
+    {
+      "file": "arvind-compact--txt.txt",
+      "spec": "arvind-compact",
+      "variant": "txt",
+      "sha256": "bc68b7212eda112f575870865d718dbf411153920862bfc28f557f2848014416"
+    },
+    {
+      "file": "ishaan-modern--pdf-single.pdf",
+      "spec": "ishaan-modern",
+      "variant": "pdf-single",
+      "sha256": "6248ce82a01744742941a9ed6c1268d9fc34a29340404c92a8d1abed4e8b2086"
+    },
+    {
+      "file": "ishaan-modern--docx-plain.docx",
+      "spec": "ishaan-modern",
+      "variant": "docx-plain",
+      "sha256": "27d17c2722369a2184892b8dd6fcd894d8d58d6c21c453af52d5fa9ee2dde714"
+    },
+    {
+      "file": "ishaan-modern--png.png",
+      "spec": "ishaan-modern",
+      "variant": "png",
+      "sha256": "716fa7cf8d277824b395dca7a7a65710a486aeaaad6762f86e8afea25407e60d"
+    },
+    {
+      "file": "ishaan-modern--rtf.rtf",
+      "spec": "ishaan-modern",
+      "variant": "rtf",
+      "sha256": "cff0436bb6c2419d8a3f32726f2ed3c3fedd242cb57efb3053000b4d9965a123"
     }
   ]
 }

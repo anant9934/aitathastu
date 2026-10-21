@@ -1,0 +1,73 @@
+{
+  "id": "lucia-modern",
+  "description": "Modern template, international: accented name, numeric month dates, overlapping freelance and employment, ongoing part-time master's with expected end, CEFR language levels, publications with authors, skills outside the vocabulary, no phone, scheme-less links",
+  "tags": ["modern-template", "international", "unicode", "numeric-dates", "overlapping-jobs", "ongoing-education", "authors", "unusual-skills"],
+  "style": "modern",
+  "variants": ["pdf-single", "docx-plain"],
+  "dateStyle": "num",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Lucía Fernández-García",
+    "headline": "Data Scientist",
+    "email": "lucia.fg@example.es",
+    "location": "Madrid, Spain",
+    "links": [
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/lucia-fg", "display": "linkedin.com/in/lucia-fg" },
+      { "label": "Website", "url": "https://luciafg.dev", "display": "luciafg.dev" }
+    ]
+  },
+  "summary": "Data scientist working on demand forecasting and data quality for retail supply chains.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Mercadona Tech", "title": "Senior Data Scientist", "type": "employment", "start": "2022-03", "current": true, "location": "Valencia", "bullets": ["Lead the store-level demand forecasting model used for 1,600 stores."] },
+        { "organization": "Independent", "title": "Freelance Data Consultant", "type": "freelance", "start": "2021-01", "end": "2022-12", "location": "Remote", "bullets": ["Built data-quality checks for three e-commerce clients."] },
+        { "organization": "Cabify", "title": "Data Analyst", "type": "employment", "start": "2019-09", "end": "2022-02", "location": "Madrid", "bullets": ["Modelled surge pricing elasticity across 12 cities."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Universidad Politécnica de Madrid", "degree": "M.Sc.", "field": "Artificial Intelligence", "level": "postgraduate", "start": "2023-09", "end": "2025-07", "current": true },
+        { "institution": "Universidad Carlos III de Madrid", "degree": "B.Sc.", "field": "Statistics", "level": "undergraduate", "start": "2015-09", "end": "2019-06", "grade": { "text": "GPA 8.9/10", "value": "8.9" } }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Tools",
+      "groups": [
+        { "label": "Data", "items": ["Python", "Polars", "dbt", "Great Expectations", "Apache Airflow"] },
+        { "label": "Modelling", "items": ["LightGBM", "Prophet", "PyMC"] }
+      ]
+    },
+    {
+      "kind": "publications",
+      "heading": "Publications",
+      "items": [
+        { "title": "Hierarchical reconciliation of retail demand forecasts", "venue": "International Journal of Forecasting", "date": "2024", "authors": "L. Fernández-García, M. Ortega" },
+        { "title": "Detecting silent data drift in pricing pipelines", "venue": "KDD Workshop on Data Quality", "date": "2022", "authors": "L. Fernández-García" }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Google Professional Data Engineer", "issuer": "Google Cloud", "date": "2023-05", "expires": "2025-05" },
+        { "name": "dbt Analytics Engineering Certification", "issuer": "dbt Labs", "date": "2022-10" }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Spanish", "proficiency": "Native" }, { "language": "English", "proficiency": "C1" }, { "language": "German", "proficiency": "B2" }]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Volunteering",
+      "items": [{ "organization": "DataKind Madrid", "role": "Volunteer Data Scientist", "start": "2020-02", "current": true, "bullets": ["Analyse food-bank logistics data."] }]
+    }
+  ]
+}

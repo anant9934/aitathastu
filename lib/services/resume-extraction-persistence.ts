@@ -108,8 +108,15 @@ export async function persistExtraction(params: {
   });
 
   const rows = new Map<string, typeof resumeExtractedRecords.$inferInsert>();
+  const seenKeys = new Map<string, number>();
   for (const c of candidates) {
-    const key = recordKey(c);
+    // Every review suggestion gets its own row, so each one's decision is kept: two
+    // records with the same identity (same school, degree and field, different
+    // dates) become "key" and "key#2", in document order.
+    const base = recordKey(c);
+    const n = (seenKeys.get(`${c.category}|${base}`) ?? 0) + 1;
+    seenKeys.set(`${c.category}|${base}`, n);
+    const key = n === 1 ? base : `${base}#${n}`;
     const id = recordId(personId, documentId, c.category, key);
     if (rows.has(id)) continue;
     const r = c.recordData ?? {};

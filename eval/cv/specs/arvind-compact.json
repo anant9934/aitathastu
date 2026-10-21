@@ -1,0 +1,262 @@
+{
+  "id": "arvind-compact",
+  "description": "Compact template (dates first, pipe rows, no bullets, issuer-first certifications, inline project Stack/Repo/Demo, colon headings): early-career data engineer with a diploma and a degree, an ongoing part-time course, hackathons and references",
+  "tags": [
+    "compact-template",
+    "dates-first",
+    "no-bullets",
+    "issuer-first",
+    "inline-project-links",
+    "references"
+  ],
+  "style": "compact",
+  "variants": [
+    "pdf-single",
+    "docx-plain",
+    "png",
+    "txt"
+  ],
+  "dateStyle": "mon",
+  "rangeSep": " - ",
+  "person": {
+    "name": "Arvind Raghunathan",
+    "email": "arvind.r.data@example.com",
+    "phone": "+91 98450 77881",
+    "location": "Coimbatore, Tamil Nadu",
+    "links": [
+      {
+        "label": "GitHub",
+        "url": "https://github.com/arvindr-data",
+        "display": "github.com/arvindr-data"
+      },
+      {
+        "label": "Kaggle",
+        "url": "https://www.kaggle.com/arvindrdata",
+        "display": "kaggle.com/arvindrdata"
+      }
+    ]
+  },
+  "summary": "Data engineer who builds batch and streaming pipelines for manufacturing analytics.",
+  "summaryHeading": "Career Objective",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Work Experience",
+      "items": [
+        {
+          "organization": "Bosch Global Software Technologies",
+          "title": "Data Engineer",
+          "type": "employment",
+          "start": "2023-02",
+          "current": true,
+          "location": "Coimbatore",
+          "bullets": [
+            "Run Spark jobs that clean sensor data from 14 plants every night."
+          ]
+        },
+        {
+          "organization": "Tiger Analytics",
+          "title": "Associate Data Engineer",
+          "type": "employment",
+          "start": "2021-08",
+          "end": "2023-01",
+          "location": "Chennai",
+          "bullets": [
+            "Moved 60 reporting tables from SQL Server to Snowflake."
+          ]
+        },
+        {
+          "organization": "Tiger Analytics",
+          "title": "Data Engineering Intern",
+          "type": "internship",
+          "start": "2021-01",
+          "end": "2021-06",
+          "location": "Chennai",
+          "bullets": [
+            "Wrote dbt tests for the marketing data mart."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Academic Qualifications",
+      "items": [
+        {
+          "institution": "PSG College of Technology",
+          "degree": "B.E.",
+          "field": "Mechanical Engineering",
+          "level": "undergraduate",
+          "start": "2017-08",
+          "end": "2021-05",
+          "grade": {
+            "text": "CGPA 7.9/10",
+            "value": "7.9"
+          }
+        },
+        {
+          "institution": "PSG Polytechnic College",
+          "degree": "Diploma",
+          "field": "Automobile Engineering",
+          "level": "diploma",
+          "start": "2014-06",
+          "end": "2017-04",
+          "grade": {
+            "text": "88%",
+            "value": "88"
+          }
+        },
+        {
+          "institution": "Indian Institute of Technology Madras",
+          "degree": "BS",
+          "field": "Data Science and Applications",
+          "level": "undergraduate",
+          "start": "2022-09",
+          "end": "2026-05",
+          "current": true
+        }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Academic and Personal Projects",
+      "items": [
+        {
+          "name": "Spindle Watch",
+          "technologies": [
+            "Python",
+            "Kafka",
+            "TimescaleDB"
+          ],
+          "url": "https://github.com/arvindr-data/spindle-watch",
+          "demo": "https://spindlewatch.streamlit.app",
+          "bullets": [
+            "Flags CNC spindle vibration anomalies from streaming sensor data."
+          ]
+        },
+        {
+          "name": "Fuel Ledger",
+          "technologies": [
+            "SQL",
+            "Metabase"
+          ],
+          "url": "https://github.com/arvindr-data/fuel-ledger",
+          "bullets": [
+            "Dashboard of fleet fuel use for a local transport cooperative."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        {
+          "name": "SnowPro Core Certification",
+          "issuer": "Snowflake",
+          "date": "2022-07",
+          "expires": "2024-07",
+          "credentialId": "SPC-118204"
+        },
+        {
+          "name": "Data Engineering Professional Certificate",
+          "issuer": "IBM",
+          "date": "2021-11",
+          "credentialUrl": "https://www.coursera.org/account/accomplishments/professional-cert/AB12CD34EF"
+        },
+        {
+          "name": "Apache Spark Developer Associate",
+          "date": "2023-05"
+        }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Achievements",
+      "items": [
+        {
+          "title": "Runner-up, Smart Manufacturing Hackathon",
+          "category": "hackathon",
+          "issuer": "CII Coimbatore",
+          "date": "2022"
+        },
+        {
+          "title": "Spot Award for pipeline reliability",
+          "category": "award",
+          "issuer": "Bosch Global Software Technologies",
+          "date": "2024"
+        }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [
+        {
+          "label": "Data",
+          "items": [
+            "Python",
+            "SQL",
+            "Apache Spark",
+            "Kafka",
+            "dbt",
+            "Snowflake"
+          ]
+        },
+        {
+          "label": "Cloud",
+          "items": [
+            "AWS",
+            "Airflow",
+            "Terraform"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "leadership",
+      "heading": "Extra-Curricular Activities",
+      "items": [
+        {
+          "organization": "SAE Collegiate Club, PSG College of Technology",
+          "role": "Team Captain",
+          "start": "2019-07",
+          "end": "2020-12",
+          "bullets": [
+            "Led a 25-member team building a formula student car."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages Known",
+      "items": [
+        {
+          "language": "Tamil",
+          "proficiency": "Native"
+        },
+        {
+          "language": "English",
+          "proficiency": "Fluent"
+        },
+        {
+          "language": "Hindi",
+          "proficiency": "Basic"
+        }
+      ]
+    },
+    {
+      "kind": "references",
+      "heading": "References",
+      "items": [
+        {
+          "name": "Mr. K. Senthil",
+          "relation": "Lead Engineer, Bosch",
+          "email": "k.senthil@example.com",
+          "phone": "+91 98940 22334"
+        }
+      ]
+    }
+  ]
+}

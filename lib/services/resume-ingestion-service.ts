@@ -47,6 +47,9 @@ import { buildProfileV2 } from "./resume-profile-v2";
 import { ExtractorServiceClient, ExtractorServiceError, type ExtractorProfileV2 } from "./extractor-service-client";
 import { resolveExtractorIdentity } from "@/lib/auth/extractor-identity";
 import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers";
+import { recoverMissingFields, type RecoveryOutcome } from "@/lib/resume/targeted-recovery";
+import type { PersonalField } from "@/lib/resume/extract/personal-details";
+import type { IntelligenceRouter } from "@/lib/intelligence/router";
 import { decisionsByCandidate, markRunFailed, persistExtraction, runIdForDocument } from "./resume-extraction-persistence";
 
 export type ResumeFailureCode =
@@ -471,7 +474,7 @@ async function runInProcessStep(job: SourceProcessingJob) {
     throw new PipelineFailure("DOCUMENT_RETRIEVAL_FAILED", err);
   }
   const name = doc.filename.toLowerCase();
-  const extension = name.endsWith(".docx") ? "docx" : /\.(?:png|jpe?g)$/.test(name) ? "image" : "pdf";
+  const extension = name.endsWith(".docx") ? "docx" : name.endsWith(".txt") ? "txt" : name.endsWith(".rtf") ? "rtf" : /\.(?:png|jpe?g)$/.test(name) ? "image" : "pdf";
 
   // Verification switch: send text-layer PDFs through the OCR branch too.
   const forceOcr = extension === "pdf" && process.env.RESUME_FORCE_OCR === "true";
@@ -491,13 +494,13 @@ async function runInProcessStep(job: SourceProcessingJob) {
       fileFormat: extension,
       pageCount: parsed.pageCount || 1,
       ocrUsed: false,
-      via: extension === "docx" ? "docx" : "native-pdf",
+      via: extension === "pdf" ? "native-pdf" : extension,
       lines: parsed.lines,
     });
     return;
   }
 
-  if (extension === "docx") throw new PipelineFailure("NATIVE_TEXT_UNAVAILABLE");
+  if (extension === "docx" || extension === "txt" || extension === "rtf") throw new PipelineFailure("NATIVE_TEXT_UNAVAILABLE");
 
   if (!ExtractorServiceClient.isConfigured()) {
     throw new PipelineFailure("OCR_SERVICE_NOT_CONFIGURED");
@@ -651,27 +654,59 @@ export function textFromExtractorPayload(raw: { raw_text?: string; pages?: Array
 }
 
 /**
- * Field-level review candidates for onboarding profile fields and typed links.
- * They are not Person 360 records: accepting one writes to the onboarding
- * draft only, so they never go through /apply.
+ * Field-level review candidates for personal details (category "profile").
+ * Built from the deterministic personal details when present, with evidence,
+ * method, confidence and the reasons a field needs a look; each decision is
+ * stored with the extracted records, so it survives reloads and reprocessing.
+ * Accepted core fields also seed the onboarding draft.
  */
 function profileCandidates(extraction: ResumeExtractionResult, text: string): ResumeReviewCandidate[] {
   const lines = text.split("\n");
   const span = (v: string) => lines.find((l) => l.toLowerCase().includes(v.toLowerCase()))?.trim().slice(0, 300) || v;
   const p = extraction.extractedProfile || {};
+  const d = extraction.personalDetails;
   const out: ResumeReviewCandidate[] = [];
-  const hasStructuredEdu = Boolean(extraction.extracted?.education && extraction.extracted.education.length > 0);
+  const add = (field: string, id: string, f: PersonalField) => {
+    const review = {
+      status: f.status === "invalid" ? "invalid" : f.status === "needs_review" ? "needs_review" : "high_confidence",
+      confidence: f.confidence === "high" ? 0.9 : f.confidence === "medium" ? 0.7 : 0.4,
+      issues: f.issues, fields: {},
+    };
+    out.push({
+      candidateId: id, category: "profile", field, value: f.value, sourceSpan: (f.evidence?.text ?? span(f.value)).slice(0, 300),
+      recordData: {
+        review, method: f.method, confidenceLevel: f.confidence,
+        ...(f.evidence ? { evidence: f.evidence } : {}),
+        ...(f.normalized && f.normalized !== f.value ? { normalized: f.normalized } : {}),
+        ...(f.original && f.original !== f.value ? { original: f.original } : {}),
+        ...(f.details ? { details: f.details } : {}),
+      },
+    });
+  };
+  const series = (field: string, list: PersonalField[]) => list.forEach((f, i) => add(field, `profile_${field}${i ? `_${i + 1}` : ""}`, f));
+  if (d) {
+    for (const k of ["fullName", "pronouns", "dateOfBirth", "nationality"] as const) if (d[k]) add(k, `profile_${k}`, d[k]!);
+    if (d.emails[0]) add("email", "profile_email", d.emails[0]);
+    series("alternateEmail", d.emails.slice(1));
+    if (d.phones[0]) add("mobile", "profile_mobile", d.phones[0]);
+    series("alternatePhone", d.phones.slice(1));
+    if (d.location) add("location", "profile_location", d.location);
+    series("address", d.addresses);
+    for (const k of ["headline", "currentRole", "currentEmployer", "experienceDuration", "workAuthorization", "drivingLicence"] as const) if (d[k]) add(k, `profile_${k}`, d[k]!);
+  }
+  // Fields the deterministic pass did not find (or paths without it) keep the earlier behaviour.
+  const have = new Set(out.map((c) => c.field));
   const fields: Array<[string, string | number | undefined]> = [
     ["fullName", p.fullName], ["email", p.email], ["mobile", p.mobile], ["location", p.location],
   ];
-  if (!hasStructuredEdu) {
+  if (!(extraction.extracted?.education && extraction.extracted.education.length > 0)) {
     fields.push(
       ["institution", p.institution], ["degree", p.degree], ["specialization", p.specialization],
       ["expectedGraduationYear", p.expectedGraduationYear],
     );
   }
   for (const [field, value] of fields) {
-    if (value === undefined || value === "") continue;
+    if (value === undefined || value === "" || have.has(field)) continue;
     out.push({ candidateId: `profile_${field}`, category: "profile", field, value: String(value), sourceSpan: span(String(value)) });
   }
   // Digital footprint links are handed off to DFI rather than generic CV review cards
@@ -772,10 +807,11 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
  */
 export async function buildResumeReview(
   input: ExtractionInput,
-  ctx: { documentId: string; personId: string; aiConsent: boolean; jobId?: string }
+  ctx: { documentId: string; personId: string; aiConsent: boolean; jobId?: string; router?: IntelligenceRouter }
 ) {
   const { documentId, personId } = ctx;
   const job = { id: ctx.jobId ?? "eval" };
+  const startedAt = Date.now();
 
   // 1. Establish Tier 1 Deterministic Baseline via Source-Grounded Reconciliation
   const method = input.ocrUsed ? "ocr" : input.fileFormat === "docx" ? "docx" : input.fileFormat === "pdf" ? "native_pdf" : "text";
@@ -803,7 +839,7 @@ export async function buildResumeReview(
   if (decision.shouldEnrich) {
     llmEnrichmentAttempted = true;
     try {
-      const enrichedResult = await extractResumeStructured(input.text, personId);
+      const enrichedResult = await extractResumeStructured(input.text, personId, ctx.router);
       if (enrichedResult.success && enrichedResult.extracted) {
         extraction = mergeExtractionResults(baseline, enrichedResult, input.text);
         llmEnrichmentSuccess = true;
@@ -841,6 +877,24 @@ export async function buildResumeReview(
         extraction.errorKind === "quota" ? "AI_QUOTA_EXCEEDED" : "EXTRACTION_FAILED",
         extraction.error || llmErrorNotice
       );
+    }
+  }
+
+  // 3b. Targeted recovery: fields still empty after the rules (and after the
+  // whole-CV pass, if it ran) are asked for once, with only the nearby lines
+  // (see targeted-recovery.ts). Skipped when the first AI call just failed.
+  let recovery: RecoveryOutcome | undefined;
+  // The upload request that runs this job has a 30 s limit (app/api/resume/extract): recovery
+  // gets what remains of a 20 s AI budget and is skipped when too little is left.
+  const recoveryBudget = 20_000 - (Date.now() - startedAt);
+  if (userConsent && extraction.extracted && !(llmEnrichmentAttempted && !llmEnrichmentSuccess) && recoveryBudget < 4_000) {
+    recovery = { attempted: false, reason: "time_budget_exhausted", gaps: 0, applied: [], rejected: [] };
+  } else if (userConsent && extraction.extracted && !(llmEnrichmentAttempted && !llmEnrichmentSuccess)) {
+    if (process.env.CORE_DISABLE_LIVE_LLM === "true" && !ctx.router) recovery = { attempted: false, reason: "ai_disabled_by_env", gaps: 0, applied: [], rejected: [] };
+    else {
+      recovery = await recoverMissingFields(extraction.extracted, input.text, { personId, router: ctx.router, budgetMs: Math.min(15_000, recoveryBudget) });
+      if (recovery.applied.length) llmEnrichmentSuccess = true;
+      console.info("[resume-pipeline] targeted recovery", { jobId: job.id, gaps: recovery.gaps, applied: recovery.applied.length, rejected: recovery.rejected.length, reason: recovery.reason ?? null });
     }
   }
 
@@ -908,6 +962,7 @@ export async function buildResumeReview(
       llmUsed: llmEnrichmentSuccess,
       llmAttempted: llmEnrichmentAttempted,
       llmSkippedReason: !decision.shouldEnrich ? decision.reason : undefined,
+      recovery: recovery ? { attempted: recovery.attempted, reason: recovery.reason, gaps: recovery.gaps, applied: recovery.applied, rejected: recovery.rejected.length, provider: recovery.provider } : undefined,
       llmError: llmErrorNotice,
       ocrUsed: input.ocrUsed,
       quality: extraction.quality ?? baseline.quality,

@@ -1,0 +1,100 @@
+{
+  "id": "tanvir-modern",
+  "description": "Modern template, multi-page with repeated header: founder role, patents and papers, scholarships, projects without dates or repository, certifications with credential IDs, leadership and volunteering, interests that must not become skills",
+  "tags": ["modern-template", "multi-page", "founder", "patents", "scholarships", "interests", "no-repo-project"],
+  "style": "modern",
+  "variants": ["pdf-multipage", "docx-table", "scan-good"],
+  "pageHeader": "Tanvir Chowdhury · Résumé",
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Tanvir Chowdhury",
+    "headline": "Embedded Systems Engineer",
+    "email": "tanvir.chowdhury@example.com",
+    "phone": "+91 90040 55667",
+    "location": "Kolkata, West Bengal",
+    "links": [
+      { "label": "GitHub", "url": "https://github.com/tanvirc", "display": "github.com/tanvirc" },
+      { "label": "Google Scholar", "url": "https://scholar.google.com/citations?user=TnVr0Q1", "display": "scholar.google.com/citations?user=TnVr0Q1" }
+    ]
+  },
+  "summary": "Embedded engineer designing low-power sensor hardware and firmware for agriculture.",
+  "sections": [
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Krishi Sense Labs", "title": "Co-founder and Hardware Lead", "type": "founder", "start": "2021-06", "current": true, "location": "Kolkata", "bullets": ["Designed a soil-moisture node that runs 3 years on two AA cells.", "Raised a seed grant from the state startup mission.", "Hired and mentor a team of five engineers.", "Ship firmware over the air to 4,000 deployed devices."] },
+        { "organization": "Texas Instruments", "title": "Embedded Software Engineer", "type": "employment", "start": "2018-07", "end": "2021-05", "location": "Bengaluru", "bullets": ["Wrote drivers for the CC13xx sub-GHz radio family.", "Reduced idle current of the reference design by 38 percent.", "Maintained the BLE stack examples used by customers."] },
+        { "organization": "ISRO Satellite Centre", "title": "Project Trainee", "type": "internship", "start": "2017-12", "end": "2018-05", "location": "Bengaluru", "bullets": ["Tested telemetry decoders for a student satellite payload."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Jadavpur University", "degree": "B.E.", "field": "Electronics and Telecommunication Engineering", "level": "undergraduate", "start": "2014-07", "end": "2018-05", "grade": { "text": "CGPA 9.02/10", "value": "9.02" } },
+        { "institution": "South Point High School", "degree": "Class XII", "level": "high_school", "end": "2014-03", "grade": { "text": "94.2%", "value": "94.2" } }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Selected Projects",
+      "items": [
+        { "name": "PocketScope", "technologies": ["C", "STM32", "KiCad"], "url": "https://github.com/tanvirc/pocketscope", "bullets": ["Two-channel USB oscilloscope on a single four-layer board.", "Streams 1 MS/s to a web front end over WebUSB."] },
+        { "name": "Irrigation Mesh Controller", "technologies": ["Zephyr RTOS", "LoRa", "Rust"], "bullets": ["Firmware for valve controllers that coordinate over a LoRa mesh.", "Survives brown-outs without corrupting the schedule."] }
+      ]
+    },
+    {
+      "kind": "publications",
+      "heading": "Patents and Publications",
+      "items": [
+        { "title": "Low-power soil moisture sensing apparatus with capacitive guard ring", "venue": "Indian Patent Application 202131045678", "date": "2022" },
+        { "title": "Energy-aware duty cycling for LoRa sensor meshes", "venue": "IEEE Sensors Journal", "date": "2023", "authors": "T. Chowdhury, R. Sen" }
+      ]
+    },
+    {
+      "kind": "scholarships",
+      "heading": "Scholarships and Honours",
+      "items": [
+        { "title": "KVPY Fellowship", "category": "award", "issuer": "Department of Science and Technology", "date": "2013" },
+        { "title": "University Gold Medal", "category": "award", "issuer": "Jadavpur University", "date": "2018" }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Embedded Systems Essentials with Arm", "issuer": "Arm Education", "date": "2020-04", "credentialId": "ARM-ESE-55120" }
+      ]
+    },
+    {
+      "kind": "leadership",
+      "heading": "Leadership",
+      "items": [{ "organization": "IEEE Student Branch, Jadavpur University", "role": "Chair", "start": "2016-08", "end": "2017-07", "bullets": ["Ran a 300-participant hardware hackathon."] }]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Volunteering",
+      "items": [{ "organization": "Robotics for Rural Schools", "role": "Mentor", "start": "2019-01", "current": true, "bullets": ["Teach weekend electronics workshops."] }]
+    },
+    {
+      "kind": "skills",
+      "heading": "Technical Skills",
+      "groups": [
+        { "label": "Firmware", "items": ["C", "C++", "Rust", "Zephyr RTOS", "FreeRTOS"] },
+        { "label": "Hardware", "items": ["KiCad", "STM32", "LoRa", "BLE"] }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Bengali", "proficiency": "Native" }, { "language": "English", "proficiency": "Fluent" }, { "language": "Hindi", "proficiency": "Fluent" }]
+    },
+    {
+      "kind": "interests",
+      "heading": "Interests",
+      "items": [{ "title": "Amateur radio (VU2TNV)" }, { "title": "Long-distance cycling" }]
+    }
+  ]
+}

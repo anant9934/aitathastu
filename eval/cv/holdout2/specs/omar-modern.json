@@ -1,0 +1,70 @@
+{
+  "id": "omar-modern",
+  "description": "Held-out, modern template with sidebar: international (UAE/UK) product engineer, three titles at one company, overlapping advisory role, certifications with expiry, volunteering",
+  "tags": ["modern-template", "sidebar", "international", "promotions", "overlapping-jobs", "expiry"],
+  "style": "modern",
+  "variants": ["pdf-sidebar", "docx-plain"],
+  "dateStyle": "mon",
+  "rangeSep": " – ",
+  "person": {
+    "name": "Omar Haddad",
+    "headline": "Staff Product Engineer",
+    "email": "omar.haddad@example.co.uk",
+    "location": "Dubai, United Arab Emirates",
+    "links": [
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/omarhaddad", "display": "linkedin.com/in/omarhaddad" },
+      { "label": "Portfolio", "url": "https://omarhaddad.io", "display": "omarhaddad.io" }
+    ]
+  },
+  "summary": "Product engineer who has shipped checkout and loyalty features used by millions of shoppers across the Gulf.",
+  "sections": [
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "sidebar": true,
+      "groups": [
+        { "label": "Frontend", "items": ["React", "Next.js", "TypeScript"] },
+        { "label": "Backend", "items": ["Node.js", "Elixir", "PostgreSQL"] },
+        { "label": "Practice", "items": ["A/B testing", "Accessibility"] }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "sidebar": true,
+      "items": [{ "language": "Arabic", "proficiency": "Native" }, { "language": "English", "proficiency": "Bilingual" }, { "language": "French", "proficiency": "Elementary" }]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "sidebar": true,
+      "items": [
+        { "name": "AWS Certified Solutions Architect – Professional", "issuer": "Amazon Web Services", "date": "2023-02", "expires": "2026-02" },
+        { "name": "Certified ScrumMaster", "issuer": "Scrum Alliance", "date": "2019-06", "expires": "2021-06" }
+      ]
+    },
+    {
+      "kind": "experience",
+      "heading": "Experience",
+      "items": [
+        { "organization": "Noon", "title": "Staff Product Engineer", "type": "employment", "start": "2023-01", "current": true, "location": "Dubai", "bullets": ["Lead the checkout platform team of nine engineers."] },
+        { "organization": "Noon", "title": "Senior Software Engineer", "type": "employment", "start": "2020-09", "end": "2022-12", "location": "Dubai", "bullets": ["Rebuilt the cart service, cutting p95 latency from 800 ms to 120 ms."] },
+        { "organization": "Noon", "title": "Software Engineer", "type": "employment", "start": "2019-03", "end": "2020-08", "location": "Dubai", "bullets": ["Built the first version of the loyalty points ledger."] },
+        { "organization": "Souqify", "title": "Technical Advisor", "type": "freelance", "start": "2021-04", "end": "2022-04", "location": "Remote", "bullets": ["Advised a seed-stage marketplace on its payment integration."] },
+        { "organization": "Deliveroo", "title": "Graduate Engineer", "type": "employment", "start": "2017-09", "end": "2019-02", "location": "London", "bullets": ["Worked on rider dispatch tooling."] }
+      ]
+    },
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "University of Manchester", "degree": "MEng", "field": "Computer Science", "level": "postgraduate", "start": "2013-09", "end": "2017-06", "grade": { "text": "First Class Honours", "value": "" } }
+      ]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Volunteering",
+      "items": [{ "organization": "Code Club UAE", "role": "Volunteer Instructor", "start": "2021-01", "current": true, "bullets": ["Teach Scratch and Python to primary school pupils."] }]
+    }
+  ]
+}

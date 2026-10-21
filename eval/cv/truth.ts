@@ -14,16 +14,22 @@ export type TruthDate = string | null; // "YYYY" or "YYYY-MM"
 
 export interface Truth {
   id: string;
-  personal: { fullName: string; emails: string[]; phones: string[]; location?: string; links: string[] };
+  personal: { fullName: string; emails: string[]; phones: string[]; location?: string; links: string[]; headline?: string };
+  /** Extended fields (scored separately from the core metric so earlier results stay comparable). */
+  summary?: string;
+  /** False for hand-annotated documents that only cover the core fields. */
+  extendedAnnotated?: boolean;
+  leadership?: Array<{ organization: string; role: string; start?: TruthDate; end?: TruthDate; current?: boolean }>;
   education: Array<{ institution: string; degree?: string; fieldOfStudy?: string; start?: TruthDate; end?: TruthDate; current?: boolean; grade?: string; level?: string }>;
-  experience: Array<{ organization: string; title: string; type?: string; start?: TruthDate; end?: TruthDate; current?: boolean; invalidDates?: boolean }>;
-  projects: Array<{ name: string; technologies: string[]; url?: string }>;
+  experience: Array<{ organization: string; title: string; type?: string; start?: TruthDate; end?: TruthDate; current?: boolean; invalidDates?: boolean; location?: string }>;
+  projects: Array<{ name: string; technologies: string[]; url?: string; repo?: string; demo?: string }>;
   skills: string[];
-  certifications: Array<{ name: string; issuer?: string; date?: TruthDate; dateAmbiguous?: boolean; credentialId?: string }>;
-  awards: Array<{ title: string; category: "award" | "hackathon" }>;
-  publications: Array<{ title: string }>;
+  certifications: Array<{ name: string; issuer?: string; date?: TruthDate; dateAmbiguous?: boolean; credentialId?: string; credentialUrl?: string; expires?: TruthDate }>;
+  awards: Array<{ title: string; category: "award" | "hackathon"; issuer?: string; date?: TruthDate }>;
+  publications: Array<{ title: string; venue?: string; date?: TruthDate }>;
   volunteering: Array<{ organization: string; role: string; start?: TruthDate; end?: TruthDate; current?: boolean }>;
   languages: string[];
+  languageProficiency?: Record<string, string>;
   memberships: string[];
   /** Contact details that appear in the document but belong to someone else (references). */
   forbidden: { emails: string[]; phones: string[] };
@@ -34,13 +40,14 @@ export interface Spec {
   description: string;
   tags: string[];
   variants: string[];
-  person: { name: string; email?: string; phone?: string; location?: string; links?: Array<{ url: string }> };
+  person: { name: string; email?: string; phone?: string; location?: string; headline?: string; links?: Array<{ url: string }> };
+  summary?: string;
   sections: Array<Record<string, any>>;
 }
 
-/** CV_EVAL_SET=holdout selects the held-out set, which is never used while tuning the extractor. */
-export const EVAL_SET = process.env.CV_EVAL_SET === "holdout" ? "holdout" : "dev";
-const SET_DIR = path.join(process.cwd(), EVAL_SET === "holdout" ? "eval/cv/holdout" : "eval/cv");
+/** CV_EVAL_SET=holdout or holdout2 selects a held-out set. holdout2 (2026-10-21) has only been run for aggregate scores; never read its per-field diffs while tuning. */
+export const EVAL_SET = process.env.CV_EVAL_SET === "holdout" || process.env.CV_EVAL_SET === "holdout2" ? process.env.CV_EVAL_SET : "dev";
+const SET_DIR = path.join(process.cwd(), EVAL_SET === "dev" ? "eval/cv" : `eval/cv/${EVAL_SET}`);
 export const SPEC_DIR = path.join(SET_DIR, "specs");
 export const FIXTURE_DIR = path.join(SET_DIR, "fixtures");
 export const PRIVATE_TRUTH_DIR = path.join(process.cwd(), "private-fixtures/ground-truth");
@@ -59,7 +66,12 @@ export function truthFromSpec(spec: Spec): Truth {
       phones: spec.person.phone ? [spec.person.phone] : [],
       location: spec.person.location,
       links: (spec.person.links || []).map((l) => l.url),
+      headline: spec.person.headline,
     },
+    summary: spec.summary,
+    extendedAnnotated: true,
+    leadership: [],
+    languageProficiency: {},
     education: [], experience: [], projects: [], skills: [], certifications: [], awards: [],
     publications: [], volunteering: [], languages: [], memberships: [],
     forbidden: { emails: [], phones: [] },
@@ -76,11 +88,14 @@ export function truthFromSpec(spec: Spec): Truth {
       case "experience":
         for (const x of items) t.experience.push({
           organization: x.organization, title: x.title, type: x.type, start: x.start ?? null,
-          end: x.current && !x.end ? null : x.end ?? null, current: Boolean(x.current), invalidDates: Boolean(x.expectInvalidDates),
+          end: x.current && !x.end ? null : x.end ?? null, current: Boolean(x.current), invalidDates: Boolean(x.expectInvalidDates), location: x.location,
         });
         break;
       case "projects":
-        for (const p of items) t.projects.push({ name: p.name, technologies: p.technologies || [], url: p.url });
+        for (const p of items) {
+          const code = (u?: string) => Boolean(u && /\/\/(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org)\//i.test(u));
+          t.projects.push({ name: p.name, technologies: p.technologies || [], url: p.url ?? p.demo, repo: code(p.url) ? p.url : undefined, demo: p.demo ?? (p.url && !code(p.url) ? p.url : undefined) });
+        }
         break;
       case "skills":
         for (const g of sec.groups || []) for (const s of g.items) if (!t.skills.some((x) => x.toLowerCase() === s.toLowerCase())) t.skills.push(s);
@@ -88,19 +103,24 @@ export function truthFromSpec(spec: Spec): Truth {
       case "certifications":
         for (const c of items) if (c.duplicateOf === undefined) t.certifications.push({
           name: c.name, issuer: c.issuer, date: c.date ?? null, dateAmbiguous: Boolean(c.dateAmbiguous), credentialId: c.credentialId,
+          credentialUrl: c.credentialUrl, expires: c.expires ?? null,
         });
         break;
       case "awards":
-        for (const a of items) t.awards.push({ title: a.title, category: a.category === "hackathon" ? "hackathon" : "award" });
+      case "scholarships":
+        for (const a of items) t.awards.push({ title: a.title, category: a.category === "hackathon" ? "hackathon" : "award", issuer: a.issuer, date: a.date ?? null });
         break;
       case "publications":
-        for (const p of items) t.publications.push({ title: p.title });
+        for (const p of items) t.publications.push({ title: p.title, venue: p.venue, date: p.date ?? null });
         break;
       case "volunteering":
         for (const v of items) t.volunteering.push({ organization: v.organization, role: v.role, start: v.start ?? null, end: v.current ? null : v.end ?? null, current: Boolean(v.current) });
         break;
       case "languages":
-        for (const l of items) t.languages.push(l.language);
+        for (const l of items) { t.languages.push(l.language); if (l.proficiency) t.languageProficiency![l.language] = l.proficiency; }
+        break;
+      case "leadership":
+        for (const x of items) t.leadership!.push({ organization: x.organization, role: x.role ?? x.title, start: x.start ?? null, end: x.current ? null : x.end ?? null, current: Boolean(x.current) });
         break;
       case "memberships":
         for (const m of items) t.memberships.push(m.title);

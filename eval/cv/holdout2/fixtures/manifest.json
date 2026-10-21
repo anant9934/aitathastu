@@ -1,0 +1,65 @@
+{
+  "renderVersion": 1,
+  "documents": [
+    {
+      "file": "kenji-modern--pdf-single.pdf",
+      "spec": "kenji-modern",
+      "variant": "pdf-single",
+      "sha256": "1420064bafd0d6e0ef4c7bdf8c1a657d09c91e9a64ac4e9db4e40111e44de4ca"
+    },
+    {
+      "file": "kenji-modern--png.png",
+      "spec": "kenji-modern",
+      "variant": "png",
+      "sha256": "43451d50c8742d07e4474183b619c996e5987e0e08a00508d759ea55c3614f50"
+    },
+    {
+      "file": "kenji-modern--docx-table.docx",
+      "spec": "kenji-modern",
+      "variant": "docx-table",
+      "sha256": "b8777a59b8470b0f39d8aff6a5c881b6329ad562cf0b20e64478287b7ddba261"
+    },
+    {
+      "file": "neha-compact--pdf-single.pdf",
+      "spec": "neha-compact",
+      "variant": "pdf-single",
+      "sha256": "ca74292bd765276bcd5cf26f7cca6f62fc7e88deec1b6076519874055e7670be"
+    },
+    {
+      "file": "neha-compact--docx-plain.docx",
+      "spec": "neha-compact",
+      "variant": "docx-plain",
+      "sha256": "68204e90c388b8e23e98b883cd408bde931596af534ef9e80acc9e7c443ebeba"
+    },
+    {
+      "file": "neha-compact--jpg.jpg",
+      "spec": "neha-compact",
+      "variant": "jpg",
+      "sha256": "8b22e3455061b1da18202f63c7cbf0480159fef61990e223e85a11d8b201b197"
+    },
+    {
+      "file": "omar-modern--pdf-sidebar.pdf",
+      "spec": "omar-modern",
+      "variant": "pdf-sidebar",
+      "sha256": "f59bbe878a26989680d5b087e8772a350b23ba75ece1e51a3d55b0db540f9531"
+    },
+    {
+      "file": "omar-modern--docx-plain.docx",
+      "spec": "omar-modern",
+      "variant": "docx-plain",
+      "sha256": "c547814bc82f79bb5a6be3f7e9fcafd5fbfde95a6ce0a7c5726ce29537236f02"
+    },
+    {
+      "file": "priyanka-compact--pdf-multipage.pdf",
+      "spec": "priyanka-compact",
+      "variant": "pdf-multipage",
+      "sha256": "c817665055fffb89afbba654cb81a726704f85666f6ba07a7c02e73d6201fc2a"
+    },
+    {
+      "file": "priyanka-compact--scan-good.pdf",
+      "spec": "priyanka-compact",
+      "variant": "scan-good",
+      "sha256": "0a7996ac01a366b022ff9608c8f5d158128350d8463293b4e78b3dfcca1f0cc9"
+    }
+  ]
+}

@@ -1,12 +1,13 @@
 /** Upload-time file checks: magic bytes, size, PDF encryption, page and image limits. No parsing. */
 
 import { RESUME_MAX_IMAGE_SIDE, RESUME_MAX_PAGES } from "@/lib/config/upload-limits";
+import { looksLikeText } from "@/lib/resume/text-formats";
 
 const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
 export interface DocumentSafetyValidation {
   isValid: boolean;
-  format: "pdf" | "docx" | "png" | "jpg" | "invalid";
+  format: "pdf" | "docx" | "png" | "jpg" | "txt" | "rtf" | "invalid";
   isEncrypted: boolean;
   isTooLarge: boolean;
   error?: string;
@@ -36,7 +37,7 @@ export function pdfPageCount(bytes: Buffer): number | null {
   return max || null;
 }
 
-export function validateDocumentSafety(bytes: Buffer, declaredExtension: "pdf" | "docx" | "png" | "jpg" | "jpeg"): DocumentSafetyValidation {
+export function validateDocumentSafety(bytes: Buffer, declaredExtension: "pdf" | "docx" | "png" | "jpg" | "jpeg" | "txt" | "rtf"): DocumentSafetyValidation {
   const invalid = (error: string): DocumentSafetyValidation => ({ isValid: false, format: "invalid", isEncrypted: false, isTooLarge: false, error });
 
   if (!bytes || bytes.length === 0) return invalid("Document buffer is empty.");
@@ -84,6 +85,15 @@ export function validateDocumentSafety(bytes: Buffer, declaredExtension: "pdf" |
       return { isValid: false, format: isPng ? "png" : "jpg", isEncrypted: false, isTooLarge: true, error: "Image dimensions exceed the processing limit." };
     }
     return { isValid: true, format: isPng ? "png" : "jpg", isEncrypted: false, isTooLarge: false };
+  }
+
+  // Text formats: no binary content (a renamed PDF, image or executable is refused).
+  if (declaredExtension === "txt") {
+    return looksLikeText(bytes) ? { isValid: true, format: "txt", isEncrypted: false, isTooLarge: false } : invalid("File is not plain text.");
+  }
+  if (declaredExtension === "rtf") {
+    const ok = bytes.subarray(0, 5).toString("latin1") === "{\\rtf" && !bytes.includes(0);
+    return ok ? { isValid: true, format: "rtf", isEncrypted: false, isTooLarge: false } : invalid("File lacks a valid RTF header ({\\rtf).");
   }
 
   // DOCX is a ZIP container: starts with PK\x03\x04.

@@ -15,14 +15,17 @@ import type { Truth, TruthDate } from "./truth";
 export interface PredDate { raw?: string | null; value?: string | null }
 
 export interface Prediction {
-  personal: { fullName?: string; emails: string[]; phones: string[]; location?: string; links: string[] };
+  personal: { fullName?: string; emails: string[]; phones: string[]; location?: string; links: string[]; headline?: string };
+  summary?: string;
+  leadership: Array<{ organization?: string; role?: string; start?: PredDate; end?: PredDate; current?: boolean }>;
+  languageProficiency: Record<string, string | undefined>;
   education: Array<{ institution?: string; degree?: string; fieldOfStudy?: string; start?: PredDate; end?: PredDate; current?: boolean; grade?: string; flags?: string[]; status?: string }>;
-  experience: Array<{ organization?: string; title?: string; type?: string; start?: PredDate; end?: PredDate; current?: boolean; flags?: string[]; status?: string }>;
-  projects: Array<{ name?: string; technologies: string[]; url?: string }>;
+  experience: Array<{ organization?: string; title?: string; type?: string; start?: PredDate; end?: PredDate; current?: boolean; flags?: string[]; status?: string; location?: string }>;
+  projects: Array<{ name?: string; technologies: string[]; url?: string; repo?: string; demo?: string }>;
   skills: string[];
-  certifications: Array<{ name?: string; issuer?: string; date?: PredDate; credentialId?: string; flags?: string[]; status?: string }>;
-  awards: Array<{ title?: string; category?: string }>;
-  publications: Array<{ title?: string }>;
+  certifications: Array<{ name?: string; issuer?: string; date?: PredDate; credentialId?: string; credentialUrl?: string; expires?: PredDate; flags?: string[]; status?: string }>;
+  awards: Array<{ title?: string; category?: string; issuer?: string; date?: PredDate }>;
+  publications: Array<{ title?: string; venue?: string; date?: PredDate }>;
   volunteering: Array<{ organization?: string; role?: string; start?: PredDate; end?: PredDate; current?: boolean }>;
   languages: string[];
   memberships: string[];
@@ -33,6 +36,8 @@ export interface Prediction {
 export type Counts = { tp: number; fp: number; fn: number };
 export interface DocScore {
   fields: Record<string, Counts>;
+  /** Fields added after the first evaluation round; kept apart so the core metric stays comparable. */
+  extended: Record<string, Counts>;
   records: Record<string, Counts & { duplicates: number }>;
   dates: { correct: number; total: number };
   association: { correct: number; total: number };
@@ -322,6 +327,41 @@ export function scoreDocument(truth: Truth, pred: Prediction, sourceText: string
     date("volunteering", "end", t.end, p.end);
   }
 
+  // Extended fields
+  const ext: Record<string, Counts> = {};
+  const opt = (key: string, tv: string | undefined, pv: string | undefined, eq: (a?: string, b?: string) => boolean) => {
+    if (tv || pv) compareField(ext, key, Boolean(tv), Boolean(pv), Boolean(tv && pv && eq(tv, pv)), tv, pv);
+  };
+  const extDate = (key: string, t: TruthDate | undefined, p?: PredDate) => {
+    const pv = predDateValue(p).value;
+    if (t || pv) compareField(ext, key, Boolean(t), Boolean(pv), dateEq(t, p), t, pv);
+  };
+  if (truth.extendedAnnotated) {
+  opt("personal.headline", truth.personal.headline, pred.personal.headline, textEq);
+  opt("summary", truth.summary, pred.summary, (a, b) => similarity(a, b) >= 0.6);
+  for (const { t, p } of exp.pairs) opt("experience.location", t.location, p.location, (a, b) => similarity(a, b) >= 0.6);
+  for (const { t, p } of proj.pairs) { opt("projects.repo", t.repo, p.repo, (a, b) => urlKey(a) === urlKey(b)); opt("projects.demo", t.demo, p.demo, (a, b) => urlKey(a) === urlKey(b)); }
+  for (const { t, p } of cert.pairs) { opt("certifications.credentialUrl", t.credentialUrl, p.credentialUrl, (a, b) => urlKey(a) === urlKey(b)); extDate("certifications.expires", t.expires ?? undefined, p.expires); }
+  for (const { t, p } of aw.pairs) { opt("awards.issuer", t.issuer, p.issuer, orgEq); extDate("awards.date", t.date ?? undefined, p.date); }
+  for (const { t, p } of pub.pairs) { opt("publications.venue", t.venue, p.venue, textEq); extDate("publications.date", t.date ?? undefined, p.date); }
+  for (const [lang, prof] of Object.entries(truth.languageProficiency ?? {})) {
+    const key = Object.keys(pred.languageProficiency).find((k) => norm(k) === norm(lang));
+    opt("languages.proficiency", prof, key ? pred.languageProficiency[key] : undefined, (a, b) => similarity(a, b) >= 0.6);
+  }
+  if (truth.leadership) {
+    const lead = pair(truth.leadership, pred.leadership, (t) => `${t.organization} ${t.role}`, (p) => `${p.organization ?? ""} ${p.role ?? ""}`, 0.35);
+    bump(ext, "leadership.record", "tp", lead.pairs.length); bump(ext, "leadership.record", "fn", lead.unmatchedTruth.length); bump(ext, "leadership.record", "fp", lead.unmatchedPred.length + lead.duplicates);
+    for (const t of lead.unmatchedTruth) DIFFS.push(`leadership: MISSING ${show(t)}`);
+    for (const p of lead.unmatchedPred) DIFFS.push(`leadership: SPURIOUS ${show(p)}`);
+    for (const { t, p } of lead.pairs) {
+      compareField(ext, "leadership.organization", true, Boolean(p.organization), orgEq(t.organization, p.organization), t.organization, p.organization);
+      compareField(ext, "leadership.role", true, Boolean(p.role), textEq(t.role, p.role), t.role, p.role);
+      extDate("leadership.start", t.start ?? undefined, p.start);
+      extDate("leadership.end", t.end ?? undefined, p.end);
+    }
+  }
+  }
+
   // Unsupported claims: extracted text that does not occur in the document at all.
   const source = groundingNorm(sourceText);
   const claimed = pred.claimedValues.map((v) => v.trim()).filter((v) => norm(v).length >= 2);
@@ -336,7 +376,7 @@ export function scoreDocument(truth: Truth, pred: Prediction, sourceText: string
   ];
 
   return {
-    fields, records, dates, association,
+    fields, extended: ext, records, dates, association,
     unsupported: { claimed: claimed.length, ungrounded: ungrounded.length, examples: ungrounded.slice(0, 8) },
     flags, forbiddenLeaks, calibration, diffs: DIFFS,
   };

@@ -1,0 +1,283 @@
+{
+  "id": "priyanka-compact",
+  "description": "Held-out, compact template, multi-page academic CV: ongoing PhD, B.Sc. and M.Sc. at the same university, teaching roles, publications, a patent, scholarships, memberships, an entry without dates",
+  "tags": [
+    "compact-template",
+    "multi-page",
+    "academic",
+    "same-institution",
+    "ongoing-phd",
+    "patent",
+    "scholarships",
+    "missing-dates"
+  ],
+  "style": "compact",
+  "variants": [
+    "pdf-multipage",
+    "scan-good"
+  ],
+  "pageHeader": "Priyanka Bose — CV",
+  "dateStyle": "year",
+  "rangeSep": "–",
+  "person": {
+    "name": "Priyanka Bose",
+    "headline": "Doctoral Researcher in Materials Chemistry",
+    "email": "priyanka.bose@example.ac.in",
+    "location": "New Delhi, India",
+    "links": [
+      {
+        "label": "ORCID",
+        "url": "https://orcid.org/0000-0001-7734-2210",
+        "display": "orcid.org/0000-0001-7734-2210"
+      }
+    ]
+  },
+  "summary": "Materials chemist studying perovskite stability for low-cost solar cells, with laboratory teaching experience.",
+  "sections": [
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        {
+          "institution": "Indian Institute of Technology Delhi",
+          "degree": "Ph.D.",
+          "field": "Chemistry",
+          "level": "doctorate",
+          "start": "2021",
+          "end": "2026",
+          "current": true
+        },
+        {
+          "institution": "University of Delhi",
+          "degree": "M.Sc.",
+          "field": "Chemistry",
+          "level": "postgraduate",
+          "start": "2019",
+          "end": "2021",
+          "grade": {
+            "text": "CGPA 9.1/10",
+            "value": "9.1"
+          }
+        },
+        {
+          "institution": "University of Delhi",
+          "degree": "B.Sc. (Hons)",
+          "field": "Chemistry",
+          "level": "undergraduate",
+          "start": "2016",
+          "end": "2019",
+          "grade": {
+            "text": "84.6%",
+            "value": "84.6"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "experience",
+      "heading": "Teaching and Research Experience",
+      "items": [
+        {
+          "organization": "Indian Institute of Technology Delhi",
+          "title": "Teaching Assistant",
+          "type": "employment",
+          "start": "2021",
+          "current": true,
+          "bullets": [
+            "Run the undergraduate physical chemistry laboratory for 80 students each semester.",
+            "Prepare and grade weekly laboratory reports.",
+            "Supervised four undergraduate research projects on thin-film deposition.",
+            "Wrote the laboratory safety manual adopted by the department in 2023.",
+            "Coordinated instrument booking for the shared Raman facility."
+          ]
+        },
+        {
+          "organization": "Council of Scientific and Industrial Research",
+          "title": "Summer Research Fellow",
+          "type": "internship",
+          "start": "2020",
+          "end": "2020",
+          "bullets": [
+            "Synthesised lead-free perovskite films and measured their band gaps.",
+            "Characterised film morphology with scanning electron microscopy.",
+            "Presented results at the institute summer symposium."
+          ]
+        },
+        {
+          "organization": "Pratham Education Foundation",
+          "title": "Science Tutor",
+          "type": "employment",
+          "bullets": [
+            "Taught weekend chemistry classes to secondary school students."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "publications",
+      "heading": "Publications",
+      "items": [
+        {
+          "title": "Moisture-resistant tin perovskites through bulky cation passivation",
+          "venue": "ACS Energy Letters",
+          "date": "2024"
+        },
+        {
+          "title": "In situ Raman tracking of perovskite degradation under illumination",
+          "venue": "Journal of Physical Chemistry C",
+          "date": "2023"
+        },
+        {
+          "title": "A low-temperature route to stable perovskite thin films",
+          "venue": "Indian Patent Application 202311009876",
+          "date": "2023"
+        },
+        {
+          "title": "Halide segregation in mixed tin-lead perovskites under bias",
+          "venue": "Chemistry of Materials",
+          "date": "2022"
+        },
+        {
+          "title": "Solution-processed hole transport layers for flexible solar cells",
+          "venue": "Materials Today Energy",
+          "date": "2022"
+        },
+        {
+          "title": "Thermal stability of formamidinium tin iodide films",
+          "venue": "RSC Advances",
+          "date": "2021"
+        },
+        {
+          "title": "Antisolvent engineering for pinhole-free tin perovskite layers",
+          "venue": "Solar RRL",
+          "date": "2024"
+        },
+        {
+          "title": "Role of excess tin fluoride in suppressing oxidation",
+          "venue": "ACS Applied Energy Materials",
+          "date": "2023"
+        },
+        {
+          "title": "Grain boundary passivation with zwitterionic additives",
+          "venue": "Nanoscale",
+          "date": "2023"
+        },
+        {
+          "title": "A review of lead-free perovskite photovoltaics for Indian climates",
+          "venue": "Current Science",
+          "date": "2022"
+        }
+      ]
+    },
+    {
+      "kind": "scholarships",
+      "heading": "Fellowships and Awards",
+      "items": [
+        {
+          "title": "Prime Minister's Research Fellowship",
+          "category": "award",
+          "issuer": "Ministry of Education",
+          "date": "2021"
+        },
+        {
+          "title": "INSPIRE Scholarship for Higher Education",
+          "category": "award",
+          "issuer": "Department of Science and Technology",
+          "date": "2016"
+        }
+      ]
+    },
+    {
+      "kind": "memberships",
+      "heading": "Conference Presentations",
+      "items": [
+        {
+          "title": "Oral talk, Materials Research Society of India Annual Meeting 2024"
+        },
+        {
+          "title": "Poster, International Conference on Perovskite Photovoltaics 2023"
+        },
+        {
+          "title": "Poster, Chemical Research Society of India Symposium 2022"
+        }
+      ]
+    },
+    {
+      "kind": "skills",
+      "heading": "Laboratory and Computational Skills",
+      "groups": [
+        {
+          "label": "Characterisation",
+          "items": [
+            "Raman spectroscopy",
+            "X-ray diffraction",
+            "UV-Vis spectroscopy"
+          ]
+        },
+        {
+          "label": "Computation",
+          "items": [
+            "Python",
+            "Origin",
+            "Quantum ESPRESSO"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "memberships",
+      "heading": "Memberships",
+      "items": [
+        {
+          "title": "Member, Royal Society of Chemistry"
+        },
+        {
+          "title": "Student Member, Materials Research Society of India"
+        }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [
+        {
+          "language": "Bengali",
+          "proficiency": "Native"
+        },
+        {
+          "language": "English",
+          "proficiency": "Fluent"
+        },
+        {
+          "language": "Hindi",
+          "proficiency": "Fluent"
+        }
+      ]
+    },
+    {
+      "kind": "volunteering",
+      "heading": "Outreach",
+      "items": [
+        {
+          "organization": "Vigyan Prasar",
+          "role": "Science Communicator",
+          "start": "2022",
+          "current": true,
+          "bullets": [
+            "Write monthly explainers on renewable energy for school students.",
+            "Host live demonstrations at the annual science festival."
+          ]
+        },
+        {
+          "organization": "National Service Scheme, University of Delhi",
+          "role": "Volunteer",
+          "start": "2016",
+          "end": "2019",
+          "bullets": [
+            "Organised adult literacy sessions in two villages near Delhi."
+          ]
+        }
+      ]
+    }
+  ]
+}

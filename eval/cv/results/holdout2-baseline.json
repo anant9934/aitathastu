@@ -1,0 +1,4353 @@
+{
+  "label": "holdout2-baseline",
+  "generatedAt": "2026-10-21T00:06:08.574Z",
+  "summary": {
+    "text-pdf": {
+      "documents": 2,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8505747126436781,
+        "recall": 0.6851851851851852,
+        "f1": 0.7589743589743589
+      },
+      "fieldCounts": {
+        "tp": 74,
+        "fp": 13,
+        "fn": 34
+      },
+      "extendedField": {
+        "precision": 0.875,
+        "recall": 0.6363636363636364,
+        "f1": 0.7368421052631579
+      },
+      "extendedCounts": {
+        "tp": 14,
+        "fp": 2,
+        "fn": 8
+      },
+      "record": {
+        "precision": 0.9411764705882353,
+        "recall": 0.8421052631578947,
+        "f1": 0.8888888888888888
+      },
+      "recordCounts": {
+        "tp": 16,
+        "fp": 1,
+        "fn": 3
+      },
+      "dateAccuracy": 0.8333333333333334,
+      "associationAccuracy": 0.5,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.016666666666666666,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 5,
+          "total": 10
+        }
+      },
+      "ocrWordRecall": null,
+      "meanLatencyMs": 246,
+      "byField": {
+        "awards.category": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.issuer": {
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.name": {
+          "precision": 0.75,
+          "recall": 0.75,
+          "f1": 0.75,
+          "tp": 3,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 0.25,
+          "f1": 0.4,
+          "tp": 1,
+          "fp": 0,
+          "fn": 3
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "education.fieldOfStudy": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.grade": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 3
+        },
+        "education.institution": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 2,
+          "fp": 2,
+          "fn": 2
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.type": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "languages.name": {
+          "precision": 1,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 0.8,
+          "recall": 1,
+          "f1": 0.888888888888889,
+          "tp": 4,
+          "fp": 1,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.phone": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 0.75,
+          "recall": 0.75,
+          "f1": 0.75,
+          "tp": 3,
+          "fp": 1,
+          "fn": 1
+        },
+        "projects.technologies": {
+          "precision": 0.6,
+          "recall": 0.2727272727272727,
+          "f1": 0.37499999999999994,
+          "tp": 3,
+          "fp": 2,
+          "fn": 8
+        },
+        "projects.url": {
+          "precision": 0.5,
+          "recall": 0.25,
+          "f1": 0.3333333333333333,
+          "tp": 1,
+          "fp": 1,
+          "fn": 3
+        },
+        "skills.name": {
+          "precision": 0.8421052631578947,
+          "recall": 0.8421052631578947,
+          "f1": 0.8421052631578947,
+          "tp": 16,
+          "fp": 3,
+          "fn": 3
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.credentialUrl": {
+          "precision": 0.5,
+          "recall": 1,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 1,
+          "fn": 0
+        },
+        "experience.location": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "leadership.record": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 1,
+          "recall": 0.3333333333333333,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 0,
+          "fn": 2
+        },
+        "projects.repo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "education": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects": {
+          "precision": 0.75,
+          "recall": 0.75,
+          "f1": 0.75,
+          "tp": 3,
+          "fp": 1,
+          "fn": 1
+        },
+        "publications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "image": {
+      "documents": 2,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8809523809523809,
+        "recall": 0.6851851851851852,
+        "f1": 0.7708333333333335
+      },
+      "fieldCounts": {
+        "tp": 74,
+        "fp": 10,
+        "fn": 34
+      },
+      "extendedField": {
+        "precision": 0.8235294117647058,
+        "recall": 0.6666666666666666,
+        "f1": 0.7368421052631577
+      },
+      "extendedCounts": {
+        "tp": 14,
+        "fp": 3,
+        "fn": 7
+      },
+      "record": {
+        "precision": 0.8823529411764706,
+        "recall": 0.7894736842105263,
+        "f1": 0.8333333333333333
+      },
+      "recordCounts": {
+        "tp": 15,
+        "fp": 2,
+        "fn": 4
+      },
+      "dateAccuracy": 0.8333333333333334,
+      "associationAccuracy": 0.8333333333333334,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.03508771929824561,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 8,
+          "total": 10
+        }
+      },
+      "ocrWordRecall": 0.990655685777637,
+      "meanLatencyMs": 1726,
+      "byField": {
+        "awards.category": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.issuer": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.name": {
+          "precision": 0.75,
+          "recall": 0.75,
+          "f1": 0.75,
+          "tp": 3,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 0.25,
+          "f1": 0.4,
+          "tp": 1,
+          "fp": 0,
+          "fn": 3
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "education.fieldOfStudy": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.grade": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 3
+        },
+        "education.institution": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.type": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "languages.name": {
+          "precision": 1,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "personal.email": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 0.8,
+          "recall": 1,
+          "f1": 0.888888888888889,
+          "tp": 4,
+          "fp": 1,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.phone": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 2,
+          "fp": 2,
+          "fn": 2
+        },
+        "projects.technologies": {
+          "precision": 0.5,
+          "recall": 0.18181818181818182,
+          "f1": 0.26666666666666666,
+          "tp": 2,
+          "fp": 2,
+          "fn": 9
+        },
+        "projects.url": {
+          "precision": 0.5,
+          "recall": 0.25,
+          "f1": 0.3333333333333333,
+          "tp": 1,
+          "fp": 1,
+          "fn": 3
+        },
+        "skills.name": {
+          "precision": 1,
+          "recall": 0.8421052631578947,
+          "f1": 0.9142857142857143,
+          "tp": 16,
+          "fp": 0,
+          "fn": 3
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.credentialUrl": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 2,
+          "fn": 1
+        },
+        "experience.location": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571428571428571,
+          "tp": 3,
+          "fp": 0,
+          "fn": 1
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "leadership.record": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 0,
+          "fn": 1
+        },
+        "projects.repo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "education": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 2,
+          "fp": 2,
+          "fn": 2
+        },
+        "publications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "docx-tables": {
+      "documents": 1,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8611111111111112,
+        "recall": 0.6739130434782609,
+        "f1": 0.7560975609756099
+      },
+      "fieldCounts": {
+        "tp": 31,
+        "fp": 5,
+        "fn": 15
+      },
+      "extendedField": {
+        "precision": 1,
+        "recall": 0.3333333333333333,
+        "f1": 0.5
+      },
+      "extendedCounts": {
+        "tp": 3,
+        "fp": 0,
+        "fn": 6
+      },
+      "record": {
+        "precision": 0.8888888888888888,
+        "recall": 1,
+        "f1": 0.9411764705882353
+      },
+      "recordCounts": {
+        "tp": 8,
+        "fp": 1,
+        "fn": 0
+      },
+      "dateAccuracy": 1,
+      "associationAccuracy": 0,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 1,
+          "total": 5
+        }
+      },
+      "ocrWordRecall": null,
+      "meanLatencyMs": 62,
+      "byField": {
+        "awards.category": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.degree": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.fieldOfStudy": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.institution": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 2,
+          "fn": 2
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.type": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "languages.name": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 0.6666666666666666,
+          "recall": 1,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 1,
+          "fn": 0
+        },
+        "projects.technologies": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 6
+        },
+        "projects.url": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 2
+        },
+        "skills.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 9,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.location": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "languages.proficiency": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "leadership.record": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "education": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects": {
+          "precision": 0.6666666666666666,
+          "recall": 1,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 1,
+          "fn": 0
+        },
+        "publications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "docx": {
+      "documents": 2,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8256880733944955,
+        "recall": 0.7692307692307693,
+        "f1": 0.7964601769911505
+      },
+      "fieldCounts": {
+        "tp": 90,
+        "fp": 19,
+        "fn": 27
+      },
+      "extendedField": {
+        "precision": 0.875,
+        "recall": 0.5833333333333334,
+        "f1": 0.7000000000000001
+      },
+      "extendedCounts": {
+        "tp": 14,
+        "fp": 2,
+        "fn": 10
+      },
+      "record": {
+        "precision": 0.9473684210526315,
+        "recall": 0.9,
+        "f1": 0.9230769230769231
+      },
+      "recordCounts": {
+        "tp": 18,
+        "fp": 1,
+        "fn": 2
+      },
+      "dateAccuracy": 0.96,
+      "associationAccuracy": 0.36363636363636365,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.030303030303030304,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 5,
+          "total": 11
+        },
+        "needs_review": {
+          "correct": 0,
+          "total": 3
+        }
+      },
+      "ocrWordRecall": null,
+      "meanLatencyMs": 23,
+      "byField": {
+        "awards.category": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571428571428571,
+          "tp": 3,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.issuer": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 0,
+          "fn": 2
+        },
+        "certifications.name": {
+          "precision": 0.25,
+          "recall": 0.25,
+          "f1": 0.25,
+          "tp": 1,
+          "fp": 3,
+          "fn": 3
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.fieldOfStudy": {
+          "precision": 0.6666666666666666,
+          "recall": 1,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 1,
+          "fn": 0
+        },
+        "education.grade": {
+          "precision": 0.75,
+          "recall": 1,
+          "f1": 0.8571428571428571,
+          "tp": 3,
+          "fp": 1,
+          "fn": 0
+        },
+        "education.institution": {
+          "precision": 0.6666666666666666,
+          "recall": 0.5,
+          "f1": 0.5714285714285715,
+          "tp": 2,
+          "fp": 1,
+          "fn": 2
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 0.2857142857142857,
+          "recall": 0.2857142857142857,
+          "f1": 0.2857142857142857,
+          "tp": 2,
+          "fp": 5,
+          "fn": 5
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 0.7142857142857143,
+          "f1": 0.8333333333333333,
+          "tp": 5,
+          "fp": 0,
+          "fn": 2
+        },
+        "experience.type": {
+          "precision": 0.8571428571428571,
+          "recall": 0.8571428571428571,
+          "f1": 0.8571428571428571,
+          "tp": 6,
+          "fp": 1,
+          "fn": 1
+        },
+        "languages.name": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 0.8333333333333334,
+          "recall": 1,
+          "f1": 0.9090909090909091,
+          "tp": 5,
+          "fp": 1,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.phone": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 0,
+          "fn": 1
+        },
+        "projects.technologies": {
+          "precision": 0.6,
+          "recall": 0.6,
+          "f1": 0.6,
+          "tp": 3,
+          "fp": 2,
+          "fn": 2
+        },
+        "projects.url": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 0,
+          "fn": 1
+        },
+        "skills.name": {
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "f1": 0.8333333333333334,
+          "tp": 15,
+          "fp": 3,
+          "fn": 3
+        },
+        "volunteering.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.role": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.credentialUrl": {
+          "precision": 0.5,
+          "recall": 1,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 1,
+          "fn": 0
+        },
+        "certifications.expires": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.location": {
+          "precision": 1,
+          "recall": 0.2857142857142857,
+          "f1": 0.4444444444444445,
+          "tp": 2,
+          "fp": 0,
+          "fn": 5
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "leadership.record": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.repo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 0.75,
+          "recall": 0.75,
+          "f1": 0.75,
+          "tp": 3,
+          "fp": 1,
+          "fn": 1
+        },
+        "education": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 0,
+          "fn": 1
+        },
+        "publications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "two-column-pdf": {
+      "documents": 1,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.7916666666666666,
+        "recall": 0.6909090909090909,
+        "f1": 0.737864077669903
+      },
+      "fieldCounts": {
+        "tp": 38,
+        "fp": 10,
+        "fn": 17
+      },
+      "extendedField": {
+        "precision": 1,
+        "recall": 0.2727272727272727,
+        "f1": 0.42857142857142855
+      },
+      "extendedCounts": {
+        "tp": 3,
+        "fp": 0,
+        "fn": 8
+      },
+      "record": {
+        "precision": 0.8888888888888888,
+        "recall": 0.8888888888888888,
+        "f1": 0.8888888888888888
+      },
+      "recordCounts": {
+        "tp": 8,
+        "fp": 1,
+        "fn": 1
+      },
+      "dateAccuracy": 0.9285714285714286,
+      "associationAccuracy": 0,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.037037037037037035,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 0,
+          "total": 5
+        },
+        "needs_review": {
+          "correct": 0,
+          "total": 2
+        }
+      },
+      "ocrWordRecall": null,
+      "meanLatencyMs": 28,
+      "byField": {
+        "certifications.date": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 0,
+          "fn": 1
+        },
+        "certifications.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "certifications.name": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 2,
+          "fn": 2
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.fieldOfStudy": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.grade": {
+          "precision": 0,
+          "recall": 1,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 0
+        },
+        "education.institution": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 5,
+          "fn": 5
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 0.6,
+          "f1": 0.7499999999999999,
+          "tp": 3,
+          "fp": 0,
+          "fn": 2
+        },
+        "experience.type": {
+          "precision": 0.8,
+          "recall": 0.8,
+          "f1": 0.8000000000000002,
+          "tp": 4,
+          "fp": 1,
+          "fn": 1
+        },
+        "languages.name": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 3
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "skills.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.role": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "certifications.expires": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.location": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 5
+        },
+        "languages.proficiency": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 3
+        },
+        "leadership.record": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "education": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "multi-page-pdf": {
+      "documents": 1,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8846153846153846,
+        "recall": 0.8846153846153846,
+        "f1": 0.8846153846153846
+      },
+      "fieldCounts": {
+        "tp": 46,
+        "fp": 6,
+        "fn": 6
+      },
+      "extendedField": {
+        "precision": 1,
+        "recall": 0.5862068965517241,
+        "f1": 0.7391304347826086
+      },
+      "extendedCounts": {
+        "tp": 17,
+        "fp": 0,
+        "fn": 12
+      },
+      "record": {
+        "precision": 0.875,
+        "recall": 0.84,
+        "f1": 0.8571428571428572
+      },
+      "recordCounts": {
+        "tp": 21,
+        "fp": 3,
+        "fn": 4
+      },
+      "dateAccuracy": 1,
+      "associationAccuracy": 0.8333333333333334,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 5,
+          "total": 6
+        }
+      },
+      "ocrWordRecall": null,
+      "meanLatencyMs": 15,
+      "byField": {
+        "awards.category": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.fieldOfStudy": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.grade": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.institution": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.type": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "languages.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "skills.name": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 4,
+          "fp": 2,
+          "fn": 2
+        },
+        "volunteering.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.organization": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "volunteering.role": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "leadership.record": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications.venue": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 10
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "education": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 0.2,
+          "f1": 0.33333333333333337,
+          "tp": 1,
+          "fp": 0,
+          "fn": 4
+        },
+        "projects": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications": {
+          "precision": 0.7692307692307693,
+          "recall": 1,
+          "f1": 0.8695652173913044,
+          "tp": 10,
+          "fp": 3,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "scanned-pdf": {
+      "documents": 1,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.88,
+        "recall": 0.8461538461538461,
+        "f1": 0.8627450980392156
+      },
+      "fieldCounts": {
+        "tp": 44,
+        "fp": 6,
+        "fn": 8
+      },
+      "extendedField": {
+        "precision": 0.9333333333333333,
+        "recall": 0.5185185185185185,
+        "f1": 0.6666666666666667
+      },
+      "extendedCounts": {
+        "tp": 14,
+        "fp": 1,
+        "fn": 13
+      },
+      "record": {
+        "precision": 0.8695652173913043,
+        "recall": 0.8,
+        "f1": 0.8333333333333333
+      },
+      "recordCounts": {
+        "tp": 20,
+        "fp": 3,
+        "fn": 5
+      },
+      "dateAccuracy": 1,
+      "associationAccuracy": 0.8333333333333334,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 4,
+          "total": 6
+        }
+      },
+      "ocrWordRecall": 0.9952380952380953,
+      "meanLatencyMs": 2858,
+      "byField": {
+        "awards.category": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.fieldOfStudy": {
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "education.grade": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.institution": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.type": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "languages.name": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 2,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 0.5,
+          "recall": 1,
+          "f1": 0.6666666666666666,
+          "tp": 1,
+          "fp": 1,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "skills.name": {
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "f1": 0.8,
+          "tp": 4,
+          "fp": 0,
+          "fn": 2
+        },
+        "volunteering.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.organization": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "volunteering.role": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 1,
+          "fp": 1,
+          "fn": 1
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 2
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 0.6666666666666666,
+          "f1": 0.8,
+          "tp": 2,
+          "fp": 0,
+          "fn": 1
+        },
+        "leadership.record": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications.date": {
+          "precision": 0.8888888888888888,
+          "recall": 0.8888888888888888,
+          "f1": 0.8888888888888888,
+          "tp": 8,
+          "fp": 1,
+          "fn": 1
+        },
+        "publications.venue": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 9
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 1,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "education": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 0.2,
+          "f1": 0.33333333333333337,
+          "tp": 1,
+          "fp": 0,
+          "fn": 4
+        },
+        "projects": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications": {
+          "precision": 0.75,
+          "recall": 0.9,
+          "f1": 0.8181818181818182,
+          "tp": 9,
+          "fp": 3,
+          "fn": 1
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "template:modern": {
+      "documents": 5,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8341463414634146,
+        "recall": 0.6895161290322581,
+        "f1": 0.7549668874172186
+      },
+      "fieldCounts": {
+        "tp": 171,
+        "fp": 34,
+        "fn": 77
+      },
+      "extendedField": {
+        "precision": 1,
+        "recall": 0.3333333333333333,
+        "f1": 0.5
+      },
+      "extendedCounts": {
+        "tp": 16,
+        "fp": 0,
+        "fn": 32
+      },
+      "record": {
+        "precision": 0.8666666666666667,
+        "recall": 0.9285714285714286,
+        "f1": 0.896551724137931
+      },
+      "recordCounts": {
+        "tp": 39,
+        "fp": 6,
+        "fn": 3
+      },
+      "dateAccuracy": 0.9591836734693877,
+      "associationAccuracy": 0.09523809523809523,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.015384615384615385,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 6,
+          "total": 25
+        },
+        "needs_review": {
+          "correct": 0,
+          "total": 4
+        }
+      },
+      "ocrWordRecall": 0.9935064935064936,
+      "meanLatencyMs": 419,
+      "byField": {
+        "awards.category": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 0.8,
+          "f1": 0.888888888888889,
+          "tp": 8,
+          "fp": 0,
+          "fn": 2
+        },
+        "certifications.issuer": {
+          "precision": 1,
+          "recall": 0.14285714285714285,
+          "f1": 0.25,
+          "tp": 1,
+          "fp": 0,
+          "fn": 6
+        },
+        "certifications.name": {
+          "precision": 0.6,
+          "recall": 0.6,
+          "f1": 0.6,
+          "tp": 6,
+          "fp": 4,
+          "fn": 4
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 0.4,
+          "f1": 0.5714285714285715,
+          "tp": 2,
+          "fp": 0,
+          "fn": 3
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "education.fieldOfStudy": {
+          "precision": 0.4,
+          "recall": 0.4,
+          "f1": 0.4000000000000001,
+          "tp": 2,
+          "fp": 3,
+          "fn": 3
+        },
+        "education.grade": {
+          "precision": 0,
+          "recall": 1,
+          "f1": 0,
+          "tp": 0,
+          "fp": 2,
+          "fn": 0
+        },
+        "education.institution": {
+          "precision": 0.6,
+          "recall": 0.6,
+          "f1": 0.6,
+          "tp": 3,
+          "fp": 2,
+          "fn": 2
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 11,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 0.125,
+          "recall": 0.125,
+          "f1": 0.125,
+          "tp": 2,
+          "fp": 14,
+          "fn": 14
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 16,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571428571428571,
+          "tp": 12,
+          "fp": 0,
+          "fn": 4
+        },
+        "experience.type": {
+          "precision": 0.875,
+          "recall": 0.875,
+          "f1": 0.875,
+          "tp": 14,
+          "fp": 2,
+          "fn": 2
+        },
+        "languages.name": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 12
+        },
+        "personal.email": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 0.5555555555555556,
+          "recall": 0.8333333333333334,
+          "f1": 0.6666666666666667,
+          "tp": 5,
+          "fp": 4,
+          "fn": 1
+        },
+        "projects.technologies": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 18
+        },
+        "projects.url": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 3,
+          "fn": 6
+        },
+        "skills.name": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 43,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.role": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.expires": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.location": {
+          "precision": 1,
+          "recall": 0.0625,
+          "f1": 0.11764705882352941,
+          "tp": 1,
+          "fp": 0,
+          "fn": 15
+        },
+        "languages.proficiency": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 12
+        },
+        "leadership.record": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 5
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 0.8,
+          "recall": 0.8,
+          "f1": 0.8000000000000002,
+          "tp": 8,
+          "fp": 2,
+          "fn": 2
+        },
+        "education": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 16,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects": {
+          "precision": 0.5555555555555556,
+          "recall": 0.8333333333333334,
+          "f1": 0.6666666666666667,
+          "tp": 5,
+          "fp": 4,
+          "fn": 1
+        },
+        "publications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 0,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "template:compact": {
+      "documents": 5,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.8659003831417624,
+        "recall": 0.7793103448275862,
+        "f1": 0.8203266787658802
+      },
+      "fieldCounts": {
+        "tp": 226,
+        "fp": 35,
+        "fn": 64
+      },
+      "extendedField": {
+        "precision": 0.8873239436619719,
+        "recall": 0.6631578947368421,
+        "f1": 0.7590361445783133
+      },
+      "extendedCounts": {
+        "tp": 63,
+        "fp": 8,
+        "fn": 32
+      },
+      "record": {
+        "precision": 0.9178082191780822,
+        "recall": 0.8072289156626506,
+        "f1": 0.858974358974359
+      },
+      "recordCounts": {
+        "tp": 67,
+        "fp": 6,
+        "fn": 16
+      },
+      "dateAccuracy": 0.8947368421052632,
+      "associationAccuracy": 0.8695652173913043,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.02072538860103627,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 22,
+          "total": 28
+        },
+        "needs_review": {
+          "correct": 0,
+          "total": 1
+        }
+      },
+      "ocrWordRecall": 0.9915214866434379,
+      "meanLatencyMs": 971,
+      "byField": {
+        "awards.category": {
+          "precision": 0.7,
+          "recall": 0.7,
+          "f1": 0.7,
+          "tp": 7,
+          "fp": 3,
+          "fn": 3
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.issuer": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications.name": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 3,
+          "fp": 3,
+          "fn": 3
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 0.7333333333333333,
+          "f1": 0.846153846153846,
+          "tp": 11,
+          "fp": 0,
+          "fn": 4
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 0.7333333333333333,
+          "f1": 0.846153846153846,
+          "tp": 11,
+          "fp": 0,
+          "fn": 4
+        },
+        "education.fieldOfStudy": {
+          "precision": 0.8888888888888888,
+          "recall": 0.8888888888888888,
+          "f1": 0.8888888888888888,
+          "tp": 8,
+          "fp": 1,
+          "fn": 1
+        },
+        "education.grade": {
+          "precision": 1,
+          "recall": 0.5384615384615384,
+          "f1": 0.7000000000000001,
+          "tp": 7,
+          "fp": 0,
+          "fn": 6
+        },
+        "education.institution": {
+          "precision": 0.8,
+          "recall": 0.5333333333333333,
+          "f1": 0.64,
+          "tp": 8,
+          "fp": 2,
+          "fn": 7
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 0.8333333333333334,
+          "f1": 0.9090909090909091,
+          "tp": 10,
+          "fp": 0,
+          "fn": 2
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 8,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.type": {
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "f1": 0.8333333333333334,
+          "tp": 10,
+          "fp": 2,
+          "fn": 2
+        },
+        "languages.name": {
+          "precision": 0.9333333333333333,
+          "recall": 0.9333333333333333,
+          "f1": 0.9333333333333333,
+          "tp": 14,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.email": {
+          "precision": 0.8,
+          "recall": 0.8,
+          "f1": 0.8000000000000002,
+          "tp": 4,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 0.7333333333333333,
+          "recall": 1,
+          "f1": 0.846153846153846,
+          "tp": 11,
+          "fp": 4,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.phone": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "projects.technologies": {
+          "precision": 0.5714285714285714,
+          "recall": 0.5333333333333333,
+          "f1": 0.5517241379310344,
+          "tp": 8,
+          "fp": 6,
+          "fn": 7
+        },
+        "projects.url": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "skills.name": {
+          "precision": 0.7837837837837838,
+          "recall": 0.6904761904761905,
+          "f1": 0.7341772151898734,
+          "tp": 29,
+          "fp": 8,
+          "fn": 13
+        },
+        "volunteering.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.organization": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 2,
+          "fp": 2,
+          "fn": 2
+        },
+        "volunteering.role": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 2,
+          "fp": 2,
+          "fn": 2
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 7
+        },
+        "certifications.credentialUrl": {
+          "precision": 0.3333333333333333,
+          "recall": 0.6666666666666666,
+          "f1": 0.4444444444444444,
+          "tp": 2,
+          "fp": 4,
+          "fn": 1
+        },
+        "experience.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 0.9333333333333333,
+          "f1": 0.9655172413793104,
+          "tp": 14,
+          "fp": 0,
+          "fn": 1
+        },
+        "leadership.record": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 3,
+          "fn": 3
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.repo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications.date": {
+          "precision": 0.9473684210526315,
+          "recall": 0.9473684210526315,
+          "f1": 0.9473684210526315,
+          "tp": 18,
+          "fp": 1,
+          "fn": 1
+        },
+        "publications.venue": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 19
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 5,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        },
+        "education": {
+          "precision": 1,
+          "recall": 0.7333333333333333,
+          "f1": 0.846153846153846,
+          "tp": 11,
+          "fp": 0,
+          "fn": 4
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 12,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 0.2,
+          "f1": 0.33333333333333337,
+          "tp": 2,
+          "fp": 0,
+          "fn": 8
+        },
+        "projects": {
+          "precision": 1,
+          "recall": 0.5,
+          "f1": 0.6666666666666666,
+          "tp": 3,
+          "fp": 0,
+          "fn": 3
+        },
+        "publications": {
+          "precision": 0.76,
+          "recall": 0.95,
+          "f1": 0.8444444444444444,
+          "tp": 19,
+          "fp": 6,
+          "fn": 1
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 4,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    },
+    "ALL-SYNTHETIC": {
+      "documents": 10,
+      "extractionFailures": 0,
+      "field": {
+        "precision": 0.851931330472103,
+        "recall": 0.7379182156133829,
+        "f1": 0.7908366533864541
+      },
+      "fieldCounts": {
+        "tp": 397,
+        "fp": 69,
+        "fn": 141
+      },
+      "extendedField": {
+        "precision": 0.9080459770114943,
+        "recall": 0.5524475524475524,
+        "f1": 0.6869565217391305
+      },
+      "extendedCounts": {
+        "tp": 79,
+        "fp": 8,
+        "fn": 64
+      },
+      "record": {
+        "precision": 0.8983050847457628,
+        "recall": 0.848,
+        "f1": 0.8724279835390946
+      },
+      "recordCounts": {
+        "tp": 106,
+        "fp": 12,
+        "fn": 19
+      },
+      "dateAccuracy": 0.9245283018867925,
+      "associationAccuracy": 0.5,
+      "duplicateRate": 0,
+      "unsupportedClaimRate": 0.018575851393188854,
+      "reviewFlagRecall": null,
+      "referenceContactLeaks": 0,
+      "calibration": {
+        "high_confidence": {
+          "correct": 28,
+          "total": 53
+        },
+        "needs_review": {
+          "correct": 0,
+          "total": 5
+        }
+      },
+      "ocrWordRecall": 0.9921831555977897,
+      "meanLatencyMs": 695,
+      "byField": {
+        "awards.category": {
+          "precision": 0.7692307692307693,
+          "recall": 0.7692307692307693,
+          "f1": 0.7692307692307693,
+          "tp": 10,
+          "fp": 3,
+          "fn": 3
+        },
+        "certifications.date": {
+          "precision": 1,
+          "recall": 0.875,
+          "f1": 0.9333333333333333,
+          "tp": 14,
+          "fp": 0,
+          "fn": 2
+        },
+        "certifications.issuer": {
+          "precision": 1,
+          "recall": 0.5384615384615384,
+          "f1": 0.7000000000000001,
+          "tp": 7,
+          "fp": 0,
+          "fn": 6
+        },
+        "certifications.name": {
+          "precision": 0.5625,
+          "recall": 0.5625,
+          "f1": 0.5625,
+          "tp": 9,
+          "fp": 7,
+          "fn": 7
+        },
+        "education.degree": {
+          "precision": 1,
+          "recall": 0.65,
+          "f1": 0.787878787878788,
+          "tp": 13,
+          "fp": 0,
+          "fn": 7
+        },
+        "education.end": {
+          "precision": 1,
+          "recall": 0.8,
+          "f1": 0.888888888888889,
+          "tp": 16,
+          "fp": 0,
+          "fn": 4
+        },
+        "education.fieldOfStudy": {
+          "precision": 0.7142857142857143,
+          "recall": 0.7142857142857143,
+          "f1": 0.7142857142857143,
+          "tp": 10,
+          "fp": 4,
+          "fn": 4
+        },
+        "education.grade": {
+          "precision": 0.7777777777777778,
+          "recall": 0.5384615384615384,
+          "f1": 0.6363636363636364,
+          "tp": 7,
+          "fp": 2,
+          "fn": 6
+        },
+        "education.institution": {
+          "precision": 0.7333333333333333,
+          "recall": 0.55,
+          "f1": 0.6285714285714286,
+          "tp": 11,
+          "fp": 4,
+          "fn": 9
+        },
+        "education.start": {
+          "precision": 1,
+          "recall": 0.8823529411764706,
+          "f1": 0.9375,
+          "tp": 15,
+          "fp": 0,
+          "fn": 2
+        },
+        "experience.current": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 19,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.organization": {
+          "precision": 0.5,
+          "recall": 0.5,
+          "f1": 0.5,
+          "tp": 14,
+          "fp": 14,
+          "fn": 14
+        },
+        "experience.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 26,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.title": {
+          "precision": 1,
+          "recall": 0.8571428571428571,
+          "f1": 0.923076923076923,
+          "tp": 24,
+          "fp": 0,
+          "fn": 4
+        },
+        "experience.type": {
+          "precision": 0.8571428571428571,
+          "recall": 0.8571428571428571,
+          "f1": 0.8571428571428571,
+          "tp": 24,
+          "fp": 4,
+          "fn": 4
+        },
+        "languages.name": {
+          "precision": 0.9333333333333333,
+          "recall": 0.5185185185185185,
+          "f1": 0.6666666666666667,
+          "tp": 14,
+          "fp": 1,
+          "fn": 13
+        },
+        "personal.email": {
+          "precision": 0.9,
+          "recall": 0.9,
+          "f1": 0.9,
+          "tp": 9,
+          "fp": 1,
+          "fn": 1
+        },
+        "personal.fullName": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.links": {
+          "precision": 0.8181818181818182,
+          "recall": 1,
+          "f1": 0.9,
+          "tp": 18,
+          "fp": 4,
+          "fn": 0
+        },
+        "personal.location": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        },
+        "personal.phone": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.name": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 8,
+          "fp": 4,
+          "fn": 4
+        },
+        "projects.technologies": {
+          "precision": 0.5714285714285714,
+          "recall": 0.24242424242424243,
+          "f1": 0.3404255319148936,
+          "tp": 8,
+          "fp": 6,
+          "fn": 25
+        },
+        "projects.url": {
+          "precision": 0.5,
+          "recall": 0.25,
+          "f1": 0.3333333333333333,
+          "tp": 3,
+          "fp": 3,
+          "fn": 9
+        },
+        "skills.name": {
+          "precision": 0.9,
+          "recall": 0.8470588235294118,
+          "f1": 0.8727272727272727,
+          "tp": 72,
+          "fp": 8,
+          "fn": 13
+        },
+        "volunteering.end": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "volunteering.organization": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 4,
+          "fp": 2,
+          "fn": 2
+        },
+        "volunteering.role": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 4,
+          "fp": 2,
+          "fn": 2
+        },
+        "volunteering.start": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byExtendedField": {
+        "awards.date": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "awards.issuer": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 7
+        },
+        "certifications.credentialUrl": {
+          "precision": 0.3333333333333333,
+          "recall": 0.6666666666666666,
+          "f1": 0.4444444444444444,
+          "tp": 2,
+          "fp": 4,
+          "fn": 1
+        },
+        "certifications.expires": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 2,
+          "fp": 0,
+          "fn": 0
+        },
+        "experience.location": {
+          "precision": 1,
+          "recall": 0.3181818181818182,
+          "f1": 0.4827586206896552,
+          "tp": 7,
+          "fp": 0,
+          "fn": 15
+        },
+        "languages.proficiency": {
+          "precision": 1,
+          "recall": 0.5185185185185185,
+          "f1": 0.6829268292682926,
+          "tp": 14,
+          "fp": 0,
+          "fn": 13
+        },
+        "leadership.record": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 3,
+          "fn": 3
+        },
+        "personal.headline": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 7,
+          "fp": 0,
+          "fn": 0
+        },
+        "projects.demo": {
+          "precision": 1,
+          "recall": 0.375,
+          "f1": 0.5454545454545454,
+          "tp": 3,
+          "fp": 0,
+          "fn": 5
+        },
+        "projects.repo": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0
+        },
+        "publications.date": {
+          "precision": 0.9473684210526315,
+          "recall": 0.9473684210526315,
+          "f1": 0.9473684210526315,
+          "tp": 18,
+          "fp": 1,
+          "fn": 1
+        },
+        "publications.venue": {
+          "precision": 0,
+          "recall": 0,
+          "f1": 0,
+          "tp": 0,
+          "fp": 0,
+          "fn": 19
+        },
+        "summary": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 10,
+          "fp": 0,
+          "fn": 0
+        }
+      },
+      "byRecord": {
+        "awards": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 13,
+          "fp": 0,
+          "fn": 0
+        },
+        "certifications": {
+          "precision": 0.875,
+          "recall": 0.875,
+          "f1": 0.875,
+          "tp": 14,
+          "fp": 2,
+          "fn": 2
+        },
+        "education": {
+          "precision": 1,
+          "recall": 0.8,
+          "f1": 0.888888888888889,
+          "tp": 16,
+          "fp": 0,
+          "fn": 4
+        },
+        "experience": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 28,
+          "fp": 0,
+          "fn": 0
+        },
+        "memberships": {
+          "precision": 1,
+          "recall": 0.2,
+          "f1": 0.33333333333333337,
+          "tp": 2,
+          "fp": 0,
+          "fn": 8
+        },
+        "projects": {
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "f1": 0.6666666666666666,
+          "tp": 8,
+          "fp": 4,
+          "fn": 4
+        },
+        "publications": {
+          "precision": 0.76,
+          "recall": 0.95,
+          "f1": 0.8444444444444444,
+          "tp": 19,
+          "fp": 6,
+          "fn": 1
+        },
+        "volunteering": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "tp": 6,
+          "fp": 0,
+          "fn": 0
+        }
+      }
+    }
+  },
+  "documents": [
+    {
+      "file": "kenji-modern--pdf-single.pdf",
+      "group": "text-pdf",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 475,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.8611111111111112,
+        "recall": 0.6739130434782609,
+        "f1": 0.7560975609756099
+      },
+      "dates": {
+        "correct": 7,
+        "total": 7
+      },
+      "unsupported": {
+        "claimed": 25,
+        "ungrounded": 0,
+        "examples": []
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "kenji-modern--png.png",
+      "group": "image",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 1509,
+      "wordRecall": 0.9935064935064936,
+      "field": {
+        "precision": 0.8918918918918919,
+        "recall": 0.717391304347826,
+        "f1": 0.7951807228915664
+      },
+      "dates": {
+        "correct": 7,
+        "total": 7
+      },
+      "unsupported": {
+        "claimed": 26,
+        "ungrounded": 0,
+        "examples": []
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "kenji-modern--docx-table.docx",
+      "group": "docx-tables",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 62,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.8611111111111112,
+        "recall": 0.6739130434782609,
+        "f1": 0.7560975609756099
+      },
+      "dates": {
+        "correct": 7,
+        "total": 7
+      },
+      "unsupported": {
+        "claimed": 25,
+        "ungrounded": 0,
+        "examples": []
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "neha-compact--pdf-single.pdf",
+      "group": "text-pdf",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 16,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.8431372549019608,
+        "recall": 0.6935483870967742,
+        "f1": 0.7610619469026549
+      },
+      "dates": {
+        "correct": 8,
+        "total": 11
+      },
+      "unsupported": {
+        "claimed": 35,
+        "ungrounded": 1,
+        "examples": [
+          "Programming, Data Structures and Algorithms using Python nptel.ac.in/noc/E_Certificate/NPTEL23CS40S5512"
+        ]
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "neha-compact--docx-plain.docx",
+      "group": "docx",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 23,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.8524590163934426,
+        "recall": 0.8387096774193549,
+        "f1": 0.8455284552845529
+      },
+      "dates": {
+        "correct": 11,
+        "total": 11
+      },
+      "unsupported": {
+        "claimed": 39,
+        "ungrounded": 1,
+        "examples": [
+          "Programming, Data Structures and Algorithms using Python nptel.ac.in/noc/E_Certificate/NPTEL23CS40S5512"
+        ]
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "neha-compact--jpg.jpg",
+      "group": "image",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 1942,
+      "wordRecall": 0.9878048780487805,
+      "field": {
+        "precision": 0.8723404255319149,
+        "recall": 0.6612903225806451,
+        "f1": 0.7522935779816514
+      },
+      "dates": {
+        "correct": 8,
+        "total": 11
+      },
+      "unsupported": {
+        "claimed": 31,
+        "ungrounded": 2,
+        "examples": [
+          "Programming, Data Structures and Algorithms using Python nptel.ac.in/noc/E_Certificate/NPTEL23CS4085512",
+          "DeepLearning.AI"
+        ]
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "omar-modern--pdf-sidebar.pdf",
+      "group": "two-column-pdf",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 28,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.7916666666666666,
+        "recall": 0.6909090909090909,
+        "f1": 0.737864077669903
+      },
+      "dates": {
+        "correct": 13,
+        "total": 14
+      },
+      "unsupported": {
+        "claimed": 27,
+        "ungrounded": 1,
+        "examples": [
+          "University of Manchester · · First Class Honours"
+        ]
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "omar-modern--docx-plain.docx",
+      "group": "docx",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 23,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.7916666666666666,
+        "recall": 0.6909090909090909,
+        "f1": 0.737864077669903
+      },
+      "dates": {
+        "correct": 13,
+        "total": 14
+      },
+      "unsupported": {
+        "claimed": 27,
+        "ungrounded": 1,
+        "examples": [
+          "University of Manchester · · First Class Honours"
+        ]
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "priyanka-compact--pdf-multipage.pdf",
+      "group": "multi-page-pdf",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 15,
+      "wordRecall": null,
+      "field": {
+        "precision": 0.8846153846153846,
+        "recall": 0.8846153846153846,
+        "f1": 0.8846153846153846
+      },
+      "dates": {
+        "correct": 12,
+        "total": 12
+      },
+      "unsupported": {
+        "claimed": 46,
+        "ungrounded": 0,
+        "examples": []
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    },
+    {
+      "file": "priyanka-compact--scan-good.pdf",
+      "group": "scanned-pdf",
+      "supported": true,
+      "failed": null,
+      "latencyMs": 2858,
+      "wordRecall": 0.9952380952380953,
+      "field": {
+        "precision": 0.88,
+        "recall": 0.8461538461538461,
+        "f1": 0.8627450980392156
+      },
+      "dates": {
+        "correct": 12,
+        "total": 12
+      },
+      "unsupported": {
+        "claimed": 42,
+        "ungrounded": 0,
+        "examples": []
+      },
+      "flags": {
+        "expected": 0,
+        "raised": 0,
+        "missing": []
+      }
+    }
+  ]
+}

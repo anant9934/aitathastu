@@ -1,0 +1,89 @@
+{
+  "id": "neha-compact",
+  "description": "Held-out, compact template: Indian final-year student, ongoing B.E. with expected end, Class X and XII, two internships at one company, projects with Repo and Demo, issuer-first certifications with a credential URL, hackathons, leadership, references",
+  "tags": ["compact-template", "fresher", "ongoing-education", "same-company-internships", "demo-links", "issuer-first", "references"],
+  "style": "compact",
+  "variants": ["pdf-single", "docx-plain", "jpg"],
+  "dateStyle": "mon",
+  "rangeSep": " - ",
+  "person": {
+    "name": "Neha Kulkarni",
+    "email": "neha.kulkarni21@example.com",
+    "phone": "+91 99870 12345",
+    "location": "Nagpur, Maharashtra",
+    "links": [
+      { "label": "GitHub", "url": "https://github.com/nehak21", "display": "github.com/nehak21" },
+      { "label": "LinkedIn", "url": "https://www.linkedin.com/in/neha-kulkarni-21", "display": "linkedin.com/in/neha-kulkarni-21" },
+      { "label": "HackerRank", "url": "https://www.hackerrank.com/profile/nehak21", "display": "hackerrank.com/profile/nehak21" }
+    ]
+  },
+  "summary": "Final-year computer engineering student interested in backend systems and applied machine learning.",
+  "summaryHeading": "Objective",
+  "sections": [
+    {
+      "kind": "education",
+      "heading": "Education",
+      "items": [
+        { "institution": "Visvesvaraya National Institute of Technology", "degree": "B.E.", "field": "Computer Science and Engineering", "level": "undergraduate", "start": "2022-08", "end": "2026-05", "current": true, "grade": { "text": "CGPA: 8.94/10", "value": "8.94" } },
+        { "institution": "Somalwar Junior College", "degree": "Class XII", "level": "high_school", "start": "2020-06", "end": "2022-03", "grade": { "text": "91.5%", "value": "91.5" } },
+        { "institution": "Bhavan's Vidya Mandir", "degree": "Class X", "level": "high_school", "end": "2020-03", "grade": { "text": "96.2%", "value": "96.2" } }
+      ]
+    },
+    {
+      "kind": "experience",
+      "heading": "Internships",
+      "items": [
+        { "organization": "Persistent Systems", "title": "Software Engineering Intern", "type": "internship", "start": "2025-05", "end": "2025-07", "location": "Pune", "bullets": ["Migrated a reporting service from cron jobs to Temporal workflows."] },
+        { "organization": "Persistent Systems", "title": "Summer Intern", "type": "internship", "start": "2024-06", "end": "2024-07", "location": "Nagpur", "bullets": ["Wrote integration tests for an internal billing API."] }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Projects",
+      "items": [
+        { "name": "KrishiPrice", "technologies": ["Python", "FastAPI", "scikit-learn"], "url": "https://github.com/nehak21/krishiprice", "demo": "https://krishiprice.onrender.com", "bullets": ["Predicts mandi crop prices from 10 years of market data."] },
+        { "name": "HostelHub", "technologies": ["Flutter", "Firebase"], "url": "https://github.com/nehak21/hostelhub", "bullets": ["Room allocation and complaint tracking app used by 600 students."] }
+      ]
+    },
+    {
+      "kind": "certifications",
+      "heading": "Certifications",
+      "items": [
+        { "name": "Programming, Data Structures and Algorithms using Python", "issuer": "NPTEL", "date": "2023-10", "credentialUrl": "https://nptel.ac.in/noc/E_Certificate/NPTEL23CS40S5512" },
+        { "name": "Machine Learning Specialization", "issuer": "DeepLearning.AI", "date": "2024-02" }
+      ]
+    },
+    {
+      "kind": "awards",
+      "heading": "Achievements",
+      "items": [
+        { "title": "Finalist, Flipkart GRiD 5.0", "category": "hackathon", "date": "2023" },
+        { "title": "First Prize, VNIT Code Sprint", "category": "hackathon", "issuer": "VNIT ACM Chapter", "date": "2024" }
+      ]
+    },
+    {
+      "kind": "leadership",
+      "heading": "Positions of Responsibility",
+      "items": [{ "organization": "VNIT ACM Student Chapter", "role": "Technical Secretary", "start": "2024-08", "current": true, "bullets": ["Organise weekly competitive programming contests."] }]
+    },
+    {
+      "kind": "skills",
+      "heading": "Technical Skills",
+      "groups": [
+        { "label": "Languages", "items": ["C++", "Python", "Java", "Dart"] },
+        { "label": "Frameworks", "items": ["FastAPI", "Flutter", "Spring Boot"] },
+        { "label": "Tools", "items": ["Git", "Docker", "PostgreSQL"] }
+      ]
+    },
+    {
+      "kind": "languages",
+      "heading": "Languages",
+      "items": [{ "language": "Marathi", "proficiency": "Native" }, { "language": "Hindi", "proficiency": "Fluent" }, { "language": "English", "proficiency": "Fluent" }]
+    },
+    {
+      "kind": "references",
+      "heading": "References",
+      "items": [{ "name": "Prof. S. Deshpande", "relation": "Faculty Advisor, VNIT", "email": "s.deshpande@example.ac.in", "phone": "+91 94220 33445" }]
+    }
+  ]
+}

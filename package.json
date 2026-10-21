@@ -20,6 +20,7 @@
     "e2e:onboarding": "node --import tsx scripts/e2e-onboarding-redesign.ts",
     "test:cv-accuracy": "node --import tsx --test scripts/verify-cv-extraction-accuracy.ts scripts/test-cv-extraction-regression.ts scripts/verify-v6-cv-intelligence.ts",
     "test:cv-v3": "node --import tsx --test --test-concurrency=1 scripts/verify-cv-extraction-v3.ts",
+    "test:cv-personal": "node --import tsx --test --test-concurrency=1 scripts/verify-cv-personal-details.ts",
     "eval:cv": "node --import tsx eval/cv/run.ts",
     "eval:cv:render": "services/resume-extractor/.venv/bin/python -I eval/cv/render.py",
     "test:portfolio-network": "node --import tsx --test scripts/verify-portfolio-network.test.mjs",

@@ -29,7 +29,7 @@ const verbose = args.includes("--verbose");
 
 const GROUP: Record<string, string> = {
   "pdf-single": "text-pdf", "pdf-table": "text-pdf-tables", "pdf-sidebar": "two-column-pdf", "pdf-multipage": "multi-page-pdf",
-  "docx-plain": "docx", "docx-table": "docx-tables", "scan-good": "scanned-pdf", "scan-poor": "scanned-pdf-degraded", png: "image", jpg: "image",
+  "docx-plain": "docx", "docx-table": "docx-tables", txt: "plain-text", rtf: "rtf", "scan-good": "scanned-pdf", "scan-poor": "scanned-pdf-degraded", png: "image", jpg: "image",
 };
 
 const accepted = (ext: string) =>
@@ -41,10 +41,10 @@ async function extract(file: string) {
   if (!accepted(ext)) return { supported: false, text: "", ocrUsed: false, latencyMs: 0, review: null, ocrText: "" };
   let input;
   let ocrText = "";
-  if (ext === "pdf" || ext === "docx") {
+  if (ext === "pdf" || ext === "docx" || ext === "txt" || ext === "rtf") {
     const parsed = await readDocumentText(fs.readFileSync(file), ext);
     if (parsed.text.replace(/\s/g, "").length >= 40) {
-      input = { text: parsed.text, hyperlinks: parsed.hyperlinks, fileFormat: ext, pageCount: parsed.pageCount, ocrUsed: false, via: ext === "docx" ? "docx" : "native-pdf", lines: parsed.lines };
+      input = { text: parsed.text, hyperlinks: parsed.hyperlinks, fileFormat: ext, pageCount: parsed.pageCount, ocrUsed: false, via: ext === "pdf" ? "native-pdf" : ext, lines: parsed.lines };
     }
   }
   if (!input) {
@@ -68,21 +68,21 @@ function wordRecall(reference: string, ocr: string) {
   return ref.length ? hit / ref.length : 1;
 }
 
-type Row = { file: string; group: string; spec: string; supported: boolean; ocrUsed: boolean; latencyMs: number; score: DocScore; wordRecall?: number; failed?: string };
+type Row = { style?: string; file: string; group: string; spec: string; supported: boolean; ocrUsed: boolean; latencyMs: number; score: DocScore; wordRecall?: number; failed?: string };
 
 async function main() {
-  const jobs: Array<{ file: string; group: string; spec: string; truth: Truth; reference?: string; private: boolean }> = [];
+  const jobs: Array<{ file: string; group: string; spec: string; truth: Truth; reference?: string; private: boolean; style?: string }> = [];
   const specs = new Map(loadSpecs().map((s) => [s.id, s]));
   const manifest = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, "manifest.json"), "utf8"));
   for (const doc of manifest.documents) {
     const spec = specs.get(doc.spec)!;
     const primary = spec.variants.find((v) => v.startsWith("pdf-"));
     jobs.push({
-      file: path.join(FIXTURE_DIR, doc.file), group: GROUP[doc.variant], spec: doc.spec, truth: truthFromSpec(spec), private: false,
+      file: path.join(FIXTURE_DIR, doc.file), group: GROUP[doc.variant], spec: doc.spec, truth: truthFromSpec(spec), private: false, style: (spec as { style?: string }).style ?? "classic",
       reference: ["scan-good", "scan-poor", "png", "jpg"].includes(doc.variant) && primary ? path.join(FIXTURE_DIR, `${doc.spec}--${primary}.pdf`) : undefined,
     });
   }
-  for (const [file, truth] of EVAL_SET === "holdout" ? [] : loadPrivateTruth()) {
+  for (const [file, truth] of EVAL_SET !== "dev" ? [] : loadPrivateTruth()) {
     const full = path.join(process.cwd(), "private-fixtures", file);
     if (fs.existsSync(full)) jobs.push({ file: full, group: "real-cv", spec: truth.id, truth, private: true });
   }
@@ -101,6 +101,7 @@ async function main() {
     } catch (err) {
       row = { file: path.basename(j.file), group: j.group, spec: j.spec, supported: true, ocrUsed: false, latencyMs: 0, score: scoreDocument(j.truth, emptyPrediction(), ""), failed: err instanceof Error ? err.message : String(err) };
     }
+    row.style = j.style;
     rows.push(row);
     (row as Row & { private?: boolean }).private = j.private;
   }
@@ -111,10 +112,13 @@ function summarise(rows: Row[]) {
   const fields: Record<string, Counts> = {};
   const records: Record<string, Counts> = {};
   const all: Counts = { tp: 0, fp: 0, fn: 0 };
+  const extended: Record<string, Counts> = {};
+  const extAll: Counts = { tp: 0, fp: 0, fn: 0 };
   const rec: Counts = { tp: 0, fp: 0, fn: 0 };
   let dates = 0, datesTotal = 0, assoc = 0, assocTotal = 0, claimed = 0, ungrounded = 0, dups = 0, predRecords = 0, flagsExp = 0, flagsRaised = 0, leaks = 0;
   for (const r of rows) {
     for (const [k, c] of Object.entries(r.score.fields)) { fields[k] ??= { tp: 0, fp: 0, fn: 0 }; add(fields[k], c); add(all, c); }
+    for (const [k, c] of Object.entries(r.score.extended ?? {})) { extended[k] ??= { tp: 0, fp: 0, fn: 0 }; add(extended[k], c); add(extAll, c); }
     for (const [k, c] of Object.entries(r.score.records)) { records[k] ??= { tp: 0, fp: 0, fn: 0 }; add(records[k], c); add(rec, c); dups += c.duplicates; predRecords += c.tp + c.fp; }
     dates += r.score.dates.correct; datesTotal += r.score.dates.total;
     assoc += r.score.association.correct; assocTotal += r.score.association.total;
@@ -127,6 +131,7 @@ function summarise(rows: Row[]) {
     documents: rows.length,
     extractionFailures: failures,
     field: prf(all), fieldCounts: all,
+    extendedField: extAll.tp + extAll.fp + extAll.fn ? prf(extAll) : null, extendedCounts: extAll,
     record: prf(rec), recordCounts: rec,
     dateAccuracy: datesTotal ? dates / datesTotal : null,
     associationAccuracy: assocTotal ? assoc / assocTotal : null,
@@ -141,6 +146,7 @@ function summarise(rows: Row[]) {
     ocrWordRecall: recall.length ? recall.reduce((s, r) => s + (r.wordRecall || 0), 0) / recall.length : null,
     meanLatencyMs: Math.round(rows.reduce((s, r) => s + r.latencyMs, 0) / Math.max(1, rows.length)),
     byField: Object.fromEntries(Object.entries(fields).sort().map(([k, c]) => [k, { ...prf(c), ...c }])),
+    byExtendedField: Object.fromEntries(Object.entries(extended).sort().map(([k, c]) => [k, { ...prf(c), ...c }])),
     byRecord: Object.fromEntries(Object.entries(records).sort().map(([k, c]) => [k, { ...prf(c), ...c }])),
   };
 }
@@ -154,14 +160,15 @@ function report(rows: Row[]) {
     const s = summarise([r]);
     console.log(`  ${r.file.padEnd(44)} ${pct(s.field.f1)} | ${pct(s.record.f1)} | ${pct(s.dateAccuracy)} | ${pct(s.unsupportedClaimRate)} | ${String(r.latencyMs).padStart(5)}ms${r.failed ? `  FAILED: ${r.failed}` : ""}${r.supported ? "" : "  UNSUPPORTED FORMAT"}${r.score.unsupported.examples.length && verbose ? `  ungrounded: ${r.score.unsupported.examples.join(" / ")}` : ""}`);
   }
-  console.log("\nby document type   docs  fieldP fieldR fieldF1 recF1  dates assoc unsupp  dupl flags ocrWR");
+  console.log("\nby document type   docs  fieldP fieldR fieldF1 recF1  dates assoc unsupp  dupl flags ocrWR  extF1");
   const out: Record<string, unknown> = {};
-  for (const g of [...groups, "ALL-SYNTHETIC", "ALL"]) {
-    const sel = g === "ALL" ? rows : g === "ALL-SYNTHETIC" ? rows.filter((r) => r.group !== "real-cv") : rows.filter((r) => r.group === g);
+  const styles = [...new Set(rows.map((r) => r.style).filter(Boolean))].map((s) => `template:${s}`);
+  for (const g of [...groups, ...(styles.length > 1 ? styles : []), "ALL-SYNTHETIC", "ALL"]) {
+    const sel = g === "ALL" ? rows : g === "ALL-SYNTHETIC" ? rows.filter((r) => r.group !== "real-cv") : g.startsWith("template:") ? rows.filter((r) => `template:${r.style}` === g) : rows.filter((r) => r.group === g);
     if (!sel.length) continue;
     const s = summarise(sel);
     out[g] = s;
-    console.log(`  ${g.padEnd(22)} ${String(s.documents).padStart(3)}  ${pct(s.field.precision)}  ${pct(s.field.recall)}  ${pct(s.field.f1)}  ${pct(s.record.f1)} ${pct(s.dateAccuracy)} ${pct(s.associationAccuracy)} ${pct(s.unsupportedClaimRate)} ${pct(s.duplicateRate)} ${pct(s.reviewFlagRecall)} ${pct(s.ocrWordRecall)}${s.extractionFailures ? `  failures=${s.extractionFailures}` : ""}`);
+    console.log(`  ${g.padEnd(22)} ${String(s.documents).padStart(3)}  ${pct(s.field.precision)}  ${pct(s.field.recall)}  ${pct(s.field.f1)}  ${pct(s.record.f1)} ${pct(s.dateAccuracy)} ${pct(s.associationAccuracy)} ${pct(s.unsupportedClaimRate)} ${pct(s.duplicateRate)} ${pct(s.reviewFlagRecall)} ${pct(s.ocrWordRecall)}  ${pct(s.extendedField?.f1 ?? null)}${s.extractionFailures ? `  failures=${s.extractionFailures}` : ""}`);
   }
   const all = out["ALL"] as ReturnType<typeof summarise> | undefined;
   if (all) {
@@ -172,6 +179,8 @@ function report(rows: Row[]) {
   if (syn) {
     console.log("\nsynthetic set by field  (P / R / F1, tp fp fn)");
     for (const [k, v] of Object.entries(syn.byField)) console.log(`  ${k.padEnd(28)} ${pct(v.precision)} ${pct(v.recall)} ${pct(v.f1)}   ${v.tp} ${v.fp} ${v.fn}`);
+    console.log("\nsynthetic set, extended fields (not in the core F1)");
+    for (const [k, v] of Object.entries(syn.byExtendedField)) console.log(`  ${k.padEnd(28)} ${pct(v.precision)} ${pct(v.recall)} ${pct(v.f1)}   ${v.tp} ${v.fp} ${v.fn}`);
     console.log("\nsynthetic set by record type");
     for (const [k, v] of Object.entries(syn.byRecord)) console.log(`  ${k.padEnd(28)} ${pct(v.precision)} ${pct(v.recall)} ${pct(v.f1)}   ${v.tp} ${v.fp} ${v.fn}`);
   }

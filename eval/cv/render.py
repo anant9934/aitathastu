@@ -26,7 +26,7 @@ from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent
 # CV_EVAL_SET=holdout renders the held-out set (eval/cv/holdout), which is never used for tuning.
-SET_DIR = ROOT / 'holdout' if os.environ.get('CV_EVAL_SET') == 'holdout' else ROOT
+SET_DIR = ROOT / os.environ['CV_EVAL_SET'] if os.environ.get('CV_EVAL_SET') in ('holdout', 'holdout2') else ROOT
 SPECS = SET_DIR / 'specs'
 OUT = SET_DIR / 'fixtures'
 RENDER_VERSION = 1
@@ -90,6 +90,7 @@ table { width: 100%; border-collapse: collapse; }
 td { padding: 0; vertical-align: top; }
 td.r { text-align: right; }
 .sub { font-style: italic; }
+.mh { font-size: 11.5pt; margin: 8pt 0 2pt 0; }
 '''
 
 
@@ -196,6 +197,190 @@ def section_html(sec, spec, table_mode=False):
     return ''.join(out)
 
 
+# ---------------------------------------------------------------- alternative templates
+#
+# spec["style"] = "modern" | "compact" lays the same content out with different
+# conventions (heading style, field order, separators, labelled link lines), so
+# a held-out set can use a template the extractor was never tuned on. Each
+# section becomes blocks that both the PDF and DOCX writers render:
+#   ('h', text) heading; ('p', parts) paragraph; ('li', parts) bullet;
+#   ('row', parts, right) paragraph with right-aligned text.
+# parts = [(text, bold, italic, url)].
+
+def T(text, bold=False, italic=False, url=None):
+    return (text, bold, italic, url)
+
+
+def link_text(url):
+    return url.replace('https://', '').replace('http://', '')
+
+
+def groups_by_org(items):
+    out = []
+    for x in items:
+        if out and out[-1][0] == x.get('organization'):
+            out[-1][1].append(x)
+        else:
+            out.append((x.get('organization'), [x]))
+    return out
+
+
+def blocks_modern(sec, spec):
+    kind, items = sec['kind'], sec.get('items', [])
+    b = [('h', sec['heading'])]
+    if kind == 'education':
+        for e in items:
+            b.append(('p', [T(e['degree'] + (f' in {e["field"]}' if e.get('field') else ''), bold=True)]))
+            bits = [e['institution']] + ([e['location']] if e.get('location') else []) + [date_range(e, spec)]
+            if e.get('grade'):
+                bits.append(e['grade']['text'])
+            b.append(('p', [T(' · '.join(x for x in bits if x))]))
+            if e.get('notes'):
+                b.append(('p', [T(e['notes'])]))
+    elif kind in ('experience', 'volunteering', 'leadership'):
+        for org, group in groups_by_org(items):
+            loc = group[0].get('location')
+            b.append(('p', [T(org, bold=True)] + ([T(f' · {loc}')] if loc else [])))
+            for x in group:
+                b.append(('row', [T(x.get('title') or x.get('role'), italic=True)], date_range(x, spec)))
+                b += [('li', [T(t)]) for t in x.get('bullets', [])]
+    elif kind == 'projects':
+        for pr in items:
+            b.append(('row', [T(pr['name'], bold=True)], date_range(pr, spec) if pr.get('start') else ''))
+            b += [('li', [T(t)]) for t in pr.get('bullets', [])]
+            b.append(('p', [T('Tech: ' + ', '.join(pr['technologies']))]))
+            if pr.get('url'):
+                b.append(('p', [T('GitHub: '), T(link_text(pr['url']), url=pr['url'])]))
+            if pr.get('demo'):
+                b.append(('p', [T('Live: '), T(pr['demo'], url=pr['demo'])]))
+    elif kind == 'skills':
+        for g in sec['groups']:
+            b.append(('p', ([T(f'{g["label"]}: ', bold=True)] if g.get('label') else []) + [T(', '.join(g['items']))]))
+    elif kind == 'certifications':
+        style = spec.get('dateStyle', 'mon')
+        for c in items:
+            bits = [c['name']] + ([c['issuer']] if c.get('issuer') else [])
+            when = c.get('dateText') or fmt_date(c.get('date'), style)
+            if when:
+                bits.append(f'Issued {when}')
+            if c.get('expires'):
+                bits.append(f'Expires {fmt_date(c["expires"], style)}')
+            if c.get('credentialId'):
+                bits.append(f'ID {c["credentialId"]}')
+            parts = [T(' · '.join(bits))]
+            if c.get('credentialUrl'):
+                parts += [T(' · Credential: '), T(link_text(c['credentialUrl']), url=c['credentialUrl'])]
+            b.append(('li', parts))
+    elif kind in ('awards', 'scholarships'):
+        for a in items:
+            tail = ', '.join(x for x in (a.get('issuer'), a.get('date')) if x)
+            b.append(('li', [T(a['title'] + (f' — {tail}' if tail else ''))]))
+    elif kind == 'publications':
+        for p in items:
+            b.append(('li', [T((f'{p["authors"]}. ' if p.get('authors') else '') + f'"{p["title"]}." '), T(p['venue'], italic=True), T(f', {p["date"]}.')]))
+    elif kind == 'languages':
+        for l in items:
+            b.append(('p', [T(l['language'] + (f' — {l["proficiency"]}' if l.get('proficiency') else ''))]))
+    elif kind in ('memberships', 'interests'):
+        b += [('li', [T(m['title'])]) for m in items]
+    elif kind == 'references':
+        for r in items:
+            b.append(('p', [T(r['name'], bold=True), T(f', {r["relation"]}')]))
+            b.append(('p', [T(' | '.join(v for v in (r.get('email'), r.get('phone')) if v))]))
+    return b
+
+
+def blocks_compact(sec, spec):
+    kind, items = sec['kind'], sec.get('items', [])
+    b = [('p', [T(sec['heading'].upper() + ':', bold=True)])]
+    if kind == 'education':
+        for e in items:
+            deg = e['degree'] + (f', {e["field"]}' if e.get('field') else '')
+            grade = f' ({e["grade"]["text"]})' if e.get('grade') else ''
+            b.append(('p', [T(f'{date_range(e, spec)}  '), T(deg, bold=True), T(f' — {e["institution"]}{grade}')]))
+    elif kind in ('experience', 'volunteering', 'leadership'):
+        for x in items:
+            loc = f', {x["location"]}' if x.get('location') else ''
+            dr = date_range(x, spec)
+            b.append(('p', ([T(f'{dr} | ')] if dr else []) + [T(x.get('title') or x.get('role'), bold=True), T(f' | {x["organization"]}{loc}')]))
+            b += [('p', [T(t)]) for t in x.get('bullets', [])]
+    elif kind == 'projects':
+        for pr in items:
+            parts = [T(pr['name'], bold=True), T(' — ' + ' '.join(pr.get('bullets', [])[:1]) + f' Stack: {", ".join(pr["technologies"])}.')]
+            if pr.get('url'):
+                parts += [T(' Repo: '), T(link_text(pr['url']), url=pr['url'])]
+            if pr.get('demo'):
+                parts += [T(' Demo: '), T(link_text(pr['demo']), url=pr['demo'])]
+            b.append(('p', parts))
+    elif kind == 'skills':
+        for g in sec['groups']:
+            b.append(('p', [T((f'{g["label"]} – ' if g.get('label') else '') + ' | '.join(g['items']))]))
+    elif kind == 'certifications':
+        style = spec.get('dateStyle', 'mon')
+        for c in items:
+            when = c.get('dateText') or fmt_date(c.get('date'), style)
+            head = f'{c["issuer"]} — {c["name"]}' if c.get('issuer') else c['name']
+            extra = ', '.join(x for x in (when, f'valid until {fmt_date(c["expires"], style)}' if c.get('expires') else None, f'ID {c["credentialId"]}' if c.get('credentialId') else None) if x)
+            parts = [T(head + (f' ({extra})' if extra else ''))]
+            if c.get('credentialUrl'):
+                parts += [T(' '), T(link_text(c['credentialUrl']), url=c['credentialUrl'])]
+            b.append(('p', parts))
+    elif kind in ('awards', 'scholarships'):
+        for a in items:
+            b.append(('p', [T(', '.join(x for x in (a['title'], a.get('issuer'), a.get('date')) if x))]))
+    elif kind == 'publications':
+        for i, p in enumerate(items, 1):
+            b.append(('p', [T(f'[{i}] {p["title"]}, {p["venue"]}, {p["date"]}')]))
+    elif kind == 'languages':
+        b.append(('p', [T(', '.join(l['language'] + (f' ({l["proficiency"]})' if l.get('proficiency') else '') for l in items))]))
+    elif kind in ('memberships', 'interests'):
+        b.append(('p', [T('; '.join(m['title'] for m in items))]))
+    elif kind == 'references':
+        for r in items:
+            b.append(('p', [T(f'{r["name"]}, {r["relation"]}, ' + ', '.join(v for v in (r.get('email'), r.get('phone')) if v))]))
+    return b
+
+
+def style_blocks(sec, spec):
+    return blocks_modern(sec, spec) if spec.get('style') == 'modern' else blocks_compact(sec, spec)
+
+
+def parts_html(parts, spec):
+    out = ''
+    for text, bold, italic, url in parts:
+        t = esc(text, spec)
+        if url:
+            t = f'<a href="{html.escape(url)}">{t}</a>'
+        if bold:
+            t = f'<b>{t}</b>'
+        if italic:
+            t = f'<i>{t}</i>'
+        out += t
+    return out
+
+
+def blocks_html(blocks, spec):
+    out, in_list = [], False
+    for blk in blocks:
+        if blk[0] == 'li' and not in_list:
+            out.append('<ul>')
+            in_list = True
+        if blk[0] != 'li' and in_list:
+            out.append('</ul>')
+            in_list = False
+        if blk[0] == 'h':
+            out.append(f'<p class="mh"><b>{html.escape(blk[1])}</b></p>')
+        elif blk[0] == 'p':
+            out.append(f'<p>{parts_html(blk[1], spec)}</p>')
+        elif blk[0] == 'li':
+            out.append(f'<li>{parts_html(blk[1], spec)}</li>')
+        elif blk[0] == 'row':
+            out.append(row(parts_html(blk[1], spec), blk[2]))
+    if in_list:
+        out.append('</ul>')
+    return ''.join(out)
+
+
 def header_html(spec, center=False):
     p = spec['person']
     bits, links = contact_html(spec)
@@ -215,9 +400,13 @@ def summary_html(spec):
     return f'<h2>{html.escape(spec.get("summaryHeading", "Summary"))}</h2><p>{esc(spec["summary"], spec)}</p>'
 
 
+def sec_html(sec, spec, table_mode=False):
+    return blocks_html(style_blocks(sec, spec), spec) if spec.get('style') else section_html(sec, spec, table_mode)
+
+
 def doc_html(spec, sections, table_mode=False, with_header=True):
     body = (header_html(spec) if with_header else '') + summary_html(spec)
-    body += ''.join(section_html(s, spec, table_mode) for s in sections)
+    body += ''.join(sec_html(s, spec, table_mode) for s in sections)
     return body
 
 
@@ -292,9 +481,9 @@ def write_sidebar(spec, path):
     p = spec['person']
     bits, links = contact_html(spec)
     side_html = '<h2>Contact</h2>' + ''.join(f'<p>{b}</p>' for b in bits) + ''.join(f'<p>{l}</p>' for l in links)
-    side_html += ''.join(section_html(s, spec) for s in side)
+    side_html += ''.join(sec_html(s, spec) for s in side)
     head = f'<h1>{html.escape(p["name"])}</h1>' + (f'<p>{esc(p["headline"], spec)}</p>' if p.get('headline') else '')
-    main_html = head + summary_html(spec) + ''.join(section_html(s, spec) for s in main)
+    main_html = head + summary_html(spec) + ''.join(sec_html(s, spec) for s in main)
     layout_pdf(path, [(side_html, fitz.Rect(22, 34, 196, A4.height - 30)), (main_html, fitz.Rect(212, 34, A4.width - 30, A4.height - 30))], 9, sidebar_fill=fitz.Rect(0, 0, 204, A4.height))
 
 
@@ -399,6 +588,29 @@ def docx_section(container, sec, spec, table_mode):
             container.add_paragraph(' | '.join(v for v in (r.get('email'), r.get('phone')) if v))
 
 
+def docx_blocks(container, blocks):
+    for blk in blocks:
+        if blk[0] == 'h':
+            container.add_paragraph(blk[1]).style = 'Heading 2'
+            continue
+        p = container.add_paragraph(style='List Bullet') if blk[0] == 'li' else container.add_paragraph()
+        for text, bold, italic, url in blk[1]:
+            if url:
+                add_hyperlink(p, url, text)
+            else:
+                r = p.add_run(text)
+                r.bold, r.italic = bold, italic
+        if blk[0] == 'row' and blk[2]:
+            p.add_run(f'\t{blk[2]}')
+
+
+def docx_any(container, sec, spec, table_mode):
+    if spec.get('style'):
+        docx_blocks(container, style_blocks(sec, spec))
+    else:
+        docx_section(container, sec, spec, table_mode)
+
+
 def write_docx(spec, path, table_mode=False):
     d = Document()
     d.styles['Normal'].font.size = Pt(10)
@@ -434,15 +646,93 @@ def write_docx(spec, path, table_mode=False):
         layout = d.add_table(rows=1, cols=2)
         left, right = layout.rows[0].cells
         for s in side:
-            docx_section(left, s, spec, True)
+            docx_any(left, s, spec, True)
         for s in main:
-            docx_section(right, s, spec, True)
+            docx_any(right, s, spec, True)
     else:
         for s in spec['sections']:
-            docx_section(d, s, spec, False)
+            docx_any(d, s, spec, False)
     if spec.get('pageHeader'):
         d.sections[0].footer.paragraphs[0].text = 'Curriculum Vitae'
     d.save(path)
+
+
+# ---------------------------------------------------------------- plain text and RTF
+#
+# Written from the template's blocks (as a word processor would save them):
+# a right-aligned date follows its row after a tab, bullets are "•" lines.
+
+def text_lines(spec):
+    """[(parts, kind)] for the whole document; parts as in blocks, kind 'h' | 'p' | 'li' | 'row'."""
+    p = spec['person']
+    out = [([T(p['name'], bold=True)], 'p')]
+    if p.get('headline'):
+        out.append(([T(p['headline'])], 'p'))
+    out.append(([T(' | '.join(v for v in (p.get('email'), p.get('phone'), p.get('location')) if v))], 'p'))
+    links = []
+    for i, l in enumerate(p.get('links', [])):
+        links += ([T(' | ')] if i else []) + [T(l['display'], url=l['url'])]
+    if links:
+        out.append((links, 'p'))
+    if spec.get('summary'):
+        out.append(([T(spec.get('summaryHeading', 'Summary'))], 'h'))
+        out.append(([T(spec['summary'])], 'p'))
+    for sec in spec['sections']:
+        for blk in style_blocks(sec, spec):
+            if blk[0] == 'h':
+                out.append(([T(blk[1])], 'h'))
+            elif blk[0] == 'row':
+                out.append((blk[1] + ([T('\t' + blk[2])] if blk[2] else []), 'row'))
+            else:
+                out.append((blk[1], blk[0]))
+    return out
+
+
+def write_txt(spec, path, source=None):
+    lines = []
+    for parts, kind in text_lines(spec):
+        text = ''.join(t for t, *_ in parts)
+        lines.append(('• ' if kind == 'li' else '') + text)
+        if kind == 'h':
+            lines[-1] = text.upper()
+    path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
+def rtf_escape(text):
+    out = []
+    for ch in text:
+        if ch in '\\{}':
+            out.append('\\' + ch)
+        elif ch == '\t':
+            out.append('\\tab ')
+        elif ord(ch) > 127:
+            code = ord(ch)
+            out.append(f'\\u{code if code < 32768 else code - 65536}?')
+        else:
+            out.append(ch)
+    return ''.join(out)
+
+
+def write_rtf(spec, path, source=None):
+    """Word-processor RTF: font and colour tables, a generator group, bold
+    runs, Unicode escapes and links as HYPERLINK fields (visible text kept)."""
+    body = []
+    for parts, kind in text_lines(spec):
+        runs = []
+        for text, bold, italic, url in parts:
+            t = rtf_escape(text)
+            if url:
+                t = '{\\field{\\*\\fldinst {HYPERLINK "' + url + '"}}{\\fldrslt {' + t + '}}}'
+            elif bold or kind == 'h':
+                t = '{\\b ' + t + '}'
+            elif italic:
+                t = '{\\i ' + t + '}'
+            runs.append(t)
+        prefix = '\\bullet\\tab ' if kind == 'li' else ''
+        size = '\\fs24 ' if kind == 'h' else ''
+        body.append('\\pard' + (' ' if not size else '') + size + prefix + ''.join(runs) + ('\\fs20' if size else '') + '\\par')
+    head = '{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Arial;}{\\f1\\froman Times New Roman;}}{\\colortbl;\\red0\\green0\\blue0;}{\\*\\generator Riched20 10.0;}\\viewkind4\\uc1\\f0\\fs20\n'
+    path.write_text(head + '\n'.join(body) + '\n}\n', encoding='latin1')
 
 
 # ---------------------------------------------------------------- scans and images
@@ -487,7 +777,7 @@ def main():
             continue
         primary_pdf = None
         for variant in spec['variants']:
-            ext = {'docx-plain': 'docx', 'docx-table': 'docx', 'png': 'png', 'jpg': 'jpg'}.get(variant, 'pdf')
+            ext = {'docx-plain': 'docx', 'docx-table': 'docx', 'png': 'png', 'jpg': 'jpg', 'txt': 'txt', 'rtf': 'rtf'}.get(variant, 'pdf')
             path = OUT / f'{spec["id"]}--{variant}.{ext}'
             if variant == 'pdf-single':
                 write_single(spec, path)
@@ -501,6 +791,10 @@ def main():
                 write_docx(spec, path)
             elif variant == 'docx-table':
                 write_docx(spec, path, table_mode=True)
+            elif variant in ('txt', 'rtf'):
+                if not spec.get('style'):
+                    raise SystemExit(f'{spec["id"]}: txt/rtf variants need a "style" template')
+                (write_txt if variant == 'txt' else write_rtf)(spec, path)
             elif variant in ('scan-good', 'scan-poor', 'png', 'jpg'):
                 source = primary_pdf or OUT / f'{spec["id"]}--_source.pdf'
                 if primary_pdf is None:
@@ -525,8 +819,12 @@ def main():
                 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
             })
             print(f'wrote {path.name}')
-    if not only:
-        (OUT / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    path = OUT / 'manifest.json'
+    if only and path.exists():
+        # Re-rendering a subset keeps the other entries (their files are untouched).
+        old = json.loads(path.read_text())
+        manifest['documents'] = [d for d in old['documents'] if d['spec'] not in only] + manifest['documents']
+    path.write_text(json.dumps(manifest, indent=2) + '\n')
 
 
 if __name__ == '__main__':

@@ -56,6 +56,15 @@ export function sanitizeTextForModel(text: string): string {
   // Email addresses
   sanitized = sanitized.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[EMAIL_REDACTED]");
 
+  // Labelled personal details a model never needs: the label stays, the value goes.
+  sanitized = sanitized.replace(
+    /\b((?:date\s+of\s+birth|d\.?\s?o\.?\s?b\.?|birth\s*date|(?:current|present|permanent|residential|home|correspondence|mailing|postal)\s+address|address|driving\s+licen[cs]e(?:\s+(?:no\.?|number))?|driver'?s\s+licen[cs]e|passport(?:\s+(?:no\.?|number))?|aadhaa?r(?:\s+(?:no\.?|number))?|pan(?:\s+(?:no\.?|number|card))?|father'?s\s+name|mother'?s\s+name|marital\s+status|religion|caste))\s*([:\-–—\t])\s*[^\n|•]+/gi,
+    "$1$2 [PERSONAL_REDACTED]",
+  );
+  // Aadhaar-shaped numbers (12 digits in groups of four), labelled or not.
+  // A run of years ("2019 2020 2021") is not an ID.
+  sanitized = sanitized.replace(/\b(?!(?:19|20)\d{2}\s(?:19|20)\d{2}\b)[2-9]\d{3}\s\d{4}\s\d{4}\b/g, "[ID_REDACTED]");
+
   // Compensation / salary mentions
   sanitized = sanitized.replace(/(₹|\$|INR|USD)\s*\d+([,\d]+)*(\s*(LPA|k|lakhs?|per annum))?/gi, "[COMPENSATION_REDACTED]");
   sanitized = sanitized.replace(/\b\d+(\.\d+)?\s*(LPA|CTC)\b/gi, "[COMPENSATION_REDACTED]");

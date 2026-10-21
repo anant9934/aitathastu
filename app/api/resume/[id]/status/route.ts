@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const deadlineAt = Date.now() + maxDuration * 1000;
   const { id: documentId } = await params;
   const auth = await getServerAuthContext();
   if (!auth) return unauthorized();
@@ -39,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const jobId = statusRes.jobId;
       after(async () => {
         try {
-          await processResumeJob(jobId, personId);
+          await processResumeJob(jobId, personId, { deadlineAt });
         } catch (err) {
           console.error("[resume-status] background nudge error", { jobId, error: err });
         }

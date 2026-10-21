@@ -11,12 +11,29 @@
  * private-fixtures/results/ only.
  */
 
-process.env.CORE_DISABLE_LIVE_LLM = "true";
+// Must stay the first import: isolates the database, Redis and network before
+// any other module runs (see live-guard.ts). AI configurations need CV_EVAL_ALLOW_LIVE_AI=yes.
+import { LIVE_AI, liveGuardStats } from "./live-guard";
+const AI_CONFIGS = (process.argv.includes("--ai-configs") ? process.argv[process.argv.indexOf("--ai-configs") + 1] ?? "" : "").split(",").filter(Boolean);
+process.env.CORE_DISABLE_LIVE_LLM = LIVE_AI ? "false" : "true";
 
 import fs from "node:fs";
 import path from "node:path";
 import { readDocumentText } from "@/lib/resume/document-text";
 import { buildResumeReview, textFromExtractorPayload } from "@/lib/services/resume-ingestion-service";
+import { shouldEnrichWithLLM } from "@/lib/services/resume-extraction-service";
+import { findRecoveryGaps } from "@/lib/resume/targeted-recovery";
+
+/** Stage switches per benchmark configuration. */
+const CONFIG_STAGES: Record<string, { consent: boolean; structure: boolean; recovery: boolean; verify: boolean }> = {
+  deterministic: { consent: false, structure: false, recovery: false, verify: false },
+  structure: { consent: true, structure: true, recovery: false, verify: false },
+  recovery: { consent: true, structure: false, recovery: true, verify: false },
+  "structure+recovery": { consent: true, structure: true, recovery: true, verify: false },
+  all: { consent: true, structure: true, recovery: true, verify: true },
+};
+let CURRENT = CONFIG_STAGES.deterministic;
+let CURRENT_NAME = "deterministic";
 import * as uploadLimits from "@/lib/config/upload-limits";
 import { EVAL_SET, FIXTURE_DIR, loadPrivateTruth, loadSpecs, truthFromSpec, type Truth } from "./truth";
 import { add, prf, scoreDocument, norm, type Counts, type DocScore } from "./score";
@@ -34,6 +51,18 @@ const GROUP: Record<string, string> = {
 
 const accepted = (ext: string) =>
   ((uploadLimits as Record<string, unknown>).RESUME_ACCEPTED_EXTENSIONS as string[] | undefined ?? ["pdf", "docx"]).includes(ext);
+
+/** Whether each AI stage would run for this document, without calling anything. */
+function wouldCall(built: Awaited<ReturnType<typeof buildResumeReview>>, text: string) {
+  const prev = process.env.CORE_DISABLE_LIVE_LLM;
+  process.env.CORE_DISABLE_LIVE_LLM = "false";
+  try {
+    const d = shouldEnrichWithLLM(built.extraction.extracted, { consent: true, rawText: text, quality: built.extraction.quality });
+    return { structure: d.shouldEnrich ? d.reason : null, recoveryGaps: built.extraction.extracted ? findRecoveryGaps(built.extraction.extracted, text).length : 0 };
+  } finally {
+    process.env.CORE_DISABLE_LIVE_LLM = prev;
+  }
+}
 
 async function extract(file: string) {
   const ext = path.extname(file).slice(1).toLowerCase();
@@ -53,8 +82,10 @@ async function extract(file: string) {
     const { text, hyperlinks, pageCount, lines, pageQuality } = textFromExtractorPayload(raw as never);
     input = { text, hyperlinks, fileFormat: ext, pageCount, ocrUsed: true, via: "extractor-ocr", renderProfile: raw.profile as never, lines, pageQuality };
   }
-  const built = await buildResumeReview(input as never, { documentId: "eval-doc", personId: "eval-person", aiConsent: false });
-  return { supported: true, text: input.text, ocrUsed: input.ocrUsed, latencyMs: Date.now() - started, review: built.review, ocrText };
+  // One evaluation "person" per document and configuration, as each CV is a different
+  // student: per-person AI quotas then behave as in production instead of accumulating.
+  const built = await buildResumeReview(input as never, { documentId: "eval-doc", personId: `eval-${CURRENT_NAME}-${path.basename(file)}`, aiConsent: CURRENT.consent, stages: { structure: CURRENT.structure, recovery: CURRENT.recovery, verify: CURRENT.verify } });
+  return { supported: true, text: input.text, ocrUsed: input.ocrUsed, latencyMs: Date.now() - started, review: built.review, ocrText, would: wouldCall(built, input.text) };
 }
 
 /** Order-insensitive word recall of OCR text against the text layer of the source PDF. */
@@ -68,9 +99,9 @@ function wordRecall(reference: string, ocr: string) {
   return ref.length ? hit / ref.length : 1;
 }
 
-type Row = { style?: string; file: string; group: string; spec: string; supported: boolean; ocrUsed: boolean; latencyMs: number; score: DocScore; wordRecall?: number; failed?: string };
+type Row = { would?: { structure: string | null; recoveryGaps: number }; ai?: { calls: import("@/lib/intelligence/stage-routing").AiCallRecord[]; totalTokens: number; costUsd: number | null }; style?: string; file: string; group: string; spec: string; supported: boolean; ocrUsed: boolean; latencyMs: number; score: DocScore; wordRecall?: number; failed?: string };
 
-async function main() {
+async function main(capture?: Row[]) {
   const jobs: Array<{ file: string; group: string; spec: string; truth: Truth; reference?: string; private: boolean; style?: string }> = [];
   const specs = new Map(loadSpecs().map((s) => [s.id, s]));
   const manifest = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, "manifest.json"), "utf8"));
@@ -82,7 +113,10 @@ async function main() {
       reference: ["scan-good", "scan-poor", "png", "jpg"].includes(doc.variant) && primary ? path.join(FIXTURE_DIR, `${doc.spec}--${primary}.pdf`) : undefined,
     });
   }
-  for (const [file, truth] of EVAL_SET !== "dev" ? [] : loadPrivateTruth()) {
+  // Real CVs never go to an external provider unless explicitly allowed.
+  const aiOnRealCvs = AI_CONFIGS.some((c) => c !== "deterministic") && process.env.CV_EVAL_ALLOW_REAL_CVS_WITH_AI !== "yes";
+  if (aiOnRealCvs) console.error("Real CVs are excluded from AI configurations (set CV_EVAL_ALLOW_REAL_CVS_WITH_AI=yes only with the owners' consent).");
+  for (const [file, truth] of EVAL_SET !== "dev" || aiOnRealCvs ? [] : loadPrivateTruth()) {
     const full = path.join(process.cwd(), "private-fixtures", file);
     if (fs.existsSync(full)) jobs.push({ file: full, group: "real-cv", spec: truth.id, truth, private: true });
   }
@@ -95,7 +129,7 @@ async function main() {
       const r = await extract(j.file);
       const pred = r.review ? toPrediction(r.review as never) : emptyPrediction();
       const score = scoreDocument(j.truth, pred, r.text);
-      row = { file: path.basename(j.file), group: j.group, spec: j.spec, supported: r.supported, ocrUsed: r.ocrUsed, latencyMs: r.latencyMs, score };
+      row = { file: path.basename(j.file), group: j.group, spec: j.spec, supported: r.supported, ocrUsed: r.ocrUsed, latencyMs: r.latencyMs, score, would: r.would, ai: (r.review?.extractionMeta as { ai?: Row["ai"] } | undefined)?.ai };
       if (j.reference && r.ocrText) row.wordRecall = wordRecall((await readDocumentText(fs.readFileSync(j.reference), "pdf")).text, r.ocrText);
       if (verbose) console.log(`\n### ${path.basename(j.file)}\n${row.score.diffs.map((x) => `   ${x}`).join("\n")}`);
     } catch (err) {
@@ -105,7 +139,23 @@ async function main() {
     rows.push(row);
     (row as Row & { private?: boolean }).private = j.private;
   }
-  report(rows);
+  if (capture) { capture.push(...rows); return; }
+  if (!AI_CONFIGS.length) { report(rows); stageExposure(rows); return; }
+  if (!benchRows) report(rows);
+}
+
+let benchRows: Record<string, Row[]> | null = null;
+
+/** How many documents would trigger each AI stage with consent (no call is made). */
+function stageExposure(rows: Row[]) {
+  const n = rows.filter((r) => r.would).length;
+  const structure = rows.filter((r) => r.would?.structure);
+  const recovery = rows.filter((r) => (r.would?.recoveryGaps ?? 0) > 0);
+  const f1 = (sel: Row[]) => (sel.length ? summarise(sel).field.f1 : null);
+  console.log(`\nAI stage exposure with consent (no calls made): whole-CV structuring on ${structure.length}/${n} documents (their deterministic field F1 ${pct(f1(structure))}), targeted recovery on ${recovery.length}/${n} (F1 ${pct(f1(recovery))}); the rest need no AI call.`);
+  const reasons: Record<string, number> = {};
+  for (const r of structure) reasons[r.would!.structure!] = (reasons[r.would!.structure!] || 0) + 1;
+  if (structure.length) console.log(`  structuring reasons: ${Object.entries(reasons).map(([k, v]) => `${k} ${v}`).join(", ")}`);
 }
 
 function summarise(rows: Row[]) {
@@ -198,4 +248,60 @@ function report(rows: Row[]) {
   console.log(`\nwrote eval/cv/results/${label}.json${privRows.length ? ` and private-fixtures/results/${label}.json` : ""}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+async function bench() {
+  if (!AI_CONFIGS.length) return main();
+  benchRows = {};
+  for (const name of AI_CONFIGS) {
+    const cfg = CONFIG_STAGES[name];
+    if (!cfg) { console.error(`unknown configuration ${name}; use ${Object.keys(CONFIG_STAGES).join(", ")}`); process.exit(2); }
+    CURRENT = cfg;
+    CURRENT_NAME = name;
+    const captured: Row[] = [];
+    const origLog = console.log, origInfo = console.info, origWarn = console.warn;
+    console.log = console.info = console.warn = () => undefined;
+    try { await main(captured); } finally { console.log = origLog; console.info = origInfo; console.warn = origWarn; }
+    benchRows[name] = captured;
+  }
+  benchReport(benchRows);
+  if (liveGuardStats) console.log(`\nprovider requests sent: ${JSON.stringify(liveGuardStats.allowed)}; refused at the ceiling of ${liveGuardStats.ceiling}: ${liveGuardStats.refusedOverCeiling}; blocked non-provider hosts: ${JSON.stringify(liveGuardStats.blockedHosts)}`);
+}
+
+/** Measured values only: anything the providers did not report stays "unknown". */
+function benchReport(all: Record<string, Row[]>) {
+  const names = Object.keys(all);
+  const base = all[names[0]];
+  const known = (xs: Array<number | undefined>) => (xs.length && xs.every((x) => typeof x === "number") ? (xs as number[]) : null);
+  const mean = (xs: number[] | null) => (xs ? (xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length)).toFixed(0) : "unknown");
+  console.log("\nconfig              docs  coreP  coreR coreF1  extF1  calls s/r/v  failed fallback  AI latency/CV  in tokens/CV out tokens/CV  cost/CV");
+  for (const name of names) {
+    const rows = all[name];
+    const s = summarise(rows);
+    const calls = rows.flatMap((r) => r.ai?.calls ?? []).filter((c) => c.outcome !== "skipped");
+    const n = (st: string) => calls.filter((c) => c.stage === st).length;
+    const perCv = (k: "latencyMs" | "inputTokens" | "outputTokens") => rows.map((r) => (r.ai?.calls ?? []).filter((c) => c.outcome !== "skipped").reduce<number | undefined>((sum, c) => (sum === undefined || c[k] === undefined ? undefined : sum + (c[k] as number)), 0));
+    const costs = rows.map((r) => (r.ai?.calls?.length ? r.ai.costUsd ?? undefined : 0));
+    const failed = calls.filter((c) => c.outcome === "failed").length;
+    const fallback = calls.filter((c) => c.fallback).length;
+    const cost = known(costs as Array<number | undefined>);
+    console.log(`${name.padEnd(19)} ${String(s.documents).padStart(4)}  ${pct(s.field.precision)}  ${pct(s.field.recall)}  ${pct(s.field.f1)}  ${pct(s.extendedField?.f1 ?? null)}  ${String(n("structure")).padStart(3)}/${String(n("recovery")).padStart(2)}/${String(n("verify")).padStart(2)}   ${String(failed).padStart(5)} ${String(fallback).padStart(8)}  ${String(mean(known(perCv("latencyMs")))).padStart(10)} ms  ${String(mean(known(perCv("inputTokens")))).padStart(12)} ${String(mean(known(perCv("outputTokens")))).padStart(13)}  ${cost ? `$${(cost.reduce((a, b) => a + b, 0) / cost.length).toFixed(5)}` : "unknown"}`);
+  }
+  const groupsOf = (r: Row) => [r.group === "real-cv" ? "real" : "synthetic", r.group, ...(r.ocrUsed ? ["ocr"] : ["text-layer"])];
+  const groups = [...new Set(base.flatMap(groupsOf))];
+  console.log("\ncore field F1 by document group (" + names.join(" | ") + ")");
+  for (const g of groups) console.log(`  ${g.padEnd(22)} ${names.map((n) => pct(summarise(all[n].filter((r) => groupsOf(r).includes(g))).field.f1)).join(" | ")}`);
+  const baseFields = summarise(base).byField;
+  for (const name of names.slice(1)) {
+    const fields = summarise(all[name]).byField;
+    const changes = Object.keys({ ...baseFields, ...fields }).map((k) => {
+      const a = baseFields[k] ?? { tp: 0, fp: 0, fn: 0, f1: 1 }, b = fields[k] ?? { tp: 0, fp: 0, fn: 0, f1: 1 };
+      return { k, dF1: b.f1 - a.f1, addedFalse: b.fp - a.fp, addedMissing: b.fn - a.fn };
+    }).filter((c) => c.dF1 !== 0 || c.addedFalse || c.addedMissing).sort((x, y) => x.dF1 - y.dF1);
+    console.log(`\n${name} vs ${names[0]}: per-field changes (regressions first; false additions = extra fp, false omissions = extra fn)`);
+    if (!changes.length) console.log("  no field changed");
+    for (const c of changes) console.log(`  ${c.k.padEnd(28)} F1 ${c.dF1 >= 0 ? "+" : ""}${(c.dF1 * 100).toFixed(1)}  false additions ${c.addedFalse >= 0 ? "+" : ""}${c.addedFalse}  false omissions ${c.addedMissing >= 0 ? "+" : ""}${c.addedMissing}`);
+    const docs = all[name].map((r, i) => ({ file: r.file, d: summarise([r]).field.f1 - summarise([base[i]]).field.f1 })).filter((x) => Math.abs(x.d) > 1e-9);
+    if (docs.length) console.log(`  documents changed: ${docs.map((x) => `${x.file} ${x.d >= 0 ? "+" : ""}${(x.d * 100).toFixed(1)}`).join(", ")}`);
+  }
+}
+
+bench().catch((e) => { console.error(e); process.exit(1); });

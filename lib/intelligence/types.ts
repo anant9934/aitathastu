@@ -10,6 +10,7 @@ export type IntelligenceTask =
   | "LEARNING_RECOMMENDATIONS"
   | "RESUME_STRUCTURE"
   | "RESUME_RECOVERY"
+  | "RESUME_VERIFY"
   // Legacy aliases
   | "resume_interpretation"
   | "project_summarization"
@@ -62,9 +63,15 @@ export type StructuredCompletionRequest = CompletionRequest & {
   timeoutMs?: number;
   /** Prior bad output + validation errors, for the single json_object repair turn. */
   repair?: { previousOutput: string; errors: string };
+  /** Stage routing: providers to try, in order (a subset of the configured providers). */
+  providers?: ModelProviderName[];
+  /** Stage routing: model per provider; unset providers use their configured model. */
+  models?: Partial<Record<ModelProviderName, string>>;
+  /** Set by the router for the provider being called. */
+  model?: string;
 };
 
-export type StructuredProviderResponse = { content: string; modelUsed: string; totalTokens?: number };
+export type StructuredProviderResponse = { content: string; modelUsed: string; totalTokens?: number; inputTokens?: number; outputTokens?: number };
 
 export function parseProviderRetryAfter(
   headers?: Headers | Record<string, string | null | undefined> | null,

@@ -14,7 +14,11 @@ import { docMeta, jsonNoStore, loadOwnedResumeDocument, unauthorized } from "@/l
 
 export const runtime = "nodejs";
 
+/** Same job as an upload, so the same limit; AI stages fit inside it. */
+export const maxDuration = 30;
+
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const deadlineAt = Date.now() + maxDuration * 1000;
   const { id: documentId } = await params;
   const auth = await getServerAuthContext();
   if (!auth) return unauthorized();
@@ -46,7 +50,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   after(async () => {
     try {
-      await processResumeJob(jobId, personId);
+      await processResumeJob(jobId, personId, { deadlineAt });
     } catch (err) {
       console.error("[resume-retry] background processResumeJob error", { jobId, error: err instanceof Error ? err.message : err });
     }

@@ -12,6 +12,7 @@ import { defaultIntelligenceRouter, StructuredCompletionError, type Intelligence
 import { RESUME_EXTRACTION_JSON_SCHEMA, ResumeExtractionSchema, type ResumeExtraction } from "./schema";
 import { sanitizeTextForModel } from "@/lib/intelligence/context-firewall";
 import { wrapUntrustedContent } from "@/lib/intelligence/prompt-defense";
+import { stageRoute } from "@/lib/intelligence/stage-routing";
 
 /** Long enough for a dense two-page CV; longer input is truncated, never split across calls. */
 const MAX_INPUT_CHARS = 24_000;
@@ -45,15 +46,23 @@ export class ResumeStructuringError extends Error {
 export async function structureResumeText(
   text: string,
   personId?: string,
-  router: IntelligenceRouter = defaultIntelligenceRouter
-): Promise<{ data: ResumeExtraction; model: string; provider: string; truncated: boolean; attempts: StructuredAttempt[] }> {
+  router: IntelligenceRouter = defaultIntelligenceRouter,
+  opts: { budgetMs?: number } = {}
+): Promise<{ data: ResumeExtraction; model: string; provider: string; truncated: boolean; attempts: StructuredAttempt[]; totalTokens?: number; inputTokens?: number; outputTokens?: number }> {
   const truncated = text.length > MAX_INPUT_CHARS;
   // Truncate first (preserves the character budget), then redact PII so phones/emails
   // never enter any LLM provider prompt, retry payload, or repair turn.
   const input = sanitizeTextForModel(truncated ? text.slice(0, MAX_INPUT_CHARS) : text);
+  const route = stageRoute("structure");
+  // The whole step is bounded by the job's remaining time; on expiry the answer is ignored.
+  const budgetMs = Math.max(1_000, opts.budgetMs ?? 25_000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<"deadline">((resolve) => { timer = setTimeout(() => resolve("deadline"), budgetMs); });
   try {
-    const result = await router.completeStructured(
+    const call = router.completeStructured(
       {
+        ...(route.providers ? { providers: route.providers } : {}),
+        models: route.models,
         task: "RESUME_STRUCTURE",
         systemPrompt: SYSTEM_PROMPT,
         // Injection phrasing is stripped and the text is fenced as untrusted data.
@@ -64,15 +73,21 @@ export async function structureResumeText(
         promptVersion: RESUME_PROMPT_VERSION,
         schemaName: "resume",
         jsonSchema: RESUME_EXTRACTION_JSON_SCHEMA,
-        timeoutMs: 25_000,
+        timeoutMs: Math.min(25_000, budgetMs),
       },
       ResumeExtractionSchema
     );
-    return { data: result.data, model: result.model, provider: result.provider, truncated, attempts: result.attempts };
+    call.catch(() => undefined);
+    const result = await Promise.race([call, deadline]);
+    if (result === "deadline") throw new ResumeStructuringError("The AI time budget for this upload ran out.", "provider");
+    return { data: result.data, model: result.model, provider: result.provider, truncated, attempts: result.attempts, totalTokens: result.totalTokens, inputTokens: result.inputTokens, outputTokens: result.outputTokens };
   } catch (error) {
+    if (error instanceof ResumeStructuringError) throw error;
     if (error instanceof StructuredCompletionError) {
       throw new ResumeStructuringError(error.message, error.kind, error.attempts);
     }
     throw new ResumeStructuringError(error instanceof Error ? error.message : "Resume structuring failed.", "provider");
+  } finally {
+    clearTimeout(timer);
   }
 }

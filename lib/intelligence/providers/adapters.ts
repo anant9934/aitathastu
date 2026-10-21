@@ -148,7 +148,7 @@ abstract class BaseHttpProvider implements ModelProvider {
 
   private async structuredWithKey(request: StructuredCompletionRequest, key: string): Promise<StructuredProviderResponse> {
     const strict = this.structuredCapability === "strict_json_schema";
-    const model = this.defaultModel;
+    const model = request.model || this.defaultModel;
     const res = await fetch(this.endpointUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -167,7 +167,7 @@ abstract class BaseHttpProvider implements ModelProvider {
     });
     if (!res.ok) return readProviderError(this.name, res);
     const data = await res.json();
-    return { content: data.choices?.[0]?.message?.content ?? "", modelUsed: model, totalTokens: data.usage?.total_tokens };
+    return { content: data.choices?.[0]?.message?.content ?? "", modelUsed: model, totalTokens: data.usage?.total_tokens, inputTokens: data.usage?.prompt_tokens, outputTokens: data.usage?.completion_tokens };
   }
 }
 
@@ -192,7 +192,7 @@ export class GeminiProvider implements ModelProvider {
   }
 
   private async structuredWithKey(request: StructuredCompletionRequest, key: string): Promise<StructuredProviderResponse> {
-    const model = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+    const model = request.model || process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
     const contents = [{ role: "user", parts: [{ text: request.userPrompt }] }];
     if (request.repair) {
       contents.push(
@@ -202,7 +202,7 @@ ${request.repair.errors}
 Return the corrected JSON only.` }] },
       );
     }
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       // Key in a header, not the URL, so it never lands in request logs.
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -224,6 +224,8 @@ Return the corrected JSON only.` }] },
       content: data.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
       modelUsed: model,
       totalTokens: data.usageMetadata?.totalTokenCount,
+      inputTokens: data.usageMetadata?.promptTokenCount,
+      outputTokens: data.usageMetadata?.candidatesTokenCount,
     };
   }
   private keyPool = new KeyPool(["GEMINI_API_KEYS", "GEMINI_API_KEY"]);

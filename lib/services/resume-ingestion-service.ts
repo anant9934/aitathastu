@@ -26,6 +26,7 @@
  */
 
 import crypto from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, resumeDocuments, sourceProcessingJobs } from "@/lib/db";
 import { ObjectStorageService } from "@/lib/storage/object-storage";
@@ -50,6 +51,9 @@ import { docMeta, loadOwnedResumeDocument } from "@/lib/api/resume-route-helpers
 import { recoverMissingFields, type RecoveryOutcome } from "@/lib/resume/targeted-recovery";
 import type { PersonalField } from "@/lib/resume/extract/personal-details";
 import type { IntelligenceRouter } from "@/lib/intelligence/router";
+import { verifyAiValues, type VerificationOutcome } from "@/lib/resume/ai-verification";
+import { estimateCostUsd, usageOf, type AiCallRecord } from "@/lib/intelligence/stage-routing";
+import type { ModelProviderName } from "@/lib/intelligence/types";
 import { decisionsByCandidate, markRunFailed, persistExtraction, runIdForDocument } from "./resume-extraction-persistence";
 
 export type ResumeFailureCode =
@@ -369,10 +373,24 @@ export async function getResumeJobStatus(
 }
 
 /**
+ * When the serverless request running a job must end (epoch ms). Routes pass
+ * their maxDuration; AI stages size their timeouts to what is left so the job
+ * can still save its result. Unset (tests, scripts): a 28 s budget from the start
+ * of the extraction step.
+ */
+const jobDeadline = new AsyncLocalStorage<number | undefined>();
+/** Time kept back after the AI stages for persistence and the status update. */
+const PERSIST_MARGIN_MS = 5_000;
+
+/**
  * Executes a resume job asynchronously in the background.
  * Uses atomic transitions and leases so concurrent executions never duplicate work.
  */
-export async function processResumeJob(jobId: string, personId: string): Promise<SourceProcessingJob | null> {
+export async function processResumeJob(jobId: string, personId: string, opts: { deadlineAt?: number } = {}): Promise<SourceProcessingJob | null> {
+  return jobDeadline.run(opts.deadlineAt, () => processResumeJobInner(jobId, personId));
+}
+
+async function processResumeJobInner(jobId: string, personId: string): Promise<SourceProcessingJob | null> {
   let job = await SourceProcessingJobService.getJobForPerson(jobId, personId);
   if (!job || job.sourceId !== "resume") return job;
 
@@ -560,7 +578,9 @@ async function pollExtractor(job: SourceProcessingJob, extractorDocumentId: stri
   }
 
   const loopStart = Date.now();
-  while (Date.now() - loopStart < 22_000) {
+  // Stop polling early enough for finalize() (and its AI stages) to fit in this request.
+  const pollWindow = Math.min(22_000, (jobDeadline.getStore() ?? Infinity) - Date.now() - 2 * PERSIST_MARGIN_MS);
+  while (Date.now() - loopStart < pollWindow) {
     if (Date.now() - submittedAt > OCR_DEADLINE_MS) {
       throw new PipelineFailure("OCR_TIMEOUT", "OCR deadline exceeded");
     }
@@ -731,7 +751,7 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
   const { personId } = job;
   await SourceProcessingJobService.updateStage(job.id, personId, "validate", { heartbeatAt: Date.now() });
   const t0 = Date.now();
-  const built = await buildResumeReview(input, { documentId, personId, aiConsent: meta(job).aiConsent === true, jobId: job.id });
+  const built = await buildResumeReview(input, { documentId, personId, aiConsent: meta(job).aiConsent === true, jobId: job.id, deadlineAt: jobDeadline.getStore() });
   const { review, profile, reviewCandidates, extractedInterpretation, mergedDiscoveredProfiles, llmEnrichmentSuccess } = built;
   const extractMs = Date.now() - t0;
 
@@ -807,11 +827,28 @@ async function finalize(job: SourceProcessingJob, documentId: string, input: Ext
  */
 export async function buildResumeReview(
   input: ExtractionInput,
-  ctx: { documentId: string; personId: string; aiConsent: boolean; jobId?: string; router?: IntelligenceRouter }
+  ctx: {
+    documentId: string; personId: string; aiConsent: boolean; jobId?: string; router?: IntelligenceRouter;
+    /** Stage switches (benchmarks): whole-CV structuring defaults on; recovery follows AI_RECOVERY_ENABLED, verification AI_VERIFY_ENABLED. */
+    stages?: { structure?: boolean; recovery?: boolean; verify?: boolean };
+    /** When the request running this job ends (epoch ms); AI stages fit inside it. */
+    deadlineAt?: number;
+  }
 ) {
+  const aiCalls: AiCallRecord[] = [];
+  // Recovery is off unless AI_RECOVERY_ENABLED=true: in the 2026-10-21 live benchmark it
+  // lowered core F1 (97.2 -> 97.0) and added six wrong certificate issuers.
+  const stageOn = {
+    structure: ctx.stages?.structure !== false,
+    recovery: ctx.stages?.recovery ?? process.env.AI_RECOVERY_ENABLED === "true",
+    verify: ctx.stages?.verify ?? process.env.AI_VERIFY_ENABLED === "true",
+  };
   const { documentId, personId } = ctx;
   const job = { id: ctx.jobId ?? "eval" };
   const startedAt = Date.now();
+  const deadlineAt = ctx.deadlineAt ?? startedAt + 28_000;
+  /** AI time left before the result must be saved. */
+  const aiBudget = () => deadlineAt - Date.now() - PERSIST_MARGIN_MS;
 
   // 1. Establish Tier 1 Deterministic Baseline via Source-Grounded Reconciliation
   const method = input.ocrUsed ? "ocr" : input.fileFormat === "docx" ? "docx" : input.fileFormat === "pdf" ? "native_pdf" : "text";
@@ -829,17 +866,28 @@ export async function buildResumeReview(
 
   // 2. Evaluate Optional AI Enrichment
   const userConsent = ctx.aiConsent;
-  const decision = shouldEnrichWithLLM(baseline.extracted, { consent: userConsent, rawText: input.text });
+  const decision = stageOn.structure
+    ? shouldEnrichWithLLM(baseline.extracted, { consent: userConsent, rawText: input.text, quality: baseline.quality })
+    : { shouldEnrich: false, reason: "stage_disabled" };
 
   let extraction: ResumeExtractionResult = baseline;
   let llmEnrichmentAttempted = false;
   let llmEnrichmentSuccess = false;
   let llmErrorNotice: string | undefined;
 
-  if (decision.shouldEnrich) {
+  // The whole-CV call needs room for a full answer; with under 10 s left it is skipped.
+  if (decision.shouldEnrich && aiBudget() < 10_000) {
+    aiCalls.push({ stage: "structure", latencyMs: 0, costUsd: null, outcome: "skipped", reason: "time_budget_exhausted" });
+  } else if (decision.shouldEnrich) {
     llmEnrichmentAttempted = true;
     try {
-      const enrichedResult = await extractResumeStructured(input.text, personId, ctx.router);
+      const enrichedResult = await extractResumeStructured(input.text, personId, ctx.router, { budgetMs: Math.min(25_000, aiBudget()) });
+      aiCalls.push({
+        stage: "structure", provider: enrichedResult.provider === "unknown" ? undefined : enrichedResult.provider, model: enrichedResult.modelUsed || undefined, latencyMs: enrichedResult.latencyMs,
+        ...usageOf(enrichedResult.aiUsage),
+        costUsd: estimateCostUsd(enrichedResult.provider, enrichedResult.aiUsage?.totalTokens),
+        outcome: enrichedResult.success ? "ok" : "failed", ...(enrichedResult.errorKind ? { reason: enrichedResult.errorKind } : {}),
+      });
       if (enrichedResult.success && enrichedResult.extracted) {
         extraction = mergeExtractionResults(baseline, enrichedResult, input.text);
         llmEnrichmentSuccess = true;
@@ -886,15 +934,45 @@ export async function buildResumeReview(
   let recovery: RecoveryOutcome | undefined;
   // The upload request that runs this job has a 30 s limit (app/api/resume/extract): recovery
   // gets what remains of a 20 s AI budget and is skipped when too little is left.
-  const recoveryBudget = 20_000 - (Date.now() - startedAt);
-  if (userConsent && extraction.extracted && !(llmEnrichmentAttempted && !llmEnrichmentSuccess) && recoveryBudget < 4_000) {
+  const recoveryBudget = Math.min(15_000, aiBudget());
+  if (!stageOn.recovery) {
+    recovery = { attempted: false, reason: "stage_disabled", gaps: 0, applied: [], rejected: [] };
+  } else if (userConsent && extraction.extracted && !(llmEnrichmentAttempted && !llmEnrichmentSuccess) && recoveryBudget < 4_000) {
     recovery = { attempted: false, reason: "time_budget_exhausted", gaps: 0, applied: [], rejected: [] };
   } else if (userConsent && extraction.extracted && !(llmEnrichmentAttempted && !llmEnrichmentSuccess)) {
     if (process.env.CORE_DISABLE_LIVE_LLM === "true" && !ctx.router) recovery = { attempted: false, reason: "ai_disabled_by_env", gaps: 0, applied: [], rejected: [] };
     else {
-      recovery = await recoverMissingFields(extraction.extracted, input.text, { personId, router: ctx.router, budgetMs: Math.min(15_000, recoveryBudget) });
+      recovery = await recoverMissingFields(extraction.extracted, input.text, { personId, router: ctx.router, budgetMs: recoveryBudget });
       if (recovery.applied.length) llmEnrichmentSuccess = true;
+      if (recovery.attempted) aiCalls.push({
+        stage: "recovery", provider: recovery.provider, model: recovery.model, latencyMs: recovery.latencyMs ?? 0,
+        ...(recovery.usage ?? {}),
+        costUsd: recovery.provider ? estimateCostUsd(recovery.provider, recovery.totalTokens) : null,
+        outcome: recovery.provider ? "ok" : "failed", ...(recovery.reason ? { reason: recovery.reason } : {}),
+      });
       console.info("[resume-pipeline] targeted recovery", { jobId: job.id, gaps: recovery.gaps, applied: recovery.applied.length, rejected: recovery.rejected.length, reason: recovery.reason ?? null });
+    }
+  }
+
+  // 3c. Optional independent verification of AI-provided values, by a provider
+  // other than the ones that produced them (see ai-verification.ts).
+  let verification: VerificationOutcome | undefined;
+  const producedByAi = llmEnrichmentSuccess && extraction.extracted;
+  const verifyBudget = Math.min(12_000, aiBudget());
+  if (stageOn.verify && userConsent && producedByAi && extraction.extracted) {
+    if (verifyBudget < 4_000) verification = { attempted: false, reason: "time_budget_exhausted", claims: 0, supported: 0, rejected: [], unclear: 0 };
+    else if (process.env.CORE_DISABLE_LIVE_LLM === "true" && !ctx.router) verification = { attempted: false, reason: "ai_disabled_by_env", claims: 0, supported: 0, rejected: [], unclear: 0 };
+    else {
+      const producers = [...new Set([...extraction.provider.split("+"), recovery?.provider ?? ""])].filter((p): p is ModelProviderName => ["groq", "gemini", "openrouter"].includes(p));
+      const producerModels = aiCalls.filter((c) => c.outcome === "ok" && c.model).map((c) => c.model!);
+      verification = await verifyAiValues(extraction.extracted, input.text, { producers, producerModels, recovered: recovery?.applied, personId, router: ctx.router, budgetMs: verifyBudget });
+      if (verification.attempted) aiCalls.push({
+        stage: "verify", provider: verification.provider, model: verification.model, latencyMs: verification.latencyMs ?? 0,
+        ...(verification.usage ?? {}),
+        costUsd: verification.provider ? estimateCostUsd(verification.provider, verification.totalTokens) : null,
+        outcome: verification.provider ? "ok" : "failed", ...(verification.reason ? { reason: verification.reason } : {}),
+      });
+      console.info("[resume-pipeline] verification", { jobId: job.id, claims: verification.claims, supported: verification.supported, rejected: verification.rejected.length, unclear: verification.unclear, reason: verification.reason ?? null });
     }
   }
 
@@ -962,6 +1040,13 @@ export async function buildResumeReview(
       llmUsed: llmEnrichmentSuccess,
       llmAttempted: llmEnrichmentAttempted,
       llmSkippedReason: !decision.shouldEnrich ? decision.reason : undefined,
+      verification: verification ? { attempted: verification.attempted, reason: verification.reason, claims: verification.claims, supported: verification.supported, rejected: verification.rejected.length, unclear: verification.unclear, provider: verification.provider } : undefined,
+      ai: {
+        calls: aiCalls,
+        totalTokens: aiCalls.reduce((n, c) => n + (c.totalTokens ?? 0), 0),
+        // Known only when every call has a configured price.
+        costUsd: aiCalls.length && aiCalls.every((c) => c.costUsd !== null) ? Math.round(aiCalls.reduce((n, c) => n + (c.costUsd ?? 0), 0) * 1e6) / 1e6 : aiCalls.length ? null : 0,
+      },
       recovery: recovery ? { attempted: recovery.attempted, reason: recovery.reason, gaps: recovery.gaps, applied: recovery.applied, rejected: recovery.rejected.length, provider: recovery.provider } : undefined,
       llmError: llmErrorNotice,
       ocrUsed: input.ocrUsed,

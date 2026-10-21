@@ -692,10 +692,16 @@ test("targeted recovery: only gaps are sent, redacted and fenced; only grounded 
     assert.equal(prompts.length, 0);
     assert.equal(off.extractedInterpretation.experience[0].company, "");
 
-    const built = await buildResumeReview(input, { documentId: "d", personId: "p", aiConsent: true, router });
-    assert.equal(prompts.length, 2, "one whole-CV call, then one targeted call for all remaining gaps");
-    assert.ok(/resume_data_untrusted/.test(prompts[0]) && !/98765/.test(prompts[0]) && !/Ignore previous instructions/i.test(prompts[0]), "the whole-CV prompt is redacted and fenced too");
-    const sent = prompts[1];
+    // Recovery is opt-in (AI_RECOVERY_ENABLED); this test exercises it explicitly.
+    const built = await buildResumeReview(input, { documentId: "d", personId: "p", aiConsent: true, router, stages: { recovery: true } });
+    // Since the evidence-based gate (2026-10-21) a well-read CV gets no whole-CV call;
+    // only the targeted call for its remaining gaps is made.
+    assert.equal(prompts.length, 1, "one targeted call for all remaining gaps, no whole-CV call");
+    const { structureResumeText } = await import("../lib/resume/structure");
+    await structureResumeText(GAP_CV, "p", router);
+    const whole = prompts[1];
+    assert.ok(/resume_data_untrusted/.test(whole) && !/98765/.test(whole) && !/Ignore previous instructions/i.test(whole), "the whole-CV prompt is redacted and fenced too");
+    const sent = prompts[0];
     assert.match(sent, /Gap experience_0/);
     assert.ok(!/98765/.test(sent) && !/riya\.sen@/.test(sent), "contact details never reach the provider");
     assert.ok(/_data_untrusted>/.test(sent) && !/Ignore previous instructions/i.test(sent), "document text is fenced and injection phrasing removed");

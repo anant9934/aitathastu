@@ -184,9 +184,13 @@ export class IntelligenceRouter {
     if (process.env.CORE_DISABLE_LIVE_LLM === "true" || !coreIngestionReady()) {
       throw new StructuredCompletionError("Live LLM calls are disabled in this environment.", "not_configured", attempts);
     }
+    // A stage route may narrow and reorder the configured providers, never add one.
+    const pool = request.providers?.length
+      ? request.providers.map((n) => this.providers.find((p) => p.name === n)).filter((p): p is ModelProvider => Boolean(p))
+      : this.providers;
     const ordered = [
-      ...this.providers.filter((p) => p.structuredCapability === "strict_json_schema"),
-      ...this.providers.filter((p) => p.structuredCapability === "json_object"),
+      ...pool.filter((p) => p.structuredCapability === "strict_json_schema"),
+      ...pool.filter((p) => p.structuredCapability === "json_object"),
     ].filter((p) => p.isAvailable());
     if (!ordered.length) throw new StructuredCompletionError("No AI provider is configured.", "not_configured", attempts);
 
@@ -203,7 +207,7 @@ export class IntelligenceRouter {
       for (let turn = 0; turn < turns; turn++) {
         const t0 = Date.now();
         try {
-          const res = await provider.completeStructured({ ...request, repair });
+          const res = await provider.completeStructured({ ...request, repair, model: request.models?.[provider.name] });
           let json: unknown;
           try {
             json = JSON.parse(res.content);
@@ -223,7 +227,12 @@ export class IntelligenceRouter {
           await settleAiQuota(quota, res.totalTokens ?? estimateTokens(request.systemPrompt + request.userPrompt + res.content));
           const response: CompletionResponse = { content: res.content, provider: provider.name, modelUsed: res.modelUsed, fallbackUsed: false, latencyMs: Date.now() - started };
           await this.logAudit(request, response, Date.now() - started, attempts.length > 1 ? "fallback" : "success");
-          return { data: parsed.data, provider: provider.name, model: res.modelUsed, attempts, latencyMs: Date.now() - started };
+          return {
+            data: parsed.data, provider: provider.name, model: res.modelUsed, attempts, latencyMs: Date.now() - started,
+            ...(res.totalTokens ? { totalTokens: res.totalTokens } : {}),
+            ...(res.inputTokens !== undefined ? { inputTokens: res.inputTokens } : {}),
+            ...(res.outputTokens !== undefined ? { outputTokens: res.outputTokens } : {}),
+          };
         } catch (error) {
           const ms = Date.now() - t0;
           if (error instanceof ProviderHttpError) {
@@ -269,7 +278,7 @@ export type StructuredAttempt = {
   detail?: string;
 };
 
-export type StructuredCompletionResult<T> = { data: T; provider: ModelProviderName; model: string; attempts: StructuredAttempt[]; latencyMs: number };
+export type StructuredCompletionResult<T> = { data: T; provider: ModelProviderName; model: string; attempts: StructuredAttempt[]; latencyMs: number; totalTokens?: number; inputTokens?: number; outputTokens?: number };
 
 export class StructuredCompletionError extends Error {
   constructor(message: string, readonly kind: "not_configured" | "quota" | "provider", readonly attempts: StructuredAttempt[], readonly quota?: QuotaReservation) {

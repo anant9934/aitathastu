@@ -17,6 +17,7 @@ import { sanitizeTextForModel } from "@/lib/intelligence/context-firewall";
 import { wrapUntrustedContent } from "@/lib/intelligence/prompt-defense";
 import { parseDatePoint } from "@/lib/resume/extract/dates";
 import type { ResumeInterpretationOutput } from "@/lib/intelligence/schemas";
+import { stageRoute, usageOf, type AiCallRecord } from "@/lib/intelligence/stage-routing";
 
 export const RECOVERY_PROMPT_VERSION = "resume-recovery-v1";
 const MAX_GAPS = 12;
@@ -41,6 +42,9 @@ export interface RecoveryOutcome {
   rejected: Array<{ gap: string; field: string; why: string }>;
   provider?: string;
   model?: string;
+  latencyMs?: number;
+  totalTokens?: number;
+  usage?: Partial<AiCallRecord>;
 }
 
 const RecoverySchema = z.object({
@@ -139,7 +143,9 @@ export async function recoverMissingFields(
     blocks.push(`Gap ${g.id} (${g.category}): fill ${g.missing.join(", ")}\n${wrapUntrustedContent(`gap_${g.id}`, excerpt)}`);
   }
   const router = opts.router ?? defaultIntelligenceRouter;
+  const route = stageRoute("recovery");
   outcome.attempted = true;
+  const t0 = Date.now();
   // The router may try several providers; the whole recovery step is bounded so a
   // job never outlives its serverless request. On expiry the result is ignored.
   const budgetMs = Math.max(1_000, opts.budgetMs ?? 15_000);
@@ -148,6 +154,8 @@ export async function recoverMissingFields(
   let result;
   try {
     const call = router.completeStructured({
+      ...(route.providers ? { providers: route.providers } : {}),
+      models: route.models,
       task: "RESUME_RECOVERY",
       systemPrompt: SYSTEM_PROMPT,
       userPrompt: blocks.join("\n\n"),
@@ -161,15 +169,18 @@ export async function recoverMissingFields(
     }, RecoverySchema);
     call.catch(() => undefined);
     const raced = await Promise.race([call, deadline]);
-    if (raced === "deadline") return { ...outcome, reason: "llm_deadline" };
+    if (raced === "deadline") return { ...outcome, reason: "llm_deadline", latencyMs: Date.now() - t0 };
     result = raced;
   } catch (err) {
-    return { ...outcome, reason: err instanceof StructuredCompletionError ? `llm_${err.kind}` : "llm_error" };
+    return { ...outcome, reason: err instanceof StructuredCompletionError ? `llm_${err.kind}` : "llm_error", latencyMs: Date.now() - t0, usage: usageOf({ attempts: err instanceof StructuredCompletionError ? err.attempts : [] }) };
   } finally {
     clearTimeout(timer);
   }
   outcome.provider = result.provider;
   outcome.model = result.model;
+  outcome.latencyMs = Date.now() - t0;
+  if (result.totalTokens) outcome.totalTokens = result.totalTokens;
+  outcome.usage = usageOf(result);
 
   const byId = new Map(gaps.map((g) => [g.id, g]));
   const seen = new Set<string>();

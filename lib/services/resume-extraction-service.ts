@@ -51,6 +51,8 @@ export interface ResumeExtractionResult {
   error?: string;
   /** Document-level quality from the deterministic engine. */
   quality?: ExtractionQuality;
+  /** Whole-CV AI call usage (no prompt or document content). */
+  aiUsage?: { attempts?: Array<{ outcome: string }>; totalTokens?: number; inputTokens?: number; outputTokens?: number };
   /** Personal details with evidence and confidence; deterministic only (never from a model). */
   personalDetails?: import("@/lib/resume/extract/personal-details").PersonalDetails;
   /** Why structuring failed, when it did: "quota" lets ingestion say so plainly. */
@@ -335,12 +337,12 @@ export function toExtractedProfile(r: ResumeExtraction): ExtractedProfile {
 }
 
 /** Primary entry point: reading-order text in, structured + validated resume out. */
-export async function extractResumeStructured(resumeText: string, personId?: string, router?: import("@/lib/intelligence/router").IntelligenceRouter): Promise<ResumeExtractionResult> {
+export async function extractResumeStructured(resumeText: string, personId?: string, router?: import("@/lib/intelligence/router").IntelligenceRouter, opts: { budgetMs?: number } = {}): Promise<ResumeExtractionResult> {
   const startTime = Date.now();
   let base = { provider: "unknown", promptVersion: RESUME_PROMPT_VERSION, truncated: false };
   try {
-    const { data, model, provider, truncated } = await structureResumeText(resumeText, personId, router);
-    base = { ...base, provider };
+    const { data, model, provider, truncated, totalTokens, inputTokens, outputTokens, attempts } = await structureResumeText(resumeText, personId, router, opts);
+    base = { ...base, provider, aiUsage: { attempts, totalTokens, inputTokens, outputTokens } } as typeof base;
     const { resume, links } = sanitizeResumeExtraction(data);
     const validated = ResumeInterpretationSchema.safeParse(toInterpretation(resume, resumeText));
     if (!validated.success) {
@@ -367,6 +369,7 @@ export async function extractResumeStructured(resumeText: string, personId?: str
       latencyMs: Date.now() - startTime,
       error: err instanceof Error ? err.message : "Structured extraction could not be completed.",
       errorKind: err instanceof ResumeStructuringError ? err.kind : undefined,
+      ...(err instanceof ResumeStructuringError ? { aiUsage: { attempts: err.attempts } } : {}),
     };
   }
 }
@@ -785,6 +788,8 @@ export interface EnrichmentDecisionOptions {
   quotaAllowed?: boolean;
   rawText?: string;
   sourceReport?: SourceCoverageReport;
+  /** Document-level quality from the deterministic engine (text quality, detected sections). */
+  quality?: ExtractionQuality;
 }
 
 export interface EnrichmentDecision {
@@ -809,7 +814,8 @@ export function shouldEnrichWithLLM(
     return { shouldEnrich: false, reason: "ai_disabled_by_env" };
   }
 
-  if (options.consent === false) {
+  // Fail closed: only an explicit yes allows CV text to reach an AI provider.
+  if (options.consent !== true) {
     return { shouldEnrich: false, reason: "user_consent_declined" };
   }
 
@@ -821,15 +827,24 @@ export function shouldEnrichWithLLM(
     return { shouldEnrich: true, reason: "missing_deterministic_baseline" };
   }
 
-  // 1. Source coverage evaluation if rawText is provided
+  // 1. With the document text, decide on measurable uncertainty, not on how rich the CV is.
+  //    The coverage score rewards quantity (10+ skills, 3+ roles, 5+ certificates), so
+  //    "not sufficient" fired the whole-CV call on 22 of 28 evaluation documents whose
+  //    deterministic field F1 averaged 99.6% (measured 2026-10-21). Only a section that is
+  //    present but yielded nothing counts as a coverage gap here.
   if (options.rawText) {
     const report = options.sourceReport || CvQualityEvaluator.evaluateSourceCoverage(baseline, options.rawText);
-    if (!report.isSufficient || report.criticalGaps.length > 0) {
-      return {
-        shouldEnrich: true,
-        reason: report.criticalGaps[0] || "source_coverage_gap",
-      };
-    }
+    if (report.criticalGaps.length > 0) return { shouldEnrich: true, reason: report.criticalGaps[0] };
+    const records = [...(baseline.education ?? []), ...(baseline.experience ?? []), ...(baseline.projects ?? []), ...(baseline.certifications ?? []), ...(baseline.leadership ?? [])] as Array<{ review?: { status?: string } }>;
+    const uncertain = records.filter((r) => r.review?.status && r.review.status !== "high_confidence").length;
+    if (records.length >= 2 && uncertain / records.length >= 0.3) return { shouldEnrich: true, reason: "records_need_review" };
+    if (options.quality && ["limited", "poor"].includes(options.quality.textQuality)) return { shouldEnrich: true, reason: "low_text_quality" };
+    if (options.quality?.sections?.some((sec) => sec.section === "other")) return { shouldEnrich: true, reason: "unclassified_sections" };
+    if (records.length <= 2 && options.rawText.replace(/\s/g, "").length >= 600) return { shouldEnrich: true, reason: "low_yield_for_document_length" };
+    const projects = baseline.projects ?? [];
+    if (projects.length && projects.filter((p) => !p.technologies?.length).length > projects.length / 2) return { shouldEnrich: true, reason: "project_technologies_sparse" };
+    if (baseline.achievements?.some((a) => a.title.length > 150 || /^(?:leadership|publications)\s*:/i.test(a.title))) return { shouldEnrich: true, reason: "composite_claims_need_structuring" };
+    return { shouldEnrich: false, reason: "deterministic_result_reliable" };
   }
 
   const eduCount = baseline.education?.length ?? 0;

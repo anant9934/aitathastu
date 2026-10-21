@@ -23,6 +23,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
+  const deadlineAt = Date.now() + maxDuration * 1000;
   const requestId = crypto.randomUUID();
   const fail = (code: string, message: string, status: number, headers?: Record<string, string>) =>
     jsonNoStore({ ok: false, code, message, error: message, retryable: status >= 500 || status === 429, requestId }, status, headers);
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await processResumeJob(queued.jobId, personId);
+        await processResumeJob(queued.jobId, personId, { deadlineAt });
       } catch (err) {
         console.error("[resume-extract] background processResumeJob error", { jobId: queued.jobId, error: err instanceof Error ? err.message : err });
       }

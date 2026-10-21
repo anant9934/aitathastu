@@ -6,6 +6,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { reviewPayload } from "./lib/review-payload";
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const FIXTURES = path.join(process.cwd(), "scripts", "fixtures");
@@ -54,6 +55,7 @@ class Client {
       ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       : "application/pdf";
     form.append("resume", new Blob([fs.readFileSync(file)], { type }), name);
+    form.append("consent", "true");
     form.append("aiConsent", "true");
     return this.req("POST", "/api/resume/extract", form);
   }
@@ -101,11 +103,8 @@ async function runCvPipelineVerification() {
   // Apply decisions
   const candidates = pollPdf.body?.result?.reviewCandidates || [];
   check("PDF produced review candidates", candidates.length > 0, candidates.length);
-  const applyCandidates = candidates.filter(
-    (c: any) => !c.candidateId.startsWith("profile_") && !c.candidateId.startsWith("link_")
-  );
-  const decisions = applyCandidates.map((c: any) => ({ candidateId: c.candidateId, state: "confirmed" }));
-  const applyPdf = await student1.req("POST", `/api/resume/${upPdf.json.documentId}/apply`, { decisions });
+  const applyPdf = await student1.req("POST", `/api/resume/${upPdf.json.documentId}/apply`,
+    reviewPayload(candidates, (c) => !c.candidateId.startsWith("profile_") && !c.candidateId.startsWith("link_")));
   check("PDF apply succeeds", applyPdf.status === 200 && applyPdf.json?.ok === true, applyPdf.json);
 
   // Verify draft persistence
@@ -139,12 +138,8 @@ async function runCvPipelineVerification() {
   check("DOCX discovered embedded Portfolio hyperlink", discoveredDocx.portfolio === "https://anantmishra.dev", discoveredDocx);
   check("DOCX discovered embedded DEV Community hyperlink", discoveredDocx.devto === "https://dev.to/anant9934", discoveredDocx);
 
-  const docxCandidates = (pollDocx.body?.result?.reviewCandidates || []).filter(
-    (c: any) => !c.candidateId.startsWith("profile_") && !c.candidateId.startsWith("link_")
-  );
-  const applyDocx = await student2.req("POST", `/api/resume/${upDocx.json.documentId}/apply`, {
-    decisions: docxCandidates.map((c: any) => ({ candidateId: c.candidateId, state: "confirmed" }))
-  });
+  const applyDocx = await student2.req("POST", `/api/resume/${upDocx.json.documentId}/apply`,
+    reviewPayload(pollDocx.body?.result?.reviewCandidates || [], (c) => !c.candidateId.startsWith("profile_") && !c.candidateId.startsWith("link_")));
   check("DOCX apply succeeds", applyDocx.status === 200 && applyDocx.json?.ok === true, applyDocx.json);
 
   const resDocx = await student2.req("GET", "/api/onboarding-v2");

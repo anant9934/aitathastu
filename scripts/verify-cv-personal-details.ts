@@ -155,7 +155,7 @@ test("persistence: personal-field decisions and corrections survive reload and r
   const alt = after.result!.reviewCandidates.find((c) => c.candidateId === "profile_alternateEmail")!;
   assert.deepEqual([email.decision, email.decidedValue, alt.decision], ["confirmed", "asha.rao@example.com", "rejected"], "reprocessing keeps the student's decisions");
   assert.equal((await getResumeJobStatus(documentId, other, again)).httpStatus, 404, "another student cannot read them");
-  assert.deepEqual(await recordDecisions(other, documentId, [{ candidateId: "profile_email", state: "rejected" }]), { updated: 0, unchanged: 0 });
+  assert.deepEqual(await recordDecisions(other, documentId, [{ candidateId: "profile_email", state: "rejected" }]), { updated: 0, unchanged: 0, added: 0 });
 });
 
 test("privacy: labelled personal details and contacts never reach an AI prompt", async () => {

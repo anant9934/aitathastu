@@ -14,6 +14,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { reviewPayload } from "./lib/review-payload";
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const args = process.argv.slice(2);
@@ -63,6 +64,7 @@ class Client {
     const form = new FormData();
     const type = name.endsWith(".docx") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf";
     form.append("resume", new Blob([fs.readFileSync(file)], { type }), name);
+    form.append("consent", "true");
     form.append("aiConsent", "true");
     return this.req("POST", "/api/resume/extract", form);
   }
@@ -168,8 +170,7 @@ async function main() {
   const skills = candidates.filter((c: any) => c.category === "skill");
   if (skills.length >= 2) {
     const keep = skills[0], drop = skills[1];
-    const decisions = candidates.map((c: any) => ({ candidateId: c.candidateId, state: c.candidateId === drop.candidateId ? "rejected" : "confirmed" }));
-    const apply = await alice.req("POST", `/api/resume/${a1.up.json.documentId}/apply`, { decisions });
+    const apply = await alice.req("POST", `/api/resume/${a1.up.json.documentId}/apply`, reviewPayload(candidates, (c) => c.candidateId !== drop.candidateId));
     check("apply succeeds and reports confirmed/rejected counts", apply.status === 200 && apply.json?.ok && apply.json.rejected >= 1, apply.json);
     const doc = await alice.req("GET", `/api/resume/${a1.up.json.documentId}`);
     const skillRecords: any[] = doc.json?.profile?.groups?.skills ?? [];
@@ -183,7 +184,7 @@ async function main() {
     check(`deselected skill "${drop.value}" NOT imported into Person 360 evidence`, p360.status === 200 && !skillEvidence.includes(drop.value), skillEvidence);
     const afterApply = await alice.req("GET", `/api/resume/${a1.up.json.documentId}/status`);
     check("job is completed after apply", afterApply.json?.status === "completed", afterApply.json?.status);
-    const badApply = await alice.req("POST", `/api/resume/${a1.up.json.documentId}/apply`, { decisions: [{ candidateId: "skill_999", state: "confirmed" }] });
+    const badApply = await alice.req("POST", `/api/resume/${a1.up.json.documentId}/apply`, { workspaceVersion: 1, decisions: [{ candidateId: "skill_999", state: "confirmed" }], additions: [], currentEducationId: null });
     check("apply with an unknown candidate is rejected, not silently accepted", badApply.status === 409 && badApply.json?.ok === false, badApply.json);
   } else {
     check("fixture has at least 2 skill candidates for the deselect test", false, skills);

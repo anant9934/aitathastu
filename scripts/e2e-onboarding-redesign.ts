@@ -18,6 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { startIsolatedServer as startServer } from "./e2e-isolation";
+import { completeCvReview } from "./e2e-cv-workspace";
 
 
 let BASE = "";
@@ -108,12 +109,11 @@ async function main() {
     await page.getByText("I allow AI Tathastu to upload, store and process my CV", { exact: false }).click();
     await page.locator('input[type="file"]').first().setInputFiles(path.join("scripts", "fixtures", process.env.E2E_CV || "dfi21_rich_profile.pdf"));
     const t0 = Date.now();
-    await page.getByText(/Extracted suggestions from/i).first().waitFor({ timeout: 120_000 });
+    await page.locator('section[aria-labelledby="cv-review-title"]').waitFor({ timeout: 120_000 });
     record("CV extraction reaches review", true, `${Math.round((Date.now() - t0) / 1000)} s`);
     await describe(page, "06-cv-review");
-    await page.getByRole("button", { name: /^Select all/ }).click();
-    await page.getByRole("button", { name: "Confirm & save suggestions" }).click();
-    await page.waitForTimeout(2500);
+    const cvSave = await completeCvReview(page);
+    record("CV review saves once the required fields are complete", cvSave.saved, cvSave.message.slice(0, 160));
     await describe(page, "06b-cv-saved");
     fs.writeFileSync(path.join(OUT, "buttons-cv-saved.txt"), (await page.getByRole("button").allTextContents()).join("\n") + "\n---ALERTS\n" + (await page.locator('[role=alert],[role=status]').allTextContents()).join("\n"));
     await next(page, /^(Save & Continue|Continue)$/);
@@ -205,11 +205,12 @@ async function main() {
   record("Reduced motion turns off the primary button shimmer", parseFloat(anim) < 0.01, `animation-duration=${anim}`);
 
   // Keyboard only: reach a source's Connect button, open its drawer, close with Escape, focus returns.
-  const portfolioConnect = page.locator("li", { hasText: "Portfolio or website" }).getByRole("button", { name: "Connect" });
+  // "Manage" once the CV review saved the portfolio link the student confirmed.
+  const portfolioConnect = page.locator("li", { hasText: "Portfolio or website" }).getByRole("button", { name: /^(Connect|Manage)$/ }).first();
   let reached = false;
   for (let i = 0; i < 60 && !reached; i++) {
     await page.keyboard.press("Tab");
-    reached = await portfolioConnect.evaluate((el) => el === document.activeElement).catch(() => false);
+    reached = await portfolioConnect.evaluate((el) => el === document.activeElement, null, { timeout: 2000 }).catch(() => false);
   }
   record("Keyboard reaches a source's Connect button", reached);
   if (reached) {
@@ -219,7 +220,7 @@ async function main() {
     const focusInside = await page.waitForFunction(() => Boolean(document.querySelector('[role="dialog"]')?.contains(document.activeElement)), null, { timeout: 2000 }).then(() => true).catch(() => false);
     await page.keyboard.press("Escape");
     await dlg.waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
-    const focusBack = await portfolioConnect.evaluate((el) => el === document.activeElement).catch(() => false);
+    const focusBack = await portfolioConnect.evaluate((el) => el === document.activeElement, null, { timeout: 2000 }).catch(() => false);
     record("Drawer takes focus and Escape returns it to the trigger", focusInside && focusBack, `inside=${focusInside} back=${focusBack}`);
   }
 

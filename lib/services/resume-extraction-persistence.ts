@@ -161,6 +161,24 @@ export async function persistExtraction(params: {
     throw err;
   }
 
+  // Candidate ids are positions ("education_1"), so they can change when a document is
+  // reprocessed. A decided row is not rewritten by the upsert above; point it at its
+  // record's new id, and stop a decided record that is no longer extracted from
+  // claiming an id that now belongs to a different record. The student's own
+  // additions keep their ids.
+  const newIdByRow = new Map(values.map((v) => [v.id!, v.candidateId!]));
+  const decidedRows = await db
+    .select({ id: resumeExtractedRecords.id, candidateId: resumeExtractedRecords.candidateId, provenance: resumeExtractedRecords.provenance })
+    .from(resumeExtractedRecords)
+    .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId), ne(resumeExtractedRecords.reviewStatus, "pending")));
+  for (const r of decidedRows) {
+    if (r.provenance === "user") continue;
+    const next = newIdByRow.get(r.id) ?? null;
+    if (next === r.candidateId) continue;
+    await db.update(resumeExtractedRecords).set({ candidateId: next, updatedAt: new Date() })
+      .where(and(eq(resumeExtractedRecords.id, r.id), eq(resumeExtractedRecords.personId, personId)));
+  }
+
   // Same file uploaded again: bring forward this person's earlier decisions.
   const carried = new Map<string, { state: DecisionState; userValue: string | null }>();
   if (doc.checksum && values.length) {
@@ -207,54 +225,129 @@ export async function markRunFailed(personId: string, documentId: string, jobId:
   });
 }
 
+export interface SavedDecision { state: DecisionState; userValue: string | null; fields?: Record<string, string>; currentEducation?: boolean }
+
 /** The student's own decisions on this document, by candidate id (restored on reload). */
-export async function decisionsByCandidate(personId: string, documentId: string): Promise<Map<string, { state: DecisionState; userValue: string | null }>> {
+export async function decisionsByCandidate(personId: string, documentId: string): Promise<Map<string, SavedDecision>> {
   const db = await getDb();
   const rows = await db
-    .select({ candidateId: resumeExtractedRecords.candidateId, reviewStatus: resumeExtractedRecords.reviewStatus, userValue: resumeExtractedRecords.userValue })
+    .select({ candidateId: resumeExtractedRecords.candidateId, reviewStatus: resumeExtractedRecords.reviewStatus, userValue: resumeExtractedRecords.userValue, data: resumeExtractedRecords.data })
     .from(resumeExtractedRecords)
     .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId), ne(resumeExtractedRecords.reviewStatus, "pending")));
-  const out = new Map<string, { state: DecisionState; userValue: string | null }>();
-  for (const r of rows) if (r.candidateId) out.set(r.candidateId, { state: r.reviewStatus as DecisionState, userValue: r.userValue });
+  const out = new Map<string, SavedDecision>();
+  for (const r of rows) {
+    if (!r.candidateId || (r.data as { userAdded?: boolean })?.userAdded) continue;
+    const data = r.data as { userFields?: Record<string, string>; currentEducation?: boolean };
+    out.set(r.candidateId, { state: r.reviewStatus as DecisionState, userValue: r.userValue, ...(data?.userFields ? { fields: data.userFields } : {}), ...(data?.currentEducation ? { currentEducation: true } : {}) });
+  }
   return out;
 }
 
+/** What the student added that the CV did not contain (shown again on reload). */
+export interface UserAddedRecord { candidateId: string; category: string; kind: string; field?: string; fields: Record<string, string>; value: string; state: DecisionState; currentEducation: boolean }
+
+export async function userAddedRecords(personId: string, documentId: string): Promise<UserAddedRecord[]> {
+  const db = await getDb();
+  const rows = await db.select().from(resumeExtractedRecords)
+    .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId), eq(resumeExtractedRecords.provenance, "user"), ne(resumeExtractedRecords.reviewStatus, "pending")));
+  return rows.flatMap((r) => {
+    const d = r.data as { userAdded?: boolean; kind?: string; field?: string; userFields?: Record<string, string>; value?: string; currentEducation?: boolean };
+    if (!d?.userAdded || !r.candidateId) return [];
+    return [{ candidateId: r.candidateId, category: r.category, kind: d.kind ?? r.category, ...(d.field ? { field: d.field } : {}), fields: d.userFields ?? {}, value: d.value ?? "", state: r.reviewStatus as DecisionState, currentEducation: Boolean(d.currentEducation) }];
+  });
+}
+
+export interface DecisionInput { candidateId: string; state: DecisionState; correctedValue?: string; fields?: Record<string, string>; currentEducation?: boolean }
+export interface AdditionInput { id: string; category: string; kind: string; field?: string; fields: Record<string, string>; value: string; currentEducation?: boolean }
+
 /**
  * Records the student's decision on each candidate (audit trail included).
- * Re-sending the same decision is a no-op, so a retried save is safe.
+ * Field-level edits and the current-education marker are kept in the row's
+ * data (no schema change). Re-sending the same decision is a no-op, so a
+ * retried save is safe. Additions are what the student typed in themselves:
+ * stored as confirmed rows with provenance "user" and no evidence.
  */
 export async function recordDecisions(
   personId: string,
   documentId: string,
-  decisions: Array<{ candidateId: string; state: DecisionState; correctedValue?: string }>
-): Promise<{ updated: number; unchanged: number }> {
+  decisions: DecisionInput[],
+  additions: AdditionInput[] = []
+): Promise<{ updated: number; unchanged: number; added: number }> {
   const db = await getDb();
-  if (!decisions.length) return { updated: 0, unchanged: 0 };
-  const rows = await db
+  if (!decisions.length && !additions.length) return { updated: 0, unchanged: 0, added: 0 };
+  let rows = await db
     .select()
     .from(resumeExtractedRecords)
     .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId)));
+  let added = 0;
+  if (additions.length) {
+    // Additions create rows: only on this person's own document.
+    const [owned] = await db.select({ id: resumeDocuments.id }).from(resumeDocuments)
+      .where(and(eq(resumeDocuments.id, documentId), eq(resumeDocuments.personId, personId))).limit(1);
+    if (!owned) return { updated: 0, unchanged: 0, added: 0 };
+    const runId = rows[0]?.runId ?? runIdForDocument(documentId);
+    for (const a of additions) {
+      if (rows.some((r) => r.candidateId === a.id)) continue;
+      const key = `user:${a.id}`;
+      await db.insert(resumeExtractedRecords).values({
+        id: recordId(personId, documentId, a.category, key), personId, documentId, runId, category: a.category, recordKey: key, candidateId: a.id,
+        data: { value: a.value, userAdded: true, kind: a.kind, ...(a.field ? { field: a.field } : {}), userFields: {} },
+        evidence: null, review: null, provenance: "user", reviewStatus: "pending",
+      }).onConflictDoNothing();
+      added++;
+    }
+    rows = await db.select().from(resumeExtractedRecords)
+      .where(and(eq(resumeExtractedRecords.personId, personId), eq(resumeExtractedRecords.documentId, documentId)));
+  }
+  const all: DecisionInput[] = [
+    ...decisions,
+    ...additions.map((a) => ({ candidateId: a.id, state: "confirmed" as const, correctedValue: a.value, fields: a.fields, currentEducation: a.currentEducation })),
+  ];
+  const hasMarker = all.some((d) => d.currentEducation);
   let updated = 0, unchanged = 0;
-  for (const d of decisions) {
+  for (const d of all) {
     const row = rows.find((r) => r.candidateId === d.candidateId);
     if (!row) continue;
+    const data = (row.data ?? {}) as Record<string, unknown>;
     const userValue = d.state === "confirmed" && d.correctedValue?.trim() ? d.correctedValue.trim().slice(0, 500) : row.userValue;
-    if (row.reviewStatus === d.state && (row.userValue ?? null) === (userValue ?? null)) { unchanged++; continue; }
+    const userFields = d.state === "confirmed" && d.fields ? d.fields : (data.userFields as Record<string, string> | undefined);
+    const currentEducation = hasMarker ? Boolean(d.currentEducation) && d.state === "confirmed" : Boolean(data.currentEducation);
+    const nextData = { ...data, ...(userFields ? { userFields } : {}), currentEducation };
+    const sameData = sameFields(data.userFields as Record<string, string> | undefined, userFields) && Boolean(data.currentEducation) === currentEducation;
+    if (row.reviewStatus === d.state && (row.userValue ?? null) === (userValue ?? null) && sameData) { unchanged++; continue; }
     await db.update(resumeExtractedRecords)
-      .set({ reviewStatus: d.state, userValue, decidedAt: new Date(), updatedAt: new Date() })
+      .set({ reviewStatus: d.state, userValue, data: nextData, decidedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(resumeExtractedRecords.id, row.id), eq(resumeExtractedRecords.personId, personId)));
-    await db.insert(resumeReviewHistory).values({
-      id: `rh_${hash(row.id, d.state, userValue ?? "", String(Date.now()))}`,
-      documentId, personId, groupKey: row.category, recordId: row.id, fieldKey: (row.data as { field?: string })?.field ?? null,
-      action: d.state === "rejected" ? "reject" : userValue && userValue !== row.userValue ? "correct" : "confirm",
-      actor: "student", actorPersonId: personId,
-      previousValue: row.userValue ?? (row.data as { value?: string })?.value ?? null,
-      newValue: userValue ?? (row.data as { value?: string })?.value ?? null,
-      previousState: row.reviewStatus, newState: d.state,
-    }).onConflictDoNothing();
+    if (row.reviewStatus !== d.state || (row.userValue ?? null) !== (userValue ?? null) || !sameFields(data.userFields as Record<string, string> | undefined, userFields)) {
+      await db.insert(resumeReviewHistory).values({
+        id: `rh_${hash(row.id, d.state, userValue ?? "", JSON.stringify(userFields ?? null), String(Date.now()))}`,
+        documentId, personId, groupKey: row.category, recordId: row.id, fieldKey: (row.data as { field?: string })?.field ?? null,
+        action: d.state === "rejected" ? "reject" : row.provenance === "user" && row.reviewStatus === "pending" ? "add" : userValue && userValue !== row.userValue ? "correct" : "confirm",
+        actor: "student", actorPersonId: personId,
+        previousValue: row.userValue ?? (row.data as { value?: string })?.value ?? null,
+        newValue: userValue ?? (row.data as { value?: string })?.value ?? null,
+        previousState: row.reviewStatus, newState: d.state,
+      }).onConflictDoNothing();
+    }
     updated++;
   }
-  return { updated, unchanged };
+  // Only one record is the current education: clear it on rows not in this save.
+  if (hasMarker) {
+    const mentioned = new Set(all.map((d) => d.candidateId));
+    for (const r of rows) {
+      if (mentioned.has(r.candidateId ?? "") || !(r.data as { currentEducation?: boolean })?.currentEducation) continue;
+      await db.update(resumeExtractedRecords).set({ data: { ...(r.data as object), currentEducation: false }, updatedAt: new Date() })
+        .where(and(eq(resumeExtractedRecords.id, r.id), eq(resumeExtractedRecords.personId, personId)));
+    }
+  }
+  return { updated, unchanged, added };
+}
+
+/** jsonb does not keep key order, so field maps are compared key by key. */
+function sameFields(a?: Record<string, string>, b?: Record<string, string>): boolean {
+  if (!a || !b) return !a === !b;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => a[k] === b[k]);
 }
 
 export async function listRecords(personId: string, documentId: string) {

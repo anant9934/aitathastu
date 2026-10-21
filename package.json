@@ -22,6 +22,7 @@
     "test:cv-v3": "node --import tsx --test --test-concurrency=1 scripts/verify-cv-extraction-v3.ts",
     "test:cv-personal": "node --import tsx --test --test-concurrency=1 scripts/verify-cv-personal-details.ts",
     "test:cv-ai-stages": "node --import tsx --test --test-concurrency=1 scripts/verify-cv-ai-stages.ts",
+    "test:cv-review-workspace": "node --import tsx --test --test-concurrency=1 scripts/verify-cv-review-workspace.ts",
     "eval:cv": "node --import tsx eval/cv/run.ts",
     "eval:cv:render": "services/resume-extractor/.venv/bin/python -I eval/cv/render.py",
     "test:portfolio-network": "node --import tsx --test scripts/verify-portfolio-network.test.mjs",

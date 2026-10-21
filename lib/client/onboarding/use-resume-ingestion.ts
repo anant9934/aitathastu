@@ -13,7 +13,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { requestJson, describeError } from "@/lib/client/api";
 import { RESUME_ACCEPTED_EXTENSIONS, RESUME_ACCEPTED_LABEL, RESUME_MAX_UPLOAD_BYTES, RESUME_MAX_UPLOAD_MB } from "@/lib/config/upload-limits";
-import type { ReviewedResumeClaim } from "./types";
+import {
+  acceptedProfileFrom, addRecord, addSingle, buildWorkspace, githubProfileFrom, isChanged, isUserItem, recordFromValues,
+  removeItem, restoreItem, saveProblems, serializeWorkspace, setCurrentEducation, setSectionSelected, setSelected, setValue, summarize, SECTIONS,
+  type CandidateLike, type Problem, type RecordType, type SectionId, type Workspace, type WsItem,
+} from "@/lib/resume/review-workspace";
+import { PROFILE_SOURCE_IDS, type ReviewedResumeClaim } from "./types";
 
 export type ResumeProcessingState = "IDLE" | "UPLOADING" | "QUEUED" | "PROCESSING" | "REVIEW_REQUIRED" | "SAVING" | "COMPLETED" | "FAILED";
 
@@ -45,6 +50,15 @@ export type ResumeExtraData = {
   extractedEducation?: Array<{ institution: string; degree: string; fieldOfStudy?: string; graduationYear?: string; startDate?: string; endDate?: string; gpa?: string; percentage?: string; academicLevel?: string }>;
   extractedExperience?: Array<{ company: string; role: string; type?: string; duration?: string; startDate?: string; endDate?: string; highlights?: string[]; technologies?: string[]; sourceSpan: string }>;
   extractedAchievements?: Array<{ title: string; category?: string; subType?: string; issuer?: string; date?: string; description?: string; sourceSpan: string }>;
+  /** The records the student confirmed in the review workspace, with their edits and additions (replaces index lookups). */
+  reviewedRecords?: {
+    education: NonNullable<ResumeExtraData["extractedEducation"]>;
+    experience: NonNullable<ResumeExtraData["extractedExperience"]>;
+    achievements: NonNullable<ResumeExtraData["extractedAchievements"]>;
+    projects: NonNullable<ResumeExtraData["extractedProjects"]>;
+    /** Every confirmed skill name, edited or added ones included. */
+    skills?: string[];
+  };
 };
 
 type JobStatus = {
@@ -60,8 +74,6 @@ type JobStatus = {
   result?: Record<string, any> | null;
 };
 
-const RECORD_CANDIDATE_ID = /^[a-zA-Z_]+_\d+$/;
-const ONBOARDING_PROFILE_FIELDS = new Set(["fullName", "email", "mobile", "location", "degree", "specialization", "institution", "currentYear", "expectedGraduationYear", "gpa"]);
 
 /** Review sections, structured per record category for all 16 CV categories. */
 /** Personal-detail fields shown in each personal group (category "profile"). */
@@ -148,6 +160,10 @@ export function useResumeIngestion({
   const [retryDocumentId, setRetryDocumentId] = useState<string | null>(null);
   const [advice, setAdvice] = useState<string | null>(null);
   const [extra, setExtra] = useState<ResumeExtraData>({});
+  const [workspace, setWorkspace] = useState<Workspace>({ items: [], currentEducationId: null });
+  /** Problems found when the student last tried to save; cleared as they edit. */
+  const [problems, setProblems] = useState<Problem[]>([]);
+  const [dirty, setDirty] = useState(false);
   // null = checking, true = upload service available, false = unavailable.
   const [serviceReady, setServiceReady] = useState<boolean | null>(null);
 
@@ -210,6 +226,11 @@ export function useResumeIngestion({
     setRetryDocumentId(null);
     setError(null);
     setCandidates(rows);
+    setWorkspace(buildWorkspace(
+      (Array.isArray(result.reviewCandidates) ? result.reviewCandidates : []).filter((c: Record<string, unknown>) => c && typeof c.candidateId === "string" && typeof c.value === "string") as CandidateLike[],
+    ));
+    setProblems([]);
+    setDirty(false);
     setReviewSaved(reviewed);
     setState(reviewed ? "COMPLETED" : "REVIEW_REQUIRED");
     setExtra({
@@ -335,53 +356,75 @@ export function useResumeIngestion({
     setCandidates((cur) => cur.map((c) => (c.id === id ? { ...c, value, corrected: true } : c)));
   };
 
+  const edit = (fn: (ws: Workspace) => Workspace) => {
+    setReviewSaved(false);
+    setDirty(true);
+    setWorkspace((ws) => {
+      const next = fn(ws);
+      // Re-check only what was flagged, so a fixed field stops showing its error.
+      setProblems((cur) => (cur.length ? saveProblems(next) : cur));
+      return next;
+    });
+  };
+  const ws = {
+    setValue: (id: string, key: string, value: string) => edit((w) => setValue(w, id, key, value)),
+    setSelected: (id: string, selected: boolean) => edit((w) => setSelected(w, id, selected)),
+    setSection: (section: SectionId, selected: boolean) => edit((w) => setSectionSelected(w, section, selected)),
+    add: (type: RecordType) => edit((w) => addRecord(w, type).ws),
+    addSingle: (field: string) => edit((w) => addSingle(w, field).ws),
+    remove: (id: string) => edit((w) => removeItem(w, id)),
+    restore: (id: string) => edit((w) => restoreItem(w, id)),
+    setCurrentEducation: (id: string) => edit((w) => setCurrentEducation(w, id)),
+  };
+
   /**
    * Saves every decision to the CV record (unticked means rejected), then lets
    * the caller fold the accepted data into onboarding. Returns an error
    * message, or null on success.
    */
   const saveReview = async (applyToOnboarding: (fileName: string, claims: ReviewedResumeClaim[], extra: ResumeExtraData) => Promise<boolean>): Promise<string | null> => {
-    const accepted = candidates.filter((c) => c.selected && c.value.trim());
-    const records = candidates.filter((c) => RECORD_CANDIDATE_ID.test(c.candidateId || c.id) && c.category !== "profile" && c.category !== "link");
-    if (accepted.length === 0) return "Tick at least one detail that is right, or continue without saving the CV review.";
     if (!documentId) return "This review is no longer linked to an uploaded file. Upload the file again.";
-    const claims = accepted.filter((c) => records.includes(c)).map(({ candidateId, category, value, sourceSpan, documentId: d, corrected, recordData }) => ({
-      candidateId, category: category as ReviewedResumeClaim["category"], value: value.trim(), sourceSpan, documentId: d, corrected, recordData,
-    }));
-    const acceptedProfile: AcceptedResumeProfile = {};
-    const acceptedLinks: Partial<Record<string, string>> = {};
-    const acceptedPortfolioUrls: string[] = [];
-    for (const c of accepted) {
-      // Only the onboarding profile's own fields seed the draft; the rest are kept with the CV review.
-      if (c.category === "profile" && c.field && ONBOARDING_PROFILE_FIELDS.has(c.field)) acceptedProfile[c.field as keyof AcceptedResumeProfile] = c.value.trim();
-      if (c.category === "link" && c.field) {
-        if (!acceptedLinks[c.field]) acceptedLinks[c.field] = c.value.trim();
-        if (c.field === "portfolio") acceptedPortfolioUrls.push(c.value.trim());
-      }
+    // Required fields are checked here, when saving, never while the student is reading the review.
+    const found = saveProblems(workspace);
+    setProblems(found);
+    if (found.length) {
+      const n = found.length;
+      return `${n} ${n === 1 ? "field needs" : "fields need"} your attention before saving: ${[...new Set(found.map((p) => p.label))].slice(0, 4).join(", ")}${n > 4 ? "…" : ""}.`;
     }
-    const reviewSummary = Object.fromEntries(REVIEW_GROUPS.map((g) => {
-      const rows = candidates.filter((c) => inGroup(c, g));
-      return [g.id, { total: rows.length, accepted: rows.filter((c) => accepted.includes(c)).length }];
-    }));
+    const payload = serializeWorkspace(workspace);
     setState("SAVING");
     setError(null);
-    // Personal-detail fields are decided too, so a confirmed or corrected value survives reloads and reprocessing.
-    const profileRows = candidates.filter((c) => c.category === "profile" && /^profile_[a-zA-Z]+(?:_\d+)?$/.test(c.candidateId || c.id));
-    const decisions = [...records, ...profileRows].map((c) => ({
-      candidateId: c.candidateId || c.id,
-      state: c.selected && c.value.trim() ? "confirmed" : "rejected",
-      ...(c.corrected && c.selected ? { correctedValue: c.value.trim() } : {}),
-    }));
-    const res = await requestJson<{ ok?: boolean }>(`/api/resume/${documentId}/apply`, { method: "POST", json: { decisions } });
+    const res = await requestJson<{ ok?: boolean; code?: string }>(`/api/resume/${documentId}/apply`, { method: "POST", json: payload });
     if (!res.ok || !res.data?.ok) {
       setState("REVIEW_REQUIRED");
+      // The server checks the same required fields; show its findings on the fields.
+      const server = !res.ok ? (res.data as { problems?: Problem[] } | null)?.problems : undefined;
+      if (!res.ok && res.error.code === "MANDATORY_FIELDS_MISSING" && Array.isArray(server)) {
+        setProblems(server);
+        return `Some required details are missing or not valid: ${[...new Set(server.map((p) => p.label))].slice(0, 4).join(", ")}.`;
+      }
       return res.ok ? "Your review couldn't be saved. Try again." : describeError(res.error);
     }
-    const saved = await applyToOnboarding(fileName || "CV", claims, { ...extra, acceptedProfile, acceptedLinks, acceptedPortfolioUrls, reviewSummary });
+    const kept = workspace.items.filter((i) => i.selected && !i.removed && Object.values(i.values).some((v) => v.trim()));
+    const toOnboarding = workspaceToOnboarding(kept, workspace, documentId);
+    const reviewSummary = Object.fromEntries(SECTIONS.map((s) => {
+      const rows = workspace.items.filter((i) => i.section === s.id && !i.removed && i.source !== "none");
+      return [s.id, { total: rows.length, accepted: rows.filter((i) => kept.includes(i)).length }];
+    }));
+    const saved = await applyToOnboarding(fileName || "CV", toOnboarding.claims, { ...extra, ...toOnboarding.extra, reviewSummary });
     if (!saved) {
       setState("REVIEW_REQUIRED");
       return "Your review was saved to your profile, but your onboarding progress couldn't be updated. Try again.";
     }
+    // What was just saved is now the baseline for a later edit.
+    setWorkspace((cur) => ({
+      ...cur,
+      items: cur.items.filter((i) => !(i.removed && isUserItem(i))).map((i) => ({
+        ...i,
+        saved: kept.includes(i) ? "confirmed" : i.source === "none" && !Object.values(i.values).some((v) => v.trim()) ? undefined : "rejected",
+      })),
+    }));
+    setDirty(false);
     setReviewSaved(true);
     setState("COMPLETED");
     onSpeak?.("Everything is saved. Next, your accounts.", "HAPPY");
@@ -401,8 +444,54 @@ export function useResumeIngestion({
   };
 
   return {
-    fileName, state, stage, error, setError, candidates, reviewSaved, documentId, retryDocumentId, advice, extra, serviceReady, busy,
+    fileName, state, stage, error, setError, candidates, workspace, problems, dirty, ws, reviewSaved, documentId, retryDocumentId, advice, extra, serviceReady, busy,
     hasSelectedFile: () => Boolean(selectedFile.current),
     upload, retry, setAll, toggle, correct, saveReview, remove,
   };
+}
+
+/** Categories kept in the server's extraction snapshot: only these are CV claims (lib/services/resume-review-service.ts). */
+const SNAPSHOT_CATEGORIES = new Set(["education", "experience", "project", "skill", "certification", "publication", "achievement", "leadership", "summary", "research", "hackathon", "training", "volunteering", "language", "digitalFootprint", "additional"]);
+const PLATFORM_IDS: Record<string, string> = { github: "github", linkedin: "linkedin", leetcode: "leetcode", hackerrank: "hackerrank", kaggle: "kaggle", portfolio: "portfolio", website: "portfolio" };
+
+/**
+ * What onboarding takes from the saved workspace. A CV claim is something read
+ * from the CV: it carries the suggestion's exact category and source text (the
+ * server checks both against the extraction snapshot) and its original value
+ * unless the student edited it. What the student added is not a CV claim; it
+ * reaches onboarding through reviewedRecords only.
+ */
+export function workspaceToOnboarding(kept: WsItem[], ws: Workspace, documentId: string): { claims: ReviewedResumeClaim[]; extra: ResumeExtraData } {
+  const claims: ReviewedResumeClaim[] = [];
+  const reviewed: NonNullable<ResumeExtraData["reviewedRecords"]> = { education: [], experience: [], achievements: [], projects: [], skills: [] };
+  const acceptedLinks: Partial<Record<string, string>> = {};
+  const acceptedPortfolioUrls: string[] = [];
+  const claim = (i: WsItem, value: string) => {
+    const ex = i.extracted;
+    if (isUserItem(i) || !ex || !SNAPSHOT_CATEGORIES.has(ex.category)) return;
+    const edited = isChanged(i);
+    claims.push({ candidateId: i.linkedCandidateId ?? i.id, category: ex.category as ReviewedResumeClaim["category"], value: edited ? value : ex.value, sourceSpan: ex.sourceSpan, documentId, corrected: edited, recordData: i.recordData });
+  };
+  for (const i of kept) {
+    if (i.kind === "single") {
+      if (i.field === "githubUrl" && githubProfileFrom(i.values.value)) acceptedLinks.github = i.values.value.trim();
+      if (i.field === "summary") claim(i, i.values.value.trim());
+      continue;
+    }
+    claim(i, summarize(i.kind, i.values));
+    const span = i.extracted?.sourceSpan ?? "";
+    const rec = recordFromValues(i.kind, i.values, (i.recordData ?? {}) as Record<string, unknown>) as Record<string, any>;
+    if (i.kind === "skill" && i.values.name?.trim()) reviewed.skills!.push(i.values.name.trim());
+    if (i.kind === "education") reviewed.education.push(rec as never);
+    if (i.kind === "experience") reviewed.experience.push({ ...rec, sourceSpan: span } as never);
+    if (i.kind === "project") reviewed.projects.push({ ...rec, sourceSpan: span } as never);
+    if (i.kind === "achievement" || i.kind === "publication") reviewed.achievements.push({ ...rec, category: rec.category ?? (i.kind === "publication" ? "publication" : "award"), sourceSpan: span } as never);
+    if (i.kind === "link") {
+      const id = PLATFORM_IDS[(i.values.platform ?? "").toLowerCase()];
+      const url = i.values.url?.trim();
+      if (id && url && PROFILE_SOURCE_IDS.includes(id) && !acceptedLinks[id]) acceptedLinks[id] = url;
+      if (id === "portfolio" && url) acceptedPortfolioUrls.push(url);
+    }
+  }
+  return { claims, extra: { acceptedProfile: acceptedProfileFrom(ws) as AcceptedResumeProfile, acceptedLinks, acceptedPortfolioUrls, reviewedRecords: reviewed } };
 }

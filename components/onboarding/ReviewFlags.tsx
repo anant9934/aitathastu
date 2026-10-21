@@ -4,7 +4,7 @@ import { cn } from "@/lib/client/cn";
 
 type Review = { status?: string; confidence?: number; issues?: string[] };
 
-const ISSUE_TEXT: Record<string, string> = {
+export const ISSUE_TEXT: Record<string, string> = {
   missing_title: "Job title not found in the CV",
   missing_organization: "Organisation not found in the CV",
   missing_institution: "Institution not found in the CV",
@@ -27,7 +27,7 @@ const ISSUE_TEXT: Record<string, string> = {
   ungrounded_date_dropped: "An AI-suggested date was not in your CV and was removed",
 };
 
-const STATUS: Record<string, { label: string; tone: "warn" | "danger" }> = {
+export const STATUS: Record<string, { label: string; tone: "warn" | "danger" }> = {
   needs_review: { label: "Check this", tone: "warn" },
   invalid: { label: "Needs a fix", tone: "danger" },
   conflicting: { label: "Conflicting details", tone: "warn" },
@@ -38,7 +38,7 @@ const STATUS: Record<string, { label: string; tone: "warn" | "danger" }> = {
  * Why a suggestion needs a look, from the extractor's own checks. Nothing is
  * shown for records that passed every check.
  */
-const SECTION_LABEL: Record<string, string> = {
+export const SECTION_LABEL: Record<string, string> = {
   experience: "Experience", education: "Education", projects: "Projects", skills: "Skills", certifications: "Certifications",
   awards: "Awards", publications: "Publications", leadership: "Leadership", volunteering: "Volunteering", languages: "Languages",
   summary: "Summary", memberships: "Memberships", contact: "Contact details", header: "Header",

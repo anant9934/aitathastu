@@ -14,6 +14,14 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
   const acceptedLinks = Object.fromEntries(Object.entries(extra.acceptedLinks || {}).filter(([type, url]) => PROFILE_SOURCE_IDS.includes(type) && url)) as Partial<Record<string, string>>;
   const acceptedIndexes = (category: string) =>
     new Set(claims.filter((c) => c.category === category && c.candidateId).map((c) => Number(c.candidateId!.split("_").pop())));
+  // The review workspace sends the confirmed records themselves (edited and added ones included);
+  // older callers send claims that index into the extracted arrays.
+  const reviewed = extra.reviewedRecords;
+  const accepted = <T,>(category: string, all: T[] | undefined, mine: T[] | undefined): T[] => {
+    if (reviewed) return mine ?? [];
+    const idx = acceptedIndexes(category);
+    return (all || []).filter((_, i) => idx.has(i));
+  };
 
   const discoveredFromExtraction = Object.fromEntries(
     Object.entries(extra.discoveredProfiles || {}).filter(([type, url]) => PROFILE_SOURCE_IDS.includes(type) && url)
@@ -24,9 +32,13 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
     ...(data.portfolioUrls || []),
     ...(extra.acceptedPortfolioUrls || []),
   ])).filter(Boolean);
-  const skills = Array.from(new Set([...data.skills, ...claims.filter((c) => c.category === "skill").map((c) => c.value)]));
+  const skills = Array.from(new Set([...data.skills, ...(extra.reviewedRecords?.skills ?? claims.filter((c) => c.category === "skill").map((c) => c.value))]));
 
-  const resumeProjects: ProjectEntry[] = claims.filter((c) => c.category === "project").map((c, index) => {
+  const resumeProjects: ProjectEntry[] = reviewed ? reviewed.projects.map((p, index) => ({
+    id: `resume_${(claims[0]?.documentId ?? "cv").slice(0, 12)}_${index}`,
+    title: p.title, description: p.description || "", technologies: p.technologies || [], sources: ["resume"], status: "confirmed",
+    contribution: [], contributionNote: "", url: p.repositoryUrl || undefined,
+  })) : claims.filter((c) => c.category === "project").map((c, index) => {
     const found = extra.extractedProjects?.find((p) => p.sourceSpan === c.sourceSpan);
     return {
       id: `resume_${c.documentId.slice(0, 12)}_${index}`,
@@ -45,19 +57,16 @@ export function applyResumeReview(data: OnboardingData, fileName: string, claims
     ...resumeProjects.filter((incoming) => !hasEntry("projects", data.projects, incoming) && !data.projects.some((p) => p.status === "confirmed" && p.title.toLowerCase().trim() === incoming.title.toLowerCase().trim())),
   ];
 
-  const expIdx = acceptedIndexes("experience");
-  const experiences = mergeAccepted("experiences", data.experiences, (extra.extractedExperience || []).filter((_, i) => expIdx.has(i)).map((x): ExperienceEntry => ({
+  const experiences = mergeAccepted("experiences", data.experiences, accepted("experience", extra.extractedExperience, reviewed?.experience).map((x): ExperienceEntry => ({
     company: x.company || "", role: x.role || "", type: x.type, duration: x.duration, startDate: x.startDate, endDate: x.endDate,
     highlights: x.highlights, technologies: x.technologies, status: "confirmed", source: "resume",
   })));
 
-  const achIdx = acceptedIndexes("achievement");
-  const achievements = mergeAccepted("achievements", data.achievements, (extra.extractedAchievements || []).filter((_, i) => achIdx.has(i)).map((a): AchievementEntry => ({
+  const achievements = mergeAccepted("achievements", data.achievements, accepted("achievement", extra.extractedAchievements, reviewed?.achievements).map((a): AchievementEntry => ({
     title: a.title, category: a.category || "academic", subType: a.subType, issuer: a.issuer, date: a.date, description: a.description, status: "confirmed", source: "resume",
   })));
 
-  const eduIdx = acceptedIndexes("education");
-  const mergedEducation = mergeAccepted("education", data.education, (extra.extractedEducation || []).filter((_, i) => eduIdx.has(i)).map((e): EducationEntry => ({
+  const mergedEducation = mergeAccepted("education", data.education, accepted("education", extra.extractedEducation, reviewed?.education).map((e): EducationEntry => ({
     institution: e.institution, degree: e.degree, fieldOfStudy: e.fieldOfStudy, graduationYear: e.graduationYear, startDate: e.startDate,
     endDate: e.endDate, gpa: e.gpa, percentage: e.percentage, academicLevel: e.academicLevel, status: "confirmed", source: "resume",
   })));

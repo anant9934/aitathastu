@@ -10,6 +10,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { reviewPayload } from "./lib/review-payload";
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const CV = path.join(process.cwd(), "scripts", "fixtures", "test_student_cv.pdf");
@@ -39,6 +40,7 @@ class Browser {
   async uploadCv() {
     const form = new FormData();
     form.append("resume", new Blob([fs.readFileSync(CV)], { type: "application/pdf" }), "cv.pdf");
+    form.append("consent", "true");
     form.append("aiConsent", "true");
     const up = await this.req("POST", "/api/resume/extract", form);
     for (let i = 0; i < 60; i++) {
@@ -68,8 +70,7 @@ async function main() {
   await g.req("PUT", "/api/onboarding-v2", { version: 2, currentScreen: 5, name: "Guest Name", targetRole: "Data Scientist" });
   const cv = await g.uploadCv();
   await g.req("PUT", "/api/onboarding-v2", { version: 2, resumeDocumentId: cv.documentId, resumeFileName: "cv.pdf" });
-  const decisions = cv.result.reviewCandidates.map((c: any) => ({ candidateId: c.candidateId, state: "confirmed" }));
-  check("guest applies CV review", (await g.req("POST", `/api/resume/${cv.documentId}/apply`, { decisions })).json?.ok === true);
+  check("guest applies CV review", (await g.req("POST", `/api/resume/${cv.documentId}/apply`, reviewPayload(cv.result.reviewCandidates))).json?.ok === true);
 
   // ...then signs in to R from the same browser.
   const signIn = await g.req("POST", "/api/auth/sign-in", { email: rEmail, password: "password123" });

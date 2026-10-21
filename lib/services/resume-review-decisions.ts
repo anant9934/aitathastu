@@ -16,7 +16,43 @@ export type ReviewDecision = {
   state: "confirmed" | "rejected";
   /** Present when the student edited the wording. */
   correctedValue?: string;
+  /** Field-level values from the review workspace (canonical keys, see FIELD_MAP). */
+  fields?: Record<string, string>;
 };
+
+/** Review-workspace field -> Schema v2 field(s), per candidate category. */
+const FIELD_MAP: Record<string, Record<string, string[]>> = {
+  education: { degree: ["qualification", "degree_title"], institution: ["institution"], fieldOfStudy: ["specialization"], endDate: ["expected_graduation"] },
+  experience: { company: ["organization"], role: ["job_title"] },
+  project: { title: ["title"], description: ["description"], technologies: ["technologies"], repositoryUrl: ["github_url"], demoUrl: ["demo_url"] },
+  skill: { name: ["canonical_name"] },
+  certification: { name: ["title"] },
+  achievement: { title: ["name"] },
+  leadership: { role: ["role"], organization: ["organization"] },
+  research: { title: ["title"] },
+  publication: { title: ["title"] },
+  digitalFootprint: { value: ["normalized_url", "original_url"], url: ["normalized_url", "original_url"], platform: ["platform"] },
+  summary: { value: ["professional_summary"] },
+};
+
+function setField(record: ExtractorRecord, key: string, value: string, create: boolean) {
+  const now = new Date().toISOString();
+  const f = record.fields[key];
+  if (!f) {
+    if (!create || !value) return;
+    // Typed in by the student: no evidence, because the CV did not contain it.
+    record.fields[key] = { value, original_value: "", evidence: [], confidence: 1, confidence_kind: "heuristic", review_state: "student_confirmed", history: [{ action: "add", actor: "student", timestamp: now, previous_value: null, new_value: value, previous_state: "extracted" }] };
+    return;
+  }
+  if (f.value === value) return;
+  f.history.push({ action: f.value ? "correct" : "add", actor: "student", timestamp: now, previous_value: f.value, new_value: value, previous_state: f.review_state });
+  // Evidence stays only while it still supports the value: a value the student typed
+  // that is not in the cited CV text (or filled a blank) carries none.
+  const norm = (t: string) => t.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  if (!(f.value ?? "").trim() || !f.evidence.some((e) => norm(e.snippet ?? "").includes(norm(value)))) f.evidence = [];
+  f.value = value;
+  f.review_state = "student_confirmed";
+}
 
 /** candidate category -> [profile group, primary field that holds the candidate's value] */
 const CATEGORY_GROUPS: Record<string, [string, string[]]> = {
@@ -130,6 +166,15 @@ export function applyReviewDecisions(
 
       record.record_state = "student_confirmed";
       recordConfirmed++;
+      if (decision.fields) {
+        // Field-level edits go to their own fields; the one-line summary is not written anywhere.
+        const map = FIELD_MAP[category] ?? {};
+        for (const [k, v] of Object.entries(decision.fields)) {
+          const value = k === "technologies" ? v.split(/\n+|\s*,\s*/).map((x) => x.trim()).filter(Boolean).join(", ") : k === "endDate" ? (v.match(/\b(19|20)\d{2}\b/)?.[0] ?? v).trim() : v.trim();
+          (map[k] ?? []).forEach((target, n) => setField(record, target, value, n === 0));
+        }
+        return;
+      }
       const corrected = decision.correctedValue?.trim();
       const key = valueFields.find((k) => record.fields[k]);
       if (corrected && key && record.fields[key].value !== corrected) {

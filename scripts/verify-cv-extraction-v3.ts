@@ -401,7 +401,7 @@ test("two suggestions with the same identity are stored as separate rows, so bot
   const rows = await listRecords(owner, documentId);
   assert.equal(rows.length, 2, "one row per suggestion, and a retry adds none");
   const r = await recordDecisions(owner, documentId, [{ candidateId: "education_0", state: "confirmed" }, { candidateId: "education_1", state: "rejected" }]);
-  assert.deepEqual(r, { updated: 2, unchanged: 0 });
+  assert.deepEqual(r, { updated: 2, unchanged: 0, added: 0 });
 });
 
 test("20-25 upload -> processing -> persisted records -> decisions; idempotent, isolated, edits preserved", async () => {
@@ -451,12 +451,12 @@ test("20-25 upload -> processing -> persisted records -> decisions; idempotent, 
   const kept = after.find((r) => r.candidateId === exp.candidateId)!;
   assert.deepEqual([kept.reviewStatus, kept.userValue], ["confirmed", "Senior Software Engineer · Northwind Payments"]);
   const again = await recordDecisions(owner, documentId, [{ candidateId: exp.candidateId, state: "confirmed", correctedValue: "Senior Software Engineer · Northwind Payments" }]);
-  assert.deepEqual(again, { updated: 0, unchanged: 1 }, "a repeated save is a no-op");
+  assert.deepEqual(again, { updated: 0, unchanged: 1, added: 0 }, "a repeated save is a no-op");
 
   // 21: another account sees nothing and changes nothing.
   assert.equal((await getResumeJobStatus(documentId, other, jobId)).httpStatus, 404);
   assert.equal((await listRecords(other, documentId)).length, 0);
-  assert.deepEqual(await recordDecisions(other, documentId, [{ candidateId: exp.candidateId, state: "rejected" }]), { updated: 0, unchanged: 0 });
+  assert.deepEqual(await recordDecisions(other, documentId, [{ candidateId: exp.candidateId, state: "rejected" }]), { updated: 0, unchanged: 0, added: 0 });
   await assert.rejects(persistExtraction({ personId: other, documentId, jobId: "x", candidates: [], llmUsed: false }));
 
   // Decisions map to the stored profile record at the same index (leadership/footprints included).

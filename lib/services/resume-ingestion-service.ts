@@ -54,7 +54,7 @@ import type { IntelligenceRouter } from "@/lib/intelligence/router";
 import { verifyAiValues, type VerificationOutcome } from "@/lib/resume/ai-verification";
 import { estimateCostUsd, usageOf, type AiCallRecord } from "@/lib/intelligence/stage-routing";
 import type { ModelProviderName } from "@/lib/intelligence/types";
-import { decisionsByCandidate, markRunFailed, persistExtraction, runIdForDocument } from "./resume-extraction-persistence";
+import { decisionsByCandidate, markRunFailed, persistExtraction, runIdForDocument, userAddedRecords } from "./resume-extraction-persistence";
 
 export type ResumeFailureCode =
   | "DOCUMENT_RETRIEVAL_FAILED"
@@ -122,6 +122,12 @@ export type ResumeReviewCandidate = {
   /** The student's saved decision on this item for this document (added when status is read). */
   decision?: "confirmed" | "rejected";
   decidedValue?: string;
+  /** Field-level values the student saved (review workspace). */
+  decidedFields?: Record<string, string>;
+  /** The student marked this education record as their current one. */
+  currentEducation?: boolean;
+  /** Something the student typed in that the CV did not contain: no evidence, provenance "user". */
+  userAdded?: boolean;
 };
 
 export type ResumeReviewPayload = {
@@ -338,14 +344,21 @@ export async function getResumeJobStatus(
   if (result) {
     // A reload shows what the student saved, not the original extraction.
     try {
-      const decided = await decisionsByCandidate(personId, documentId);
-      if (decided.size) {
+      const [decided, added] = await Promise.all([decisionsByCandidate(personId, documentId), userAddedRecords(personId, documentId)]);
+      if (decided.size || added.length) {
         result = {
           ...result,
-          reviewCandidates: result.reviewCandidates.map((c) => {
-            const d = decided.get(c.candidateId);
-            return d ? { ...c, decision: d.state, ...(d.userValue ? { decidedValue: d.userValue } : {}) } : c;
-          }),
+          reviewCandidates: [
+            ...result.reviewCandidates.map((c) => {
+              const d = decided.get(c.candidateId);
+              return d ? { ...c, decision: d.state, ...(d.userValue ? { decidedValue: d.userValue } : {}), ...(d.fields ? { decidedFields: d.fields } : {}), ...(d.currentEducation ? { currentEducation: true } : {}) } : c;
+            }),
+            ...added.map((a): ResumeReviewCandidate => ({
+              candidateId: a.candidateId, category: a.category, value: a.value, sourceSpan: "", ...(a.field ? { field: a.field } : {}),
+              recordData: { provenance: "user", kind: a.kind }, decision: a.state, decidedValue: a.value, decidedFields: a.fields, userAdded: true,
+              ...(a.currentEducation ? { currentEducation: true } : {}),
+            })),
+          ],
         };
       }
     } catch (err) {

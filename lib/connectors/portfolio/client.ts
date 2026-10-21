@@ -38,6 +38,8 @@ export interface PortfolioMetadata {
 }
 
 const MAX_HTML_BYTES = 150_000;
+/** Whole fetch, redirects included: the 5 s socket timeout alone lets a slow server trickle bytes indefinitely. */
+const MAX_TOTAL_MS = 12_000;
 
 function isPublicIpv4(address: string): boolean {
   if (isIP(address) !== 4) return false;
@@ -72,6 +74,9 @@ export function isPublicIpv6(address: string): boolean {
   if (/^ff[0-9a-f]{2}:/i.test(lower)) return false;
   // Documentation 2001:db8::/32
   if (/^2001:0?db8:/i.test(lower)) return false;
+  // NAT64 64:ff9b::/96 reaches the embedded IPv4 address
+  const nat64 = /^64:ff9b::(?:ffff:)?(.+)$/i.exec(lower);
+  if (nat64) return isIP(nat64[1]) === 4 ? isPublicIpv4(nat64[1]) : false;
   // Discard prefix 100::/64
   if (/^0?100::/i.test(lower)) return false;
   return true;
@@ -84,7 +89,8 @@ export function isSafePublicIp(address: string): boolean {
 import { isSafePublicUrl } from "./url-check";
 export { isSafePublicUrl };
 
-export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Promise<{ url: string; html: string }> {
+export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3, deadlineAt = Date.now() + MAX_TOTAL_MS): Promise<{ url: string; html: string }> {
+  if (Date.now() >= deadlineAt) throw new Error("Portfolio request timed out.");
   const check = isSafePublicUrl(rawUrl);
   if (!check.safe || !check.parsed) {
     throw new Error(check.reason || "Invalid portfolio URL");
@@ -93,10 +99,13 @@ export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Pro
   if (!addresses || addresses.length === 0) {
     throw new Error("Portfolio host could not be resolved.");
   }
-  const address = addresses.find((entry) => isSafePublicIp(entry.address));
+  // Every answer must be public (checked below); connect over IPv4 when there is one, because
+  // many hosts (serverless runtimes included) have no IPv6 route and the first answer is often IPv6.
+  const address = addresses.find((entry) => entry.family === 4 && isSafePublicIp(entry.address)) ?? addresses.find((entry) => isSafePublicIp(entry.address));
   if (!address || addresses.some((entry) => !isSafePublicIp(entry.address))) {
     throw new Error("Portfolio host did not resolve exclusively to safe public IP addresses.");
   }
+  let overall: ReturnType<typeof setTimeout> | undefined;
   const response = await new Promise<{ status: number; contentType: string; location?: string; html: string }>((resolve, reject) => {
     const request = https.get(check.parsed!, {
       headers: { "User-Agent": "AI-Tathastu-PortfolioAuditor/1.0", Accept: "text/html,application/xhtml+xml" },
@@ -129,12 +138,17 @@ export async function fetchSafeHtml(rawUrl: string, redirectsRemaining = 3): Pro
       res.on("end", () => resolve({ status, contentType, html: Buffer.concat(chunks).toString("utf8") }));
       res.on("error", reject);
     });
+    overall = setTimeout(() => {
+      const err = new Error("Portfolio request timed out.");
+      request.destroy(err);
+      reject(err);
+    }, Math.max(0, deadlineAt - Date.now()));
     request.on("timeout", () => request.destroy(new Error("Portfolio request timed out.")));
     request.on("error", reject);
-  });
+  }).finally(() => clearTimeout(overall));
   if (response.status >= 300 && response.status < 400) {
     if (!response.location || redirectsRemaining === 0) throw new Error("Portfolio redirect could not be followed safely.");
-    return fetchSafeHtml(new URL(response.location, check.parsed).toString(), redirectsRemaining - 1);
+    return fetchSafeHtml(new URL(response.location, check.parsed).toString(), redirectsRemaining - 1, deadlineAt);
   }
   if (response.status < 200 || response.status >= 300) throw new Error(`Portfolio site returned HTTP status ${response.status}`);
   if (!/text\/html|application\/xhtml\+xml/i.test(response.contentType)) throw new Error("Portfolio URL did not return HTML content.");
